@@ -122,24 +122,13 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
   const [expandedBills, setExpandedBills] = useState<Set<number>>(new Set());
   const perPage = 25;
 
-  const toggleBillExpand = (billId: number) => {
-    const wasExpanded = expandedBills.has(billId);
-    setExpandedBills((prev) => {
-      const next = new Set(prev);
-      if (next.has(billId)) next.delete(billId);
-      else next.add(billId);
-      return next;
-    });
-    if (!wasExpanded) {
-      fetchBillNotes(billId);
-    }
-  };
-
   const [billNotes, setBillNotes] = useState<Record<number, string | null>>({});
   const [loadingNotes, setLoadingNotes] = useState<Set<number>>(new Set());
+  const fetchedNotesRef = React.useRef<Set<number>>(new Set());
 
   const fetchBillNotes = useCallback(async (billId: number) => {
-    if (billId in billNotes) return;
+    if (fetchedNotesRef.current.has(billId)) return;
+    fetchedNotesRef.current.add(billId);
     setLoadingNotes((prev) => { const next = new Set(prev); next.add(billId); return next; });
     try {
       const res = await fetch(`/api/sienge/bills?id=${billId}`);
@@ -150,7 +139,23 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     } finally {
       setLoadingNotes((prev) => { const next = new Set(prev); next.delete(billId); return next; });
     }
-  }, [billNotes]);
+  }, []);
+
+  const toggleBillExpand = useCallback((billId: number) => {
+    setExpandedBills((prev) => {
+      const wasExpanded = prev.has(billId);
+      const next = new Set(prev);
+      if (wasExpanded) {
+        next.delete(billId);
+      } else {
+        next.add(billId);
+      }
+      if (!wasExpanded) {
+        setTimeout(() => fetchBillNotes(billId), 0);
+      }
+      return next;
+    });
+  }, [fetchBillNotes]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -162,6 +167,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
       setItems(data.data || []);
       setPage(0);
       setBillNotes({});
+      fetchedNotesRef.current = new Set();
     } catch {
       setItems([]);
     } finally {

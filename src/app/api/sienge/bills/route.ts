@@ -21,13 +21,13 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const url = `${apiUrl}/v1/bills/${billId}`;
+    const url = `${apiUrl}/bills/${billId}`;
     const response = await fetch(url, {
       headers: {
         Authorization: authHeader,
         "Content-Type": "application/json",
       },
-      next: { revalidate: 300 },
+      cache: "no-store",
     });
 
     if (!response.ok) {
