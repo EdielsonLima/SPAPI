@@ -96,6 +96,7 @@ export interface SiengeOutcome {
   billDate: string;
   registeredBy: string;
   registeredDate: string;
+  observation?: string;
   paymentsCategories: SiengeOutcomePaymentCategory[];
   payments: SiengeOutcomePayment[];
   buildingsCosts: SiengeOutcomeBuildingCost[];

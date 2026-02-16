@@ -844,13 +844,11 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
                           <TableRow
-                            className={`hover:bg-slate-50 ${totalParcelas > 1 ? "cursor-pointer" : ""} ${isExpanded ? "bg-blue-50/50" : ""}`}
-                            onClick={() => totalParcelas > 1 && toggleBillExpand(item.billId)}
+                            className={`hover:bg-slate-50 cursor-pointer ${isExpanded ? "bg-blue-50/50" : ""}`}
+                            onClick={() => toggleBillExpand(item.billId)}
                           >
                             <TableCell className="w-[40px] px-2">
-                              {totalParcelas > 1 && (
-                                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
-                              )}
+                              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                             </TableCell>
                             <TableCell className="font-mono text-sm">{item.billId}</TableCell>
                             <TableCell className="text-sm">
@@ -883,60 +881,73 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                               {formatCurrency(item.balanceAmount)}
                             </TableCell>
                           </TableRow>
-                          {isExpanded && totalParcelas > 1 && (
+                          {isExpanded && (
                             <TableRow className="bg-blue-50/30">
                               <TableCell colSpan={colCount} className="p-0">
                                 <div className="px-8 py-3 border-l-4 border-blue-400 ml-4">
-                                  <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
-                                    Parcelas do Titulo {item.billId} — {item.creditorName}
-                                    <Badge variant="secondary" className="text-xs">{totalParcelas} parcelas</Badge>
-                                    <span className="text-slate-400">|</span>
-                                    <span className="font-mono">Total: {formatCurrency(billParcelas.reduce((s, p) => s + (p.balanceAmount || 0), 0))}</span>
-                                  </div>
-                                  <Table>
-                                    <TableHeader className="bg-blue-100/50">
-                                      <TableRow className="border-b border-blue-200/50">
-                                        <TableHead className="text-xs h-8 py-1">Parcela</TableHead>
-                                        <TableHead className="text-xs h-8 py-1">Vencimento</TableHead>
-                                        {isOverdue && <TableHead className="text-xs h-8 py-1">Dias Atraso</TableHead>}
-                                        <TableHead className="text-xs h-8 py-1">Emissao</TableHead>
-                                        <TableHead className="text-xs text-right h-8 py-1">Valor Original</TableHead>
-                                        <TableHead className="text-xs text-right h-8 py-1">Saldo</TableHead>
-                                        <TableHead className="text-xs h-8 py-1">Status</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                      {billParcelas.map((parcela) => {
-                                        const pDays = daysDiff(parcela.dueDate);
-                                        const isPaid = parcela.balanceAmount === 0;
-                                        return (
-                                          <TableRow key={`sub-${parcela.billId}-${parcela.installmentId}`} className="border-b border-blue-100/50">
-                                            <TableCell className="font-mono text-xs py-1.5">{parcela.installmentId}</TableCell>
-                                            <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.dueDate)}</TableCell>
-                                            {isOverdue && (
-                                              <TableCell className="text-xs py-1.5">
-                                                <Badge variant="destructive" className="text-[10px] font-mono">{Math.abs(pDays)}d</Badge>
-                                              </TableCell>
-                                            )}
-                                            <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.issueDate)}</TableCell>
-                                            <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(parcela.originalAmount)}</TableCell>
-                                            <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaid ? "text-green-600" : isOverdue ? "text-red-600" : "text-slate-800"}`}>
-                                              {formatCurrency(parcela.balanceAmount)}
-                                            </TableCell>
-                                            <TableCell className="text-xs py-1.5">
-                                              {isPaid ? (
-                                                <Badge className="bg-green-100 text-green-700 text-[10px]">Pago</Badge>
-                                              ) : parcela.payments && parcela.payments.length > 0 ? (
-                                                <Badge className="bg-amber-100 text-amber-700 text-[10px]">Parcial</Badge>
-                                              ) : (
-                                                <Badge variant="outline" className="text-[10px]">Aberto</Badge>
-                                              )}
-                                            </TableCell>
+                                  {item.observation && (
+                                    <div className="mb-3 text-sm">
+                                      <span className="font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Observacoes:</span>
+                                      <span className="ml-2 text-slate-600">{item.observation}</span>
+                                    </div>
+                                  )}
+                                  {totalParcelas > 1 && (
+                                    <>
+                                      <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
+                                        Parcelas do Titulo {item.billId} — {item.creditorName}
+                                        <Badge variant="secondary" className="text-xs">{totalParcelas} parcelas</Badge>
+                                        <span className="text-slate-400">|</span>
+                                        <span className="font-mono">Total: {formatCurrency(billParcelas.reduce((s, p) => s + (p.balanceAmount || 0), 0))}</span>
+                                      </div>
+                                      <Table>
+                                        <TableHeader className="bg-blue-100/50">
+                                          <TableRow className="border-b border-blue-200/50">
+                                            <TableHead className="text-xs h-8 py-1">Parcela</TableHead>
+                                            <TableHead className="text-xs h-8 py-1">Vencimento</TableHead>
+                                            {isOverdue && <TableHead className="text-xs h-8 py-1">Dias Atraso</TableHead>}
+                                            <TableHead className="text-xs h-8 py-1">Emissao</TableHead>
+                                            <TableHead className="text-xs text-right h-8 py-1">Valor Original</TableHead>
+                                            <TableHead className="text-xs text-right h-8 py-1">Saldo</TableHead>
+                                            <TableHead className="text-xs h-8 py-1">Status</TableHead>
                                           </TableRow>
-                                        );
-                                      })}
-                                    </TableBody>
-                                  </Table>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {billParcelas.map((parcela) => {
+                                            const pDays = daysDiff(parcela.dueDate);
+                                            const isPaid = parcela.balanceAmount === 0;
+                                            return (
+                                              <TableRow key={`sub-${parcela.billId}-${parcela.installmentId}`} className="border-b border-blue-100/50">
+                                                <TableCell className="font-mono text-xs py-1.5">{parcela.installmentId}</TableCell>
+                                                <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.dueDate)}</TableCell>
+                                                {isOverdue && (
+                                                  <TableCell className="text-xs py-1.5">
+                                                    <Badge variant="destructive" className="text-[10px] font-mono">{Math.abs(pDays)}d</Badge>
+                                                  </TableCell>
+                                                )}
+                                                <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.issueDate)}</TableCell>
+                                                <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(parcela.originalAmount)}</TableCell>
+                                                <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaid ? "text-green-600" : isOverdue ? "text-red-600" : "text-slate-800"}`}>
+                                                  {formatCurrency(parcela.balanceAmount)}
+                                                </TableCell>
+                                                <TableCell className="text-xs py-1.5">
+                                                  {isPaid ? (
+                                                    <Badge className="bg-green-100 text-green-700 text-[10px]">Pago</Badge>
+                                                  ) : parcela.payments && parcela.payments.length > 0 ? (
+                                                    <Badge className="bg-amber-100 text-amber-700 text-[10px]">Parcial</Badge>
+                                                  ) : (
+                                                    <Badge variant="outline" className="text-[10px]">Aberto</Badge>
+                                                  )}
+                                                </TableCell>
+                                              </TableRow>
+                                            );
+                                          })}
+                                        </TableBody>
+                                      </Table>
+                                    </>
+                                  )}
+                                  {!item.observation && totalParcelas <= 1 && (
+                                    <div className="text-xs text-slate-400">Nenhuma observacao registrada para este titulo.</div>
+                                  )}
                                 </div>
                               </TableCell>
                             </TableRow>
