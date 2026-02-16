@@ -122,11 +122,36 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
   const [expandedBills, setExpandedBills] = useState<Set<number>>(new Set());
   const perPage = 25;
 
+  const [billNotes, setBillNotes] = useState<Map<number, string | null>>(new Map());
+  const [loadingNotes, setLoadingNotes] = useState<Set<number>>(new Set());
+
+  const fetchBillNotes = useCallback(async (billId: number) => {
+    if (billNotes.has(billId)) return;
+    setLoadingNotes((prev) => new Set(prev).add(billId));
+    try {
+      const res = await fetch(`/api/sienge/bills?billId=${billId}`);
+      const data = await res.json();
+      setBillNotes((prev) => new Map(prev).set(billId, data.notes));
+    } catch {
+      setBillNotes((prev) => new Map(prev).set(billId, null));
+    } finally {
+      setLoadingNotes((prev) => {
+        const next = new Set(prev);
+        next.delete(billId);
+        return next;
+      });
+    }
+  }, [billNotes]);
+
   const toggleBillExpand = (billId: number) => {
     setExpandedBills((prev) => {
       const next = new Set(prev);
-      if (next.has(billId)) next.delete(billId);
-      else next.add(billId);
+      if (next.has(billId)) {
+        next.delete(billId);
+      } else {
+        next.add(billId);
+        fetchBillNotes(billId);
+      }
       return next;
     });
   };
@@ -844,13 +869,11 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
                           <TableRow
-                            className={`hover:bg-slate-50 ${totalParcelas > 1 ? "cursor-pointer" : ""} ${isExpanded ? "bg-blue-50/50" : ""}`}
-                            onClick={() => totalParcelas > 1 && toggleBillExpand(item.billId)}
+                            className={`hover:bg-slate-50 cursor-pointer ${isExpanded ? "bg-blue-50/50" : ""}`}
+                            onClick={() => toggleBillExpand(item.billId)}
                           >
                             <TableCell className="w-[40px] px-2">
-                              {totalParcelas > 1 && (
-                                <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
-                              )}
+                              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
                             </TableCell>
                             <TableCell className="font-mono text-sm">{item.billId}</TableCell>
                             <TableCell className="text-sm">
@@ -883,10 +906,22 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                               {formatCurrency(item.balanceAmount)}
                             </TableCell>
                           </TableRow>
-                          {isExpanded && totalParcelas > 1 && (
+                          {isExpanded && (
                             <TableRow className="bg-blue-50/30">
                               <TableCell colSpan={colCount} className="p-0">
                                 <div className="px-8 py-3 border-l-4 border-blue-400 ml-4">
+                                  {/* Observacoes */}
+                                  <div className="mb-3">
+                                    <span className="text-xs font-semibold text-slate-500">Observacoes: </span>
+                                    {loadingNotes.has(item.billId) ? (
+                                      <span className="text-xs text-slate-400 italic">Carregando...</span>
+                                    ) : billNotes.get(item.billId) ? (
+                                      <span className="text-xs text-slate-700 bg-white/80 rounded px-2 py-1 inline-block mt-1">{billNotes.get(item.billId)}</span>
+                                    ) : (
+                                      <span className="text-xs text-slate-400 italic">Sem observacoes</span>
+                                    )}
+                                  </div>
+                                  {totalParcelas > 1 && (<>
                                   <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
                                     Parcelas do Titulo {item.billId} — {item.creditorName}
                                     <Badge variant="secondary" className="text-xs">{totalParcelas} parcelas</Badge>
@@ -937,6 +972,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                       })}
                                     </TableBody>
                                   </Table>
+                                </>)}
                                 </div>
                               </TableCell>
                             </TableRow>
