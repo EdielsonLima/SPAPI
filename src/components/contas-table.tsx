@@ -131,6 +131,8 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     });
   };
 
+  const [billNotes, setBillNotes] = useState<Record<number, string | null>>({});
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -138,8 +140,27 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}`
       );
       const data = await res.json();
-      setItems(data.data || []);
+      const outcomeItems: SiengeOutcome[] = data.data || [];
+      setItems(outcomeItems);
       setPage(0);
+
+      const uniqueBillIds = Array.from(new Set(outcomeItems.map((i) => i.billId)));
+      const batchSize = 50;
+      const allNotes: Record<number, string | null> = {};
+      for (let i = 0; i < uniqueBillIds.length; i += batchSize) {
+        const batch = uniqueBillIds.slice(i, i + batchSize);
+        try {
+          const notesRes = await fetch(`/api/sienge/bills?ids=${batch.join(",")}`);
+          const notesData = await notesRes.json();
+          if (notesData.notes) {
+            Object.entries(notesData.notes).forEach(([id, note]) => {
+              allNotes[Number(id)] = note as string | null;
+            });
+          }
+        } catch {
+        }
+      }
+      setBillNotes(allNotes);
     } catch {
       setItems([]);
     } finally {
@@ -885,10 +906,10 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                             <TableRow className="bg-blue-50/30">
                               <TableCell colSpan={colCount} className="p-0">
                                 <div className="px-8 py-3 border-l-4 border-blue-400 ml-4">
-                                  {item.observation && (
+                                  {billNotes[item.billId] && (
                                     <div className="mb-3 text-sm">
                                       <span className="font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Observacoes:</span>
-                                      <span className="ml-2 text-slate-600">{item.observation}</span>
+                                      <span className="ml-2 text-slate-600">{billNotes[item.billId]}</span>
                                     </div>
                                   )}
                                   {totalParcelas > 1 && (
@@ -945,7 +966,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                       </Table>
                                     </>
                                   )}
-                                  {!item.observation && totalParcelas <= 1 && (
+                                  {!billNotes[item.billId] && totalParcelas <= 1 && (
                                     <div className="text-xs text-slate-400">Nenhuma observacao registrada para este titulo.</div>
                                   )}
                                 </div>
