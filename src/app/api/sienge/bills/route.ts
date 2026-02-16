@@ -14,41 +14,28 @@ export async function GET(request: NextRequest) {
   const authHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
 
   const { searchParams } = new URL(request.url);
-  const billIds = searchParams.get("ids");
+  const billId = searchParams.get("id");
 
-  if (!billIds) {
-    return NextResponse.json({ error: "Missing ids parameter" }, { status: 400 });
+  if (!billId) {
+    return NextResponse.json({ error: "Missing id parameter" }, { status: 400 });
   }
 
-  const ids = billIds.split(",").map(id => id.trim()).filter(Boolean);
-
   try {
-    const results = await Promise.allSettled(
-      ids.map(async (id) => {
-        const url = `${apiUrl}/v1/bills/${id}`;
-        const response = await fetch(url, {
-          headers: {
-            Authorization: authHeader,
-            "Content-Type": "application/json",
-          },
-          next: { revalidate: 300 },
-        });
-        if (!response.ok) {
-          return { billId: Number(id), notes: null };
-        }
-        const data = await response.json();
-        return { billId: Number(id), notes: data.notes || null };
-      })
-    );
-
-    const notes: Record<number, string | null> = {};
-    results.forEach((result) => {
-      if (result.status === "fulfilled") {
-        notes[result.value.billId] = result.value.notes;
-      }
+    const url = `${apiUrl}/v1/bills/${billId}`;
+    const response = await fetch(url, {
+      headers: {
+        Authorization: authHeader,
+        "Content-Type": "application/json",
+      },
+      next: { revalidate: 300 },
     });
 
-    return NextResponse.json({ notes });
+    if (!response.ok) {
+      return NextResponse.json({ billId: Number(billId), notes: null });
+    }
+
+    const data = await response.json();
+    return NextResponse.json({ billId: Number(billId), notes: data.notes || null });
   } catch (error) {
     console.error("Error fetching bill notes:", error);
     return NextResponse.json(

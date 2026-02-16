@@ -123,15 +123,34 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
   const perPage = 25;
 
   const toggleBillExpand = (billId: number) => {
+    const wasExpanded = expandedBills.has(billId);
     setExpandedBills((prev) => {
       const next = new Set(prev);
       if (next.has(billId)) next.delete(billId);
       else next.add(billId);
       return next;
     });
+    if (!wasExpanded) {
+      fetchBillNotes(billId);
+    }
   };
 
   const [billNotes, setBillNotes] = useState<Record<number, string | null>>({});
+  const [loadingNotes, setLoadingNotes] = useState<Set<number>>(new Set());
+
+  const fetchBillNotes = useCallback(async (billId: number) => {
+    if (billId in billNotes) return;
+    setLoadingNotes((prev) => { const next = new Set(prev); next.add(billId); return next; });
+    try {
+      const res = await fetch(`/api/sienge/bills?id=${billId}`);
+      const data = await res.json();
+      setBillNotes((prev) => ({ ...prev, [billId]: data.notes || null }));
+    } catch {
+      setBillNotes((prev) => ({ ...prev, [billId]: null }));
+    } finally {
+      setLoadingNotes((prev) => { const next = new Set(prev); next.delete(billId); return next; });
+    }
+  }, [billNotes]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -140,27 +159,9 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}`
       );
       const data = await res.json();
-      const outcomeItems: SiengeOutcome[] = data.data || [];
-      setItems(outcomeItems);
+      setItems(data.data || []);
       setPage(0);
-
-      const uniqueBillIds = Array.from(new Set(outcomeItems.map((i) => i.billId)));
-      const batchSize = 50;
-      const allNotes: Record<number, string | null> = {};
-      for (let i = 0; i < uniqueBillIds.length; i += batchSize) {
-        const batch = uniqueBillIds.slice(i, i + batchSize);
-        try {
-          const notesRes = await fetch(`/api/sienge/bills?ids=${batch.join(",")}`);
-          const notesData = await notesRes.json();
-          if (notesData.notes) {
-            Object.entries(notesData.notes).forEach(([id, note]) => {
-              allNotes[Number(id)] = note as string | null;
-            });
-          }
-        } catch {
-        }
-      }
-      setBillNotes(allNotes);
+      setBillNotes({});
     } catch {
       setItems([]);
     } finally {
@@ -906,12 +907,17 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                             <TableRow className="bg-blue-50/30">
                               <TableCell colSpan={colCount} className="p-0">
                                 <div className="px-8 py-3 border-l-4 border-blue-400 ml-4">
-                                  {billNotes[item.billId] && (
+                                  {loadingNotes.has(item.billId) ? (
+                                    <div className="mb-3 text-sm flex items-center gap-2">
+                                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
+                                      <span className="text-slate-400">Carregando observacoes...</span>
+                                    </div>
+                                  ) : billNotes[item.billId] ? (
                                     <div className="mb-3 text-sm">
                                       <span className="font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Observacoes:</span>
                                       <span className="ml-2 text-slate-600">{billNotes[item.billId]}</span>
                                     </div>
-                                  )}
+                                  ) : null}
                                   {totalParcelas > 1 && (
                                     <>
                                       <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
@@ -966,7 +972,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                       </Table>
                                     </>
                                   )}
-                                  {!billNotes[item.billId] && totalParcelas <= 1 && (
+                                  {!loadingNotes.has(item.billId) && !billNotes[item.billId] && totalParcelas <= 1 && (
                                     <div className="text-xs text-slate-400">Nenhuma observacao registrada para este titulo.</div>
                                   )}
                                 </div>
