@@ -30,5 +30,19 @@ src/
 - **Environment Variables**: NEXTAUTH_URL, NEXTAUTH_SECRET, ADMIN_USERNAME, ADMIN_PASSWORD, SIENGE_API_URL, SIENGE_BULK_API_URL, NEXT_PUBLIC_COMPANY_NAME, NEXT_PUBLIC_COMPANY_SUBTITLE, NEXT_PUBLIC_COMPANY_EMAIL_DOMAIN
 - **Default login**: admin / admin
 
+## Key Dependencies
+- **sonner**: Toast notifications
+- **jspdf + jspdf-autotable**: PDF export for data tables
+- **recharts**: Charts on dashboard and contas pages
+
 ## Recent Changes
+- 2026-02-16: Complete UI/UX overhaul
+  - Dashboard: welcome message with real-time clock, 5 clickable financial summary cards, monthly Recharts chart
+  - Sidebar: overdue bills badge (red count), version footer (SPAPI v1.0.0)
+  - Header: breadcrumbs navigation, mobile page title display
+  - Cadastro tables (Empresas, Centros de Custo, Plano Financeiro): refresh button, PDF export, error states with retry, improved skeletons
+  - Contas tables: Sienge connection indicator (green/red dot), toast notifications, error/empty states with retry
+  - Mobile: hamburger menu via Sheet, responsive grids, truncated breadcrumbs
+  - Fixed bill observations API URL (duplicated /v1 path)
+  - On-demand notes fetching (per-bill when expanded) to avoid rate limiting
 - 2026-02-16: Initial Replit setup - configured port 5000, allowed dev origins, set environment variables
