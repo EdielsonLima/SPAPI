@@ -40,6 +40,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  RefreshCw,
 } from "lucide-react";
 import {
   BarChart,
@@ -765,6 +766,10 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
               <Button onClick={fetchData} disabled={loading} size="sm">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Filter className="h-4 w-4 mr-1" />}
                 Buscar
+              </Button>
+              <Button onClick={fetchData} disabled={loading} size="sm" variant="outline">
+                <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
+                Atualizar
               </Button>
             </div>
 
