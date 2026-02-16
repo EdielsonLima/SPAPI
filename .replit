@@ -17,3 +17,36 @@ NEXT_PUBLIC_COMPANY_SUBTITLE = "Sistema de Gestao"
 NEXT_PUBLIC_COMPANY_EMAIL_DOMAIN = "empresa.com.br"
 SIENGE_API_URL = "https://api.sienge.com.br/SLUG/public/api/v1"
 SIENGE_BULK_API_URL = "https://api.sienge.com.br/SLUG/public/api/bulk-data/v1"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Start application"
+
+[[workflows.workflow]]
+name = "Start application"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace && npm run dev"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["npm", "run", "start"]
+build = ["npm", "run", "build"]
