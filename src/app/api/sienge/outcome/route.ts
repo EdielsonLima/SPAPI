@@ -2,16 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
-const SIENGE_BASE = process.env.SIENGE_BULK_API_URL!;
-const SIENGE_USERNAME = process.env.SIENGE_USERNAME!;
-const SIENGE_PASSWORD = process.env.SIENGE_PASSWORD!;
-const authHeader = "Basic " + Buffer.from(`${SIENGE_USERNAME}:${SIENGE_PASSWORD}`).toString("base64");
-
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const SIENGE_BASE = process.env.SIENGE_BULK_API_URL!;
+  const SIENGE_USERNAME = process.env.SIENGE_USERNAME!;
+  const SIENGE_PASSWORD = process.env.SIENGE_PASSWORD!;
+  const authHeader = "Basic " + Buffer.from(`${SIENGE_USERNAME}:${SIENGE_PASSWORD}`).toString("base64");
 
   const { searchParams } = new URL(request.url);
   const startDate = searchParams.get("startDate") || "2015-01-01";

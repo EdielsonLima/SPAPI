@@ -1,11 +1,10 @@
-const SIENGE_API_URL = process.env.SIENGE_API_URL!;
-const SIENGE_USERNAME = process.env.SIENGE_USERNAME!;
-const SIENGE_PASSWORD = process.env.SIENGE_PASSWORD!;
-
-const authHeader = "Basic " + Buffer.from(`${SIENGE_USERNAME}:${SIENGE_PASSWORD}`).toString("base64");
-
 export async function siengeGet<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
-  const url = new URL(`${SIENGE_API_URL}${endpoint}`);
+  const apiUrl = process.env.SIENGE_API_URL!;
+  const username = process.env.SIENGE_USERNAME!;
+  const password = process.env.SIENGE_PASSWORD!;
+  const authHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+
+  const url = new URL(`${apiUrl}${endpoint}`);
   if (params) {
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
   }
