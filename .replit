@@ -1,0 +1,19 @@
+modules = ["nodejs-20", "web"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+NEXTAUTH_URL = "https://ab885dea-eb1c-4ef4-920a-9e8f2f38ecd1-00-2nb92rx85ahq0.kirk.replit.dev"
+NEXTAUTH_SECRET = "TEYrijHs+rIdPPQvHUtvSaOmjJW85vf9rrUF6+dTLQw="
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "admin"
+NEXT_PUBLIC_COMPANY_NAME = "Nome da Construtora"
+NEXT_PUBLIC_COMPANY_SUBTITLE = "Sistema de Gestao"
+NEXT_PUBLIC_COMPANY_EMAIL_DOMAIN = "empresa.com.br"
+SIENGE_API_URL = "https://api.sienge.com.br/SLUG/public/api/v1"
+SIENGE_BULK_API_URL = "https://api.sienge.com.br/SLUG/public/api/bulk-data/v1"
