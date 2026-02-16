@@ -74,9 +74,10 @@ export default function DashboardPage() {
   const [outcomes, setOutcomes] = useState<SiengeOutcome[]>([]);
   const [loading, setLoading] = useState(true);
   const [outcomeLoading, setOutcomeLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
   useEffect(() => {
+    setCurrentTime(new Date());
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
@@ -170,7 +171,7 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-bold text-slate-800">
           Bem-vindo, {userName}!
         </h1>
-        <p className="text-slate-500 mt-1">{formatDateTime(currentTime)}</p>
+        <p className="text-slate-500 mt-1">{currentTime ? formatDateTime(currentTime) : "\u00A0"}</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
