@@ -886,11 +886,16 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                         ))}
                       </TableRow>
                     ))
-                  : paginatedItems.map((item, idx) => {
+                  : (() => {
+                      const seenExpandedBills = new Set<number>();
+                      return paginatedItems.map((item, idx) => {
                       const days = daysDiff(item.dueDate);
                       const billParcelas = parcelasByBill.get(item.billId) || [];
                       const totalParcelas = billParcelas.length;
                       const isExpanded = expandedBills.has(item.billId);
+                      const isFirstOfBill = !seenExpandedBills.has(item.billId);
+                      if (isExpanded) seenExpandedBills.add(item.billId);
+                      const showExpandedPanel = isExpanded && isFirstOfBill;
                       const colCount = isOverdue ? 12 : 11;
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
@@ -932,7 +937,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                               {formatCurrency(item.balanceAmount)}
                             </TableCell>
                           </TableRow>
-                          {isExpanded && (
+                          {showExpandedPanel && (
                             <TableRow className="bg-blue-50/30">
                               <TableCell colSpan={colCount} className="p-0">
                                 <div className="px-8 py-3 border-l-4 border-blue-400 ml-4">
@@ -1001,7 +1006,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                       </Table>
                                     </>
                                   )}
-                                  {!loadingNotes.has(item.billId) && !billNotes[item.billId] && totalParcelas <= 1 && (
+                                  {!loadingNotes.has(item.billId) && !billNotes[item.billId] && (
                                     <div className="text-xs text-slate-400">Nenhuma observacao registrada para este titulo.</div>
                                   )}
                                 </div>
@@ -1010,7 +1015,8 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                           )}
                         </React.Fragment>
                       );
-                    })}
+                    });
+                    })()}
                 {!loading && error && (
                   <TableRow>
                     <TableCell colSpan={isOverdue ? 12 : 11} className="text-center py-12">
