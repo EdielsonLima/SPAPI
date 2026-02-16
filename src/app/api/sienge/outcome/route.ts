@@ -2,6 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 
+interface CacheEntry {
+  data: unknown;
+  timestamp: number;
+}
+
+const cache = new Map<string, CacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000;
+
+function getCached(key: string): unknown | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data;
+}
+
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -14,8 +32,14 @@ export async function GET(request: NextRequest) {
   const authHeader = "Basic " + Buffer.from(`${SIENGE_USERNAME}:${SIENGE_PASSWORD}`).toString("base64");
 
   const { searchParams } = new URL(request.url);
-  const startDate = searchParams.get("startDate") || "2015-01-01";
-  const endDate = searchParams.get("endDate") || "2040-12-31";
+  const startDate = searchParams.get("startDate") || "2024-01-01";
+  const endDate = searchParams.get("endDate") || new Date().toISOString().split("T")[0];
+
+  const cacheKey = `outcome:${startDate}:${endDate}`;
+  const cached = getCached(cacheKey);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   const url = new URL(`${SIENGE_BASE}/outcome`);
   url.searchParams.set("startDate", startDate);
@@ -32,7 +56,7 @@ export async function GET(request: NextRequest) {
         Authorization: authHeader,
         "Content-Type": "application/json",
       },
-      next: { revalidate: 120 },
+      cache: "no-store",
     });
 
     if (!response.ok) {
@@ -40,6 +64,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
+    cache.set(cacheKey, { data, timestamp: Date.now() });
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching outcome:", error);

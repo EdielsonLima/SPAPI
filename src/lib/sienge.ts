@@ -1,3 +1,11 @@
+interface CacheEntry {
+  data: unknown;
+  timestamp: number;
+}
+
+const cache = new Map<string, CacheEntry>();
+const CACHE_TTL = 5 * 60 * 1000;
+
 export async function siengeGet<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
   const apiUrl = process.env.SIENGE_API_URL!;
   const username = process.env.SIENGE_USERNAME!;
@@ -9,17 +17,25 @@ export async function siengeGet<T>(endpoint: string, params?: Record<string, str
     Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
   }
 
+  const cacheKey = url.toString();
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data as T;
+  }
+
   const response = await fetch(url.toString(), {
     headers: {
       Authorization: authHeader,
       "Content-Type": "application/json",
     },
-    next: { revalidate: 60 },
+    cache: "no-store",
   });
 
   if (!response.ok) {
     throw new Error(`Sienge API error: ${response.status} ${response.statusText}`);
   }
 
-  return response.json();
+  const data = await response.json();
+  cache.set(cacheKey, { data, timestamp: Date.now() });
+  return data as T;
 }

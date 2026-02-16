@@ -88,7 +88,8 @@ export function Sidebar() {
   useEffect(() => {
     const today = new Date();
     const endDate = today.toISOString().split("T")[0];
-    fetch(`/api/sienge/outcome?startDate=2015-01-01&endDate=${endDate}`)
+    const startDate = `${today.getFullYear()}-01-01`;
+    fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}`)
       .then((res) => res.json())
       .then((json: { data: SiengeOutcome[] }) => {
         const now = new Date();

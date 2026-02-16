@@ -115,7 +115,9 @@ export default function DashboardPage() {
 
   const fetchOutcomes = useCallback(async () => {
     try {
-      const res = await fetch("/api/sienge/outcome");
+      const year = new Date().getFullYear();
+      const endDate = new Date().toISOString().split("T")[0];
+      const res = await fetch(`/api/sienge/outcome?startDate=${year}-01-01&endDate=${endDate}`);
       if (!res.ok) throw new Error("Erro ao buscar contas");
       const data = await res.json();
       const items: SiengeOutcome[] = Array.isArray(data) ? data : data.data ?? [];
