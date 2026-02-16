@@ -15,8 +15,8 @@ ADMIN_PASSWORD = "admin"
 NEXT_PUBLIC_COMPANY_NAME = "Nome da Construtora"
 NEXT_PUBLIC_COMPANY_SUBTITLE = "Sistema de Gestao"
 NEXT_PUBLIC_COMPANY_EMAIL_DOMAIN = "empresa.com.br"
-SIENGE_API_URL = "https://api.sienge.com.br/SLUG/public/api/v1"
-SIENGE_BULK_API_URL = "https://api.sienge.com.br/SLUG/public/api/bulk-data/v1"
+SIENGE_API_URL = "https://api.sienge.com.br/silvapacker/public/api/v1"
+SIENGE_BULK_API_URL = "https://api.sienge.com.br/silvapacker/public/api/bulk-data/v1"
 
 [workflows]
 runButton = "Project"
