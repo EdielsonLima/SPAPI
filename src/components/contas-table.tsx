@@ -36,6 +36,7 @@ import {
   Loader2,
   X,
   FileText,
+  AlertCircle,
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
@@ -52,6 +53,7 @@ import {
   LabelList,
 } from "recharts";
 import { SiengeOutcome } from "@/types/sienge";
+import { toast } from "sonner";
 
 type SortField =
   | "billId"
@@ -157,12 +159,16 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     });
   }, [fetchBillNotes]);
 
+  const [error, setError] = useState(false);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
       const res = await fetch(
         `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}`
       );
+      if (!res.ok) throw new Error("API error");
       const data = await res.json();
       setItems(data.data || []);
       setPage(0);
@@ -170,6 +176,10 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
       fetchedNotesRef.current = new Set();
     } catch {
       setItems([]);
+      setError(true);
+      toast.error("Erro ao carregar dados do Sienge", {
+        description: "Verifique sua conexao e tente novamente.",
+      });
     } finally {
       setLoading(false);
     }
@@ -503,9 +513,17 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
           <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
           <p className="text-slate-500 mt-1">{subtitle}</p>
         </div>
-        <Badge variant="secondary" className="text-sm py-1">
-          {sorted.length} parcelas
-        </Badge>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 text-xs">
+            <div className={`h-2 w-2 rounded-full ${error ? "bg-red-500" : "bg-emerald-500 animate-pulse"}`} />
+            <span className={error ? "text-red-500" : "text-slate-400"}>
+              {error ? "Sienge offline" : "Sienge conectado"}
+            </span>
+          </div>
+          <Badge variant="secondary" className="text-sm py-1">
+            {sorted.length} parcelas
+          </Badge>
+        </div>
       </div>
 
       {/* Summary Cards */}
@@ -988,10 +1006,36 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                         </React.Fragment>
                       );
                     })}
-                {!loading && paginatedItems.length === 0 && (
+                {!loading && error && (
                   <TableRow>
-                    <TableCell colSpan={isOverdue ? 12 : 11} className="text-center py-8 text-slate-500">
-                      Nenhuma parcela encontrada
+                    <TableCell colSpan={isOverdue ? 12 : 11} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="p-3 bg-red-50 rounded-full">
+                          <AlertCircle className="h-8 w-8 text-red-400" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-700">Erro ao carregar dados</p>
+                          <p className="text-sm text-slate-400 mt-1">Nao foi possivel conectar ao Sienge.</p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={fetchData} className="mt-2">
+                          Tentar novamente
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!loading && !error && paginatedItems.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={isOverdue ? 12 : 11} className="text-center py-12">
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="p-3 bg-slate-100 rounded-full">
+                          <FileText className="h-8 w-8 text-slate-300" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-slate-500">Nenhuma parcela encontrada</p>
+                          <p className="text-sm text-slate-400 mt-1">Ajuste os filtros ou o periodo de busca.</p>
+                        </div>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}

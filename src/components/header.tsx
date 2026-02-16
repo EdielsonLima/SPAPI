@@ -1,6 +1,7 @@
 "use client";
 
 import { signOut, useSession } from "next-auth/react";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,8 +15,18 @@ import { LogOut, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 
+const pathLabels: Record<string, string[]> = {
+  "/dashboard": ["Dashboard"],
+  "/cadastros/empresas": ["Cadastros", "Empresas"],
+  "/cadastros/centros-custo": ["Cadastros", "Centros de Custo"],
+  "/cadastros/plano-financeiro": ["Cadastros", "Plano Financeiro"],
+  "/financeiro/contas-pagar": ["Financeiro", "Contas a Pagar"],
+  "/financeiro/contas-vencidas": ["Financeiro", "Contas Vencidas"],
+};
+
 export function Header() {
   const { data: session } = useSession();
+  const pathname = usePathname();
   const userName = session?.user?.name || "Usuario";
   const initials = userName
     .split(" ")
@@ -23,6 +34,8 @@ export function Header() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
+
+  const breadcrumbSegments = pathLabels[pathname] || [];
 
   return (
     <header className="h-16 border-b bg-white flex items-center justify-between px-4 md:px-6">
@@ -38,7 +51,28 @@ export function Header() {
         </SheetContent>
       </Sheet>
 
-      <div className="flex-1" />
+      <div className="flex-1 flex items-center min-w-0">
+        {breadcrumbSegments.length > 0 && (
+          <>
+            <span className="text-sm font-medium text-slate-700 truncate md:hidden">
+              {breadcrumbSegments[breadcrumbSegments.length - 1]}
+            </span>
+            <nav className="text-sm hidden md:flex items-center gap-1">
+              {breadcrumbSegments.map((segment, index) => {
+                const isLast = index === breadcrumbSegments.length - 1;
+                return (
+                  <span key={index} className="flex items-center gap-1">
+                    {index > 0 && <span className="text-slate-300">{">"}</span>}
+                    <span className={isLast ? "font-medium text-slate-700" : "text-slate-500"}>
+                      {segment}
+                    </span>
+                  </span>
+                );
+              })}
+            </nav>
+          </>
+        )}
+      </div>
 
       {/* User menu */}
       <DropdownMenu>

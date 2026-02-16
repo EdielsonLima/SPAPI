@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { SiengeOutcome } from "@/types/sienge";
 
 interface MenuItem {
   label: string;
@@ -81,7 +82,24 @@ const menuItems: MenuItem[] = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [openSubmenus, setOpenSubmenus] = useState<string[]>(["Cadastros"]);
+  const [overdueCount, setOverdueCount] = useState(0);
   const pathname = usePathname();
+
+  useEffect(() => {
+    const today = new Date();
+    const endDate = today.toISOString().split("T")[0];
+    fetch(`/api/sienge/outcome?startDate=2015-01-01&endDate=${endDate}`)
+      .then((res) => res.json())
+      .then((json: { data: SiengeOutcome[] }) => {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        const count = (json.data || []).filter((item) => {
+          return new Date(item.dueDate) < now && item.balanceAmount > 0;
+        }).length;
+        setOverdueCount(count);
+      })
+      .catch(() => {});
+  }, []);
 
   const toggleSubmenu = (label: string) => {
     setOpenSubmenus((prev) =>
@@ -224,6 +242,11 @@ export function Sidebar() {
                             >
                               {child.icon}
                               <span className="truncate">{child.label}</span>
+                              {child.label === "Contas Vencidas" && overdueCount > 0 && (
+                                <span className="bg-red-500 text-white text-[10px] rounded-full min-w-[18px] h-[18px] flex items-center justify-center ml-auto">
+                                  {overdueCount}
+                                </span>
+                              )}
                             </Link>
                           );
                         })}
@@ -237,6 +260,12 @@ export function Sidebar() {
         </nav>
 
         <Separator className="bg-slate-800" />
+
+        {!collapsed && (
+          <div className="text-[10px] text-slate-500 text-center py-2">
+            SPAPI v1.0.0
+          </div>
+        )}
 
         {/* Toggle */}
         <button

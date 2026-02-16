@@ -13,8 +13,12 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, RefreshCw, FileDown, AlertCircle } from "lucide-react";
 import { SiengePaymentCategory } from "@/types/sienge";
+import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const tipoConta: Record<string, string> = {
   R: "Receita",
@@ -25,16 +29,20 @@ const tipoConta: Record<string, string> = {
 export default function PlanoFinanceiroPage() {
   const [items, setItems] = useState<SiengePaymentCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(false);
     try {
       const res = await fetch("/api/sienge/financial-plans");
       const data = await res.json();
       setItems(Array.isArray(data) ? data : []);
     } catch {
       setItems([]);
+      setError(true);
+      toast.error("Erro ao carregar dados do Sienge");
     } finally {
       setLoading(false);
     }
@@ -43,6 +51,31 @@ export default function PlanoFinanceiroPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const handleRefresh = () => {
+    toast.info("Atualizando dados...");
+    fetchData();
+  };
+
+  const exportPDF = () => {
+    const doc = new jsPDF();
+    doc.text("Plano Financeiro - Silva Packer", 14, 16);
+    autoTable(doc, {
+      startY: 22,
+      head: [["Codigo", "Nome", "Tipo Conta", "Redutora", "Ativa", "Adiantamento", "Imposto"]],
+      body: filtered.map((item) => [
+        item.id,
+        item.name || "",
+        tipoConta[item.tpConta || ""] || item.tpConta || "",
+        item.flRedutora === "S" ? "Sim" : "Nao",
+        item.flAtiva === "S" ? "Sim" : "Nao",
+        item.flAdiantamento === "S" ? "Sim" : "Nao",
+        item.flImposto === "S" ? "Sim" : "Nao",
+      ]),
+    });
+    doc.save("plano-financeiro.pdf");
+    toast.success("PDF exportado com sucesso!");
+  };
 
   const filtered = items.filter(
     (item) =>
@@ -68,98 +101,121 @@ export default function PlanoFinanceiroPage() {
 
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-4">
-          <div className="relative max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Buscar por codigo ou nome..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10"
-            />
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Buscar por codigo ou nome..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={handleRefresh}>
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Atualizar
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportPDF}>
+                <FileDown className="h-4 w-4 mr-1" />
+                Exportar PDF
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="px-0 pb-0">
-          <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
-            <Table>
-              <TableHeader className="bg-slate-100/80">
-                <TableRow>
-                  <TableHead className="w-32">Codigo</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead className="w-28">Tipo Conta</TableHead>
-                  <TableHead className="w-24">Redutora</TableHead>
-                  <TableHead className="w-24">Ativa</TableHead>
-                  <TableHead className="w-28">Adiantamento</TableHead>
-                  <TableHead className="w-24">Imposto</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {loading
-                  ? Array.from({ length: 8 }).map((_, i) => (
-                      <TableRow key={i}>
-                        {Array.from({ length: 7 }).map((_, j) => (
-                          <TableCell key={j}>
-                            <Skeleton className="h-4 w-full" />
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  : filtered.map((item) => (
-                      <TableRow key={item.id} className="hover:bg-slate-50">
-                        <TableCell className="font-mono text-sm">
-                          {item.id}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {item.name}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="text-xs">
-                            {tipoConta[item.tpConta || ""] || item.tpConta || "-"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={item.flRedutora === "S" ? "destructive" : "secondary"}
-                            className="text-xs"
-                          >
-                            {item.flRedutora === "S" ? "Sim" : "Nao"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge
-                            className={`text-xs ${
-                              item.flAtiva === "S"
-                                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
-                                : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {item.flAtiva === "S" ? "Sim" : "Nao"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-xs">
-                            {item.flAdiantamento === "S" ? "Sim" : "Nao"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="secondary" className="text-xs">
-                            {item.flImposto === "S" ? "Sim" : "Nao"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                {!loading && filtered.length === 0 && (
+          {error && !loading ? (
+            <div className="flex flex-col items-center justify-center py-16 px-4">
+              <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+              <h3 className="text-lg font-semibold text-slate-800 mb-1">Erro ao carregar dados</h3>
+              <p className="text-slate-500 mb-4 text-center">Nao foi possivel conectar ao Sienge. Verifique sua conexao.</p>
+              <Button variant="outline" onClick={fetchData}>Tentar novamente</Button>
+            </div>
+          ) : (
+            <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
+              <Table>
+                <TableHeader className="bg-slate-100/80">
                   <TableRow>
-                    <TableCell
-                      colSpan={7}
-                      className="text-center py-8 text-slate-500"
-                    >
-                      Nenhuma categoria encontrada
-                    </TableCell>
+                    <TableHead className="w-32">Codigo</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead className="w-28">Tipo Conta</TableHead>
+                    <TableHead className="w-24">Redutora</TableHead>
+                    <TableHead className="w-24">Ativa</TableHead>
+                    <TableHead className="w-28">Adiantamento</TableHead>
+                    <TableHead className="w-24">Imposto</TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {loading
+                    ? Array.from({ length: 8 }).map((_, i) => (
+                        <TableRow key={i}>
+                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                          <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+                        </TableRow>
+                      ))
+                    : filtered.map((item) => (
+                        <TableRow key={item.id} className="hover:bg-slate-50">
+                          <TableCell className="font-mono text-sm">
+                            {item.id}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {item.name}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="text-xs">
+                              {tipoConta[item.tpConta || ""] || item.tpConta || "-"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={item.flRedutora === "S" ? "destructive" : "secondary"}
+                              className="text-xs"
+                            >
+                              {item.flRedutora === "S" ? "Sim" : "Nao"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              className={`text-xs ${
+                                item.flAtiva === "S"
+                                  ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
+                                  : "bg-slate-100 text-slate-500"
+                              }`}
+                            >
+                              {item.flAtiva === "S" ? "Sim" : "Nao"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">
+                              {item.flAdiantamento === "S" ? "Sim" : "Nao"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary" className="text-xs">
+                              {item.flImposto === "S" ? "Sim" : "Nao"}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  {!loading && filtered.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={7}
+                        className="text-center py-8 text-slate-500"
+                      >
+                        Nenhuma categoria encontrada
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
