@@ -81,6 +81,8 @@ export default function PedidosPage() {
   const [orderItems, setOrderItems] = useState<Record<number, SiengePurchaseOrderItem[]>>({});
   const [loadingItems, setLoadingItems] = useState<Set<number>>(new Set());
   const [deliverySchedules, setDeliverySchedules] = useState<Record<string, SiengeDeliverySchedule[]>>({});
+  const [orderDeliveryStatus, setOrderDeliveryStatus] = useState<Record<number, string>>({});
+  const [loadingDeliveryStatus, setLoadingDeliveryStatus] = useState(false);
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
   const currentYear = new Date().getFullYear();
@@ -154,6 +156,7 @@ export default function PedidosPage() {
 
   const handleRefresh = () => {
     toast.info("Atualizando pedidos...");
+    setOrderDeliveryStatus({});
     fetchOrders();
   };
 
@@ -225,6 +228,41 @@ export default function PedidosPage() {
   }, [search, filterCompany, filterCostCenter]);
 
   const paginatedItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  const paginatedIds = paginatedItems.map((o) => o.id).join(",");
+  useEffect(() => {
+    if (!paginatedIds) return;
+    const ids = paginatedIds.split(",").map(Number);
+    const idsToFetch = ids.filter((id) => !(id in orderDeliveryStatus));
+    if (idsToFetch.length === 0) return;
+
+    const fetchBatch = async () => {
+      setLoadingDeliveryStatus(true);
+      const batchSize = 5;
+      for (let i = 0; i < idsToFetch.length; i += batchSize) {
+        const batch = idsToFetch.slice(i, i + batchSize);
+        const results = await Promise.all(
+          batch.map(async (id) => {
+            try {
+              const res = await fetch(`/api/sienge/purchase-orders/${id}/delivery-status`);
+              if (!res.ok) return { id, status: "error" };
+              const data = await res.json();
+              return { id, status: data.status };
+            } catch {
+              return { id, status: "error" };
+            }
+          })
+        );
+        setOrderDeliveryStatus((prev) => {
+          const next = { ...prev };
+          results.forEach(({ id, status }) => { next[id] = status; });
+          return next;
+        });
+      }
+      setLoadingDeliveryStatus(false);
+    };
+    fetchBatch();
+  }, [paginatedIds]);
 
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape" });
@@ -381,6 +419,7 @@ export default function PedidosPage() {
                       <TableHead className="w-24">Fornecedor</TableHead>
                       <TableHead className="w-24">Centro Custo</TableHead>
                       <TableHead className="w-28">Status</TableHead>
+                      <TableHead className="w-28">Entrega</TableHead>
                       <TableHead className="text-right w-32">Valor Total</TableHead>
                       <TableHead className="w-8"></TableHead>
                     </TableRow>
@@ -389,7 +428,7 @@ export default function PedidosPage() {
                     {loading
                       ? Array.from({ length: 8 }).map((_, i) => (
                           <TableRow key={i}>
-                            {Array.from({ length: 8 }).map((_, j) => (
+                            {Array.from({ length: 9 }).map((_, j) => (
                               <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                             ))}
                           </TableRow>
@@ -418,6 +457,21 @@ export default function PedidosPage() {
                               <TableCell>
                                 {getStatusBadge(order.status, order.authorized, order.disapproved)}
                               </TableCell>
+                              <TableCell>
+                                {!(order.id in orderDeliveryStatus) ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                                ) : orderDeliveryStatus[order.id] === "complete" ? (
+                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs gap-1"><PackageCheck className="h-3 w-3" />Entregue</Badge>
+                                ) : orderDeliveryStatus[order.id] === "partial" ? (
+                                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs gap-1"><Truck className="h-3 w-3" />Parcial</Badge>
+                                ) : orderDeliveryStatus[order.id] === "pending" ? (
+                                  <Badge variant="secondary" className="text-xs gap-1"><Clock className="h-3 w-3" />Aguardando</Badge>
+                                ) : orderDeliveryStatus[order.id] === "none" ? (
+                                  <span className="text-slate-400 text-xs">-</span>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">-</span>
+                                )}
+                              </TableCell>
                               <TableCell className="text-right font-mono text-sm font-medium">
                                 {formatCurrency(order.totalAmount)}
                               </TableCell>
@@ -427,7 +481,7 @@ export default function PedidosPage() {
                             </TableRow>
                             {expandedOrder === order.id && (
                               <TableRow className="bg-blue-50/30">
-                                <TableCell colSpan={8} className="p-0">
+                                <TableCell colSpan={9} className="p-0">
                                   <div className="px-8 py-4 border-l-4 border-blue-400 ml-4 space-y-2">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                                       <div>
@@ -584,7 +638,7 @@ export default function PedidosPage() {
                         ))}
                     {!loading && filtered.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                           Nenhum pedido encontrado
                         </TableCell>
                       </TableRow>
