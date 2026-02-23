@@ -26,7 +26,7 @@ import {
   Clock,
   ChevronDown,
 } from "lucide-react";
-import { SiengePurchaseOrder } from "@/types/sienge";
+import { SiengePurchaseOrder, SiengePurchaseOrderItem } from "@/types/sienge";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -65,6 +65,8 @@ export default function PedidosPage() {
   const [totalCount, setTotalCount] = useState(0);
   const [offset, setOffset] = useState(0);
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [orderItems, setOrderItems] = useState<Record<number, SiengePurchaseOrderItem[]>>({});
+  const [loadingItems, setLoadingItems] = useState<Set<number>>(new Set());
   const limit = 200;
   const year = new Date().getFullYear();
 
@@ -98,6 +100,32 @@ export default function PedidosPage() {
   const handleRefresh = () => {
     toast.info("Atualizando pedidos...");
     fetchOrders();
+  };
+
+  const toggleExpand = async (orderId: number) => {
+    if (expandedOrder === orderId) {
+      setExpandedOrder(null);
+      return;
+    }
+    setExpandedOrder(orderId);
+    if (!orderItems[orderId]) {
+      setLoadingItems((prev) => new Set(prev).add(orderId));
+      try {
+        const res = await fetch(`/api/sienge/purchase-orders/${orderId}/items`);
+        if (!res.ok) throw new Error("API error");
+        const data = await res.json();
+        setOrderItems((prev) => ({ ...prev, [orderId]: data.results || [] }));
+      } catch {
+        toast.error(`Erro ao carregar itens do pedido ${orderId}`);
+        setOrderItems((prev) => ({ ...prev, [orderId]: [] }));
+      } finally {
+        setLoadingItems((prev) => {
+          const next = new Set(prev);
+          next.delete(orderId);
+          return next;
+        });
+      }
+    }
   };
 
   const filtered = orders.filter(
@@ -246,7 +274,7 @@ export default function PedidosPage() {
                           <React.Fragment key={order.id}>
                             <TableRow
                               className={`hover:bg-slate-50 cursor-pointer ${expandedOrder === order.id ? "bg-blue-50/50" : ""}`}
-                              onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+                              onClick={() => toggleExpand(order.id)}
                             >
                               <TableCell className="font-mono text-sm font-medium">
                                 {order.formattedPurchaseOrderId}
@@ -333,9 +361,53 @@ export default function PedidosPage() {
                                         <span className="ml-2 text-slate-600">{order.internalNotes}</span>
                                       </div>
                                     )}
-                                    {!order.notes && !order.internalNotes && (
-                                      <div className="text-xs text-slate-400">Nenhuma observacao registrada para este pedido.</div>
-                                    )}
+
+                                    <div className="mt-3">
+                                      <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
+                                        Itens do Pedido
+                                        {orderItems[order.id] && (
+                                          <Badge variant="secondary" className="text-xs">{orderItems[order.id].length} {orderItems[order.id].length === 1 ? "item" : "itens"}</Badge>
+                                        )}
+                                      </div>
+                                      {loadingItems.has(order.id) ? (
+                                        <div className="space-y-2">
+                                          <Skeleton className="h-4 w-full" />
+                                          <Skeleton className="h-4 w-3/4" />
+                                          <Skeleton className="h-4 w-1/2" />
+                                        </div>
+                                      ) : orderItems[order.id] && orderItems[order.id].length > 0 ? (
+                                        <div className="overflow-x-auto">
+                                          <Table className="text-xs">
+                                            <TableHeader>
+                                              <TableRow className="bg-slate-100/50">
+                                                <TableHead className="text-xs py-1.5 w-12">#</TableHead>
+                                                <TableHead className="text-xs py-1.5 w-24">Codigo</TableHead>
+                                                <TableHead className="text-xs py-1.5">Descricao</TableHead>
+                                                <TableHead className="text-xs py-1.5 w-16">Unid</TableHead>
+                                                <TableHead className="text-xs py-1.5 text-right w-20">Qtde</TableHead>
+                                                <TableHead className="text-xs py-1.5 text-right w-28">Preco Unit.</TableHead>
+                                                <TableHead className="text-xs py-1.5 text-right w-28">Valor Liq.</TableHead>
+                                              </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                              {orderItems[order.id].map((item) => (
+                                                <TableRow key={item.itemNumber} className="hover:bg-white/50">
+                                                  <TableCell className="py-1.5 font-mono">{item.itemNumber}</TableCell>
+                                                  <TableCell className="py-1.5 font-mono">{item.resourceCode}</TableCell>
+                                                  <TableCell className="py-1.5">{item.resourceDescription}</TableCell>
+                                                  <TableCell className="py-1.5">{item.unitOfMeasure}</TableCell>
+                                                  <TableCell className="py-1.5 text-right font-mono">{item.quantity.toLocaleString("pt-BR")}</TableCell>
+                                                  <TableCell className="py-1.5 text-right font-mono">{formatCurrency(item.unitPrice)}</TableCell>
+                                                  <TableCell className="py-1.5 text-right font-mono font-medium">{formatCurrency(item.netPrice)}</TableCell>
+                                                </TableRow>
+                                              ))}
+                                            </TableBody>
+                                          </Table>
+                                        </div>
+                                      ) : orderItems[order.id] ? (
+                                        <div className="text-xs text-slate-400">Nenhum item encontrado para este pedido.</div>
+                                      ) : null}
+                                    </div>
                                   </div>
                                 </TableCell>
                               </TableRow>

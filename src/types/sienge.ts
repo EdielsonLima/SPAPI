@@ -143,3 +143,28 @@ export interface SiengePurchaseOrder {
   notes: string;
   paymentCondition: string;
 }
+
+export interface SiengePurchaseOrderItem {
+  itemNumber: number;
+  buildingCostDatabaseId: number;
+  resourceId: number;
+  resourceDescription: string;
+  resourceCode: string;
+  resourceReference: string;
+  detailId: number | null;
+  detailDescription: string;
+  trademarkId: number | null;
+  trademarkDescription: string;
+  unitOfMeasure: string;
+  quantity: number;
+  unitPrice: number;
+  netPrice: number;
+  freightUnitPrice: number;
+  discount: number;
+  discountPercentage: number;
+  increasePercentage: number;
+  icmsTaxPercentage: number;
+  ipiTaxPercentage: number;
+  issTaxPercentage: number;
+  notes: string;
+}
