@@ -91,6 +91,7 @@ export default function PedidosPage() {
   const [filterMonth, setFilterMonth] = useState<string>("all");
   const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
   const [costCenters, setCostCenters] = useState<{ id: number; name: string; idCompany: number }[]>([]);
+  const [supplierNames, setSupplierNames] = useState<Record<number, string>>({});
   const limit = 200;
 
   const getDateRange = useCallback(() => {
@@ -264,6 +265,32 @@ export default function PedidosPage() {
     fetchBatch();
   }, [paginatedIds]);
 
+  useEffect(() => {
+    if (orders.length === 0) return;
+    const uniqueIds = [...new Set(orders.map((o) => o.supplierId))].filter((id) => !(id in supplierNames));
+    if (uniqueIds.length === 0) return;
+    const fetchNames = async () => {
+      const batchSize = 50;
+      for (let i = 0; i < uniqueIds.length; i += batchSize) {
+        const batch = uniqueIds.slice(i, i + batchSize);
+        try {
+          const res = await fetch(`/api/sienge/creditors?ids=${batch.join(",")}`);
+          if (res.ok) {
+            const data = await res.json();
+            setSupplierNames((prev) => ({ ...prev, ...data }));
+          }
+        } catch {}
+      }
+    };
+    fetchNames();
+  }, [orders]);
+
+  const costCenterMap = React.useMemo(() => {
+    const map: Record<number, string> = {};
+    costCenters.forEach((cc) => { map[cc.id] = cc.name; });
+    return map;
+  }, [costCenters]);
+
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape" });
     doc.text("Pedidos de Compra - Silva Packer", 14, 16);
@@ -416,8 +443,8 @@ export default function PedidosPage() {
                       <TableHead className="w-20">Pedido</TableHead>
                       <TableHead className="w-24">Data</TableHead>
                       <TableHead>Comprador</TableHead>
-                      <TableHead className="w-24">Fornecedor</TableHead>
-                      <TableHead className="w-24">Centro Custo</TableHead>
+                      <TableHead>Fornecedor</TableHead>
+                      <TableHead>Centro Custo</TableHead>
                       <TableHead className="w-28">Status</TableHead>
                       <TableHead className="w-28">Entrega</TableHead>
                       <TableHead className="text-right w-32">Valor Total</TableHead>
@@ -448,11 +475,13 @@ export default function PedidosPage() {
                               <TableCell className="text-sm font-medium">
                                 {order.buyerId || "-"}
                               </TableCell>
-                              <TableCell className="font-mono text-sm">
-                                {order.supplierId}
+                              <TableCell className="text-sm">
+                                <span className="font-mono text-xs text-slate-400">{order.supplierId}</span>{" "}
+                                <span className="truncate">{supplierNames[order.supplierId] || ""}</span>
                               </TableCell>
-                              <TableCell className="font-mono text-sm">
-                                {order.costCenterId}
+                              <TableCell className="text-sm">
+                                <span className="font-mono text-xs text-slate-400">{order.costCenterId}</span>{" "}
+                                <span className="truncate">{costCenterMap[order.costCenterId] || ""}</span>
                               </TableCell>
                               <TableCell>
                                 {getStatusBadge(order.status, order.authorized, order.disapproved)}
