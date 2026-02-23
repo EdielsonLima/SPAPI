@@ -168,3 +168,11 @@ export interface SiengePurchaseOrderItem {
   issTaxPercentage: number;
   notes: string;
 }
+
+export interface SiengeDeliverySchedule {
+  deliveryScheduleNumber: number;
+  sheduledDate: string;
+  sheduledQuantity: number;
+  deliveredQuantity: number;
+  openQuantity: number;
+}

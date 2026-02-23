@@ -42,6 +42,9 @@ src/
   - Full-featured table with search, pagination (client-side 20/page + server-side 200/batch), PDF export
   - Summary cards (Valor Total, Autorizados, Pendentes)
   - Expandable rows showing order details (empresa, obra, frete, desconto, observacoes)
+  - On-demand items loading with delivery schedule status per item
+  - Delivery control: Previsao, Entregue, Pendente columns with status badges (Entregue/Parcial/Aguardando)
+  - API routes for /purchase-orders/{id}/items and /purchase-orders/{id}/items/{itemNumber}/delivery-schedules
   - Status badges (Autorizado/Pendente/Reprovado) with icons
   - Breadcrumbs updated in header
   - Middleware updated to protect /suprimentos/* routes

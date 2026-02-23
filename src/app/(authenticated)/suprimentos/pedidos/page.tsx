@@ -25,8 +25,11 @@ import {
   XCircle,
   Clock,
   ChevronDown,
+  Loader2,
+  Truck,
+  PackageCheck,
 } from "lucide-react";
-import { SiengePurchaseOrder, SiengePurchaseOrderItem } from "@/types/sienge";
+import { SiengePurchaseOrder, SiengePurchaseOrderItem, SiengeDeliverySchedule } from "@/types/sienge";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -67,6 +70,7 @@ export default function PedidosPage() {
   const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
   const [orderItems, setOrderItems] = useState<Record<number, SiengePurchaseOrderItem[]>>({});
   const [loadingItems, setLoadingItems] = useState<Set<number>>(new Set());
+  const [deliverySchedules, setDeliverySchedules] = useState<Record<string, SiengeDeliverySchedule[]>>({});
   const limit = 200;
   const year = new Date().getFullYear();
 
@@ -114,7 +118,26 @@ export default function PedidosPage() {
         const res = await fetch(`/api/sienge/purchase-orders/${orderId}/items`);
         if (!res.ok) throw new Error("API error");
         const data = await res.json();
-        setOrderItems((prev) => ({ ...prev, [orderId]: data.results || [] }));
+        const items: SiengePurchaseOrderItem[] = data.results || [];
+        setOrderItems((prev) => ({ ...prev, [orderId]: items }));
+
+        const deliveryPromises = items.map(async (item) => {
+          const key = `${orderId}-${item.itemNumber}`;
+          try {
+            const dRes = await fetch(`/api/sienge/purchase-orders/${orderId}/items/${item.itemNumber}/delivery-schedules`);
+            if (!dRes.ok) return { key, schedules: [] };
+            const dData = await dRes.json();
+            return { key, schedules: dData.results || [] };
+          } catch {
+            return { key, schedules: [] };
+          }
+        });
+        const deliveryResults = await Promise.all(deliveryPromises);
+        setDeliverySchedules((prev) => {
+          const next = { ...prev };
+          deliveryResults.forEach(({ key, schedules }) => { next[key] = schedules; });
+          return next;
+        });
       } catch {
         toast.error(`Erro ao carregar itens do pedido ${orderId}`);
         setOrderItems((prev) => ({ ...prev, [orderId]: [] }));
@@ -387,10 +410,29 @@ export default function PedidosPage() {
                                                 <TableHead className="text-xs py-1.5 text-right w-20">Qtde</TableHead>
                                                 <TableHead className="text-xs py-1.5 text-right w-28">Preco Unit.</TableHead>
                                                 <TableHead className="text-xs py-1.5 text-right w-28">Valor Liq.</TableHead>
+                                                <TableHead className="text-xs py-1.5 text-center w-24">Previsao</TableHead>
+                                                <TableHead className="text-xs py-1.5 text-right w-20">Entregue</TableHead>
+                                                <TableHead className="text-xs py-1.5 text-right w-20">Pendente</TableHead>
+                                                <TableHead className="text-xs py-1.5 text-center w-28">Situacao</TableHead>
                                               </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                              {orderItems[order.id].map((item) => (
+                                              {orderItems[order.id].map((item) => {
+                                                const dsKey = `${order.id}-${item.itemNumber}`;
+                                                const schedules = deliverySchedules[dsKey];
+                                                const totalScheduled = schedules?.reduce((s, d) => s + d.sheduledQuantity, 0) ?? 0;
+                                                const totalDelivered = schedules?.reduce((s, d) => s + d.deliveredQuantity, 0) ?? 0;
+                                                const totalOpen = schedules?.reduce((s, d) => s + d.openQuantity, 0) ?? 0;
+                                                const nextDate = schedules?.filter(d => d.openQuantity > 0).sort((a, b) => a.sheduledDate.localeCompare(b.sheduledDate))[0]?.sheduledDate;
+
+                                                let deliveryStatus: "loading" | "complete" | "partial" | "pending" | "none" = "none";
+                                                if (!schedules) deliveryStatus = "loading";
+                                                else if (schedules.length === 0) deliveryStatus = "none";
+                                                else if (totalOpen === 0 && totalDelivered > 0) deliveryStatus = "complete";
+                                                else if (totalDelivered > 0 && totalOpen > 0) deliveryStatus = "partial";
+                                                else deliveryStatus = "pending";
+
+                                                return (
                                                 <TableRow key={item.itemNumber} className="hover:bg-white/50">
                                                   <TableCell className="py-1.5 font-mono">{item.itemNumber}</TableCell>
                                                   <TableCell className="py-1.5 font-mono">{item.resourceCode}</TableCell>
@@ -399,8 +441,33 @@ export default function PedidosPage() {
                                                   <TableCell className="py-1.5 text-right font-mono">{item.quantity.toLocaleString("pt-BR")}</TableCell>
                                                   <TableCell className="py-1.5 text-right font-mono">{formatCurrency(item.unitPrice)}</TableCell>
                                                   <TableCell className="py-1.5 text-right font-mono font-medium">{formatCurrency(item.netPrice)}</TableCell>
+                                                  <TableCell className="py-1.5 text-center font-mono">
+                                                    {deliveryStatus === "loading" ? (
+                                                      <Loader2 className="h-3 w-3 animate-spin text-slate-400 mx-auto" />
+                                                    ) : nextDate ? formatDate(nextDate) : "-"}
+                                                  </TableCell>
+                                                  <TableCell className="py-1.5 text-right font-mono">
+                                                    {deliveryStatus === "loading" ? "-" : totalDelivered.toLocaleString("pt-BR")}
+                                                  </TableCell>
+                                                  <TableCell className="py-1.5 text-right font-mono">
+                                                    {deliveryStatus === "loading" ? "-" : totalOpen.toLocaleString("pt-BR")}
+                                                  </TableCell>
+                                                  <TableCell className="py-1.5 text-center">
+                                                    {deliveryStatus === "loading" ? (
+                                                      <Loader2 className="h-3 w-3 animate-spin text-slate-400 mx-auto" />
+                                                    ) : deliveryStatus === "complete" ? (
+                                                      <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-[10px] gap-0.5"><PackageCheck className="h-3 w-3" />Entregue</Badge>
+                                                    ) : deliveryStatus === "partial" ? (
+                                                      <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-[10px] gap-0.5"><Truck className="h-3 w-3" />Parcial</Badge>
+                                                    ) : deliveryStatus === "pending" ? (
+                                                      <Badge variant="secondary" className="text-[10px] gap-0.5"><Clock className="h-3 w-3" />Aguardando</Badge>
+                                                    ) : (
+                                                      <span className="text-slate-400">-</span>
+                                                    )}
+                                                  </TableCell>
                                                 </TableRow>
-                                              ))}
+                                                );
+                                              })}
                                             </TableBody>
                                           </Table>
                                         </div>
