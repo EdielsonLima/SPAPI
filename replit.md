@@ -15,7 +15,7 @@ A Next.js 14 management system (Sistema de Gestao) for a construction company, i
 ```
 src/
   app/             - Next.js App Router pages & API routes
-    (authenticated)/ - Protected routes (dashboard, cadastros, financeiro)
+    (authenticated)/ - Protected routes (dashboard, cadastros, financeiro, suprimentos)
     api/           - API endpoints (auth, sienge proxy)
     login/         - Login page
   components/      - React components (UI + feature components)
@@ -36,6 +36,15 @@ src/
 - **recharts**: Charts on dashboard and contas pages
 
 ## Recent Changes
+- 2026-02-23: Added Suprimentos section with Pedidos de Compra page
+  - New sidebar section "Suprimentos" with "Pedidos" sub-item
+  - API proxy route for /purchase-orders endpoint with pagination support
+  - Full-featured table with search, pagination (client-side 20/page + server-side 200/batch), PDF export
+  - Summary cards (Valor Total, Autorizados, Pendentes)
+  - Expandable rows showing order details (empresa, obra, frete, desconto, observacoes)
+  - Status badges (Autorizado/Pendente/Reprovado) with icons
+  - Breadcrumbs updated in header
+  - Middleware updated to protect /suprimentos/* routes
 - 2026-02-16: Complete UI/UX overhaul
   - Dashboard: welcome message with real-time clock, 5 clickable financial summary cards, monthly Recharts chart
   - Sidebar: overdue bills badge (red count), version footer (SPAPI v1.0.0)

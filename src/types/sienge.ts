@@ -105,3 +105,41 @@ export interface SiengeOutcome {
 export interface SiengeOutcomeResponse {
   data: SiengeOutcome[];
 }
+
+export interface SiengePurchaseOrder {
+  id: number;
+  formattedPurchaseOrderId: string;
+  status: string;
+  consistent: string;
+  authorized: boolean;
+  disapproved: boolean;
+  deliveryLate: boolean;
+  supplierId: number;
+  buildingId: number;
+  buyerId: string;
+  date: string;
+  salesRepresentativeId: number | null;
+  internalNotes: string;
+  costCenterId: number;
+  departamentId: number | null;
+  companyBillId: number;
+  transporterId: number | null;
+  forecastDocumentId: string;
+  forecastBillId: number | null;
+  indexerId: number;
+  discount: number;
+  increase: number;
+  totalAmount: number;
+  createdBy: string;
+  createdAt: string;
+  modifiedBy: string;
+  modifiedAt: string;
+  authorizedAt: string | null;
+  sentDate: string | null;
+  freightType: string;
+  itemsFreightAmount: number;
+  freightAmount: number;
+  totalFreight: number;
+  notes: string;
+  paymentCondition: string;
+}

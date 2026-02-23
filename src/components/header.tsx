@@ -22,6 +22,7 @@ const pathLabels: Record<string, string[]> = {
   "/cadastros/plano-financeiro": ["Cadastros", "Plano Financeiro"],
   "/financeiro/contas-pagar": ["Financeiro", "Contas a Pagar"],
   "/financeiro/contas-vencidas": ["Financeiro", "Contas Vencidas"],
+  "/suprimentos/pedidos": ["Suprimentos", "Pedidos"],
 };
 
 export function Header() {

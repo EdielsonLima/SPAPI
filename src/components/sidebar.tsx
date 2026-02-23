@@ -17,6 +17,8 @@ import {
   DollarSign,
   Receipt,
   AlertTriangle,
+  Package,
+  ShoppingCart,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -74,6 +76,17 @@ const menuItems: MenuItem[] = [
         label: "Contas Vencidas",
         href: "/financeiro/contas-vencidas",
         icon: <AlertTriangle className="h-4 w-4" />,
+      },
+    ],
+  },
+  {
+    label: "Suprimentos",
+    icon: <Package className="h-5 w-5" />,
+    children: [
+      {
+        label: "Pedidos",
+        href: "/suprimentos/pedidos",
+        icon: <ShoppingCart className="h-4 w-4" />,
       },
     ],
   },
