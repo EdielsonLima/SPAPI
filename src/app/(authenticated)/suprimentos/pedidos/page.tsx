@@ -10,6 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -86,8 +88,8 @@ export default function PedidosPage() {
   const [deliveryRefreshKey, setDeliveryRefreshKey] = useState(0);
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
-  const [filterDelivery, setFilterDelivery] = useState<string>("all");
-  const [filterStatus, setFilterStatus] = useState<string>("pendente");
+  const [filterDelivery, setFilterDelivery] = useState<string[]>([]);
+  const [filterStatus, setFilterStatus] = useState<string[]>(["pendente"]);
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const [filterYear, setFilterYear] = useState<string>(String(currentYear));
@@ -231,11 +233,11 @@ export default function PedidosPage() {
     const matchesCompany = filterCompany === "all" || costCenters.filter(cc => cc.idCompany === Number(filterCompany)).some(cc => cc.id === o.costCenterId);
     const matchesCostCenter = filterCostCenter === "all" || o.costCenterId === Number(filterCostCenter);
     const ds = orderDeliveryStatus[o.id];
-    const matchesDelivery = filterDelivery === "all" || ds === filterDelivery || (filterDelivery !== "all" && ds === "error");
-    let matchesStatus = true;
-    if (filterStatus === "autorizado") matchesStatus = o.authorized === true;
-    else if (filterStatus === "pendente") matchesStatus = !o.authorized && !o.disapproved;
-    else if (filterStatus === "reprovado") matchesStatus = o.disapproved === true;
+    const matchesDelivery = filterDelivery.length === 0 || (ds && filterDelivery.includes(ds)) || (ds === "error");
+    let orderStatus = "pendente";
+    if (o.disapproved) orderStatus = "reprovado";
+    else if (o.authorized) orderStatus = "autorizado";
+    const matchesStatus = filterStatus.length === 0 || filterStatus.includes(orderStatus);
     return matchesSearch && matchesCompany && matchesCostCenter && matchesDelivery && matchesStatus;
   });
 
@@ -406,18 +408,35 @@ export default function PedidosPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[160px]">
-                <CheckCircle2 className="h-4 w-4 mr-1 text-slate-400" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Status</SelectItem>
-                <SelectItem value="pendente">Pendente</SelectItem>
-                <SelectItem value="autorizado">Autorizado</SelectItem>
-                <SelectItem value="reprovado">Reprovado</SelectItem>
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="w-[160px] justify-start text-left font-normal">
+                  <CheckCircle2 className="h-4 w-4 mr-1 text-slate-400 shrink-0" />
+                  <span className="truncate">
+                    {filterStatus.length === 0 ? "Todos Status" : filterStatus.length === 3 ? "Todos Status" : filterStatus.map(s => s === "pendente" ? "Pend." : s === "autorizado" ? "Aut." : "Repr.").join(", ")}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[180px] p-2" align="start">
+                {[
+                  { value: "pendente", label: "Pendente" },
+                  { value: "autorizado", label: "Autorizado" },
+                  { value: "reprovado", label: "Reprovado" },
+                ].map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-100 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={filterStatus.includes(opt.value)}
+                      onCheckedChange={(checked) => {
+                        setFilterStatus((prev) =>
+                          checked ? [...prev, opt.value] : prev.filter((v) => v !== opt.value)
+                        );
+                      }}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </PopoverContent>
+            </Popover>
             <Select value={filterCompany} onValueChange={setFilterCompany}>
               <SelectTrigger className="w-[220px]">
                 <Building2 className="h-4 w-4 mr-1 text-slate-400" />
@@ -442,19 +461,36 @@ export default function PedidosPage() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={filterDelivery} onValueChange={setFilterDelivery}>
-              <SelectTrigger className="w-[170px]">
-                <Truck className="h-4 w-4 mr-1 text-slate-400" />
-                <SelectValue placeholder="Entrega" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas Entregas</SelectItem>
-                <SelectItem value="complete">Entregue</SelectItem>
-                <SelectItem value="partial">Parcial</SelectItem>
-                <SelectItem value="pending">Aguardando</SelectItem>
-                <SelectItem value="none">Sem previsao</SelectItem>
-              </SelectContent>
-            </Select>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="w-[170px] justify-start text-left font-normal">
+                  <Truck className="h-4 w-4 mr-1 text-slate-400 shrink-0" />
+                  <span className="truncate">
+                    {filterDelivery.length === 0 ? "Todas Entregas" : filterDelivery.length === 4 ? "Todas Entregas" : filterDelivery.map(s => s === "complete" ? "Entregue" : s === "partial" ? "Parcial" : s === "pending" ? "Aguard." : "S/prev.").join(", ")}
+                  </span>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[180px] p-2" align="start">
+                {[
+                  { value: "complete", label: "Entregue" },
+                  { value: "partial", label: "Parcial" },
+                  { value: "pending", label: "Aguardando" },
+                  { value: "none", label: "Sem previsao" },
+                ].map((opt) => (
+                  <label key={opt.value} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-slate-100 cursor-pointer text-sm">
+                    <Checkbox
+                      checked={filterDelivery.includes(opt.value)}
+                      onCheckedChange={(checked) => {
+                        setFilterDelivery((prev) =>
+                          checked ? [...prev, opt.value] : prev.filter((v) => v !== opt.value)
+                        );
+                      }}
+                    />
+                    {opt.label}
+                  </label>
+                ))}
+              </PopoverContent>
+            </Popover>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4 mr-1" />
