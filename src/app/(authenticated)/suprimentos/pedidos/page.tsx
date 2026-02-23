@@ -4,6 +4,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -28,6 +35,8 @@ import {
   Loader2,
   Truck,
   PackageCheck,
+  Building2,
+  Filter,
 } from "lucide-react";
 import { SiengePurchaseOrder, SiengePurchaseOrderItem, SiengeDeliverySchedule } from "@/types/sienge";
 import { toast } from "sonner";
@@ -71,6 +80,10 @@ export default function PedidosPage() {
   const [orderItems, setOrderItems] = useState<Record<number, SiengePurchaseOrderItem[]>>({});
   const [loadingItems, setLoadingItems] = useState<Set<number>>(new Set());
   const [deliverySchedules, setDeliverySchedules] = useState<Record<string, SiengeDeliverySchedule[]>>({});
+  const [filterCompany, setFilterCompany] = useState<string>("all");
+  const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
+  const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
+  const [costCenters, setCostCenters] = useState<{ id: number; name: string }[]>([]);
   const limit = 200;
   const year = new Date().getFullYear();
 
@@ -100,6 +113,26 @@ export default function PedidosPage() {
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  useEffect(() => {
+    const loadFilters = async () => {
+      try {
+        const [compRes, ccRes] = await Promise.all([
+          fetch("/api/sienge/companies?limit=200&offset=0"),
+          fetch("/api/sienge/cost-centers?limit=200&offset=0"),
+        ]);
+        if (compRes.ok) {
+          const compData = await compRes.json();
+          setCompanies((compData.results || []).sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)));
+        }
+        if (ccRes.ok) {
+          const ccData = await ccRes.json();
+          setCostCenters((ccData.results || []).sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name)));
+        }
+      } catch {}
+    };
+    loadFilters();
+  }, []);
 
   const handleRefresh = () => {
     toast.info("Atualizando pedidos...");
@@ -151,15 +184,19 @@ export default function PedidosPage() {
     }
   };
 
-  const filtered = orders.filter(
-    (o) =>
+  const filtered = orders.filter((o) => {
+    const matchesSearch =
+      !search ||
       o.formattedPurchaseOrderId?.toLowerCase().includes(search.toLowerCase()) ||
       o.buyerId?.toLowerCase().includes(search.toLowerCase()) ||
       String(o.supplierId).includes(search) ||
       String(o.id).includes(search) ||
       o.notes?.toLowerCase().includes(search.toLowerCase()) ||
-      o.internalNotes?.toLowerCase().includes(search.toLowerCase())
-  );
+      o.internalNotes?.toLowerCase().includes(search.toLowerCase());
+    const matchesCompany = filterCompany === "all" || o.buildingId === Number(filterCompany);
+    const matchesCostCenter = filterCostCenter === "all" || o.costCenterId === Number(filterCostCenter);
+    return matchesSearch && matchesCompany && matchesCostCenter;
+  });
 
   const pageSize = 20;
   const totalPages = Math.ceil(filtered.length / pageSize);
@@ -167,7 +204,7 @@ export default function PedidosPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search]);
+  }, [search, filterCompany, filterCostCenter]);
 
   const paginatedItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -248,6 +285,30 @@ export default function PedidosPage() {
                 className="pl-10"
               />
             </div>
+            <Select value={filterCompany} onValueChange={setFilterCompany}>
+              <SelectTrigger className="w-[220px]">
+                <Building2 className="h-4 w-4 mr-1 text-slate-400" />
+                <SelectValue placeholder="Empresa" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas Empresas</SelectItem>
+                {companies.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterCostCenter} onValueChange={setFilterCostCenter}>
+              <SelectTrigger className="w-[240px]">
+                <Filter className="h-4 w-4 mr-1 text-slate-400" />
+                <SelectValue placeholder="Centro de Custo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Centros de Custo</SelectItem>
+                {costCenters.map((c) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4 mr-1" />
