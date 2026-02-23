@@ -251,26 +251,22 @@ export default function PedidosPage() {
 
     const fetchBatch = async () => {
       setLoadingDeliveryStatus(true);
-      const batchSize = 5;
-      for (let i = 0; i < idsToFetch.length; i += batchSize) {
-        const batch = idsToFetch.slice(i, i + batchSize);
-        const results = await Promise.all(
-          batch.map(async (id) => {
-            try {
-              const res = await fetch(`/api/sienge/purchase-orders/${id}/delivery-status`);
-              if (!res.ok) return { id, status: "error" };
-              const data = await res.json();
-              return { id, status: data.status };
-            } catch {
-              return { id, status: "error" };
-            }
-          })
-        );
-        setOrderDeliveryStatus((prev) => {
-          const next = { ...prev };
-          results.forEach(({ id, status }) => { next[id] = status; });
-          return next;
-        });
+      for (let i = 0; i < idsToFetch.length; i++) {
+        const id = idsToFetch[i];
+        try {
+          const res = await fetch(`/api/sienge/purchase-orders/${id}/delivery-status`);
+          if (!res.ok) {
+            setOrderDeliveryStatus((prev) => ({ ...prev, [id]: "error" }));
+          } else {
+            const data = await res.json();
+            setOrderDeliveryStatus((prev) => ({ ...prev, [id]: data.status }));
+          }
+        } catch {
+          setOrderDeliveryStatus((prev) => ({ ...prev, [id]: "error" }));
+        }
+        if (i < idsToFetch.length - 1) {
+          await new Promise((r) => setTimeout(r, 500));
+        }
       }
       setLoadingDeliveryStatus(false);
     };

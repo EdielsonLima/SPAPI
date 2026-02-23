@@ -24,30 +24,26 @@ export async function GET(
       return NextResponse.json({ status: "none", totalItems: 0, delivered: 0, pending: 0 });
     }
 
-    const schedulePromises = items.map(async (item) => {
+    let totalDelivered = 0;
+    let totalOpen = 0;
+    let hasSchedules = false;
+
+    for (const item of items) {
       try {
         const data = await siengeGet<SiengeListResponse<SiengeDeliverySchedule>>(
           `/purchase-orders/${params.id}/items/${item.itemNumber}/delivery-schedules`,
           { limit: "200", offset: "0" }
         );
-        return data.results || [];
+        const schedules = data.results || [];
+        schedules.forEach((s) => {
+          hasSchedules = true;
+          totalDelivered += s.deliveredQuantity;
+          totalOpen += s.openQuantity;
+        });
       } catch {
-        return [];
+        // skip failed item
       }
-    });
-
-    const allSchedules = await Promise.all(schedulePromises);
-    let totalDelivered = 0;
-    let totalOpen = 0;
-    let hasSchedules = false;
-
-    allSchedules.forEach((schedules) => {
-      schedules.forEach((s) => {
-        hasSchedules = true;
-        totalDelivered += s.deliveredQuantity;
-        totalOpen += s.openQuantity;
-      });
-    });
+    }
 
     let status = "none";
     if (!hasSchedules) status = "none";
