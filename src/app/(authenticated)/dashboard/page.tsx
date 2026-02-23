@@ -331,7 +331,7 @@ export default function DashboardPage() {
                   }
                 />
                 <Tooltip
-                  formatter={(value: number) => [formatCurrency.format(value), "Total"]}
+                  formatter={(value?: number) => [formatCurrency.format(value ?? 0), "Total"]}
                   labelFormatter={(label: string) => `Mês: ${label}`}
                   contentStyle={{ borderRadius: "8px", fontSize: "13px" }}
                 />
