@@ -37,6 +37,7 @@ import {
   PackageCheck,
   Building2,
   Filter,
+  CalendarDays,
 } from "lucide-react";
 import { SiengePurchaseOrder, SiengePurchaseOrderItem, SiengeDeliverySchedule } from "@/types/sienge";
 import { toast } from "sonner";
@@ -52,8 +53,8 @@ function formatCurrency(value: number) {
 
 function formatDate(dateStr: string) {
   if (!dateStr) return "-";
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("pt-BR");
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return `${String(d).padStart(2, "0")}/${String(m).padStart(2, "0")}/${y}`;
 }
 
 function getStatusBadge(status: string, authorized: boolean, disapproved: boolean) {
@@ -82,17 +83,34 @@ export default function PedidosPage() {
   const [deliverySchedules, setDeliverySchedules] = useState<Record<string, SiengeDeliverySchedule[]>>({});
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1;
+  const [filterYear, setFilterYear] = useState<string>(String(currentYear));
+  const [filterMonth, setFilterMonth] = useState<string>("all");
   const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
   const [costCenters, setCostCenters] = useState<{ id: number; name: string; idCompany: number }[]>([]);
   const limit = 200;
-  const year = new Date().getFullYear();
+
+  const getDateRange = useCallback(() => {
+    const y = Number(filterYear);
+    if (filterMonth === "all") {
+      return { startDate: `${y}-01-01`, endDate: `${y}-12-31` };
+    }
+    const m = Number(filterMonth);
+    const lastDay = new Date(y, m, 0).getDate();
+    return {
+      startDate: `${y}-${String(m).padStart(2, "0")}-01`,
+      endDate: `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+    };
+  }, [filterYear, filterMonth]);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
+      const { startDate, endDate } = getDateRange();
       const res = await fetch(
-        `/api/sienge/purchase-orders?limit=${limit}&offset=${offset}&startDate=${year}-01-01&endDate=${year}-12-31`
+        `/api/sienge/purchase-orders?limit=${limit}&offset=${offset}&startDate=${startDate}&endDate=${endDate}`
       );
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
@@ -108,7 +126,7 @@ export default function PedidosPage() {
     } finally {
       setLoading(false);
     }
-  }, [offset, year]);
+  }, [offset, getDateRange]);
 
   useEffect(() => {
     fetchOrders();
@@ -212,7 +230,7 @@ export default function PedidosPage() {
     const doc = new jsPDF({ orientation: "landscape" });
     doc.text("Pedidos de Compra - Silva Packer", 14, 16);
     doc.setFontSize(10);
-    doc.text(`Periodo: ${year}`, 14, 22);
+    doc.text(`Periodo: ${filterYear}${filterMonth !== "all" ? "/" + String(filterMonth).padStart(2, "0") : ""}`, 14, 22);
     autoTable(doc, {
       startY: 28,
       head: [["Pedido", "Data", "Comprador", "Fornecedor", "Centro Custo", "Status", "Valor Total"]],
@@ -227,7 +245,7 @@ export default function PedidosPage() {
       ]),
       styles: { fontSize: 8 },
     });
-    doc.save(`pedidos-compra-${year}.pdf`);
+    doc.save(`pedidos-compra-${filterYear}${filterMonth !== "all" ? "-" + String(filterMonth).padStart(2, "0") : ""}.pdf`);
     toast.success("PDF exportado com sucesso!");
   };
 
@@ -244,7 +262,7 @@ export default function PedidosPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Pedidos de Compra</h1>
           <p className="text-slate-500 mt-1">
-            Pedidos de compra registrados no Sienge — {year}
+            Pedidos de compra registrados no Sienge — {filterYear}{filterMonth !== "all" ? `/${String(filterMonth).padStart(2, "0")}` : ""}
           </p>
         </div>
         <Badge variant="secondary" className="text-sm">
@@ -285,6 +303,28 @@ export default function PedidosPage() {
                 className="pl-10"
               />
             </div>
+            <Select value={filterYear} onValueChange={(v) => { setFilterYear(v); setOffset(0); }}>
+              <SelectTrigger className="w-[110px]">
+                <CalendarDays className="h-4 w-4 mr-1 text-slate-400" />
+                <SelectValue placeholder="Ano" />
+              </SelectTrigger>
+              <SelectContent>
+                {Array.from({ length: 6 }, (_, i) => currentYear - i).map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterMonth} onValueChange={(v) => { setFilterMonth(v); setOffset(0); }}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Mes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Meses</SelectItem>
+                {["Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"].map((name, i) => (
+                  <SelectItem key={i + 1} value={String(i + 1)}>{name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Select value={filterCompany} onValueChange={setFilterCompany}>
               <SelectTrigger className="w-[220px]">
                 <Building2 className="h-4 w-4 mr-1 text-slate-400" />
