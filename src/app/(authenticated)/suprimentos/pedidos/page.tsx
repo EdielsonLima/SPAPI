@@ -82,8 +82,11 @@ export default function PedidosPage() {
   const [loadingItems, setLoadingItems] = useState<Set<number>>(new Set());
   const [deliverySchedules, setDeliverySchedules] = useState<Record<string, SiengeDeliverySchedule[]>>({});
   const [deliveriesAttended, setDeliveriesAttended] = useState<Record<number, SiengeDeliveryAttended[]>>({});
+  const [orderDeliveryStatus, setOrderDeliveryStatus] = useState<Record<number, string>>({});
+  const [deliveryRefreshKey, setDeliveryRefreshKey] = useState(0);
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
+  const [filterDelivery, setFilterDelivery] = useState<string>("all");
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const [filterYear, setFilterYear] = useState<string>(String(currentYear));
@@ -156,6 +159,8 @@ export default function PedidosPage() {
 
   const handleRefresh = () => {
     toast.info("Atualizando pedidos...");
+    setOrderDeliveryStatus({});
+    setDeliveryRefreshKey((k) => k + 1);
     fetchOrders();
   };
 
@@ -224,7 +229,9 @@ export default function PedidosPage() {
       o.internalNotes?.toLowerCase().includes(search.toLowerCase());
     const matchesCompany = filterCompany === "all" || costCenters.filter(cc => cc.idCompany === Number(filterCompany)).some(cc => cc.id === o.costCenterId);
     const matchesCostCenter = filterCostCenter === "all" || o.costCenterId === Number(filterCostCenter);
-    return matchesSearch && matchesCompany && matchesCostCenter;
+    const ds = orderDeliveryStatus[o.id];
+    const matchesDelivery = filterDelivery === "all" || ds === filterDelivery || (filterDelivery !== "all" && ds === "error");
+    return matchesSearch && matchesCompany && matchesCostCenter && matchesDelivery;
   });
 
   const pageSize = 20;
@@ -233,9 +240,41 @@ export default function PedidosPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, filterCompany, filterCostCenter]);
+  }, [search, filterCompany, filterCostCenter, filterDelivery]);
 
   const paginatedItems = filtered.slice((page - 1) * pageSize, page * pageSize);
+
+  const paginatedIds = paginatedItems.map((o) => o.id).join(",");
+  useEffect(() => {
+    if (!paginatedIds) return;
+    const ids = paginatedIds.split(",").map(Number);
+    const idsToFetch = ids.filter((id) => !(id in orderDeliveryStatus));
+    if (idsToFetch.length === 0) return;
+
+    let cancelled = false;
+    const fetchSequential = async () => {
+      for (let i = 0; i < idsToFetch.length; i++) {
+        if (cancelled) break;
+        const id = idsToFetch[i];
+        try {
+          const res = await fetch(`/api/sienge/purchase-orders/${id}/delivery-status`);
+          if (!res.ok) {
+            setOrderDeliveryStatus((prev) => ({ ...prev, [id]: "error" }));
+          } else {
+            const data = await res.json();
+            setOrderDeliveryStatus((prev) => ({ ...prev, [id]: data.status }));
+          }
+        } catch {
+          setOrderDeliveryStatus((prev) => ({ ...prev, [id]: "error" }));
+        }
+        if (i < idsToFetch.length - 1 && !cancelled) {
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+    };
+    fetchSequential();
+    return () => { cancelled = true; };
+  }, [paginatedIds, deliveryRefreshKey]);
 
   useEffect(() => {
     if (orders.length === 0) return;
@@ -386,6 +425,19 @@ export default function PedidosPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={filterDelivery} onValueChange={setFilterDelivery}>
+              <SelectTrigger className="w-[170px]">
+                <Truck className="h-4 w-4 mr-1 text-slate-400" />
+                <SelectValue placeholder="Entrega" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas Entregas</SelectItem>
+                <SelectItem value="complete">Entregue</SelectItem>
+                <SelectItem value="partial">Parcial</SelectItem>
+                <SelectItem value="pending">Aguardando</SelectItem>
+                <SelectItem value="none">Sem previsao</SelectItem>
+              </SelectContent>
+            </Select>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handleRefresh}>
                 <RefreshCw className="h-4 w-4 mr-1" />
@@ -418,7 +470,7 @@ export default function PedidosPage() {
                       <TableHead>Fornecedor</TableHead>
                       <TableHead>Centro Custo</TableHead>
                       <TableHead className="w-28">Status</TableHead>
-
+                      <TableHead className="w-28">Entrega</TableHead>
                       <TableHead className="text-right w-32">Valor Total</TableHead>
                       <TableHead className="w-8"></TableHead>
                     </TableRow>
@@ -427,7 +479,7 @@ export default function PedidosPage() {
                     {loading
                       ? Array.from({ length: 8 }).map((_, i) => (
                           <TableRow key={i}>
-                            {Array.from({ length: 8 }).map((_, j) => (
+                            {Array.from({ length: 9 }).map((_, j) => (
                               <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                             ))}
                           </TableRow>
@@ -458,6 +510,21 @@ export default function PedidosPage() {
                               <TableCell>
                                 {getStatusBadge(order.status, order.authorized, order.disapproved)}
                               </TableCell>
+                              <TableCell>
+                                {!(order.id in orderDeliveryStatus) ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />
+                                ) : orderDeliveryStatus[order.id] === "complete" ? (
+                                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100 text-xs gap-1"><PackageCheck className="h-3 w-3" />Entregue</Badge>
+                                ) : orderDeliveryStatus[order.id] === "partial" ? (
+                                  <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-xs gap-1"><Truck className="h-3 w-3" />Parcial</Badge>
+                                ) : orderDeliveryStatus[order.id] === "pending" ? (
+                                  <Badge variant="secondary" className="text-xs gap-1"><Clock className="h-3 w-3" />Aguardando</Badge>
+                                ) : orderDeliveryStatus[order.id] === "none" ? (
+                                  <span className="text-slate-400 text-xs">-</span>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">-</span>
+                                )}
+                              </TableCell>
                               <TableCell className="text-right font-mono text-sm font-medium">
                                 {formatCurrency(order.totalAmount)}
                               </TableCell>
@@ -467,7 +534,7 @@ export default function PedidosPage() {
                             </TableRow>
                             {expandedOrder === order.id && (
                               <TableRow className="bg-blue-50/30">
-                                <TableCell colSpan={8} className="p-0">
+                                <TableCell colSpan={9} className="p-0">
                                   <div className="px-8 py-4 border-l-4 border-blue-400 ml-4 space-y-2">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
                                       <div>
@@ -633,7 +700,7 @@ export default function PedidosPage() {
                         ))}
                     {!loading && filtered.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-slate-500">
+                        <TableCell colSpan={9} className="text-center py-8 text-slate-500">
                           Nenhum pedido encontrado
                         </TableCell>
                       </TableRow>
