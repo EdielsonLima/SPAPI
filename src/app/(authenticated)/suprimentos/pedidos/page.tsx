@@ -385,7 +385,7 @@ export default function PedidosPage() {
                 <SelectValue placeholder="Ano" />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: 6 }, (_, i) => currentYear - i).map((y) => (
+                {Array.from({ length: currentYear - 2025 + 1 }, (_, i) => currentYear - i).map((y) => (
                   <SelectItem key={y} value={String(y)}>{y}</SelectItem>
                 ))}
               </SelectContent>
