@@ -83,7 +83,7 @@ export default function PedidosPage() {
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
   const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
-  const [costCenters, setCostCenters] = useState<{ id: number; name: string }[]>([]);
+  const [costCenters, setCostCenters] = useState<{ id: number; name: string; idCompany: number }[]>([]);
   const limit = 200;
   const year = new Date().getFullYear();
 
@@ -193,7 +193,7 @@ export default function PedidosPage() {
       String(o.id).includes(search) ||
       o.notes?.toLowerCase().includes(search.toLowerCase()) ||
       o.internalNotes?.toLowerCase().includes(search.toLowerCase());
-    const matchesCompany = filterCompany === "all" || o.buildingId === Number(filterCompany);
+    const matchesCompany = filterCompany === "all" || costCenters.filter(cc => cc.idCompany === Number(filterCompany)).some(cc => cc.id === o.costCenterId);
     const matchesCostCenter = filterCostCenter === "all" || o.costCenterId === Number(filterCostCenter);
     return matchesSearch && matchesCompany && matchesCostCenter;
   });
