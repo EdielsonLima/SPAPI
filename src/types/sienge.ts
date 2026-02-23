@@ -176,3 +176,14 @@ export interface SiengeDeliverySchedule {
   deliveredQuantity: number;
   openQuantity: number;
 }
+
+export interface SiengeDeliveryAttended {
+  purchaseOrderId: number;
+  purchaseOrderItemNumber: number;
+  deliveryItemPurchaseOrderNumber: number;
+  purchaseOrderItemAttendedNumber: number;
+  sequentialNumber: number;
+  invoiceItemNumber: number;
+  deliveryDate: string;
+  quantityDelivery: number;
+}

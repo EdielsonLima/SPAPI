@@ -39,7 +39,7 @@ import {
   Filter,
   CalendarDays,
 } from "lucide-react";
-import { SiengePurchaseOrder, SiengePurchaseOrderItem, SiengeDeliverySchedule } from "@/types/sienge";
+import { SiengePurchaseOrder, SiengePurchaseOrderItem, SiengeDeliverySchedule, SiengeDeliveryAttended } from "@/types/sienge";
 import { toast } from "sonner";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -81,6 +81,7 @@ export default function PedidosPage() {
   const [orderItems, setOrderItems] = useState<Record<number, SiengePurchaseOrderItem[]>>({});
   const [loadingItems, setLoadingItems] = useState<Set<number>>(new Set());
   const [deliverySchedules, setDeliverySchedules] = useState<Record<string, SiengeDeliverySchedule[]>>({});
+  const [deliveriesAttended, setDeliveriesAttended] = useState<Record<number, SiengeDeliveryAttended[]>>({});
   const [orderDeliveryStatus, setOrderDeliveryStatus] = useState<Record<number, string>>({});
   const [loadingDeliveryStatus, setLoadingDeliveryStatus] = useState(false);
   const [filterCompany, setFilterCompany] = useState<string>("all");
@@ -204,6 +205,15 @@ export default function PedidosPage() {
           return next;
         });
       }
+    }
+    if (!deliveriesAttended[orderId]) {
+      try {
+        const daRes = await fetch(`/api/sienge/purchase-invoices/deliveries-attended?purchaseOrderId=${orderId}`);
+        if (daRes.ok) {
+          const daData = await daRes.json();
+          setDeliveriesAttended((prev) => ({ ...prev, [orderId]: daData.results || [] }));
+        }
+      } catch {}
     }
   };
 
@@ -610,6 +620,7 @@ export default function PedidosPage() {
                                                 <TableHead className="text-xs py-1.5 text-right w-28">Preco Unit.</TableHead>
                                                 <TableHead className="text-xs py-1.5 text-right w-28">Valor Liq.</TableHead>
                                                 <TableHead className="text-xs py-1.5 text-center w-24">Previsao</TableHead>
+                                                <TableHead className="text-xs py-1.5 text-center w-24">Dt. Entrega</TableHead>
                                                 <TableHead className="text-xs py-1.5 text-right w-20">Entregue</TableHead>
                                                 <TableHead className="text-xs py-1.5 text-right w-20">Pendente</TableHead>
                                                 <TableHead className="text-xs py-1.5 text-center w-28">Situacao</TableHead>
@@ -623,6 +634,11 @@ export default function PedidosPage() {
                                                 const totalDelivered = schedules?.reduce((s, d) => s + d.deliveredQuantity, 0) ?? 0;
                                                 const totalOpen = schedules?.reduce((s, d) => s + d.openQuantity, 0) ?? 0;
                                                 const nextDate = schedules?.filter(d => d.openQuantity > 0).sort((a, b) => a.sheduledDate.localeCompare(b.sheduledDate))[0]?.sheduledDate;
+
+                                                const itemDeliveries = (deliveriesAttended[order.id] || [])
+                                                  .filter((da) => da.purchaseOrderItemNumber === item.itemNumber)
+                                                  .sort((a, b) => b.deliveryDate.localeCompare(a.deliveryDate));
+                                                const lastDeliveryDate = itemDeliveries[0]?.deliveryDate;
 
                                                 let deliveryStatus: "loading" | "complete" | "partial" | "pending" | "none" = "none";
                                                 if (!schedules) deliveryStatus = "loading";
@@ -644,6 +660,9 @@ export default function PedidosPage() {
                                                     {deliveryStatus === "loading" ? (
                                                       <Loader2 className="h-3 w-3 animate-spin text-slate-400 mx-auto" />
                                                     ) : nextDate ? formatDate(nextDate) : "-"}
+                                                  </TableCell>
+                                                  <TableCell className="py-1.5 text-center font-mono">
+                                                    {lastDeliveryDate ? formatDate(lastDeliveryDate) : "-"}
                                                   </TableCell>
                                                   <TableCell className="py-1.5 text-right font-mono">
                                                     {deliveryStatus === "loading" ? "-" : totalDelivered.toLocaleString("pt-BR")}
