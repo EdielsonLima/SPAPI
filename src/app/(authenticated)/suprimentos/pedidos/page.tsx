@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -85,6 +85,8 @@ export default function PedidosPage() {
   const [deliverySchedules, setDeliverySchedules] = useState<Record<string, SiengeDeliverySchedule[]>>({});
   const [deliveriesAttended, setDeliveriesAttended] = useState<Record<number, SiengeDeliveryAttended[]>>({});
   const [orderDeliveryStatus, setOrderDeliveryStatus] = useState<Record<number, string>>({});
+  const orderDeliveryStatusRef = useRef(orderDeliveryStatus);
+  orderDeliveryStatusRef.current = orderDeliveryStatus;
   const [deliveryRefreshKey, setDeliveryRefreshKey] = useState(0);
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
@@ -97,6 +99,8 @@ export default function PedidosPage() {
   const [companies, setCompanies] = useState<{ id: number; name: string }[]>([]);
   const [costCenters, setCostCenters] = useState<{ id: number; name: string; idCompany: number }[]>([]);
   const [supplierNames, setSupplierNames] = useState<Record<number, string>>({});
+  const supplierNamesRef = useRef(supplierNames);
+  supplierNamesRef.current = supplierNames;
   const limit = 200;
 
   const getDateRange = useCallback(() => {
@@ -255,7 +259,7 @@ export default function PedidosPage() {
   useEffect(() => {
     if (!paginatedIds) return;
     const ids = paginatedIds.split(",").map(Number);
-    const idsToFetch = ids.filter((id) => !(id in orderDeliveryStatus));
+    const idsToFetch = ids.filter((id) => !(id in orderDeliveryStatusRef.current));
     if (idsToFetch.length === 0) return;
 
     let cancelled = false;
@@ -285,7 +289,7 @@ export default function PedidosPage() {
 
   useEffect(() => {
     if (orders.length === 0) return;
-    const uniqueIds = [...new Set(orders.map((o) => o.supplierId))].filter((id) => !(id in supplierNames));
+    const uniqueIds = [...new Set(orders.map((o) => o.supplierId))].filter((id) => !(id in supplierNamesRef.current));
     if (uniqueIds.length === 0) return;
     const fetchNames = async () => {
       const batchSize = 50;
@@ -682,7 +686,6 @@ export default function PedidosPage() {
                                               {orderItems[order.id].map((item) => {
                                                 const dsKey = `${order.id}-${item.itemNumber}`;
                                                 const schedules = deliverySchedules[dsKey];
-                                                const totalScheduled = schedules?.reduce((s, d) => s + d.sheduledQuantity, 0) ?? 0;
                                                 const totalDelivered = schedules?.reduce((s, d) => s + d.deliveredQuantity, 0) ?? 0;
                                                 const totalOpen = schedules?.reduce((s, d) => s + d.openQuantity, 0) ?? 0;
                                                 const nextDate = schedules?.filter(d => d.openQuantity > 0).sort((a, b) => a.sheduledDate.localeCompare(b.sheduledDate))[0]?.sheduledDate;
