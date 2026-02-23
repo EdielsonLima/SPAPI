@@ -87,6 +87,7 @@ export default function PedidosPage() {
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
   const [filterDelivery, setFilterDelivery] = useState<string>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("pendente");
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const [filterYear, setFilterYear] = useState<string>(String(currentYear));
@@ -231,7 +232,11 @@ export default function PedidosPage() {
     const matchesCostCenter = filterCostCenter === "all" || o.costCenterId === Number(filterCostCenter);
     const ds = orderDeliveryStatus[o.id];
     const matchesDelivery = filterDelivery === "all" || ds === filterDelivery || (filterDelivery !== "all" && ds === "error");
-    return matchesSearch && matchesCompany && matchesCostCenter && matchesDelivery;
+    let matchesStatus = true;
+    if (filterStatus === "autorizado") matchesStatus = o.authorized === true;
+    else if (filterStatus === "pendente") matchesStatus = !o.authorized && !o.disapproved;
+    else if (filterStatus === "reprovado") matchesStatus = o.disapproved === true;
+    return matchesSearch && matchesCompany && matchesCostCenter && matchesDelivery && matchesStatus;
   });
 
   const pageSize = 20;
@@ -240,7 +245,7 @@ export default function PedidosPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, filterCompany, filterCostCenter, filterDelivery]);
+  }, [search, filterCompany, filterCostCenter, filterDelivery, filterStatus]);
 
   const paginatedItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -399,6 +404,18 @@ export default function PedidosPage() {
                 {["Janeiro","Fevereiro","Marco","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"].map((name, i) => (
                   <SelectItem key={i + 1} value={String(i + 1)}>{name}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterStatus} onValueChange={setFilterStatus}>
+              <SelectTrigger className="w-[160px]">
+                <CheckCircle2 className="h-4 w-4 mr-1 text-slate-400" />
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Status</SelectItem>
+                <SelectItem value="pendente">Pendente</SelectItem>
+                <SelectItem value="autorizado">Autorizado</SelectItem>
+                <SelectItem value="reprovado">Reprovado</SelectItem>
               </SelectContent>
             </Select>
             <Select value={filterCompany} onValueChange={setFilterCompany}>
