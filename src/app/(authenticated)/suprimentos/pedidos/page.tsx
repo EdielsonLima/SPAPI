@@ -85,6 +85,7 @@ export default function PedidosPage() {
   const [loadingDeliveryStatus, setLoadingDeliveryStatus] = useState(false);
   const [filterCompany, setFilterCompany] = useState<string>("all");
   const [filterCostCenter, setFilterCostCenter] = useState<string>("all");
+  const [filterDelivery, setFilterDelivery] = useState<string>("all");
   const currentYear = new Date().getFullYear();
   const currentMonth = new Date().getMonth() + 1;
   const [filterYear, setFilterYear] = useState<string>(String(currentYear));
@@ -217,7 +218,8 @@ export default function PedidosPage() {
       o.internalNotes?.toLowerCase().includes(search.toLowerCase());
     const matchesCompany = filterCompany === "all" || costCenters.filter(cc => cc.idCompany === Number(filterCompany)).some(cc => cc.id === o.costCenterId);
     const matchesCostCenter = filterCostCenter === "all" || o.costCenterId === Number(filterCostCenter);
-    return matchesSearch && matchesCompany && matchesCostCenter;
+    const matchesDelivery = filterDelivery === "all" || orderDeliveryStatus[o.id] === filterDelivery;
+    return matchesSearch && matchesCompany && matchesCostCenter && matchesDelivery;
   });
 
   const pageSize = 20;
@@ -226,7 +228,7 @@ export default function PedidosPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [search, filterCompany, filterCostCenter]);
+  }, [search, filterCompany, filterCostCenter, filterDelivery]);
 
   const paginatedItems = filtered.slice((page - 1) * pageSize, page * pageSize);
 
@@ -412,6 +414,19 @@ export default function PedidosPage() {
                 {costCenters.map((c) => (
                   <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterDelivery} onValueChange={setFilterDelivery}>
+              <SelectTrigger className="w-[170px]">
+                <Truck className="h-4 w-4 mr-1 text-slate-400" />
+                <SelectValue placeholder="Entrega" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas Entregas</SelectItem>
+                <SelectItem value="complete">Entregue</SelectItem>
+                <SelectItem value="partial">Parcial</SelectItem>
+                <SelectItem value="pending">Aguardando</SelectItem>
+                <SelectItem value="none">Sem previsao</SelectItem>
               </SelectContent>
             </Select>
             <div className="flex gap-2">
