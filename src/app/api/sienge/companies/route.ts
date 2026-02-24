@@ -14,16 +14,19 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const limit = searchParams.get("limit") || "100";
   const offset = searchParams.get("offset") || "0";
+  const forceRefresh = searchParams.get("forceRefresh") === "true";
 
-  try {
-    const cached = await getCachedCompanies();
-    if (cached.length > 0) {
-      return NextResponse.json({
-        resultSetMetadata: { count: cached.length, offset: 0, limit: cached.length },
-        results: cached.map((c) => ({ id: c.id, name: c.name })),
-      });
+  if (!forceRefresh) {
+    try {
+      const cached = await getCachedCompanies();
+      if (cached.length > 0) {
+        return NextResponse.json({
+          resultSetMetadata: { count: cached.length, offset: 0, limit: cached.length },
+          results: cached.map((c) => ({ id: c.id, name: c.name })),
+        });
+      }
+    } catch {
     }
-  } catch {
   }
 
   try {
