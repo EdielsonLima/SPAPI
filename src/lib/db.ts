@@ -35,4 +35,25 @@ export async function cacheDeliveryStatus(
   );
 }
 
+export async function getCachedCompanies(): Promise<{ id: number; name: string }[]> {
+  const result = await pool.query(`SELECT id, name FROM cached_companies ORDER BY id`);
+  return result.rows;
+}
+
+export async function getCachedCompanyById(id: number): Promise<string | null> {
+  const result = await pool.query(`SELECT name FROM cached_companies WHERE id = $1`, [id]);
+  return result.rows.length > 0 ? result.rows[0].name : null;
+}
+
+export async function cacheCompanies(companies: { id: number; name: string }[]) {
+  if (companies.length === 0) return;
+  const values = companies.map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2}, NOW())`).join(",");
+  const params = companies.flatMap((c) => [c.id, c.name]);
+  await pool.query(
+    `INSERT INTO cached_companies (id, name, cached_at) VALUES ${values}
+     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, cached_at = NOW()`,
+    params
+  );
+}
+
 export default pool;

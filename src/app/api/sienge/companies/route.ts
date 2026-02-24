@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { siengeGet } from "@/lib/sienge";
 import { SiengeCompany, SiengeListResponse } from "@/types/sienge";
+import { getCachedCompanies, cacheCompanies } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -15,10 +16,30 @@ export async function GET(request: NextRequest) {
   const offset = searchParams.get("offset") || "0";
 
   try {
+    const cached = await getCachedCompanies();
+    if (cached.length > 0) {
+      return NextResponse.json({
+        resultSetMetadata: { count: cached.length, offset: 0, limit: cached.length },
+        results: cached.map((c) => ({ id: c.id, name: c.name })),
+      });
+    }
+  } catch {
+  }
+
+  try {
     const data = await siengeGet<SiengeListResponse<SiengeCompany>>(
       "/companies",
       { limit, offset }
     );
+
+    try {
+      const companies = (data.results || []).map((c: SiengeCompany) => ({ id: c.id, name: c.name }));
+      if (companies.length > 0) {
+        await cacheCompanies(companies);
+      }
+    } catch {
+    }
+
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching companies:", error);
