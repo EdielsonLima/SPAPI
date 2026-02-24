@@ -34,8 +34,14 @@ src/
 - **sonner**: Toast notifications
 - **jspdf + jspdf-autotable**: PDF export for data tables
 - **recharts**: Charts on dashboard and contas pages
+- **pg**: PostgreSQL client for delivery status caching
 
 ## Recent Changes
+- 2026-02-24: Added PostgreSQL caching for delivery status
+  - Orders with status "autorizado" + delivery "entregue" are cached in `cached_delivery_status` table
+  - Bulk cache check endpoint `/api/sienge/purchase-orders/delivery-cache` reduces API calls
+  - Delivery status route checks cache first before calling Sienge API
+  - Database utility module at `src/lib/db.ts`
 - 2026-02-23: Added Suprimentos section with Pedidos de Compra page
   - New sidebar section "Suprimentos" with "Pedidos" sub-item
   - API proxy route for /purchase-orders endpoint with pagination support

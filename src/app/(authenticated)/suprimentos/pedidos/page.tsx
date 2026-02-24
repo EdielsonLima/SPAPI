@@ -263,10 +263,11 @@ export default function PedidosPage() {
     if (idsToFetch.length === 0) return;
 
     let cancelled = false;
-    const fetchSequential = async () => {
-      for (let i = 0; i < idsToFetch.length; i++) {
+
+    const fetchSequentialIds = async (idsToLoad: number[]) => {
+      for (let i = 0; i < idsToLoad.length; i++) {
         if (cancelled) break;
-        const id = idsToFetch[i];
+        const id = idsToLoad[i];
         try {
           const res = await fetch(`/api/sienge/purchase-orders/${id}/delivery-status`);
           if (!res.ok) {
@@ -278,12 +279,35 @@ export default function PedidosPage() {
         } catch {
           setOrderDeliveryStatus((prev) => ({ ...prev, [id]: "error" }));
         }
-        if (i < idsToFetch.length - 1 && !cancelled) {
+        if (i < idsToLoad.length - 1 && !cancelled) {
           await new Promise((r) => setTimeout(r, 1500));
         }
       }
     };
-    fetchSequential();
+
+    const fetchWithCache = async () => {
+      let remaining = idsToFetch;
+      try {
+        const cacheRes = await fetch(`/api/sienge/purchase-orders/delivery-cache?ids=${idsToFetch.join(",")}`);
+        if (cacheRes.ok) {
+          const { cached } = await cacheRes.json();
+          if (Object.keys(cached).length > 0) {
+            const updates: Record<number, string> = {};
+            for (const [idStr, status] of Object.entries(cached)) {
+              updates[Number(idStr)] = status as string;
+            }
+            setOrderDeliveryStatus((prev) => ({ ...prev, ...updates }));
+            const cachedIds = new Set(Object.keys(cached).map(Number));
+            remaining = idsToFetch.filter((id) => !cachedIds.has(id));
+          }
+        }
+      } catch {
+      }
+      if (remaining.length > 0 && !cancelled) {
+        await fetchSequentialIds(remaining);
+      }
+    };
+    fetchWithCache();
     return () => { cancelled = true; };
   }, [paginatedIds, deliveryRefreshKey]);
 

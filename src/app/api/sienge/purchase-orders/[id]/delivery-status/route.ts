@@ -2,15 +2,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { siengeGet } from "@/lib/sienge";
-import { SiengeListResponse, SiengePurchaseOrderItem, SiengeDeliverySchedule } from "@/types/sienge";
+import { SiengeListResponse, SiengePurchaseOrderItem, SiengeDeliverySchedule, SiengePurchaseOrder } from "@/types/sienge";
+import { getCachedDeliveryStatuses, cacheDeliveryStatus } from "@/lib/db";
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const orderId = Number(params.id);
+
+  try {
+    const cached = await getCachedDeliveryStatuses([orderId]);
+    if (cached[orderId]) {
+      return NextResponse.json({
+        status: cached[orderId],
+        cached: true,
+      });
+    }
+  } catch {
   }
 
   try {
@@ -41,7 +55,6 @@ export async function GET(
           totalOpen += s.openQuantity;
         });
       } catch {
-        // skip failed item
       }
     }
 
@@ -50,6 +63,18 @@ export async function GET(
     else if (totalOpen === 0 && totalDelivered > 0) status = "complete";
     else if (totalDelivered > 0 && totalOpen > 0) status = "partial";
     else status = "pending";
+
+    if (status === "complete") {
+      try {
+        const orderData = await siengeGet<SiengePurchaseOrder>(
+          `/purchase-orders/${params.id}`
+        );
+        if (orderData.authorized) {
+          await cacheDeliveryStatus(orderId, status, "autorizado", items.length, totalDelivered, totalOpen);
+        }
+      } catch {
+      }
+    }
 
     return NextResponse.json({
       status,
