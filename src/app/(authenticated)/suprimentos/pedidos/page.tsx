@@ -331,11 +331,35 @@ export default function PedidosPage() {
     fetchNames();
   }, [orders]);
 
+  const [extraCostCenterNames, setExtraCostCenterNames] = useState<Record<number, string>>({});
+  const extraCostCenterNamesRef = useRef(extraCostCenterNames);
+  extraCostCenterNamesRef.current = extraCostCenterNames;
+
+  useEffect(() => {
+    if (orders.length === 0) return;
+    const knownIds = new Set(costCenters.map((cc) => cc.id));
+    const missingIds = [...new Set(orders.map((o) => o.costCenterId))].filter(
+      (id) => !knownIds.has(id) && !(id in extraCostCenterNamesRef.current)
+    );
+    if (missingIds.length === 0) return;
+    const fetchCCNames = async () => {
+      try {
+        const res = await fetch(`/api/sienge/cost-centers/lookup?ids=${missingIds.join(",")}`);
+        if (res.ok) {
+          const data = await res.json();
+          setExtraCostCenterNames((prev) => ({ ...prev, ...data }));
+        }
+      } catch {}
+    };
+    fetchCCNames();
+  }, [orders, costCenters]);
+
   const costCenterMap = React.useMemo(() => {
     const map: Record<number, string> = {};
     costCenters.forEach((cc) => { map[cc.id] = cc.name; });
+    Object.entries(extraCostCenterNames).forEach(([id, name]) => { map[Number(id)] = name; });
     return map;
-  }, [costCenters]);
+  }, [costCenters, extraCostCenterNames]);
 
   const exportPDF = () => {
     const doc = new jsPDF({ orientation: "landscape" });
