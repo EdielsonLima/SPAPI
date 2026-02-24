@@ -56,4 +56,25 @@ export async function cacheCompanies(companies: { id: number; name: string }[]) 
   );
 }
 
+export async function getCachedCostCenters(): Promise<{ id: number; name: string; cnpj?: string; idCompany?: number }[]> {
+  const result = await pool.query(`SELECT id, name, cnpj, id_company FROM cached_cost_centers ORDER BY id`);
+  return result.rows.map((r: { id: number; name: string; cnpj: string | null; id_company: number | null }) => ({
+    id: r.id,
+    name: r.name,
+    ...(r.cnpj ? { cnpj: r.cnpj } : {}),
+    ...(r.id_company ? { idCompany: r.id_company } : {}),
+  }));
+}
+
+export async function cacheCostCenters(centers: { id: number; name: string; cnpj?: string; idCompany?: number }[]) {
+  if (centers.length === 0) return;
+  const values = centers.map((_, i) => `($${i * 4 + 1}, $${i * 4 + 2}, $${i * 4 + 3}, $${i * 4 + 4}, NOW())`).join(",");
+  const params = centers.flatMap((c) => [c.id, c.name, c.cnpj || null, c.idCompany || null]);
+  await pool.query(
+    `INSERT INTO cached_cost_centers (id, name, cnpj, id_company, cached_at) VALUES ${values}
+     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, cnpj = EXCLUDED.cnpj, id_company = EXCLUDED.id_company, cached_at = NOW()`,
+    params
+  );
+}
+
 export default pool;
