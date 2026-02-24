@@ -52,9 +52,25 @@ export default function CentrosCustoPage() {
     fetchData();
   }, [fetchData]);
 
-  const handleRefresh = () => {
-    toast.info("Atualizando dados...");
-    fetchData();
+  const handleRefresh = async () => {
+    toast.info("Atualizando dados direto do Sienge...");
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await fetch(
+        `/api/sienge/cost-centers?limit=${limit}&offset=${offset}&forceRefresh=true`
+      );
+      const data = await res.json();
+      setItems(data.results || []);
+      setTotalCount(data.resultSetMetadata?.count || 0);
+      toast.success("Dados atualizados do Sienge!");
+    } catch {
+      setItems([]);
+      setError(true);
+      toast.error("Erro ao carregar dados do Sienge");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const exportPDF = () => {
