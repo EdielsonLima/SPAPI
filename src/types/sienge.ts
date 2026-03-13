@@ -53,11 +53,20 @@ export interface SiengeOutcomePaymentCategory {
 }
 
 export interface SiengeOutcomePayment {
-  paymentDate: string;
-  paidAmount: number;
+  operationTypeId: number;
+  operationTypeName: string;
+  grossAmount: number;
+  monetaryCorrectionAmount: number;
   interestAmount: number;
   fineAmount: number;
   discountAmount: number;
+  taxAmount: number;
+  netAmount: number;
+  calculationDate: string;
+  paymentDate: string;
+  paymentAuthentication: string;
+  sequencialNumber: number;
+  correctedNetAmount: number;
 }
 
 export interface SiengeOutcomeBuildingCost {
@@ -104,6 +113,57 @@ export interface SiengeOutcome {
 
 export interface SiengeOutcomeResponse {
   data: SiengeOutcome[];
+}
+
+export interface SiengeBankMovement {
+  bankMovementId: number;
+  billId: number;
+  installmentId: number;
+  bankMovementAmount: number;
+  documentIdentificationId: string;
+  documentIdentificationName: string;
+  documentIdentificationNumber: string;
+  bankMovementOriginId: string;
+  bankMovementHistoricId: string;
+  bankMovementHistoricName: string;
+  bankMovementOperationId: number;
+  bankMovementOperationName: string;
+  bankMovementOperationType: string;
+  bankMovementReconcile: string;
+  bankMovementDate: string;
+  billDate: string;
+  accountNumber: string;
+  companyId: number;
+  companyName: string;
+  groupCompanyId: number;
+  groupCompanyName: string;
+  holdingId: number;
+  holdingName: string;
+  subsidiaryId: number;
+  subsidiaryName: string;
+  creditorId: number;
+  creditorName: string;
+  clientId: number;
+  clientName: string;
+  financialCategories: SiengeBankMovementFinancialCategory[];
+}
+
+export interface SiengeBankMovementFinancialCategory {
+  companyId: number;
+  companyName: string;
+  costCenterId: number;
+  costCenterName: string;
+  financialCategoryId: string;
+  financialCategoryName: string;
+  financialCategoryReducer: string;
+  financialCategoryType: string;
+  financialCategoryRate: number;
+  projectId: number;
+  projectName: string;
+}
+
+export interface SiengeBankMovementResponse {
+  data: SiengeBankMovement[];
 }
 
 export interface SiengePurchaseOrder {
@@ -175,6 +235,49 @@ export interface SiengeDeliverySchedule {
   sheduledQuantity: number;
   deliveredQuantity: number;
   openQuantity: number;
+}
+
+export interface SiengePurchaseRequest {
+  id: number;
+  buildingId: number;
+  departamentId?: number;
+  requesterUser: string;
+  requestDate: string;
+  notes?: string;
+  status: string; // PENDING | PARTIALLY_ATTENDED | FULLY_ATTENDED | CANCELED
+  consitent?: string; // IN_INCLUSION | CONSISTENT | INCONSISTENT
+  createdBy?: string;
+  createdAt?: string;
+  modifiedBy?: string;
+  modifiedAt?: string;
+  purchaseProcessCarriedOutByBuildingFlag?: boolean;
+}
+
+export interface SiengePurchaseRequestItem {
+  purchaseRequestId: number;
+  itemNumber: number;
+  productId: number;
+  productDescription: string;
+  detailId?: number;
+  detailDescription?: string;
+  trademarkId?: number;
+  trademarkDescription?: string;
+  quantity: number;
+  unitySymbol: string;
+  notes?: string;
+  authorized: boolean;
+  disapproved: boolean;
+  competenceLevel?: number;
+  estimatedDeliveryTime?: number;
+  disapprovalReason?: number;
+}
+
+export interface SiengeDeliveryRequirement {
+  deliveryRequirementNumber: number;
+  requirementDate: string;
+  requirementQuantity: number;
+  attendedQuantity?: number;
+  openQuantity?: boolean;
 }
 
 export interface SiengeDeliveryAttended {

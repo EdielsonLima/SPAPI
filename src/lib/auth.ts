@@ -13,6 +13,9 @@ export const authOptions: NextAuthOptions = {
         const adminUser = process.env.ADMIN_USERNAME || "admin";
         const adminPass = process.env.ADMIN_PASSWORD || "admin";
 
+        console.log("Credentials received:", credentials);
+        console.log("Expected:", { adminUser, adminPass });
+
         if (
           credentials?.username === adminUser &&
           credentials?.password === adminPass

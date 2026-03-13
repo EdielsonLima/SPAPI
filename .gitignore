@@ -27,6 +27,13 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env
+
+# uploads (fotos de confirmação de chegada)
+/uploads/
+
+# credenciais de empresas (white-label) — contém senhas, nunca commitar
+/companies/
 
 # vercel
 .vercel
@@ -34,3 +41,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# replit / local state
+.local/
+.claude/
+attached_assets/
+analyze-*.js
+check-*.js
+switch-company.sh

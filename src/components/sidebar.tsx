@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   Package,
   ShoppingCart,
+  BarChart3,
+  CheckCircle,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -68,9 +70,19 @@ const menuItems: MenuItem[] = [
     icon: <DollarSign className="h-5 w-5" />,
     children: [
       {
+        label: "Painel Executivo",
+        href: "/financeiro/painel-executivo",
+        icon: <BarChart3 className="h-4 w-4" />,
+      },
+      {
         label: "Contas a Pagar",
         href: "/financeiro/contas-pagar",
         icon: <Receipt className="h-4 w-4" />,
+      },
+      {
+        label: "Contas Pagas",
+        href: "/financeiro/contas-pagas",
+        icon: <CheckCircle className="h-4 w-4" />,
       },
       {
         label: "Contas Vencidas",
@@ -83,6 +95,11 @@ const menuItems: MenuItem[] = [
     label: "Suprimentos",
     icon: <Package className="h-5 w-5" />,
     children: [
+      {
+        label: "Solicitacoes",
+        href: "/suprimentos/solicitacoes",
+        icon: <ClipboardList className="h-4 w-4" />,
+      },
       {
         label: "Pedidos",
         href: "/suprimentos/pedidos",

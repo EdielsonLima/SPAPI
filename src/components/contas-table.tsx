@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -41,18 +41,12 @@ import {
   ArrowDown,
   ArrowUpDown,
   RefreshCw,
+  Calendar,
+  Save,
+  Building2,
+  FolderOpen,
+  Users,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip as RechartsTooltip,
-  ResponsiveContainer,
-  Cell,
-  LabelList,
-} from "recharts";
 import { SiengeOutcome } from "@/types/sienge";
 import { toast } from "sonner";
 
@@ -67,7 +61,9 @@ type SortField =
   | "documentType"
   | "costEstimationSheet"
   | "originalAmount"
-  | "balanceAmount";
+  | "balanceAmount"
+  | "paymentDate"
+  | "paidAmount";
 
 type SortDir = "asc" | "desc";
 
@@ -80,8 +76,13 @@ function formatCurrency(value: number) {
 
 function formatDate(dateStr: string) {
   if (!dateStr) return "-";
-  const [year, month, day] = dateStr.split("-");
-  return `${day}/${month}/${year}`;
+  // Extract just the date portion in case Sienge returns full ISO datetime strings
+  const datePart = String(dateStr).split("T")[0];
+  const [year, month, day] = datePart.split("-");
+  if (!year || !month || !day) return String(dateStr);
+  // Parse as local noon to avoid UTC midnight → previous BRT day conversion
+  const d = new Date(Number(year), Number(month) - 1, Number(day), 12, 0, 0);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
 }
 
 function daysDiff(dateStr: string) {
@@ -91,36 +92,219 @@ function daysDiff(dateStr: string) {
   return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
+function latestPaymentDate(item: SiengeOutcome): string {
+  const dates = (item.payments || []).filter(p => p.paymentDate && p.netAmount > 0).map(p => p.paymentDate);
+  if (dates.length === 0) return "";
+  return dates.sort().reverse()[0];
+}
+
+function paidTotal(item: SiengeOutcome, yearFilter?: string): number {
+  return (item.payments || [])
+    .filter(p => p.netAmount > 0 && (!yearFilter || (p.paymentDate && p.paymentDate.startsWith(yearFilter))))
+    .reduce((s, p) => s + p.netAmount, 0);
+}
+
 const monthNames = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
 ];
 
+
+function MultiSelectFilter({
+  label,
+  icon,
+  allOptions,
+  selected,
+  onToggle,
+  onSelectAll,
+  onClear,
+  activeColor = "blue",
+  labelFn,
+  onSaveDefault,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  allOptions: string[];
+  selected: Set<string>;
+  onToggle: (name: string) => void;
+  onSelectAll: () => void;
+  onClear: () => void;
+  activeColor?: string;
+  labelFn?: (value: string) => string;
+  onSaveDefault?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const getLabel = labelFn || ((v: string) => v);
+
+  const filteredOpts = useMemo(() => {
+    if (!search) return allOptions;
+    const q = search.toLowerCase();
+    return allOptions.filter(n => getLabel(n).toLowerCase().includes(q) || n.toLowerCase().includes(q));
+  }, [allOptions, search, getLabel]);
+
+  const allSelected = selected.size === allOptions.length && allOptions.length > 0;
+
+  return (
+    <Popover open={open} onOpenChange={(o) => {
+      setOpen(o);
+      if (o) setTimeout(() => inputRef.current?.focus(), 100);
+      else setSearch("");
+    }}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={`w-full justify-between font-normal h-10 gap-2 ${selected.size > 0 ? `border-${activeColor}-300 bg-${activeColor}-50 text-${activeColor}-700` : ""}`}
+        >
+          <span className="flex items-center gap-2 truncate">
+            {icon}
+            {selected.size === 0
+              ? `Todas`
+              : selected.size === 1
+              ? getLabel([...selected][0])
+              : `${selected.size} selecionados`}
+          </span>
+          {selected.size > 0 && (
+            <Badge variant="secondary" className={`ml-1 bg-${activeColor}-100 text-${activeColor}-700 text-[10px] px-1.5 py-0`}>
+              {selected.size}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-80 p-0" align="start">
+        <div className="p-3 border-b">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+            <input
+              ref={inputRef}
+              type="text"
+              placeholder={`Buscar ${label.toLowerCase()}...`}
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+        {!search && (
+          <div className="px-1 pt-1">
+            <label className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b mb-1 pb-2">
+              <Checkbox
+                checked={allSelected}
+                onCheckedChange={() => {
+                  if (allSelected) onClear();
+                  else onSelectAll();
+                }}
+              />
+              <span>Selecionar tudo</span>
+              <span className="ml-auto text-xs text-slate-400">{allOptions.length}</span>
+            </label>
+          </div>
+        )}
+        <div className="max-h-[280px] overflow-y-auto p-1">
+          {filteredOpts.length === 0 ? (
+            <p className="text-sm text-slate-400 text-center py-4">Nenhum resultado</p>
+          ) : (
+            filteredOpts.map(name => (
+              <label
+                key={name}
+                className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-slate-50 cursor-pointer text-sm"
+              >
+                <Checkbox
+                  checked={selected.has(name)}
+                  onCheckedChange={() => onToggle(name)}
+                />
+                <span className="truncate">{getLabel(name)}</span>
+              </label>
+            ))
+          )}
+        </div>
+        {selected.size > 0 && (
+          <div className="p-2 border-t flex gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClear}
+              className="flex-1 text-slate-500 gap-2"
+            >
+              <X className="h-3.5 w-3.5" />
+              Limpar ({selected.size})
+            </Button>
+            {onSaveDefault && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onSaveDefault}
+                className="flex-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 gap-2"
+              >
+                <Save className="h-3.5 w-3.5" />
+                Salvar padrao
+              </Button>
+            )}
+          </div>
+        )}
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 interface ContasTableProps {
-  mode: "a-vencer" | "vencidas";
+  mode: "a-vencer" | "vencidas" | "pagas";
   title: string;
   subtitle: string;
 }
 
 export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
   const isOverdue = mode === "vencidas";
+  const isPagas = mode === "pagas";
 
   const currentYear = new Date().getFullYear();
 
   const [items, setItems] = useState<SiengeOutcome[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [startDate, setStartDate] = useState(`${currentYear}-01-01`);
-  const [endDate, setEndDate] = useState(`${currentYear}-12-31`);
-  const [filterEmpresa, setFilterEmpresa] = useState("all");
-  const [filterCentroCusto, setFilterCentroCusto] = useState("all");
-  const [filterCredor, setFilterCredor] = useState("all");
-  const [filterTipoDoc, setFilterTipoDoc] = useState<string[]>([]);
-  const [filterAno, setFilterAno] = useState("all");
+  const [filterEmpresas, setFilterEmpresas] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`contas_${mode}_default_empresas`);
+      if (saved) return new Set(JSON.parse(saved));
+    }
+    return new Set<string>();
+  });
+  const [filterCentrosCusto, setFilterCentrosCusto] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`contas_${mode}_default_centrosCusto`);
+      if (saved) return new Set(JSON.parse(saved));
+    }
+    return new Set<string>();
+  });
+  const [filterCredores, setFilterCredores] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`contas_${mode}_default_credores`);
+      if (saved) return new Set(JSON.parse(saved));
+    }
+    return new Set<string>();
+  });
+  const [filterTipoDoc, setFilterTipoDoc] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`contas_${mode}_default_tipoDoc`);
+      if (saved) return new Set(JSON.parse(saved));
+    }
+    return new Set<string>();
+  });
+  const [filterAno, setFilterAno] = useState(String(currentYear));
   const [filterMes, setFilterMes] = useState("all");
-  const [chartYear, setChartYear] = useState(String(currentYear));
-  const [sortField, setSortField] = useState<SortField>("dueDate");
-  const [sortDir, setSortDir] = useState<SortDir>(isOverdue ? "asc" : "asc");
+  const [filterDia, setFilterDia] = useState<string[]>([]);
+
+  // API date range: always the full selected year.
+  // For "pagas" mode, fetch 2 years back to capture items with old due dates paid in selected year.
+  const { startDate, endDate } = useMemo(() => {
+    const yr = filterAno === "all" ? currentYear : parseInt(filterAno, 10);
+    const start = isPagas ? yr - 2 : yr;
+    return { startDate: `${start}-01-01`, endDate: `${yr}-12-31` };
+  }, [filterAno, currentYear, isPagas]);
+  const [sortField, setSortField] = useState<SortField>(isPagas ? "paymentDate" : "dueDate");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(0);
   const [expandedBills, setExpandedBills] = useState<Set<number>>(new Set());
   const perPage = 25;
@@ -162,12 +346,13 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
 
   const [error, setError] = useState(false);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (forceRefresh = false) => {
     setLoading(true);
     setError(false);
     try {
       const res = await fetch(
-        `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}`
+        `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}` +
+        (forceRefresh ? "&forceRefresh=true" : "")
       );
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
@@ -186,9 +371,11 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     }
   }, [startDate, endDate]);
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+  // Only fetch on mount. Subsequent fetches are triggered explicitly by the
+  // "Buscar" and "Atualizar" buttons so that changing the date inputs does
+  // not fire an immediate (and possibly Sienge-hitting) request.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData(); }, []);
 
   const today = useMemo(() => {
     const d = new Date();
@@ -197,40 +384,31 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
   }, []);
 
   // Extract unique values for filters
-  const empresas = useMemo(() => {
-    const map = new Map<number, string>();
+  const empresaNames = useMemo(() => {
+    const set = new Set<string>();
     items.forEach((item) => {
-      if (item.companyId && item.companyName)
-        map.set(item.companyId, item.companyName);
+      if (item.companyName) set.add(item.companyName);
     });
-    return Array.from(map.entries())
-      .map(([id, name]) => ({ id: String(id), name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(set).sort();
   }, [items]);
 
-  const centrosCusto = useMemo(() => {
-    const map = new Map<number, string>();
+  const centroCustoNames = useMemo(() => {
+    const set = new Set<string>();
     items.forEach((item) => {
-      if (filterEmpresa !== "all" && String(item.companyId) !== filterEmpresa) return;
+      if (filterEmpresas.size > 0 && !filterEmpresas.has(item.companyName)) return;
       item.paymentsCategories?.forEach((cat) => {
-        if (cat.costCenterId && cat.costCenterName)
-          map.set(cat.costCenterId, cat.costCenterName);
+        if (cat.costCenterName) set.add(cat.costCenterName);
       });
     });
-    return Array.from(map.entries())
-      .map(([id, name]) => ({ id: String(id), name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [items, filterEmpresa]);
+    return Array.from(set).sort();
+  }, [items, filterEmpresas]);
 
-  const credores = useMemo(() => {
-    const map = new Map<number, string>();
+  const credorNames = useMemo(() => {
+    const set = new Set<string>();
     items.forEach((item) => {
-      if (item.creditorId && item.creditorName)
-        map.set(item.creditorId, item.creditorName);
+      if (item.creditorName) set.add(item.creditorName);
     });
-    return Array.from(map.entries())
-      .map(([id, name]) => ({ id: String(id), name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
+    return Array.from(set).sort();
   }, [items]);
 
   const tiposDocumento = useMemo(() => {
@@ -242,56 +420,68 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     return Array.from(set).sort();
   }, [items]);
 
-  const toggleTipoDoc = (tipo: string) => {
-    setFilterTipoDoc((prev) =>
-      prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo]
+  const toggleDia = (dia: string) => {
+    setFilterDia((prev) =>
+      prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia]
     );
     setPage(0);
   };
 
-  // Available years/months from mode-filtered items
-  const anosDisponiveis = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach((item) => {
-      if (!item.dueDate || item.balanceAmount === 0) return;
-      const dueDate = new Date(item.dueDate + "T00:00:00");
-      if (isOverdue && dueDate >= today) return;
-      if (!isOverdue && dueDate < today) return;
-      set.add(item.dueDate.substring(0, 4));
-    });
-    return Array.from(set).sort();
-  }, [items, isOverdue, today]);
+  // Static year/month lists; day count depends on selected month
+  const anosDisponiveis = useMemo(
+    () => isPagas
+      ? Array.from({ length: 9 }, (_, i) => String(currentYear - 8 + i))
+      : Array.from({ length: 5 }, (_, i) => String(currentYear - 2 + i)),
+    [currentYear, isPagas]
+  );
 
-  const mesesDisponiveis = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach((item) => {
-      if (!item.dueDate || item.balanceAmount === 0) return;
-      const dueDate = new Date(item.dueDate + "T00:00:00");
-      if (isOverdue && dueDate >= today) return;
-      if (!isOverdue && dueDate < today) return;
-      if (filterAno !== "all" && item.dueDate.substring(0, 4) !== filterAno) return;
-      set.add(item.dueDate.substring(5, 7));
-    });
-    return Array.from(set).sort();
-  }, [items, isOverdue, today, filterAno]);
+  const mesesDisponiveis = ["01","02","03","04","05","06","07","08","09","10","11","12"];
+
+  const diasDisponiveis = useMemo(() => {
+    if (filterMes === "all") {
+      return Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
+    }
+    const yr = filterAno === "all" ? currentYear : parseInt(filterAno, 10);
+    const lastDay = new Date(yr, parseInt(filterMes, 10), 0).getDate();
+    return Array.from({ length: lastDay }, (_, i) => String(i + 1).padStart(2, "0"));
+  }, [filterMes, filterAno, currentYear]);
 
   // Filter
   const filtered = useMemo(() => {
     return items.filter((item) => {
-      if (item.balanceAmount === 0) return false;
+      if (isPagas) {
+        // For "pagas" mode: must have payments in the selected year
+        const hasPaidInYear = (item.payments || []).some(p =>
+          p.netAmount > 0 && p.paymentDate &&
+          (filterAno === "all" || p.paymentDate.startsWith(filterAno))
+        );
+        if (!hasPaidInYear) return false;
 
-      // Mode filter
-      const dueDate = new Date(item.dueDate + "T00:00:00");
-      if (isOverdue && dueDate >= today) return false;
-      if (!isOverdue && dueDate < today) return false;
+        // Month filter: by payment date
+        if (filterMes !== "all") {
+          const hasPayInMonth = (item.payments || []).some(p =>
+            p.netAmount > 0 && p.paymentDate &&
+            (filterAno === "all" || p.paymentDate.startsWith(filterAno)) &&
+            p.paymentDate.substring(5, 7) === filterMes
+          );
+          if (!hasPayInMonth) return false;
+        }
+      } else {
+        if (item.balanceAmount === 0) return false;
 
-      // Year filter
-      if (filterAno !== "all" && item.dueDate?.substring(0, 4) !== filterAno)
-        return false;
+        // Mode filter
+        const dueDate = new Date(item.dueDate + "T00:00:00");
+        if (isOverdue && dueDate >= today) return false;
+        if (!isOverdue && dueDate < today) return false;
 
-      // Month filter
-      if (filterMes !== "all" && item.dueDate?.substring(5, 7) !== filterMes)
-        return false;
+        // Year filter
+        if (filterAno !== "all" && item.dueDate?.substring(0, 4) !== filterAno)
+          return false;
+
+        // Month filter
+        if (filterMes !== "all" && item.dueDate?.substring(5, 7) !== filterMes)
+          return false;
+      }
 
       if (search) {
         const s = search.toLowerCase();
@@ -303,27 +493,39 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         if (!match) return false;
       }
 
-      if (filterEmpresa !== "all" && String(item.companyId) !== filterEmpresa)
+      if (filterEmpresas.size > 0 && !filterEmpresas.has(item.companyName))
         return false;
 
-      if (filterCentroCusto !== "all") {
+      if (filterCentrosCusto.size > 0) {
         const has = item.paymentsCategories?.some(
-          (cat) => String(cat.costCenterId) === filterCentroCusto
+          (cat) => filterCentrosCusto.has(cat.costCenterName)
         );
         if (!has) return false;
       }
 
-      if (filterCredor !== "all" && String(item.creditorId) !== filterCredor)
+      if (filterCredores.size > 0 && !filterCredores.has(item.creditorName))
         return false;
 
-      if (filterTipoDoc.length > 0) {
+      if (filterTipoDoc.size > 0) {
         const tipo = item.documentIdentificationId?.trim() || "";
-        if (!filterTipoDoc.includes(tipo)) return false;
+        if (!filterTipoDoc.has(tipo)) return false;
+      }
+
+      if (filterDia.length > 0) {
+        if (isPagas) {
+          const hasPayInDay = (item.payments || []).some(p =>
+            p.netAmount > 0 && p.paymentDate && filterDia.includes(p.paymentDate.substring(8, 10))
+          );
+          if (!hasPayInDay) return false;
+        } else {
+          const dia = item.dueDate?.substring(8, 10);
+          if (!dia || !filterDia.includes(dia)) return false;
+        }
       }
 
       return true;
     });
-  }, [items, search, filterEmpresa, filterCentroCusto, filterCredor, filterTipoDoc, filterAno, filterMes, isOverdue, today]);
+  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterAno, filterMes, filterDia, isOverdue, isPagas, today]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -341,7 +543,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
       let cmp = 0;
       switch (sortField) {
         case "billId": cmp = a.billId - b.billId; break;
-        case "dueDate": cmp = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime(); break;
+        case "dueDate": cmp = (a.dueDate || "").localeCompare(b.dueDate || ""); break;
         case "daysOverdue": cmp = daysDiff(a.dueDate) - daysDiff(b.dueDate); break;
         case "creditorName": cmp = (a.creditorName || "").localeCompare(b.creditorName || ""); break;
         case "companyName": cmp = (a.companyName || "").localeCompare(b.companyName || ""); break;
@@ -351,6 +553,8 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         case "costEstimationSheet": cmp = (a.buildingsCosts?.[0]?.costEstimationSheetName || "").localeCompare(b.buildingsCosts?.[0]?.costEstimationSheetName || ""); break;
         case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
         case "balanceAmount": cmp = a.balanceAmount - b.balanceAmount; break;
+        case "paymentDate": cmp = (latestPaymentDate(a) || "").localeCompare(latestPaymentDate(b) || ""); break;
+        case "paidAmount": cmp = paidTotal(a) - paidTotal(b); break;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -379,6 +583,10 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     () => sorted.reduce((sum, item) => sum + (item.balanceAmount || 0), 0),
     [sorted]
   );
+  const totalPaid = useMemo(
+    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno === "all" ? undefined : filterAno), 0),
+    [sorted, filterAno]
+  );
 
   // Card: Contas a pagar/vencidas hoje
   const todayStr = useMemo(() => {
@@ -387,17 +595,50 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
   }, []);
 
   const todayStats = useMemo(() => {
+    if (isPagas) {
+      // Paid today
+      let valor = 0;
+      const billIds = new Set<number>();
+      const credorIds = new Set<number>();
+      sorted.forEach(item => {
+        (item.payments || []).filter(p => p.paymentDate === todayStr && p.netAmount > 0).forEach(p => {
+          valor += p.netAmount;
+          billIds.add(item.billId);
+          credorIds.add(item.creditorId);
+        });
+      });
+      return { valor, titulos: billIds.size, credores: credorIds.size, parcelas: billIds.size };
+    }
     const todayItems = sorted.filter((item) => item.dueDate === todayStr);
     const valor = todayItems.reduce((s, i) => s + (i.balanceAmount || 0), 0);
     const titulos = new Set(todayItems.map((i) => i.billId)).size;
     const credores = new Set(todayItems.map((i) => i.creditorId)).size;
     return { valor, titulos, credores, parcelas: todayItems.length };
-  }, [sorted, todayStr]);
+  }, [sorted, todayStr, isPagas]);
 
   // Card: Contas semana (proximos 7 dias ou ultimos 7 dias)
   const weekStats = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
+    if (isPagas) {
+      // Paid last 7 days
+      const d7 = new Date(now);
+      d7.setDate(d7.getDate() - 7);
+      const d7Str = d7.toISOString().split("T")[0];
+      let valor = 0;
+      const billIds = new Set<number>();
+      const credorIds = new Set<number>();
+      sorted.forEach(item => {
+        (item.payments || []).filter(p =>
+          p.netAmount > 0 && p.paymentDate && p.paymentDate >= d7Str && p.paymentDate <= todayStr
+        ).forEach(p => {
+          valor += p.netAmount;
+          billIds.add(item.billId);
+          credorIds.add(item.creditorId);
+        });
+      });
+      return { valor, titulos: billIds.size, credores: credorIds.size, parcelas: billIds.size };
+    }
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     const yesterday = new Date(now);
@@ -416,60 +657,22 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     const titulos = new Set(weekItems.map((i) => i.billId)).size;
     const credores = new Set(weekItems.map((i) => i.creditorId)).size;
     return { valor, titulos, credores, parcelas: weekItems.length };
-  }, [sorted, isOverdue]);
-
-  // Chart
-  const availableYears = useMemo(() => {
-    const years = new Set<string>();
-    filtered.forEach((item) => {
-      if (item.dueDate) years.add(item.dueDate.substring(0, 4));
-    });
-    return Array.from(years).sort();
-  }, [filtered]);
-
-  const chartData = useMemo(() => {
-    const valByMonth = new Array(12).fill(0);
-
-    filtered.forEach((item) => {
-      if (!item.dueDate || !item.dueDate.startsWith(chartYear)) return;
-      const month = parseInt(item.dueDate.substring(5, 7), 10) - 1;
-      valByMonth[month] += item.balanceAmount || 0;
-    });
-
-    const data = monthNames.map((name, i) => {
-      const valor = Math.round(valByMonth[i] * 100) / 100;
-      const prev = i > 0 ? Math.round(valByMonth[i - 1] * 100) / 100 : 0;
-      const variacao = i === 0 || prev === 0 ? null : Math.round(((valor - prev) / prev) * 1000) / 10;
-      return { mes: name, valor, variacao };
-    });
-
-    const nonZeroValues = data.filter((d) => d.valor > 0).map((d) => d.valor);
-    const maxVal = nonZeroValues.length > 0 ? Math.max(...nonZeroValues) : 0;
-    const minVal = nonZeroValues.length > 0 ? Math.min(...nonZeroValues) : 0;
-
-    return data.map((d) => ({
-      ...d,
-      isMax: d.valor > 0 && d.valor === maxVal,
-      isMin: d.valor > 0 && d.valor === minVal && maxVal !== minVal,
-    }));
-  }, [filtered, chartYear]);
+  }, [sorted, isOverdue, isPagas, todayStr]);
 
   const hasActiveFilters =
-    filterEmpresa !== "all" ||
-    filterCentroCusto !== "all" ||
-    filterCredor !== "all" ||
-    filterTipoDoc.length > 0 ||
-    filterAno !== "all" ||
-    filterMes !== "all" ||
+    filterEmpresas.size > 0 ||
+    filterCentrosCusto.size > 0 ||
+    filterCredores.size > 0 ||
+    filterTipoDoc.size > 0 ||
+    filterDia.length > 0 ||
     search !== "";
 
   const clearFilters = () => {
-    setFilterEmpresa("all");
-    setFilterCentroCusto("all");
-    setFilterCredor("all");
-    setFilterTipoDoc([]);
-    setFilterAno("all");
-    setFilterMes("all");
+    setFilterEmpresas(new Set());
+    setFilterCentrosCusto(new Set());
+    setFilterCredores(new Set());
+    setFilterTipoDoc(new Set());
+    setFilterDia([]);
     setSearch("");
     setPage(0);
   };
@@ -504,9 +707,6 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     </TableHead>
   );
 
-  const barColor = isOverdue ? "#ef4444" : "#3b82f6";
-
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -529,10 +729,10 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
-        <Card className={`border-0 shadow-sm border-l-4 ${isOverdue ? "border-l-red-500" : "border-l-amber-500"}`}>
+        <Card className={`border-0 shadow-sm border-l-4 ${isPagas ? "border-l-emerald-500" : isOverdue ? "border-l-red-500" : "border-l-amber-500"}`}>
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isOverdue ? "Vencidas Hoje" : "A Pagar Hoje"}</div>
-            <div className={`text-xl font-bold mt-1 ${isOverdue ? "text-red-600" : "text-amber-600"}`}>
+            <div className="text-sm text-slate-500">{isPagas ? "Pago Hoje" : isOverdue ? "Vencidas Hoje" : "A Pagar Hoje"}</div>
+            <div className={`text-xl font-bold mt-1 ${isPagas ? "text-emerald-600" : isOverdue ? "text-red-600" : "text-amber-600"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(todayStats.valor)}
             </div>
             {!loading && (
@@ -544,10 +744,10 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
             )}
           </CardContent>
         </Card>
-        <Card className={`border-0 shadow-sm border-l-4 ${isOverdue ? "border-l-orange-400" : "border-l-blue-400"}`}>
+        <Card className={`border-0 shadow-sm border-l-4 ${isPagas ? "border-l-teal-400" : isOverdue ? "border-l-orange-400" : "border-l-blue-400"}`}>
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isOverdue ? "Vencidas ultimos 7 dias" : "A Pagar em 7 dias"}</div>
-            <div className={`text-xl font-bold mt-1 ${isOverdue ? "text-orange-600" : "text-blue-600"}`}>
+            <div className="text-sm text-slate-500">{isPagas ? "Pago ultimos 7 dias" : isOverdue ? "Vencidas ultimos 7 dias" : "A Pagar em 7 dias"}</div>
+            <div className={`text-xl font-bold mt-1 ${isPagas ? "text-teal-600" : isOverdue ? "text-orange-600" : "text-blue-600"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(weekStats.valor)}
             </div>
             {!loading && (
@@ -574,179 +774,43 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">Valor Original</div>
-            <div className="text-xl font-bold text-blue-600 mt-1">
-              {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(totalAmount)}
+            <div className="text-sm text-slate-500">{isPagas ? "Total Pago" : "Valor Original"}</div>
+            <div className={`text-xl font-bold mt-1 ${isPagas ? "text-emerald-600" : "text-blue-600"}`}>
+              {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(isPagas ? totalPaid : totalAmount)}
             </div>
           </CardContent>
         </Card>
         <Card className={`border-0 shadow-sm ${isOverdue ? "border-l-4 border-l-red-500" : ""}`}>
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">Saldo Pendente</div>
+            <div className="text-sm text-slate-500">{isPagas ? "Credores" : "Saldo Pendente"}</div>
             <div className={`text-xl font-bold mt-1 ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
-              {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(totalBalance)}
+              {loading ? <Skeleton className="h-7 w-32" /> : isPagas
+                ? `${new Set(sorted.map((i) => i.creditorId)).size}`
+                : formatCurrency(totalBalance)}
             </div>
-            {!loading && (
+            {!loading && !isPagas && (
               <div className="text-xs text-slate-400 mt-1.5">
                 {new Set(sorted.map((i) => i.creditorId)).size} credores
+              </div>
+            )}
+            {!loading && isPagas && (
+              <div className="text-xs text-slate-400 mt-1.5">
+                {new Set(sorted.map((i) => i.companyName)).size} empresas
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Chart */}
-      {!loading && sorted.length > 0 && (
-        <Card className="border-0 shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-slate-800">
-                {isOverdue ? "Vencidas por Mes" : "A Vencer por Mes"}
-              </h2>
-              <Select value={chartYear} onValueChange={setChartYear}>
-                <SelectTrigger className="w-28">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableYears.map((y) => (
-                    <SelectItem key={y} value={y}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={420}>
-              <BarChart data={chartData} barGap={2} margin={{ top: 60, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: "#64748b" }} axisLine={{ stroke: "#e2e8f0" }} />
-                <YAxis
-                  tick={{ fontSize: 11, fill: "#64748b" }}
-                  axisLine={{ stroke: "#e2e8f0" }}
-                  tickFormatter={(v: number) =>
-                    v >= 1000000 ? `${(v / 1000000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
-                  }
-                />
-                <RechartsTooltip
-                  contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  content={({ active, payload }: any) => {
-                    if (!active || !payload?.[0]) return null;
-                    const d = payload[0].payload;
-                    return (
-                      <div className="bg-white rounded-lg border border-slate-200 shadow-lg p-3 text-sm">
-                        <p className="font-semibold text-slate-700">{d.mes}</p>
-                        <p className="text-slate-600 mt-1">{formatCurrency(d.valor)}</p>
-                        {d.variacao !== null && (
-                          <p className={`mt-1 font-medium ${d.variacao >= 0 ? "text-green-500" : "text-red-500"}`}>
-                            {d.variacao >= 0 ? "+" : ""}{d.variacao}% vs mes anterior
-                          </p>
-                        )}
-                        {d.isMax && <p className="mt-1 text-amber-600 font-medium">Maior valor do ano</p>}
-                        {d.isMin && <p className="mt-1 text-emerald-600 font-medium">Menor valor do ano</p>}
-                      </div>
-                    );
-                  }}
-                />
-                <Bar dataKey="valor" name="Saldo (R$)" radius={[4, 4, 0, 0]}>
-                  {chartData.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        entry.isMax
-                          ? (isOverdue ? "#dc2626" : "#f59e0b")
-                          : entry.isMin
-                          ? "#10b981"
-                          : barColor
-                      }
-                      stroke={entry.isMax || entry.isMin ? "#fff" : "none"}
-                      strokeWidth={entry.isMax || entry.isMin ? 2 : 0}
-                    />
-                  ))}
-                  <LabelList
-                    dataKey="valor"
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    content={({ x, y, width, value }: any) => {
-                      if (!value || value === 0) return null;
-                      const label =
-                        value >= 1000000
-                          ? `${(value / 1000000).toFixed(1)}M`
-                          : value >= 1000
-                          ? `${(value / 1000).toFixed(0)}k`
-                          : String(value);
-                      return (
-                        <text
-                          x={x + width / 2}
-                          y={y - 8}
-                          textAnchor="middle"
-                          fill="#475569"
-                          fontSize={11}
-                          fontWeight={600}
-                        >
-                          {label}
-                        </text>
-                      );
-                    }}
-                  />
-                  <LabelList
-                    dataKey="variacao"
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    content={({ x, y, width, value }: any) => {
-                      if (value === null || value === undefined) return null;
-                      const color = value >= 0 ? "#22c55e" : "#ef4444";
-                      const text = `${value >= 0 ? "+" : ""}${value}%`;
-                      return (
-                        <text
-                          x={x + width / 2}
-                          y={y - 24}
-                          textAnchor="middle"
-                          fill={color}
-                          fontSize={10}
-                          fontWeight={600}
-                        >
-                          {text}
-                        </text>
-                      );
-                    }}
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-            <div className="flex items-center justify-center gap-6 mt-3 text-xs text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: isOverdue ? "#dc2626" : "#f59e0b" }} />
-                <span>Maior valor</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm bg-emerald-500" />
-                <span>Menor valor</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: barColor }} />
-                <span>Demais meses</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Filters + Table */}
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-4">
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Data Inicio</label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} className="w-40" />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Data Fim</label>
-                <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-40" />
-              </div>
-              <div className="min-w-[120px]">
+              <div className="min-w-[100px]">
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Ano</label>
-                <Select value={filterAno} onValueChange={(v) => { setFilterAno(v); setFilterMes("all"); setPage(0); }}>
-                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                <Select value={filterAno} onValueChange={(v) => { setFilterAno(v); setFilterMes("all"); setFilterDia([]); setPage(0); }}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
                     {anosDisponiveis.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
@@ -754,8 +818,8 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                 </Select>
               </div>
               <div className="min-w-[120px]">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Mes</label>
-                <Select value={filterMes} onValueChange={(v) => { setFilterMes(v); setPage(0); }}>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Mês</label>
+                <Select value={filterMes} onValueChange={(v) => { setFilterMes(v); setFilterDia([]); setPage(0); }}>
                   <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos</SelectItem>
@@ -763,11 +827,59 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                   </SelectContent>
                 </Select>
               </div>
-              <Button onClick={fetchData} disabled={loading} size="sm">
+              <div className="min-w-[140px]">
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Dia</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between font-normal h-10">
+                      <span className="flex items-center gap-2 truncate">
+                        <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                        {filterDia.length === 0
+                          ? "Todos"
+                          : filterDia.length === 1
+                          ? `Dia ${parseInt(filterDia[0], 10)}`
+                          : `${filterDia.length} dias`}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-52 p-2" align="start">
+                    <div className="grid grid-cols-7 gap-1">
+                      {diasDisponiveis.map((dia) => (
+                        <button
+                          key={dia}
+                          type="button"
+                          onClick={() => toggleDia(dia)}
+                          className={`h-8 w-8 text-xs rounded-md font-mono transition-colors ${
+                            filterDia.includes(dia)
+                              ? "bg-blue-500 text-white font-bold"
+                              : "hover:bg-slate-100 text-slate-700"
+                          }`}
+                        >
+                          {parseInt(dia, 10)}
+                        </button>
+                      ))}
+                    </div>
+                    {filterDia.length > 0 && (
+                      <div className="mt-2 pt-2 border-t">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full text-xs h-7"
+                          onClick={() => setFilterDia([])}
+                        >
+                          Limpar seleção
+                        </Button>
+                      </div>
+                    )}
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <Button onClick={() => fetchData()} disabled={loading} size="sm">
                 {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Filter className="h-4 w-4 mr-1" />}
                 Buscar
               </Button>
-              <Button onClick={fetchData} disabled={loading} size="sm" variant="outline">
+              <Button onClick={() => fetchData(true)} disabled={loading} size="sm" variant="outline">
                 <RefreshCw className={`h-4 w-4 mr-1 ${loading ? "animate-spin" : ""}`} />
                 Atualizar
               </Button>
@@ -784,67 +896,58 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
 
               <div className="min-w-[200px]">
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Empresa</label>
-                <Select value={filterEmpresa} onValueChange={(v) => { setFilterEmpresa(v); setFilterCentroCusto("all"); setPage(0); }}>
-                  <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas</SelectItem>
-                    {empresas.map((e) => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  label="Empresa"
+                  icon={<Building2 className="h-4 w-4 text-slate-400" />}
+                  allOptions={empresaNames}
+                  selected={filterEmpresas}
+                  onToggle={(name) => { setFilterEmpresas(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
+                  onSelectAll={() => { setFilterEmpresas(new Set(empresaNames)); setPage(0); }}
+                  onClear={() => { setFilterEmpresas(new Set()); setPage(0); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_empresas`, JSON.stringify([...filterEmpresas])); toast.success("Padrao de empresas salvo!"); }}
+                />
               </div>
 
               <div className="min-w-[220px]">
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Centro de Custo</label>
-                <Select value={filterCentroCusto} onValueChange={(v) => { setFilterCentroCusto(v); setPage(0); }}>
-                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {centrosCusto.map((cc) => <SelectItem key={cc.id} value={cc.id}>{cc.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  label="Centro de Custo"
+                  icon={<FolderOpen className="h-4 w-4 text-slate-400" />}
+                  allOptions={centroCustoNames}
+                  selected={filterCentrosCusto}
+                  onToggle={(name) => { setFilterCentrosCusto(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
+                  onSelectAll={() => { setFilterCentrosCusto(new Set(centroCustoNames)); setPage(0); }}
+                  onClear={() => { setFilterCentrosCusto(new Set()); setPage(0); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_centrosCusto`, JSON.stringify([...filterCentrosCusto])); toast.success("Padrao de centros de custo salvo!"); }}
+                />
               </div>
 
               <div className="min-w-[220px]">
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Credor</label>
-                <Select value={filterCredor} onValueChange={(v) => { setFilterCredor(v); setPage(0); }}>
-                  <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {credores.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  label="Credor"
+                  icon={<Users className="h-4 w-4 text-slate-400" />}
+                  allOptions={credorNames}
+                  selected={filterCredores}
+                  onToggle={(name) => { setFilterCredores(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
+                  onSelectAll={() => { setFilterCredores(new Set(credorNames)); setPage(0); }}
+                  onClear={() => { setFilterCredores(new Set()); setPage(0); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_credores`, JSON.stringify([...filterCredores])); toast.success("Padrao de credores salvo!"); }}
+                />
               </div>
 
               <div className="min-w-[180px]">
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Tipo Documento</label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between font-normal h-10">
-                      <span className="flex items-center gap-2 truncate">
-                        <FileText className="h-4 w-4 text-slate-400 shrink-0" />
-                        {filterTipoDoc.length === 0 ? "Todos" : filterTipoDoc.length === 1 ? filterTipoDoc[0] : `${filterTipoDoc.length} selecionados`}
-                      </span>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-56 p-0" align="start">
-                    <div className="p-2 border-b flex gap-1">
-                      <Button variant="ghost" size="sm" className="flex-1 justify-center text-xs h-8" onClick={() => { setFilterTipoDoc([...tiposDocumento]); setPage(0); }}>
-                        Selecionar todos
-                      </Button>
-                      <Button variant="ghost" size="sm" className="flex-1 justify-center text-xs h-8" onClick={() => { setFilterTipoDoc([]); setPage(0); }}>
-                        Limpar
-                      </Button>
-                    </div>
-                    <div className="max-h-60 overflow-y-auto p-2 space-y-1">
-                      {tiposDocumento.map((tipo) => (
-                        <label key={tipo} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-100 cursor-pointer text-sm">
-                          <Checkbox checked={filterTipoDoc.includes(tipo)} onCheckedChange={() => toggleTipoDoc(tipo)} />
-                          <span className="font-mono">{tipo}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                <MultiSelectFilter
+                  label="Tipo Doc"
+                  icon={<FileText className="h-4 w-4 text-slate-400" />}
+                  allOptions={tiposDocumento}
+                  selected={filterTipoDoc}
+                  onToggle={(name) => { setFilterTipoDoc(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
+                  onSelectAll={() => { setFilterTipoDoc(new Set(tiposDocumento)); setPage(0); }}
+                  onClear={() => { setFilterTipoDoc(new Set()); setPage(0); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_tipoDoc`, JSON.stringify([...filterTipoDoc])); toast.success("Padrao de tipo documento salvo!"); }}
+                />
               </div>
 
               {hasActiveFilters && (
@@ -862,26 +965,32 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
               <TableHeader className="bg-slate-100/80">
                 <TableRow>
                   <TableHead className="w-[40px]" />
-                  <SortableHead field="billId" className="min-w-[80px]">Titulo</SortableHead>
                   <TableHead className="min-w-[50px] text-xs">Parc.</TableHead>
                   <SortableHead field="dueDate" className="min-w-[100px]">Vencimento</SortableHead>
+                  {isPagas && (
+                    <SortableHead field="paymentDate" className="min-w-[100px]">Dt. Pagamento</SortableHead>
+                  )}
                   {isOverdue && (
                     <SortableHead field="daysOverdue" className="min-w-[80px]">Dias Atraso</SortableHead>
                   )}
                   <SortableHead field="creditorName" className="min-w-[200px]">Credor</SortableHead>
                   <SortableHead field="companyName" className="min-w-[150px]">Empresa</SortableHead>
                   <SortableHead field="costEstimationSheet" className="min-w-[180px]">Item Orcamento</SortableHead>
-                  <SortableHead field="documentNumber" className="min-w-[80px]">Doc.</SortableHead>
+                  <SortableHead field="billId" className="min-w-[80px]">Titulo</SortableHead>
                   <SortableHead field="documentType" className="min-w-[80px]">Tipo Doc.</SortableHead>
                   <SortableHead field="originalAmount" className="text-right min-w-[120px]">Valor Original</SortableHead>
-                  <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>
+                  {isPagas ? (
+                    <SortableHead field="paidAmount" className="text-right min-w-[120px]">Valor Pago</SortableHead>
+                  ) : (
+                    <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {loading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: isOverdue ? 12 : 11 }).map((_, j) => (
+                        {Array.from({ length: isPagas ? 11 : isOverdue ? 11 : 10 }).map((_, j) => (
                           <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                         ))}
                       </TableRow>
@@ -896,17 +1005,16 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                       const isFirstOfBill = !seenExpandedBills.has(item.billId);
                       if (isExpanded) seenExpandedBills.add(item.billId);
                       const showExpandedPanel = isExpanded && isFirstOfBill;
-                      const colCount = isOverdue ? 12 : 11;
+                      const colCount = isPagas ? 11 : isOverdue ? 11 : 10;
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
                           <TableRow
-                            className={`hover:bg-slate-50 cursor-pointer ${isExpanded ? "bg-blue-50/50" : ""}`}
+                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-blue-100 border-l-4 border-blue-500 hover:bg-blue-100" : "hover:bg-slate-50 border-l-4 border-transparent"}`}
                             onClick={() => toggleBillExpand(item.billId)}
                           >
                             <TableCell className="w-[40px] px-2">
-                              <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} />
+                              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180 text-blue-600" : "text-slate-400"}`} />
                             </TableCell>
-                            <TableCell className="font-mono text-sm">{item.billId}</TableCell>
                             <TableCell className="text-sm">
                               {totalParcelas > 1 ? (
                                 <Badge variant="secondary" className="text-xs font-mono">{totalParcelas}x</Badge>
@@ -915,12 +1023,15 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                               )}
                             </TableCell>
                             <TableCell className="font-mono text-sm">{formatDate(item.dueDate)}</TableCell>
+                            {isPagas && (
+                              <TableCell className="font-mono text-sm text-emerald-600">{formatDate(latestPaymentDate(item))}</TableCell>
+                            )}
                             {isOverdue && (
                               <TableCell>
                                 <Badge variant="destructive" className="text-xs font-mono">{Math.abs(days)}d</Badge>
                               </TableCell>
                             )}
-                            <TableCell className="font-medium max-w-[250px] truncate" title={item.creditorName}>{item.creditorName}</TableCell>
+                            <TableCell className={`max-w-[250px] truncate ${isExpanded ? "font-bold text-blue-900" : "font-medium"}`} title={item.creditorName}>{item.creditorName}</TableCell>
                             <TableCell className="text-sm max-w-[180px] truncate" title={item.companyName}>{item.companyName}</TableCell>
                             <TableCell className="text-sm max-w-[200px] truncate" title={item.buildingsCosts?.map((bc) => bc.costEstimationSheetName).filter(Boolean).join(", ") || "-"}>
                               {item.buildingsCosts?.[0]?.costEstimationSheetName || "-"}
@@ -928,19 +1039,25 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                 <Badge variant="secondary" className="text-[10px] ml-1">+{item.buildingsCosts.length - 1}</Badge>
                               )}
                             </TableCell>
-                            <TableCell className="font-mono text-sm">{item.documentNumber || "-"}</TableCell>
+                            <TableCell className="font-mono text-sm">{item.billId}</TableCell>
                             <TableCell className="text-xs">
                               <Badge variant="outline" className="text-xs font-mono">{item.documentIdentificationId?.trim() || "-"}</Badge>
                             </TableCell>
                             <TableCell className="text-right font-mono text-sm">{formatCurrency(item.originalAmount)}</TableCell>
-                            <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
-                              {formatCurrency(item.balanceAmount)}
-                            </TableCell>
+                            {isPagas ? (
+                              <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">
+                                {formatCurrency(paidTotal(item, filterAno === "all" ? undefined : filterAno))}
+                              </TableCell>
+                            ) : (
+                              <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
+                                {formatCurrency(item.balanceAmount)}
+                              </TableCell>
+                            )}
                           </TableRow>
                           {showExpandedPanel && (
-                            <TableRow className="bg-blue-50/30">
+                            <TableRow className="bg-blue-50/60 border-l-4 border-blue-500 border-b-2 border-b-blue-200">
                               <TableCell colSpan={colCount} className="p-0">
-                                <div className="px-8 py-3 border-l-4 border-blue-400 ml-4">
+                                <div className="px-8 py-4 border-l-4 border-blue-500 ml-0 bg-blue-50/80">
                                   {loadingNotes.has(item.billId) ? (
                                     <div className="mb-3 text-sm flex items-center gap-2">
                                       <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
@@ -952,7 +1069,41 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                       <span className="ml-2 text-slate-600">{billNotes[item.billId]}</span>
                                     </div>
                                   ) : null}
-                                  {totalParcelas > 1 && (
+                                  {isPagas && (item.payments || []).length > 0 && (
+                                    <>
+                                      <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
+                                        Pagamentos do Titulo {item.billId} — {item.creditorName}
+                                        <Badge className="bg-emerald-100 text-emerald-700 text-xs">{(item.payments || []).filter(p => p.netAmount > 0).length} pagamentos</Badge>
+                                        <span className="text-slate-400">|</span>
+                                        <span className="font-mono">Total: {formatCurrency(paidTotal(item))}</span>
+                                      </div>
+                                      <Table>
+                                        <TableHeader className="bg-emerald-100/50">
+                                          <TableRow className="border-b border-emerald-200/50">
+                                            <TableHead className="text-xs h-8 py-1">Dt. Pagamento</TableHead>
+                                            <TableHead className="text-xs h-8 py-1">Tipo Operacao</TableHead>
+                                            <TableHead className="text-xs text-right h-8 py-1">Valor Liquido</TableHead>
+                                            <TableHead className="text-xs text-right h-8 py-1">Juros</TableHead>
+                                            <TableHead className="text-xs text-right h-8 py-1">Multa</TableHead>
+                                            <TableHead className="text-xs text-right h-8 py-1">Desconto</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {(item.payments || []).filter(p => p.netAmount > 0).map((p, pi) => (
+                                            <TableRow key={`pay-${item.billId}-${pi}`} className="border-b border-emerald-100/50">
+                                              <TableCell className="font-mono text-xs py-1.5">{formatDate(p.paymentDate)}</TableCell>
+                                              <TableCell className="text-xs py-1.5">{p.operationTypeName || "-"}</TableCell>
+                                              <TableCell className="text-right font-mono text-xs py-1.5 font-medium text-emerald-600">{formatCurrency(p.netAmount)}</TableCell>
+                                              <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(p.interestAmount || 0)}</TableCell>
+                                              <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(p.fineAmount || 0)}</TableCell>
+                                              <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(p.discountAmount || 0)}</TableCell>
+                                            </TableRow>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    </>
+                                  )}
+                                  {!isPagas && totalParcelas > 1 && (
                                     <>
                                       <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
                                         Parcelas do Titulo {item.billId} — {item.creditorName}
@@ -975,7 +1126,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                         <TableBody>
                                           {billParcelas.map((parcela) => {
                                             const pDays = daysDiff(parcela.dueDate);
-                                            const isPaid = parcela.balanceAmount === 0;
+                                            const isPaidItem = parcela.balanceAmount === 0;
                                             return (
                                               <TableRow key={`sub-${parcela.billId}-${parcela.installmentId}`} className="border-b border-blue-100/50">
                                                 <TableCell className="font-mono text-xs py-1.5">{parcela.installmentId}</TableCell>
@@ -987,11 +1138,11 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                                 )}
                                                 <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.issueDate)}</TableCell>
                                                 <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(parcela.originalAmount)}</TableCell>
-                                                <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaid ? "text-green-600" : isOverdue ? "text-red-600" : "text-slate-800"}`}>
+                                                <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaidItem ? "text-green-600" : isOverdue ? "text-red-600" : "text-slate-800"}`}>
                                                   {formatCurrency(parcela.balanceAmount)}
                                                 </TableCell>
                                                 <TableCell className="text-xs py-1.5">
-                                                  {isPaid ? (
+                                                  {isPaidItem ? (
                                                     <Badge className="bg-green-100 text-green-700 text-[10px]">Pago</Badge>
                                                   ) : parcela.payments && parcela.payments.length > 0 ? (
                                                     <Badge className="bg-amber-100 text-amber-700 text-[10px]">Parcial</Badge>
@@ -1019,7 +1170,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                     })()}
                 {!loading && error && (
                   <TableRow>
-                    <TableCell colSpan={isOverdue ? 12 : 11} className="text-center py-12">
+                    <TableCell colSpan={isPagas ? 11 : isOverdue ? 11 : 10} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-3 bg-red-50 rounded-full">
                           <AlertCircle className="h-8 w-8 text-red-400" />
@@ -1028,7 +1179,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                           <p className="font-medium text-slate-700">Erro ao carregar dados</p>
                           <p className="text-sm text-slate-400 mt-1">Nao foi possivel conectar ao Sienge.</p>
                         </div>
-                        <Button variant="outline" size="sm" onClick={fetchData} className="mt-2">
+                        <Button variant="outline" size="sm" onClick={() => fetchData()} className="mt-2">
                           Tentar novamente
                         </Button>
                       </div>
@@ -1037,7 +1188,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                 )}
                 {!loading && !error && paginatedItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={isOverdue ? 12 : 11} className="text-center py-12">
+                    <TableCell colSpan={isPagas ? 11 : isOverdue ? 11 : 10} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-3 bg-slate-100 rounded-full">
                           <FileText className="h-8 w-8 text-slate-300" />

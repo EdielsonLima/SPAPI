@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCachedOutcome, cacheOutcome } from "@/lib/db";
+import { getCachedBankMovements, cacheBankMovements } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -20,20 +20,15 @@ export async function GET(request: NextRequest) {
   const forceRefresh = searchParams.get("forceRefresh") === "true";
 
   if (!forceRefresh) {
-    const cached = await getCachedOutcome(startDate, endDate);
+    const cached = await getCachedBankMovements(startDate, endDate);
     if (cached) return NextResponse.json(cached);
   }
 
-  const url = new URL(`${SIENGE_BASE}/outcome`);
+  const url = new URL(`${SIENGE_BASE}/bank-movement`);
   url.searchParams.set("startDate", startDate);
   url.searchParams.set("endDate", endDate);
-  url.searchParams.set("selectionType", "D");
-  url.searchParams.set("correctionIndexerId", "0");
-  const now = new Date();
-  const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  url.searchParams.set("correctionDate", localDate);
-  url.searchParams.set("withAuthorizations", "false");
-  url.searchParams.set("withBankMovements", "true");
+  url.searchParams.set("selectionType", "M"); // Filtra por data do movimento bancário
+  url.searchParams.set("onlyDetachedMovement", "S"); // Apenas movimentos avulsos (tarifas/taxas)
 
   try {
     const response = await fetch(url.toString(), {
@@ -44,17 +39,24 @@ export async function GET(request: NextRequest) {
       cache: "no-store",
     });
 
+    if (response.status === 404) {
+      // Sem movimentos no período
+      const empty = { data: [] };
+      await cacheBankMovements(startDate, endDate, empty);
+      return NextResponse.json(empty);
+    }
+
     if (!response.ok) {
       throw new Error(`Sienge API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
-    await cacheOutcome(startDate, endDate, data);
+    await cacheBankMovements(startDate, endDate, data);
     return NextResponse.json(data);
   } catch (error) {
-    console.error("Error fetching outcome:", error);
+    console.error("Error fetching bank movements:", error);
     return NextResponse.json(
-      { error: "Failed to fetch outcome data" },
+      { error: "Failed to fetch bank movements" },
       { status: 500 }
     );
   }
