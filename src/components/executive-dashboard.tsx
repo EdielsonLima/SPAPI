@@ -623,6 +623,7 @@ export function ExecutiveDashboard() {
       if (field === "clientName") cmp = a.clientName.localeCompare(b.clientName);
       else if (field === "installments") cmp = a.installments - b.installments;
       else if (field === "maxDaysOverdue") cmp = a.maxDaysOverdue - b.maxDaysOverdue;
+      else if (field === "projects") cmp = (a.projects[0] || "").localeCompare(b.projects[0] || "");
       else cmp = a.totalOverdue - b.totalOverdue;
       return dir === "asc" ? cmp : -cmp;
     });
@@ -693,6 +694,7 @@ export function ExecutiveDashboard() {
       if (field === "creditorName") cmp = a.creditorName.localeCompare(b.creditorName);
       else if (field === "installments") cmp = a.installments - b.installments;
       else if (field === "maxDaysOverdue") cmp = a.maxDaysOverdue - b.maxDaysOverdue;
+      else if (field === "companies") cmp = (a.companies[0] || "").localeCompare(b.companies[0] || "");
       else cmp = a.totalOverdue - b.totalOverdue;
       return dir === "asc" ? cmp : -cmp;
     });
@@ -1826,7 +1828,15 @@ export function ExecutiveDashboard() {
                         {overdueSort.field === "maxDaysOverdue" ? (overdueSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
                       </div>
                     </TableHead>
-                    <TableHead>Empresas</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none hover:text-slate-700"
+                      onClick={() => setOverdueSort(s => ({ field: "companies", dir: s.field === "companies" && s.dir === "asc" ? "desc" : "asc" }))}
+                    >
+                      <div className="flex items-center gap-1">
+                        Empresas
+                        {overdueSort.field === "companies" ? (overdueSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+                      </div>
+                    </TableHead>
                     <TableHead
                       className="cursor-pointer select-none hover:text-slate-700 text-right"
                       onClick={() => setOverdueSort(s => ({ field: "totalOverdue", dir: s.field === "totalOverdue" && s.dir === "desc" ? "asc" : "desc" }))}
@@ -1996,7 +2006,15 @@ export function ExecutiveDashboard() {
                         {delinquentSort.field === "maxDaysOverdue" ? (delinquentSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
                       </div>
                     </TableHead>
-                    <TableHead>Empreendimentos</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none hover:text-slate-700"
+                      onClick={() => setDelinquentSort(s => ({ field: "projects", dir: s.field === "projects" && s.dir === "asc" ? "desc" : "asc" }))}
+                    >
+                      <div className="flex items-center gap-1">
+                        Empreendimentos
+                        {delinquentSort.field === "projects" ? (delinquentSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+                      </div>
+                    </TableHead>
                     <TableHead
                       className="cursor-pointer select-none hover:text-slate-700 text-right"
                       onClick={() => setDelinquentSort(s => ({ field: "totalOverdue", dir: s.field === "totalOverdue" && s.dir === "desc" ? "asc" : "desc" }))}
