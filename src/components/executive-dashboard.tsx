@@ -237,6 +237,9 @@ export function ExecutiveDashboard() {
   const [showDelinquentTable, setShowDelinquentTable] = useState(false);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [delinquentSort, setDelinquentSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
+  const [showOverdueTable, setShowOverdueTable] = useState(false);
+  const [expandedCreditors, setExpandedCreditors] = useState<Set<string>>(new Set());
+  const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("dashboard_default_opTypes");
@@ -614,6 +617,69 @@ export function ExecutiveDashboard() {
     const d = new Date(dateStr + "T00:00:00");
     return Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
   };
+
+  // === Overdue grouped by creditor (CP) ===
+  interface OverdueCreditor {
+    creditorName: string;
+    creditorId: number;
+    totalOverdue: number;
+    installments: number;
+    oldestDueDate: string;
+    maxDaysOverdue: number;
+    projects: string[];
+    companies: string[];
+    items: SiengeOutcome[];
+  }
+
+  const overdueByCreditor = useMemo(() => {
+    const map = new Map<string, OverdueCreditor>();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    filteredAtrasadas.forEach(item => {
+      const key = item.creditorName || `Credor ${item.creditorId}`;
+      const dueDate = new Date(item.dueDate + "T00:00:00");
+      const daysOverdue = Math.floor((today.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+
+      if (!map.has(key)) {
+        map.set(key, {
+          creditorName: key,
+          creditorId: item.creditorId,
+          totalOverdue: 0,
+          installments: 0,
+          oldestDueDate: item.dueDate,
+          maxDaysOverdue: daysOverdue,
+          projects: [],
+          companies: [],
+          items: [],
+        });
+      }
+
+      const creditor = map.get(key)!;
+      creditor.totalOverdue += effectiveAmount(item);
+      creditor.installments += 1;
+      creditor.items.push(item);
+
+      if (item.dueDate < creditor.oldestDueDate) creditor.oldestDueDate = item.dueDate;
+      if (daysOverdue > creditor.maxDaysOverdue) creditor.maxDaysOverdue = daysOverdue;
+      if (item.projectName && !creditor.projects.includes(item.projectName)) creditor.projects.push(item.projectName);
+      if (item.companyName && !creditor.companies.includes(item.companyName)) creditor.companies.push(item.companyName);
+    });
+
+    const list = Array.from(map.values());
+
+    const { field, dir } = overdueSort;
+    list.sort((a, b) => {
+      let cmp = 0;
+      if (field === "creditorName") cmp = a.creditorName.localeCompare(b.creditorName);
+      else if (field === "installments") cmp = a.installments - b.installments;
+      else if (field === "maxDaysOverdue") cmp = a.maxDaysOverdue - b.maxDaysOverdue;
+      else cmp = a.totalOverdue - b.totalOverdue;
+      return dir === "asc" ? cmp : -cmp;
+    });
+
+    return list;
+  }, [filteredAtrasadas, overdueSort]);
 
   // Tarifas bancárias filtradas por ano e empresa selecionados
   const filteredBankFees = useMemo(() => {
@@ -1106,10 +1172,11 @@ export function ExecutiveDashboard() {
       {
         label: "Credores",
         value: String(new Set(filteredAtrasadas.map(i => i.creditorName)).size),
-        subtitle: "aguardando",
+        subtitle: showOverdueTable ? "clique para fechar" : "clique para detalhar",
         icon: <FileText className="h-7 w-7 text-orange-500" />,
         iconBg: "bg-orange-50",
         gradient: "from-orange-500 to-orange-600",
+        onClick: () => { setShowOverdueTable(v => !v); setExpandedCreditors(new Set()); },
       },
     ],
     "a-receber": [
@@ -1513,7 +1580,7 @@ export function ExecutiveDashboard() {
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
-            className={`border-0 shadow-sm overflow-hidden relative group hover:shadow-md transition-all duration-300 ${kpi.onClick ? "cursor-pointer" : ""} ${kpi.onClick && showDelinquentTable ? "ring-2 ring-red-400 ring-offset-1" : ""}`}
+            className={`border-0 shadow-sm overflow-hidden relative group hover:shadow-md transition-all duration-300 ${kpi.onClick ? "cursor-pointer" : ""} ${kpi.onClick && (showDelinquentTable || showOverdueTable) ? "ring-2 ring-red-400 ring-offset-1" : ""}`}
             onClick={kpi.onClick}
           >
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${kpi.gradient}`} />
@@ -1702,6 +1769,176 @@ export function ExecutiveDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Overdue Table (CP - Contas em Atraso) */}
+      {showOverdueTable && activeTab === "atrasadas" && (
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg text-slate-800">Detalhamento de Contas em Atraso</CardTitle>
+                <p className="text-sm text-slate-400 mt-1">
+                  {overdueByCreditor.length} credores - {filteredAtrasadas.length} parcelas em atraso
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setShowOverdueTable(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="px-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50/80">
+                    <TableHead className="w-10" />
+                    <TableHead
+                      className="cursor-pointer select-none hover:text-slate-700"
+                      onClick={() => setOverdueSort(s => ({ field: "creditorName", dir: s.field === "creditorName" && s.dir === "asc" ? "desc" : "asc" }))}
+                    >
+                      <div className="flex items-center gap-1">
+                        Credor
+                        {overdueSort.field === "creditorName" ? (overdueSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none hover:text-slate-700 text-center"
+                      onClick={() => setOverdueSort(s => ({ field: "installments", dir: s.field === "installments" && s.dir === "desc" ? "asc" : "desc" }))}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Parcelas
+                        {overdueSort.field === "installments" ? (overdueSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+                      </div>
+                    </TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none hover:text-slate-700 text-center"
+                      onClick={() => setOverdueSort(s => ({ field: "maxDaysOverdue", dir: s.field === "maxDaysOverdue" && s.dir === "desc" ? "asc" : "desc" }))}
+                    >
+                      <div className="flex items-center justify-center gap-1">
+                        Maior Atraso
+                        {overdueSort.field === "maxDaysOverdue" ? (overdueSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+                      </div>
+                    </TableHead>
+                    <TableHead>Empresas</TableHead>
+                    <TableHead
+                      className="cursor-pointer select-none hover:text-slate-700 text-right"
+                      onClick={() => setOverdueSort(s => ({ field: "totalOverdue", dir: s.field === "totalOverdue" && s.dir === "desc" ? "asc" : "desc" }))}
+                    >
+                      <div className="flex items-center justify-end gap-1">
+                        Total em Atraso
+                        {overdueSort.field === "totalOverdue" ? (overdueSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+                      </div>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {overdueByCreditor.map((creditor) => {
+                    const isExpanded = expandedCreditors.has(creditor.creditorName);
+                    return (
+                      <React.Fragment key={creditor.creditorName}>
+                        <TableRow
+                          className="cursor-pointer hover:bg-slate-50 transition-colors"
+                          onClick={() => {
+                            setExpandedCreditors(prev => {
+                              const next = new Set(prev);
+                              if (next.has(creditor.creditorName)) next.delete(creditor.creditorName);
+                              else next.add(creditor.creditorName);
+                              return next;
+                            });
+                          }}
+                        >
+                          <TableCell className="w-10 pl-4">
+                            {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                          </TableCell>
+                          <TableCell className="font-medium text-slate-800">
+                            {creditor.creditorName}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="secondary" className="bg-red-50 text-red-700 font-semibold">
+                              {creditor.installments}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="destructive" className="font-semibold">
+                              {creditor.maxDaysOverdue} dias
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {creditor.companies.map(c => (
+                                <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{c}</span>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-bold text-red-600 tabular-nums">
+                            {formatCurrency(creditor.totalOverdue)}
+                          </TableCell>
+                        </TableRow>
+                        {isExpanded && (
+                          <TableRow className="bg-slate-50/50">
+                            <TableCell colSpan={6} className="p-0">
+                              <div className="px-8 py-3">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="text-xs text-slate-400 uppercase tracking-wider">
+                                      <th className="text-left py-2 font-semibold">Titulo</th>
+                                      <th className="text-left py-2 font-semibold">Documento</th>
+                                      <th className="text-left py-2 font-semibold">Vencimento</th>
+                                      <th className="text-center py-2 font-semibold">Dias Atraso</th>
+                                      <th className="text-right py-2 font-semibold">Valor Original</th>
+                                      <th className="text-right py-2 font-semibold">Saldo</th>
+                                      <th className="text-left py-2 font-semibold">Empresa</th>
+                                      <th className="text-left py-2 font-semibold">Projeto</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {creditor.items
+                                      .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+                                      .map((item, idx) => (
+                                        <tr key={`${item.billId}-${item.installmentId}-${idx}`} className="border-t border-slate-100">
+                                          <td className="py-2 text-slate-600">{item.billId}/{item.installmentId}</td>
+                                          <td className="py-2 text-slate-600">{item.documentNumber || "-"}</td>
+                                          <td className="py-2 text-slate-600">{formatDate(item.dueDate)}</td>
+                                          <td className="py-2 text-center">
+                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                                              daysDiff(item.dueDate) > 90 ? "bg-red-100 text-red-700" :
+                                              daysDiff(item.dueDate) > 30 ? "bg-orange-100 text-orange-700" :
+                                              "bg-yellow-100 text-yellow-700"
+                                            }`}>
+                                              {daysDiff(item.dueDate)}d
+                                            </span>
+                                          </td>
+                                          <td className="py-2 text-right tabular-nums text-slate-600">{formatCurrency(item.originalAmount)}</td>
+                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600">{formatCurrency(effectiveAmount(item))}</td>
+                                          <td className="py-2 text-slate-600 text-xs">{item.companyName}</td>
+                                          <td className="py-2 text-slate-600 text-xs">{item.projectName}</td>
+                                        </tr>
+                                      ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            {/* Footer totals */}
+            <div className="flex items-center justify-between px-6 pt-4 mt-2 border-t border-slate-100">
+              <div className="flex gap-6 text-sm text-slate-500">
+                <span><strong className="text-slate-700">{overdueByCreditor.length}</strong> credores</span>
+                <span><strong className="text-slate-700">{filteredAtrasadas.length}</strong> parcelas</span>
+              </div>
+              <div className="text-sm font-bold text-red-600">
+                Total: {formatCurrency(filteredAtrasadas.reduce((s, i) => s + effectiveAmount(i), 0))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Delinquent Table */}
       {showDelinquentTable && activeTab === "inadimplencia" && (
