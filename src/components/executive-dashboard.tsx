@@ -587,7 +587,7 @@ export function ExecutiveDashboard() {
     if (!cubData || companySettings.length === 0) return [];
     const cubValue = cubData.currentValue;
 
-    return companySettings.map(cs => {
+    return companySettings.filter(cs => selectedCompanies.size === 0 || selectedCompanies.has(cs.companyName)).map(cs => {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
       // Sum payments for this company using same filters as Contas Pagas (paidSum)
@@ -626,7 +626,7 @@ export function ExecutiveDashboard() {
       if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
       return b.budget - a.budget;
     });
-  }, [cubData, companySettings, consistentItems, selectedOpTypes, selectedYears]);
+  }, [cubData, companySettings, consistentItems, selectedOpTypes, selectedYears, selectedCompanies]);
 
   const budgetTotals = useMemo(() => {
     const activeRows = budgetData.filter(r => r.status === "Ativa");
@@ -1582,6 +1582,38 @@ export function ExecutiveDashboard() {
         </div>
 
         {/* Filters */}
+        {activeTab === "orcamento" && <div className="flex items-center gap-2">
+          <MultiSelectFilter
+            label="Empresas"
+            icon={<Building2 className="h-4 w-4" />}
+            allOptions={allCompanyNames}
+            selected={selectedCompanies}
+            onToggle={(name) => toggleInSet(setSelectedCompanies, name)}
+            onSelectAll={() => setSelectedCompanies(new Set(allCompanyNames))}
+            onClear={() => setSelectedCompanies(defaultCompanies())}
+            activeColor="blue"
+            onSaveDefault={() => {
+              localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
+              toast.success("Padrao de empresas salvo!");
+            }}
+          />
+          {allOpTypes.length > 0 && (
+            <MultiSelectFilter
+              label="Tipo Operação"
+              icon={<CheckCircle className="h-4 w-4" />}
+              allOptions={allOpTypes}
+              selected={selectedOpTypes}
+              onToggle={(name) => toggleInSet(setSelectedOpTypes, name)}
+              onSelectAll={() => setSelectedOpTypes(new Set(allOpTypes))}
+              onClear={() => setSelectedOpTypes(new Set())}
+              activeColor="emerald"
+              onSaveDefault={() => {
+                localStorage.setItem("dashboard_default_opTypes", JSON.stringify([...selectedOpTypes]));
+                toast.success("Padrao de operacoes salvo!");
+              }}
+            />
+          )}
+        </div>}
         {activeTab !== "orcamento" && <div className="flex items-center gap-2">
           <MultiSelectFilter
             label="Empresas"
@@ -1722,7 +1754,7 @@ export function ExecutiveDashboard() {
                     </TableHeader>
                     <TableBody>
                       {budgetData.map((row) => (
-                        <TableRow key={row.companyId} className={`hover:bg-slate-50 ${row.status === "Finalizada" ? "bg-slate-50/50" : ""}`}>
+                        <TableRow key={row.companyId} className={`${row.status === "Finalizada" ? "bg-slate-100/80 hover:bg-slate-100 text-slate-400" : "hover:bg-slate-50"}`}>
                           <TableCell className="font-medium">{row.companyName}</TableCell>
                           <TableCell className="text-center text-slate-500">{row.factor.toFixed(2)}</TableCell>
                           <TableCell className="text-right font-mono text-sm">{formatCurrency(row.budget)}</TableCell>
