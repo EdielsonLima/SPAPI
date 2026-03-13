@@ -1,9 +1,9 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build && cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public 2>/dev/null; true"
+buildCommand = "npm run build"
 
 [deploy]
-startCommand = "npm run db:migrate && HOSTNAME=0.0.0.0 node .next/standalone/server.js"
+startCommand = "npm run db:migrate && npx next start -p ${PORT:-3000} -H 0.0.0.0"
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
