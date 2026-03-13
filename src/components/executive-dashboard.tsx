@@ -299,39 +299,39 @@ export function ExecutiveDashboard() {
     return Array.from(days).sort();
   }, [activeItems]);
 
-  // Track which year ranges have been loaded for each section
-  const loadedCpYearsRef = useRef<string>("");
-  const loadedCrYearsRef = useRef<string>("");
-  const loadedBmRef = useRef(false);
+  // Always fetch the widest possible range so tab switching never causes data loss
+  const dataRangeRef = useRef({ startDate: "", endDate: "" });
+  const loadedCpRef = useRef(false);
+  const loadedCrRef = useRef(false);
+
+  // Compute the maximum date range that covers all possible tabs
+  const maxStartDate = useMemo(() => `${currentYear - 10}-01-01`, [currentYear]);
+  const maxEndDate = useMemo(() => `${currentYear + 5}-12-31`, [currentYear]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    if (selectedYears.size === 0) { setItems([]); setIncomeItems([]); setBankFees([]); return; }
-    const yearsArr = Array.from(selectedYears).map(Number).sort();
-    const startDate = `${yearsArr[0] - 2}-01-01`;
-    const endDate = `${yearsArr[yearsArr.length - 1]}-12-31`;
+    const rangeKey = `${maxStartDate}:${maxEndDate}`;
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
-    const yearsKey = `${startDate}:${endDate}`;
 
-    const isFirstLoad = loadedCpYearsRef.current === "" && loadedCrYearsRef.current === "";
+    const isFirstLoad = !loadedCpRef.current && !loadedCrRef.current;
     if (forceRefresh) setRefreshing(true);
     else if (isFirstLoad) setLoading(true);
 
     try {
       const fetches: Promise<void>[] = [];
 
-      // Fetch CP data if needed
-      if (forceRefresh || loadedCpYearsRef.current !== yearsKey) {
+      // Fetch CP data if needed (once, or on force refresh)
+      if (forceRefresh || !loadedCpRef.current) {
         fetches.push(
           (async () => {
             const [outcomeRes, bmRes] = await Promise.all([
-              fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
-              fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+              fetch(`/api/sienge/outcome?startDate=${maxStartDate}&endDate=${maxEndDate}${refreshParam}`),
+              fetch(`/api/sienge/bank-movements?startDate=${maxStartDate}&endDate=${maxEndDate}${refreshParam}`),
             ]);
             if (!outcomeRes.ok) throw new Error("Outcome API error");
             const outcomeData = await outcomeRes.json();
             setItems(outcomeData.data || []);
             if (outcomeData.cachedAt) setLastUpdatedCp(outcomeData.cachedAt);
-            loadedCpYearsRef.current = yearsKey;
+            loadedCpRef.current = true;
 
             if (bmRes.ok) {
               const bmData = await bmRes.json();
@@ -344,21 +344,20 @@ export function ExecutiveDashboard() {
               );
               setBankFees(fees);
             }
-            loadedBmRef.current = true;
           })()
         );
       }
 
-      // Fetch CR data if needed
-      if (forceRefresh || loadedCrYearsRef.current !== yearsKey) {
+      // Fetch CR data if needed (once, or on force refresh)
+      if (forceRefresh || !loadedCrRef.current) {
         fetches.push(
           (async () => {
-            const incomeRes = await fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`);
+            const incomeRes = await fetch(`/api/sienge/income?startDate=${maxStartDate}&endDate=${maxEndDate}${refreshParam}`);
             if (!incomeRes.ok) throw new Error("Income API error");
             const incomeData = await incomeRes.json();
             setIncomeItems(incomeData.data || []);
             if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
-            loadedCrYearsRef.current = yearsKey;
+            loadedCrRef.current = true;
           })()
         );
       }
@@ -366,6 +365,7 @@ export function ExecutiveDashboard() {
       if (fetches.length > 0) {
         await Promise.all(fetches);
       }
+      dataRangeRef.current = { startDate: maxStartDate, endDate: maxEndDate };
     } catch {
       toast.error("Erro ao carregar dados do painel executivo");
     } finally {
@@ -373,7 +373,7 @@ export function ExecutiveDashboard() {
       setRefreshing(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYears]);
+  }, [maxStartDate, maxEndDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
