@@ -21,6 +21,7 @@ import {
   ShoppingCart,
   BarChart3,
   CheckCircle,
+  Settings,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -43,27 +44,6 @@ const menuItems: MenuItem[] = [
     label: "Dashboard",
     href: "/dashboard",
     icon: <LayoutDashboard className="h-5 w-5" />,
-  },
-  {
-    label: "Cadastros",
-    icon: <ClipboardList className="h-5 w-5" />,
-    children: [
-      {
-        label: "Empresas",
-        href: "/cadastros/empresas",
-        icon: <Building className="h-4 w-4" />,
-      },
-      {
-        label: "Centros de Custo",
-        href: "/cadastros/centros-custo",
-        icon: <Landmark className="h-4 w-4" />,
-      },
-      {
-        label: "Plano Financeiro",
-        href: "/cadastros/plano-financeiro",
-        icon: <FileSpreadsheet className="h-4 w-4" />,
-      },
-    ],
   },
   {
     label: "Financeiro",
@@ -107,11 +87,32 @@ const menuItems: MenuItem[] = [
       },
     ],
   },
+  {
+    label: "Configuracoes",
+    icon: <Settings className="h-5 w-5" />,
+    children: [
+      {
+        label: "Empresas",
+        href: "/cadastros/empresas",
+        icon: <Building className="h-4 w-4" />,
+      },
+      {
+        label: "Centros de Custo",
+        href: "/cadastros/centros-custo",
+        icon: <Landmark className="h-4 w-4" />,
+      },
+      {
+        label: "Plano Financeiro",
+        href: "/cadastros/plano-financeiro",
+        icon: <FileSpreadsheet className="h-4 w-4" />,
+      },
+    ],
+  },
 ];
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [openSubmenus, setOpenSubmenus] = useState<string[]>(["Cadastros"]);
+  const [openSubmenus, setOpenSubmenus] = useState<string[]>(["Financeiro"]);
   const [overdueCount, setOverdueCount] = useState(0);
   const pathname = usePathname();
 
@@ -254,7 +255,7 @@ export function Sidebar() {
                     <div
                       className={cn(
                         "overflow-hidden transition-all duration-200",
-                        isOpen ? "max-h-48 mt-1" : "max-h-0"
+                        isOpen ? "max-h-64 mt-1" : "max-h-0"
                       )}
                     >
                       <div className="ml-4 pl-3 border-l border-slate-700 space-y-1">
