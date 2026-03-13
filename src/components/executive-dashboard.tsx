@@ -590,12 +590,16 @@ export function ExecutiveDashboard() {
     return companySettings.map(cs => {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
-      // Sum all payments for this company across all outcome data
+      // Sum payments for this company using same filters as Contas Pagas (paidSum)
       let realized = 0;
       consistentItems.forEach(item => {
         if (item.companyName === cs.companyName) {
           (item.payments || []).forEach(p => {
-            if (p.netAmount > 0) {
+            if (
+              p.netAmount > 0 &&
+              (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
+              p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+            ) {
               realized += p.netAmount;
             }
           });
@@ -622,7 +626,7 @@ export function ExecutiveDashboard() {
       if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
       return b.budget - a.budget;
     });
-  }, [cubData, companySettings, consistentItems]);
+  }, [cubData, companySettings, consistentItems, selectedOpTypes, selectedYears]);
 
   const budgetTotals = useMemo(() => {
     const activeRows = budgetData.filter(r => r.status === "Ativa");
