@@ -223,7 +223,11 @@ function CustomTooltip({ active, payload, label }: any) {
 export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
   const [section, setSection] = useState<Section>("cp");
-  const [selectedYears, setSelectedYears] = useState<Set<string>>(new Set([String(currentYear)]));
+  const [selectedYears, setSelectedYears] = useState<Set<string>>(() => {
+    const years: string[] = [];
+    for (let y = currentYear - 8; y <= currentYear; y++) years.push(String(y));
+    return new Set(years);
+  });
   const [selectedDuePeriods, setSelectedDuePeriods] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<MainTab>("a-pagar");
   const [items, setItems] = useState<SiengeOutcome[]>([]);
@@ -299,37 +303,38 @@ export function ExecutiveDashboard() {
     return Array.from(days).sort();
   }, [activeItems]);
 
-  // Always fetch the widest possible range so tab switching never causes data loss
-  const loadedCpRef = useRef(false);
-  const loadedCrRef = useRef(false);
-
-  // Compute the maximum date range that covers all possible tabs
-  const maxStartDate = useMemo(() => `${currentYear - 10}-01-01`, [currentYear]);
-  const maxEndDate = useMemo(() => `${currentYear + 5}-12-31`, [currentYear]);
+  // Track loaded date ranges to avoid redundant fetches
+  const loadedCpRangeRef = useRef("");
+  const loadedCrRangeRef = useRef("");
 
   const fetchData = useCallback(async (forceRefresh = false) => {
+    if (selectedYears.size === 0) { setItems([]); setIncomeItems([]); setBankFees([]); return; }
+    const yearsArr = Array.from(selectedYears).map(Number).sort();
+    const startDate = `${yearsArr[0] - 2}-01-01`;
+    const endDate = `${yearsArr[yearsArr.length - 1]}-12-31`;
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
+    const rangeKey = `${startDate}:${endDate}`;
 
-    const isFirstLoad = !loadedCpRef.current && !loadedCrRef.current;
+    const isFirstLoad = loadedCpRangeRef.current === "" && loadedCrRangeRef.current === "";
     if (forceRefresh) setRefreshing(true);
     else if (isFirstLoad) setLoading(true);
 
     try {
       const fetches: Promise<void>[] = [];
 
-      // Fetch CP data if needed (once, or on force refresh)
-      if (forceRefresh || !loadedCpRef.current) {
+      // Only fetch CP if range changed or force refresh
+      if (forceRefresh || loadedCpRangeRef.current !== rangeKey) {
         fetches.push(
           (async () => {
             const [outcomeRes, bmRes] = await Promise.all([
-              fetch(`/api/sienge/outcome?startDate=${maxStartDate}&endDate=${maxEndDate}${refreshParam}`),
-              fetch(`/api/sienge/bank-movements?startDate=${maxStartDate}&endDate=${maxEndDate}${refreshParam}`),
+              fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+              fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
             ]);
             if (!outcomeRes.ok) throw new Error("Outcome API error");
             const outcomeData = await outcomeRes.json();
             setItems(outcomeData.data || []);
             if (outcomeData.cachedAt) setLastUpdatedCp(outcomeData.cachedAt);
-            loadedCpRef.current = true;
+            loadedCpRangeRef.current = rangeKey;
 
             if (bmRes.ok) {
               const bmData = await bmRes.json();
@@ -346,16 +351,16 @@ export function ExecutiveDashboard() {
         );
       }
 
-      // Fetch CR data if needed (once, or on force refresh)
-      if (forceRefresh || !loadedCrRef.current) {
+      // Only fetch CR if range changed or force refresh
+      if (forceRefresh || loadedCrRangeRef.current !== rangeKey) {
         fetches.push(
           (async () => {
-            const incomeRes = await fetch(`/api/sienge/income?startDate=${maxStartDate}&endDate=${maxEndDate}${refreshParam}`);
+            const incomeRes = await fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`);
             if (!incomeRes.ok) throw new Error("Income API error");
             const incomeData = await incomeRes.json();
             setIncomeItems(incomeData.data || []);
             if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
-            loadedCrRef.current = true;
+            loadedCrRangeRef.current = rangeKey;
           })()
         );
       }
@@ -370,7 +375,7 @@ export function ExecutiveDashboard() {
       setRefreshing(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maxStartDate, maxEndDate]);
+  }, [selectedYears]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -1464,7 +1469,6 @@ export function ExecutiveDashboard() {
                 if (section !== "cp") {
                   setSection("cp");
                   setActiveTab("a-pagar");
-                  setSelectedYears(new Set([String(currentYear)]));
                   setSelectedCompanies(new Set());
                   setSelectedDocTypes(new Set());
                   setSelectedMonths(new Set());
@@ -1486,7 +1490,6 @@ export function ExecutiveDashboard() {
                 if (section !== "cr") {
                   setSection("cr");
                   setActiveTab("a-receber");
-                  setSelectedYears(new Set([String(currentYear)]));
                   setSelectedCompanies(new Set());
                   setSelectedDocTypes(new Set());
                   setSelectedMonths(new Set());
@@ -1523,17 +1526,10 @@ export function ExecutiveDashboard() {
           {activeTab !== "orcamento" && <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             setActiveTab(tab);
-            // Only reset time-based filters, keep company and docType selections stable
+            // Only reset time-based filters, keep company, docType and year selections stable
             setSelectedMonths(new Set());
             setSelectedDays(new Set());
             setSelectedDuePeriods(new Set());
-            if (tab === "pagas" || tab === "atrasadas" || tab === "recebidas" || tab === "inadimplencia") {
-              const allYears: string[] = [];
-              for (let y = currentYear - 8; y <= currentYear; y++) allYears.push(String(y));
-              setSelectedYears(new Set(allYears));
-            } else {
-              setSelectedYears(new Set([String(currentYear)]));
-            }
           }}>
             <TabsList className="h-12 bg-transparent p-0 gap-1">
               {section === "cp" ? (
