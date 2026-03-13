@@ -370,10 +370,13 @@ export function ExecutiveDashboard() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Reset filters when years change
+  // Reset filters when years change — restore from localStorage if available
   useEffect(() => {
-    setSelectedCompanies(defaultCompanies());
-    setSelectedDocTypes(new Set());
+    const savedCo = localStorage.getItem("dashboard_default_companies");
+    setSelectedCompanies(savedCo ? new Set(JSON.parse(savedCo)) : defaultCompanies());
+    const savedDoc = localStorage.getItem("dashboard_default_docTypes");
+    if (savedDoc) setSelectedDocTypes(new Set(JSON.parse(savedDoc)));
+    else setSelectedDocTypes(new Set());
     setSelectedMonths(new Set());
     setSelectedDays(new Set());
     setSelectedDuePeriods(new Set());
@@ -1523,7 +1526,7 @@ export function ExecutiveDashboard() {
             activeColor="blue"
             onSaveDefault={() => {
               localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
-              alert("Padrao de empresas salvo!");
+              toast.success("Padrao de empresas salvo!");
             }}
           />
           {(activeTab === "pagas" || activeTab === "recebidas") && allOpTypes.length > 0 && (
@@ -1538,7 +1541,7 @@ export function ExecutiveDashboard() {
               activeColor="emerald"
               onSaveDefault={() => {
                 localStorage.setItem("dashboard_default_opTypes", JSON.stringify([...selectedOpTypes]));
-                alert("Padrao salvo! Proxima vez que abrir, carregara com essa selecao.");
+                toast.success("Padrao de operacoes salvo!");
               }}
             />
           )}
@@ -1553,7 +1556,7 @@ export function ExecutiveDashboard() {
             activeColor="violet"
             onSaveDefault={() => {
               localStorage.setItem("dashboard_default_docTypes", JSON.stringify([...selectedDocTypes]));
-              alert("Padrao de tipo documento salvo!");
+              toast.success("Padrao de tipo documento salvo!");
             }}
           />
           {([...selectedCompanies].some(n => isExcludedCompany(n)) || selectedCompanies.size !== defaultCompanies().size || selectedMonths.size > 0 || selectedDays.size > 0 || selectedDuePeriods.size > 0 || ((activeTab === "pagas" || activeTab === "recebidas") && selectedOpTypes.size > 0 && selectedOpTypes.size !== allOpTypes.length) || selectedDocTypes.size !== allDocTypes.filter(t => !isExcludedDocType(t)).length || [...selectedDocTypes].some(t => isExcludedDocType(t))) && (
