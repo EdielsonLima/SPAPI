@@ -32,6 +32,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Ruler,
 } from "lucide-react";
 import {
   BarChart,
@@ -50,7 +51,7 @@ import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS } from "@/lib/dashboard-utils";
 
 type Section = "cp" | "cr";
-type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia";
+type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento";
 type ChartView = "mensal" | "anual";
 
 // === Reusable Multi-Select Filter ===
@@ -232,6 +233,7 @@ export function ExecutiveDashboard() {
   const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
   const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
+  const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number }[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
@@ -375,11 +377,15 @@ export function ExecutiveDashboard() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Fetch CUB data once on mount
+  // Fetch CUB data and company settings on mount
   useEffect(() => {
     fetch("/api/cub")
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data && data.currentValue) setCubData(data); })
+      .catch(() => {});
+    fetch("/api/company-settings")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.data) setCompanySettings(data.data); })
       .catch(() => {});
   }, []);
 
@@ -573,6 +579,52 @@ export function ExecutiveDashboard() {
   const filteredAReceber = useMemo(() => applyFilters(itemsAReceber), [itemsAReceber, applyFilters]);
   const filteredInadimplencia = useMemo(() => applyFilters(itemsInadimplencia), [itemsInadimplencia, applyFilters]);
   const filteredRecebidas = useMemo(() => applyFilters(itemsRecebidas), [itemsRecebidas, applyFilters]);
+
+  // === Budget vs Actual (Orçado vs Realizado) ===
+  const budgetData = useMemo(() => {
+    if (!cubData || companySettings.length === 0) return [];
+    const cubValue = cubData.currentValue;
+
+    return companySettings.map(cs => {
+      const budget = cs.areaM2 * cs.factor * cubValue;
+
+      // Sum all payments for this company across all outcome data
+      let realized = 0;
+      consistentItems.forEach(item => {
+        if (item.companyName === cs.companyName) {
+          (item.payments || []).forEach(p => {
+            if (p.netAmount > 0) {
+              realized += p.netAmount;
+            }
+          });
+        }
+      });
+
+      const toRealize = budget - realized;
+      const percentReal = budget > 0 ? (realized / budget) * 100 : 0;
+      const status: "Ativa" | "Finalizada" = toRealize > 0 ? "Ativa" : "Finalizada";
+
+      return {
+        companyId: cs.companyId,
+        companyName: cs.companyName,
+        factor: cs.factor,
+        areaM2: cs.areaM2,
+        budget,
+        realized,
+        toRealize,
+        percentReal: Math.round(percentReal * 100) / 100,
+        status,
+      };
+    }).sort((a, b) => b.budget - a.budget);
+  }, [cubData, companySettings, consistentItems]);
+
+  const budgetTotals = useMemo(() => {
+    const activeRows = budgetData.filter(r => r.status === "Ativa");
+    const totalBudget = budgetData.reduce((s, r) => s + r.budget, 0);
+    const totalRealized = budgetData.reduce((s, r) => s + r.realized, 0);
+    const totalToRealize = activeRows.reduce((s, r) => s + Math.max(0, r.toRealize), 0);
+    return { totalBudget, totalRealized, totalToRealize };
+  }, [budgetData]);
 
   // === Delinquents grouped by client ===
   interface DelinquentClient {
@@ -1305,6 +1357,7 @@ export function ExecutiveDashboard() {
         onClick: () => { setShowDelinquentTable(v => !v); setExpandedClients(new Set()); },
       },
     ],
+    orcamento: [],
   };
 
   const kpis = kpiConfigs[activeTab];
@@ -1465,10 +1518,24 @@ export function ExecutiveDashboard() {
               <ArrowDownLeft className="h-3.5 w-3.5" />
               CR
             </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                setActiveTab("orcamento");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "orcamento"
+                  ? "bg-white text-purple-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <Ruler className="h-3.5 w-3.5" />
+              Orçamento
+            </button>
           </div>
 
           {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={v => {
+          {activeTab !== "orcamento" && <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             setActiveTab(tab);
             // Only reset time-based filters, keep company and docType selections stable
@@ -1526,11 +1593,11 @@ export function ExecutiveDashboard() {
                 </>
               )}
             </TabsList>
-          </Tabs>
+          </Tabs>}
         </div>
 
         {/* Filters */}
-        <div className="flex items-center gap-2">
+        {activeTab !== "orcamento" && <div className="flex items-center gap-2">
           <MultiSelectFilter
             label="Empresas"
             icon={<Building2 className="h-4 w-4" />}
@@ -1595,11 +1662,113 @@ export function ExecutiveDashboard() {
               <X className="h-4 w-4" />
             </Button>
           )}
-        </div>
+        </div>}
       </div>
 
+      {/* Budget Tab Content */}
+      {activeTab === "orcamento" && (
+        <div className="space-y-6">
+          {/* CUB Info Bar */}
+          {cubData && (
+            <div className="flex items-center gap-3">
+              <div className="bg-slate-800 text-white rounded-lg px-4 py-2 text-center">
+                <p className="text-xs text-slate-400">Valor CUB mês atual</p>
+                <p className="text-lg font-bold">{formatCurrency(cubData.currentValue)}</p>
+              </div>
+              <div className="bg-slate-800 text-white rounded-lg px-4 py-2 text-center">
+                <p className="text-xs text-slate-400">Variação CUB mês atual</p>
+                <p className="text-lg font-bold">{cubData.monthlyVariation.toFixed(2)}%</p>
+              </div>
+              <div className="bg-slate-800 text-white rounded-lg px-4 py-2 text-center">
+                <p className="text-xs text-slate-400">Var Acum. {currentYear}</p>
+                <p className="text-lg font-bold">{cubData.yearlyAccumulated.toFixed(2)}%</p>
+              </div>
+            </div>
+          )}
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-blue-500 to-blue-600" />
+              <CardContent className="pt-4 pb-4">
+                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Orçamento</p>
+                <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(budgetTotals.totalBudget)}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-emerald-500 to-emerald-600" />
+              <CardContent className="pt-4 pb-4">
+                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Realizado</p>
+                <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(budgetTotals.totalRealized)}</p>
+              </CardContent>
+            </Card>
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-amber-500 to-amber-600" />
+              <CardContent className="pt-4 pb-4">
+                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">A Realizar</p>
+                <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(budgetTotals.totalToRealize)}</p>
+                <p className="text-xs text-slate-400 mt-1">Valor não contabiliza obras finalizadas e saldos negativos</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Budget Table */}
+          <Card className="border-0 shadow-sm">
+            <CardContent className="px-0 pb-0 pt-0">
+              {budgetData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                  <Ruler className="h-12 w-12 mb-3 text-slate-300" />
+                  <p className="text-sm font-medium">Nenhum empreendimento configurado</p>
+                  <p className="text-xs mt-1">Configure os empreendimentos em Configuracoes → Empreendimentos</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-100/80">
+                      <TableRow>
+                        <TableHead className="font-semibold">Empreendimento</TableHead>
+                        <TableHead className="text-center font-semibold w-20">Fator</TableHead>
+                        <TableHead className="text-right font-semibold">Orçamento</TableHead>
+                        <TableHead className="text-right font-semibold">Realizado</TableHead>
+                        <TableHead className="text-right font-semibold">À Realizar</TableHead>
+                        <TableHead className="text-center font-semibold w-24">% Real</TableHead>
+                        <TableHead className="text-center font-semibold w-24">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {budgetData.map((row) => (
+                        <TableRow key={row.companyId} className={`hover:bg-slate-50 ${row.status === "Finalizada" ? "bg-slate-50/50" : ""}`}>
+                          <TableCell className="font-medium">{row.companyName}</TableCell>
+                          <TableCell className="text-center text-slate-500">{row.factor.toFixed(2)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatCurrency(row.budget)}</TableCell>
+                          <TableCell className="text-right font-mono text-sm">{formatCurrency(row.realized)}</TableCell>
+                          <TableCell className={`text-right font-mono text-sm ${row.toRealize < 0 ? "text-red-600" : ""}`}>
+                            {row.toRealize < 0 && <TrendingDown className="inline h-3 w-3 mr-1" />}
+                            {formatCurrency(row.toRealize)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={`text-sm font-semibold ${row.percentReal >= 100 ? "text-emerald-600" : row.percentReal >= 70 ? "text-amber-600" : "text-blue-600"}`}>
+                              {row.percentReal.toFixed(2)}%
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant={row.status === "Ativa" ? "default" : "secondary"} className={row.status === "Ativa" ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100" : "bg-slate-200 text-slate-600"}>
+                              {row.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* KPI Cards */}
-      <div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {activeTab !== "orcamento" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
@@ -2146,6 +2315,7 @@ export function ExecutiveDashboard() {
           </CardContent>
         </Card>
       )}
+      </>)}
 
     </div>
   );
