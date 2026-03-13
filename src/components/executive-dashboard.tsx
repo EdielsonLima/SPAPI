@@ -523,12 +523,8 @@ export function ExecutiveDashboard() {
 
   const itemsRecebidas = useMemo(() =>
     consistentIncome.filter(i =>
-      (i.payments || []).some(p =>
-        p.netAmount > 0 &&
-        (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
-        p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
-      )
-    ), [consistentIncome, selectedOpTypes, selectedYears]);
+      i.originalAmount > 0 && i.correctedBalanceAmount === 0
+    ), [consistentIncome]);
 
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);
@@ -638,7 +634,7 @@ export function ExecutiveDashboard() {
     filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0), [filteredInadimplencia]);
 
   const totalRecebido = useMemo(() =>
-    filteredRecebidas.reduce((s, i) => s + paidSum(i), 0), [filteredRecebidas, paidSum]);
+    filteredRecebidas.reduce((s, i) => s + i.originalAmount, 0), [filteredRecebidas]);
 
   const receberHoje = useMemo(() => {
     const hoje = new Date().toISOString().split("T")[0];
@@ -676,15 +672,10 @@ export function ExecutiveDashboard() {
 
   const recebidoHoje = useMemo(() => {
     const hoje = new Date().toISOString().split("T")[0];
-    return filteredRecebidas.reduce((s, i) =>
-      s + (i.payments || [])
-        .filter(p =>
-          p.paymentDate === hoje &&
-          (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName))
-        )
-        .reduce((ps, p) => ps + p.netAmount, 0)
-    , 0);
-  }, [filteredRecebidas, selectedOpTypes]);
+    return filteredRecebidas
+      .filter(i => i.dueDate === hoje)
+      .reduce((s, i) => s + i.originalAmount, 0);
+  }, [filteredRecebidas]);
 
   const recebido7dias = useMemo(() => {
     const hoje = new Date();
@@ -692,23 +683,20 @@ export function ExecutiveDashboard() {
     d7.setDate(d7.getDate() - 7);
     const d7Str = d7.toISOString().split("T")[0];
     const hojeStr = hoje.toISOString().split("T")[0];
-    return filteredRecebidas.reduce((s, i) =>
-      s + (i.payments || [])
-        .filter(p =>
-          p.paymentDate && p.paymentDate >= d7Str && p.paymentDate <= hojeStr &&
-          (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName))
-        )
-        .reduce((ps, p) => ps + p.netAmount, 0)
-    , 0);
-  }, [filteredRecebidas, selectedOpTypes]);
+    return filteredRecebidas
+      .filter(i => i.dueDate >= d7Str && i.dueDate <= hojeStr)
+      .reduce((s, i) => s + i.originalAmount, 0);
+  }, [filteredRecebidas]);
 
   // === Chart helpers ===
-  function buildCompanyChart(sourceItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid") {
+  function buildCompanyChart(sourceItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received") {
     const map = new Map<string, number>();
     sourceItems.forEach(item => {
       const val = field === "balance"
         ? effectiveAmount(item)
-        : paidSum(item);
+        : field === "received"
+          ? item.originalAmount
+          : paidSum(item);
       if (val > 0) {
         map.set(item.companyName, (map.get(item.companyName) || 0) + val);
       }
@@ -731,7 +719,7 @@ export function ExecutiveDashboard() {
       .sort((a, b) => b.value - a.value);
   }
 
-  function buildMonthlyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid", skipPastMonths = false) {
+  function buildMonthlyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received", skipPastMonths = false) {
     const currentMonth = new Date().getMonth(); // 0-indexed
     if (field === "paid") {
       // Agrupa pagamentos por paymentDate (data real do pagamento), filtrando pelo ano selecionado
@@ -758,6 +746,15 @@ export function ExecutiveDashboard() {
         return { month: label, value };
       }).filter(Boolean) as { month: string; value: number }[];
     }
+    if (field === "received") {
+      // Agrupa por dueDate e usa originalAmount
+      return MONTH_LABELS.map((label, idx) => {
+        const monthItems = filteredItems.filter(i => new Date(i.dueDate + "T00:00:00").getMonth() === idx);
+        const value = monthItems.reduce((s, i) => s + i.originalAmount, 0);
+        if (value === 0 && idx > currentMonth) return null;
+        return { month: label, value };
+      }).filter(Boolean) as { month: string; value: number }[];
+    }
     return MONTH_LABELS.map((label, idx) => {
       if (skipPastMonths && selectedYears.has(String(currentYear)) && selectedYears.size === 1 && idx < currentMonth) return null;
       const monthItems = filteredItems.filter(i => {
@@ -769,7 +766,7 @@ export function ExecutiveDashboard() {
     }).filter(Boolean) as { month: string; value: number }[];
   }
 
-  function buildAnnualChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid") {
+  function buildAnnualChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received") {
     if (field === "paid") {
       // Agrupa pagamentos por ano do paymentDate, filtrando pelo ano selecionado
       const yearMap = new Map<number, number>();
@@ -788,6 +785,16 @@ export function ExecutiveDashboard() {
       filteredBankFees.forEach(bm => {
         const y = new Date(bm.bankMovementDate + "T00:00:00").getFullYear();
         yearMap.set(y, (yearMap.get(y) || 0) + Math.abs(bm.bankMovementAmount));
+      });
+      return Array.from(yearMap.entries())
+        .sort((a, b) => a[0] - b[0])
+        .map(([year, value]) => ({ month: String(year), value }));
+    }
+    if (field === "received") {
+      const yearMap = new Map<number, number>();
+      filteredItems.forEach(item => {
+        const y = new Date(item.dueDate + "T00:00:00").getFullYear();
+        yearMap.set(y, (yearMap.get(y) || 0) + item.originalAmount);
       });
       return Array.from(yearMap.entries())
         .sort((a, b) => a[0] - b[0])
@@ -857,9 +864,9 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "recebidas") {
       return {
-        companyChart: buildCompanyChart(applyChartFilters(itemsRecebidas), "paid"),
-        monthly: buildMonthlyChart(filteredRecebidas, "paid"),
-        annual: buildAnnualChart(filteredRecebidas, "paid"),
+        companyChart: buildCompanyChart(applyChartFilters(itemsRecebidas), "received"),
+        monthly: buildMonthlyChart(filteredRecebidas, "received"),
+        annual: buildAnnualChart(filteredRecebidas, "received"),
         color: "hsl(199, 89%, 48%)",
         label: "Recebido",
       };
