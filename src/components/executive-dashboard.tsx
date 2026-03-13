@@ -973,28 +973,10 @@ export function ExecutiveDashboard() {
   }
 
   // === Tab-specific data ===
-  // Company chart: applies docType filter + excludes admin/holding companies, but NOT user company selection
-  const applyChartFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string }>(list: T[]): T[] => {
-    let result = list.filter(i => !isExcludedCompany(i.companyName));
-    if (selectedDocTypes.size > 0) {
-      result = result.filter(i => selectedDocTypes.has(i.documentIdentificationName));
-    }
-    if (selectedMonths.size > 0) {
-      result = result.filter(i => i.dueDate && selectedMonths.has(i.dueDate.substring(5, 7)));
-    }
-    if (selectedDays.size > 0) {
-      result = result.filter(i => i.dueDate && selectedDays.has(i.dueDate.substring(8, 10)));
-    }
-    if (duePeriodMaxDate) {
-      result = result.filter(i => i.dueDate && i.dueDate <= duePeriodMaxDate);
-    }
-    return result;
-  }, [selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate]);
-
   const tabData = useMemo(() => {
     if (activeTab === "a-pagar") {
       return {
-        companyChart: buildCompanyChart(applyChartFilters(itemsAPagar), "balance"),
+        companyChart: buildCompanyChart(filteredAPagar, "balance"),
         monthly: buildMonthlyChart(filteredAPagar, "balance", true),
         annual: buildAnnualChart(filteredAPagar, "balance"),
         color: "hsl(217, 91%, 60%)",
@@ -1002,7 +984,7 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "pagas") {
       return {
-        companyChart: buildCompanyChart(applyChartFilters(itemsPagas), "paid"),
+        companyChart: buildCompanyChart(filteredPagas, "paid"),
         monthly: buildMonthlyChart(filteredPagas, "paid"),
         annual: buildAnnualChart(filteredPagas, "paid"),
         color: "hsl(160, 60%, 45%)",
@@ -1010,7 +992,7 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "atrasadas") {
       return {
-        companyChart: buildCompanyChart(applyChartFilters(itemsAtrasadas), "balance"),
+        companyChart: buildCompanyChart(filteredAtrasadas, "balance"),
         monthly: buildMonthlyChart(filteredAtrasadas, "balance"),
         annual: buildAnnualChart(filteredAtrasadas, "balance"),
         color: "hsl(0, 84%, 60%)",
@@ -1018,7 +1000,7 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "a-receber") {
       return {
-        companyChart: buildCompanyChart(applyChartFilters(itemsAReceber), "balance"),
+        companyChart: buildCompanyChart(filteredAReceber, "balance"),
         monthly: buildMonthlyChart(filteredAReceber, "balance", true),
         annual: buildAnnualChart(filteredAReceber, "balance"),
         color: "hsl(142, 71%, 45%)",
@@ -1026,7 +1008,7 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "recebidas") {
       return {
-        companyChart: buildCompanyChart(applyChartFilters(itemsRecebidas), "received"),
+        companyChart: buildCompanyChart(filteredRecebidas, "received"),
         monthly: buildMonthlyChart(filteredRecebidas, "received"),
         annual: buildAnnualChart(filteredRecebidas, "received"),
         color: "hsl(199, 89%, 48%)",
@@ -1035,7 +1017,7 @@ export function ExecutiveDashboard() {
     } else {
       // inadimplencia
       return {
-        companyChart: buildCompanyChart(applyChartFilters(itemsInadimplencia), "balance"),
+        companyChart: buildCompanyChart(filteredInadimplencia, "balance"),
         monthly: buildMonthlyChart(filteredInadimplencia, "balance"),
         annual: buildAnnualChart(filteredInadimplencia, "balance"),
         color: "hsl(25, 95%, 53%)",
