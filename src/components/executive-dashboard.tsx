@@ -1032,21 +1032,27 @@ export function ExecutiveDashboard() {
     return (
       <div className="space-y-8 p-1">
         <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-8 w-64 bg-slate-200" />
           <div className="flex gap-3">
-            <Skeleton className="h-10 w-28" />
-            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-10 w-28 bg-slate-200" />
+            <Skeleton className="h-10 w-64 bg-slate-200" />
           </div>
         </div>
-        <Skeleton className="h-12 w-96" />
+        {/* Loading indicator */}
+        <div className="flex items-center justify-center py-4">
+          <div className="flex items-center gap-3 px-5 py-3 bg-white rounded-xl shadow-sm border border-slate-100">
+            <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+            <span className="text-sm font-medium text-slate-600">Carregando dados do painel...</span>
+          </div>
+        </div>
         <div className="grid gap-5 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-36 rounded-xl" />
+            <Skeleton key={i} className="h-36 rounded-xl bg-slate-200" />
           ))}
         </div>
         <div className="grid gap-6 lg:grid-cols-3">
-          <Skeleton className="h-[420px] rounded-xl" />
-          <Skeleton className="h-[420px] rounded-xl lg:col-span-2" />
+          <Skeleton className="h-[420px] rounded-xl bg-slate-200" />
+          <Skeleton className="h-[420px] rounded-xl lg:col-span-2 bg-slate-200" />
         </div>
       </div>
     );
