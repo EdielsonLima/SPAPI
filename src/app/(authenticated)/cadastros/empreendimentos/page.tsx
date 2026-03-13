@@ -14,7 +14,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, RefreshCw, Save, Plus, Trash2, AlertCircle, Loader2 } from "lucide-react";
+import { Search, RefreshCw, Save, Plus, Trash2, AlertCircle, Loader2, PenLine, X } from "lucide-react";
 import { SiengeCompany } from "@/types/sienge";
 import { toast } from "sonner";
 
@@ -34,6 +34,27 @@ interface EditRow {
   status: string;
 }
 
+interface CubOverride {
+  value: number;
+  monthLabel: string;
+  monthlyVariation: number;
+  yearlyAccumulated: number;
+  updatedAt: string;
+}
+
+interface CubData {
+  currentValue: number;
+  currentMonth: string;
+  monthlyVariation: number;
+  yearlyAccumulated: number;
+  source: string;
+}
+
+const MONTH_OPTIONS = [
+  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+];
+
 export default function EmpreendimentosPage() {
   const [companies, setCompanies] = useState<SiengeCompany[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,21 +64,36 @@ export default function EmpreendimentosPage() {
   const [rows, setRows] = useState<EditRow[]>([]);
   const [showAddRow, setShowAddRow] = useState(false);
 
+  // CUB override state
+  const [cubOverride, setCubOverride] = useState<CubOverride | null>(null);
+  const [cubAuto, setCubAuto] = useState<CubData | null>(null);
+  const [cubValue, setCubValue] = useState("");
+  const [cubMonth, setCubMonth] = useState("");
+  const [cubYear, setCubYear] = useState(String(new Date().getFullYear()));
+  const [cubMonthVar, setCubMonthVar] = useState("");
+  const [cubYearVar, setCubYearVar] = useState("");
+  const [savingCub, setSavingCub] = useState(false);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
-      const [companiesRes, settingsRes] = await Promise.all([
+      const [companiesRes, settingsRes, cubOverrideRes, cubAutoRes] = await Promise.all([
         fetch("/api/sienge/companies?limit=100&offset=0"),
         fetch("/api/company-settings"),
+        fetch("/api/cub/override"),
+        fetch("/api/cub"),
       ]);
       const companiesData = await companiesRes.json();
       const settingsData = await settingsRes.json();
+      const cubOverrideData = await cubOverrideRes.json();
+      const cubAutoData = cubAutoRes.ok ? await cubAutoRes.json() : null;
 
       const allCompanies: SiengeCompany[] = companiesData.results || [];
       const allSettings: CompanySetting[] = settingsData.data || [];
 
       setCompanies(allCompanies);
+      setCubAuto(cubAutoData?.error ? null : cubAutoData);
 
       // Build rows from saved settings
       setRows(
@@ -69,6 +105,18 @@ export default function EmpreendimentosPage() {
           status: s.status || "ativa",
         }))
       );
+
+      // CUB override
+      const ov: CubOverride | null = cubOverrideData.data || null;
+      setCubOverride(ov);
+      if (ov) {
+        setCubValue(String(ov.value));
+        const parts = ov.monthLabel.split("/");
+        setCubMonth(parts[0] || "");
+        setCubYear(parts[1] || String(new Date().getFullYear()));
+        setCubMonthVar(String(ov.monthlyVariation));
+        setCubYearVar(String(ov.yearlyAccumulated));
+      }
     } catch {
       setError(true);
       toast.error("Erro ao carregar dados");
@@ -151,6 +199,52 @@ export default function EmpreendimentosPage() {
     }
   };
 
+  const handleSaveCubOverride = async () => {
+    if (!cubValue || !cubMonth) {
+      toast.error("Informe o valor e o mes do CUB");
+      return;
+    }
+    setSavingCub(true);
+    try {
+      await fetch("/api/cub/override", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          value: parseFloat(cubValue),
+          monthLabel: `${cubMonth}/${cubYear}`,
+          monthlyVariation: parseFloat(cubMonthVar) || 0,
+          yearlyAccumulated: parseFloat(cubYearVar) || 0,
+        }),
+      });
+      setCubOverride({
+        value: parseFloat(cubValue),
+        monthLabel: `${cubMonth}/${cubYear}`,
+        monthlyVariation: parseFloat(cubMonthVar) || 0,
+        yearlyAccumulated: parseFloat(cubYearVar) || 0,
+        updatedAt: new Date().toISOString(),
+      });
+      toast.success("Valor do CUB manual salvo! Ele sera usado no lugar do automatico.");
+    } catch {
+      toast.error("Erro ao salvar valor do CUB");
+    } finally {
+      setSavingCub(false);
+    }
+  };
+
+  const handleRemoveCubOverride = async () => {
+    try {
+      await fetch("/api/cub/override", { method: "DELETE" });
+      setCubOverride(null);
+      setCubValue("");
+      setCubMonth("");
+      setCubMonthVar("");
+      setCubYearVar("");
+      toast.success("Override removido. O sistema voltara a buscar automaticamente.");
+    } catch {
+      toast.error("Erro ao remover override");
+    }
+  };
+
   const filtered = rows.filter(
     (r) =>
       r.companyName.toLowerCase().includes(search.toLowerCase()) ||
@@ -179,6 +273,122 @@ export default function EmpreendimentosPage() {
         </div>
       </div>
 
+      {/* CUB Override Card */}
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <PenLine className="h-5 w-5 text-blue-600" />
+              <h2 className="text-lg font-semibold text-slate-800">Valor do CUB SC</h2>
+            </div>
+            {cubOverride ? (
+              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
+                Usando valor manual
+              </Badge>
+            ) : (
+              <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                Automatico (myside.com.br)
+              </Badge>
+            )}
+          </div>
+          {cubAuto && !cubOverride && (
+            <p className="text-sm text-slate-500 mt-1">
+              Valor atual via scraping: <strong>R$ {cubAuto.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> ({cubAuto.currentMonth}) | Var. Mes: {cubAuto.monthlyVariation}% | Acum. Ano: {cubAuto.yearlyAccumulated}%
+            </p>
+          )}
+          {!cubAuto && !cubOverride && (
+            <p className="text-sm text-slate-500 mt-1">
+              O scraping automatico ainda nao retornou dados. Insira um valor manual abaixo.
+            </p>
+          )}
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500">Valor (R$/m²)</label>
+              <Input
+                type="number"
+                placeholder="3028.45"
+                value={cubValue}
+                onChange={(e) => setCubValue(e.target.value)}
+                className="w-36 h-9"
+                step="0.01"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500">Mes</label>
+              <select
+                value={cubMonth}
+                onChange={(e) => setCubMonth(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm w-24"
+              >
+                <option value="">--</option>
+                {MONTH_OPTIONS.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500">Ano</label>
+              <Input
+                type="number"
+                value={cubYear}
+                onChange={(e) => setCubYear(e.target.value)}
+                className="w-20 h-9"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500">Var. Mes (%)</label>
+              <Input
+                type="number"
+                placeholder="0.30"
+                value={cubMonthVar}
+                onChange={(e) => setCubMonthVar(e.target.value)}
+                className="w-28 h-9"
+                step="0.01"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-500">Acum. Ano (%)</label>
+              <Input
+                type="number"
+                placeholder="0.65"
+                value={cubYearVar}
+                onChange={(e) => setCubYearVar(e.target.value)}
+                className="w-28 h-9"
+                step="0.01"
+              />
+            </div>
+            <Button
+              size="sm"
+              onClick={handleSaveCubOverride}
+              disabled={savingCub}
+              className="bg-blue-600 hover:bg-blue-700 text-white h-9"
+            >
+              {savingCub ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Save className="h-4 w-4 mr-1" />}
+              Salvar CUB Manual
+            </Button>
+            {cubOverride && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleRemoveCubOverride}
+                className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50"
+              >
+                <X className="h-4 w-4 mr-1" />
+                Remover Override
+              </Button>
+            )}
+          </div>
+          {cubOverride && (
+            <p className="text-xs text-amber-600 mt-2">
+              O valor manual tem prioridade sobre o scraping automatico. Remova o override para voltar ao automatico.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Companies Table Card */}
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-4">
           <div className="flex items-center gap-3">

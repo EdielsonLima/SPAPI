@@ -138,6 +138,16 @@ CREATE TABLE IF NOT EXISTS cached_cub (
   cached_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- ── Override Manual do CUB SC ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS cub_override (
+  id                  INTEGER PRIMARY KEY DEFAULT 1,
+  value               NUMERIC(10,2) NOT NULL,
+  month_label         TEXT NOT NULL,
+  monthly_variation   NUMERIC(6,2) NOT NULL DEFAULT 0,
+  yearly_accumulated  NUMERIC(6,2) NOT NULL DEFAULT 0,
+  updated_at          TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- ── Migração: adicionar coluna status em company_settings ──────────────────
 ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ativa';
 

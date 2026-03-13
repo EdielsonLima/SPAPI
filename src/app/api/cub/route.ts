@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCachedCub, cacheCub } from "@/lib/db";
+import { getCachedCub, cacheCub, getCubOverride } from "@/lib/db";
 
 interface CubMonthData {
   month: string;
@@ -87,19 +87,32 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const forceRefresh = searchParams.get("forceRefresh") === "true";
 
-    // Check cache first (skip if forceRefresh)
+    // 1. Check manual override first (always takes priority)
+    const override = await getCubOverride();
+    if (override) {
+      return NextResponse.json({
+        currentValue: override.value,
+        currentMonth: override.monthLabel,
+        monthlyVariation: override.monthlyVariation,
+        yearlyAccumulated: override.yearlyAccumulated,
+        monthlyData: [],
+        source: "manual",
+        cachedAt: override.updatedAt,
+      });
+    }
+
+    // 2. Check cache (skip if forceRefresh)
     if (!forceRefresh) {
       const cached = await getCachedCub();
       if (cached) {
         const d = cached.data as Record<string, unknown>;
-        // Only use cache if it was fetched from myside.com.br (has source field)
         if (d.source === "myside") {
           return NextResponse.json(cached.data);
         }
       }
     }
 
-    // Fetch from myside.com.br
+    // 3. Fetch from myside.com.br
     const response = await fetch("https://myside.com.br/guia-balneario-camboriu/cub-sc", {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",

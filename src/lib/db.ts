@@ -335,6 +335,44 @@ export async function cacheCub(data: unknown) {
   );
 }
 
+// ─── CUB Manual Override ────────────────────────────────────────────────────
+
+export interface CubOverride {
+  value: number;
+  monthLabel: string;
+  monthlyVariation: number;
+  yearlyAccumulated: number;
+  updatedAt: string;
+}
+
+export async function getCubOverride(): Promise<CubOverride | null> {
+  const result = await pool.query(
+    `SELECT value, month_label, monthly_variation, yearly_accumulated, updated_at FROM cub_override WHERE id = 1`
+  );
+  if (result.rows.length === 0) return null;
+  const r = result.rows[0];
+  return {
+    value: parseFloat(r.value),
+    monthLabel: r.month_label,
+    monthlyVariation: parseFloat(r.monthly_variation),
+    yearlyAccumulated: parseFloat(r.yearly_accumulated),
+    updatedAt: r.updated_at,
+  };
+}
+
+export async function upsertCubOverride(value: number, monthLabel: string, monthlyVariation: number, yearlyAccumulated: number) {
+  await pool.query(
+    `INSERT INTO cub_override (id, value, month_label, monthly_variation, yearly_accumulated, updated_at)
+     VALUES (1, $1, $2, $3, $4, NOW())
+     ON CONFLICT (id) DO UPDATE SET value = $1, month_label = $2, monthly_variation = $3, yearly_accumulated = $4, updated_at = NOW()`,
+    [value, monthLabel, monthlyVariation, yearlyAccumulated]
+  );
+}
+
+export async function deleteCubOverride() {
+  await pool.query(`DELETE FROM cub_override WHERE id = 1`);
+}
+
 // ─── Confirmações de Chegada de Insumos ───────────────────────────────────────
 
 export interface ArrivalConfirmation {
