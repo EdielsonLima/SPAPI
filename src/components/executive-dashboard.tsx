@@ -231,6 +231,7 @@ export function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
   const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
+  const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
@@ -373,6 +374,14 @@ export function ExecutiveDashboard() {
   }, [selectedYears]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Fetch CUB data once on mount
+  useEffect(() => {
+    fetch("/api/cub")
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data && data.currentValue) setCubData(data); })
+      .catch(() => {});
+  }, []);
 
   // Reset time-based filters when years change (keep company/docType stable)
   useEffect(() => {
@@ -1322,9 +1331,27 @@ export function ExecutiveDashboard() {
     <div className="space-y-6 p-1">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Painel Executivo</h1>
-          <p className="text-slate-500 mt-1">Visao consolidada das contas</p>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">Painel Executivo</h1>
+            <p className="text-slate-500 mt-1">Visao consolidada das contas</p>
+          </div>
+          {cubData && (
+            <div className="flex items-center gap-2 ml-4">
+              <div className="bg-slate-800 text-white rounded-lg px-3 py-1.5 text-center">
+                <p className="text-xs text-slate-400 leading-tight">Valor CUB mês atual</p>
+                <p className="text-sm font-bold leading-tight">{formatCurrency(cubData.currentValue)}</p>
+              </div>
+              <div className="bg-slate-800 text-white rounded-lg px-3 py-1.5 text-center">
+                <p className="text-xs text-slate-400 leading-tight">Variação CUB mês atual</p>
+                <p className="text-sm font-bold leading-tight">{cubData.monthlyVariation.toFixed(2)}%</p>
+              </div>
+              <div className="bg-slate-800 text-white rounded-lg px-3 py-1.5 text-center">
+                <p className="text-xs text-slate-400 leading-tight">Var Acum. {currentYear}</p>
+                <p className="text-sm font-bold leading-tight">{cubData.yearlyAccumulated.toFixed(2)}%</p>
+              </div>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           {(() => {

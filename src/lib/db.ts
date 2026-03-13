@@ -316,6 +316,23 @@ export async function deleteCompanySetting(companyId: number) {
   await pool.query(`DELETE FROM company_settings WHERE company_id = $1`, [companyId]);
 }
 
+// ─── CUB SC Cache ───────────────────────────────────────────────────────────
+
+export async function getCachedCub(): Promise<{ data: unknown; cachedAt: string } | null> {
+  const result = await pool.query(
+    `SELECT data, cached_at FROM cached_cub WHERE id = 1 AND cached_at > NOW() - INTERVAL '24 hours'`
+  );
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
+}
+
+export async function cacheCub(data: unknown) {
+  await pool.query(
+    `INSERT INTO cached_cub (id, data, cached_at) VALUES (1, $1, NOW())
+     ON CONFLICT (id) DO UPDATE SET data = $1, cached_at = NOW()`,
+    [JSON.stringify(data)]
+  );
+}
+
 // ─── Confirmações de Chegada de Insumos ───────────────────────────────────────
 
 export interface ArrivalConfirmation {

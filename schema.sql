@@ -130,6 +130,13 @@ CREATE TABLE IF NOT EXISTS company_settings (
   updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- ── Cache CUB SC ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS cached_cub (
+  id         INTEGER PRIMARY KEY DEFAULT 1,
+  data       JSONB     NOT NULL,
+  cached_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- =============================================================================
 -- Índices para performance
 -- =============================================================================
