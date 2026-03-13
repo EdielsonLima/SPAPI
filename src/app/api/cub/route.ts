@@ -89,7 +89,12 @@ export async function GET(request: Request) {
     if (!forceRefresh) {
       const cached = await getCachedCub();
       if (cached) {
-        return NextResponse.json(cached.data);
+        // Invalidate cache if it has data from old source (missing currentMonth or wrong format)
+        const d = cached.data as Record<string, unknown>;
+        const cm = String(d.currentMonth || "");
+        if (cm && cm.includes("/20")) {
+          return NextResponse.json(cached.data);
+        }
       }
     }
 
