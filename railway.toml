@@ -3,8 +3,6 @@ builder = "nixpacks"
 buildCommand = "npm run build"
 
 [deploy]
-startCommand = "npm run db:migrate && npx next start -p ${PORT:-3000} -H 0.0.0.0"
-healthcheckPath = "/api/health"
-healthcheckTimeout = 300
+startCommand = "node scripts/migrate.js && ./node_modules/.bin/next start -p ${PORT:-3000} -H 0.0.0.0"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 5
