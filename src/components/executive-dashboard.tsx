@@ -1308,38 +1308,16 @@ export function ExecutiveDashboard() {
     return { ...item, pct };
   });
 
-  const barColorFn = (idx: number, fullName?: string) => {
-    const isSelected = selectedCompanies.size > 0 && fullName && selectedCompanies.has(fullName);
-    const isDeselected = selectedCompanies.size > 0 && fullName && !selectedCompanies.has(fullName);
-    if (isDeselected) return "#cbd5e1";
-
-    if (activeTab === "a-pagar") return isSelected ? "hsl(217, 91%, 50%)" : `hsl(217, 91%, ${55 + idx * 3}%)`;
-    if (activeTab === "pagas") return isSelected ? "hsl(160, 60%, 35%)" : `hsl(160, 60%, ${40 + idx * 3}%)`;
-    if (activeTab === "atrasadas") return isSelected ? "hsl(0, 84%, 45%)" : `hsl(0, 84%, ${50 + idx * 3}%)`;
-    if (activeTab === "a-receber") return isSelected ? "hsl(142, 71%, 35%)" : `hsl(142, 71%, ${40 + idx * 3}%)`;
-    if (activeTab === "recebidas") return isSelected ? "hsl(199, 89%, 38%)" : `hsl(199, 89%, ${43 + idx * 3}%)`;
-    return isSelected ? "hsl(25, 95%, 43%)" : `hsl(25, 95%, ${48 + idx * 3}%)`;
+  const barColorFn = (idx: number) => {
+    if (activeTab === "a-pagar") return `hsl(217, 91%, ${55 + idx * 3}%)`;
+    if (activeTab === "pagas") return `hsl(160, 60%, ${40 + idx * 3}%)`;
+    if (activeTab === "atrasadas") return `hsl(0, 84%, ${50 + idx * 3}%)`;
+    if (activeTab === "a-receber") return `hsl(142, 71%, ${40 + idx * 3}%)`;
+    if (activeTab === "recebidas") return `hsl(199, 89%, ${43 + idx * 3}%)`;
+    return `hsl(25, 95%, ${48 + idx * 3}%)`;
   };
 
-  // Handle bar click on company chart - drill down to single company, click again to reset
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleCompanyBarClick = (data: any, _idx: number, e: React.MouseEvent) => {
-    if (!data?.fullName) return;
-    // Remove focus from SVG element to prevent outline/stroke
-    if (e?.currentTarget instanceof HTMLElement || e?.currentTarget instanceof SVGElement) {
-      (e.currentTarget as HTMLElement).blur();
-    }
-    if (document.activeElement instanceof HTMLElement) {
-      document.activeElement.blur();
-    }
-    // If only this company is selected, reset to all companies
-    if (selectedCompanies.size === 1 && selectedCompanies.has(data.fullName)) {
-      setSelectedCompanies(defaultCompanies());
-    } else {
-      // Select only this company
-      setSelectedCompanies(new Set([data.fullName]));
-    }
-  };
+
 
   return (
     <div className="space-y-6 p-1">
@@ -1686,11 +1664,9 @@ export function ExecutiveDashboard() {
                     dataKey="value"
                     radius={[0, 4, 4, 0]}
                     maxBarSize={24}
-                    className="cursor-pointer"
-                    onClick={handleCompanyBarClick}
                   >
                     {companyChart.map((entry, idx) => (
-                      <Cell key={idx} fill={barColorFn(idx, entry.fullName)} />
+                      <Cell key={idx} fill={barColorFn(idx)} />
                     ))}
                     <LabelList
                       dataKey="value"
