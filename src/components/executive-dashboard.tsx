@@ -307,14 +307,15 @@ export function ExecutiveDashboard() {
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
     const yearsKey = `${startDate}:${endDate}`;
 
+    const isFirstLoad = loadedCpYearsRef.current === "" && loadedCrYearsRef.current === "";
     if (forceRefresh) setRefreshing(true);
+    else if (isFirstLoad) setLoading(true);
 
     try {
       const fetches: Promise<void>[] = [];
 
       // Fetch CP data if needed
       if (forceRefresh || loadedCpYearsRef.current !== yearsKey) {
-        if (!forceRefresh && items.length === 0) setLoading(true);
         fetches.push(
           (async () => {
             const [outcomeRes, bmRes] = await Promise.all([
@@ -344,7 +345,6 @@ export function ExecutiveDashboard() {
 
       // Fetch CR data if needed
       if (forceRefresh || loadedCrYearsRef.current !== yearsKey) {
-        if (!forceRefresh && incomeItems.length === 0) setLoading(true);
         fetches.push(
           (async () => {
             const incomeRes = await fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`);
