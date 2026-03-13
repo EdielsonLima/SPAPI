@@ -233,7 +233,7 @@ export function ExecutiveDashboard() {
   const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
   const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
-  const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number }[]>([]);
+  const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string }[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
@@ -602,7 +602,7 @@ export function ExecutiveDashboard() {
 
       const toRealize = budget - realized;
       const percentReal = budget > 0 ? (realized / budget) * 100 : 0;
-      const status: "Ativa" | "Finalizada" = toRealize > 0 ? "Ativa" : "Finalizada";
+      const companyStatus: "Ativa" | "Finalizada" = cs.status === "finalizada" ? "Finalizada" : "Ativa";
 
       return {
         companyId: cs.companyId,
@@ -613,9 +613,13 @@ export function ExecutiveDashboard() {
         realized,
         toRealize,
         percentReal: Math.round(percentReal * 100) / 100,
-        status,
+        status: companyStatus,
       };
-    }).sort((a, b) => b.budget - a.budget);
+    }).sort((a, b) => {
+      // Finalized always at the bottom
+      if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
+      return b.budget - a.budget;
+    });
   }, [cubData, companySettings, consistentItems]);
 
   const budgetTotals = useMemo(() => {
@@ -1389,22 +1393,6 @@ export function ExecutiveDashboard() {
             <h1 className="text-2xl font-bold text-slate-800">Painel Executivo</h1>
             <p className="text-slate-500 mt-1">Visao consolidada das contas</p>
           </div>
-          {cubData && (
-            <div className="flex items-center gap-2 ml-4">
-              <div className="bg-slate-800 text-white rounded-lg px-3 py-1.5 text-center">
-                <p className="text-xs text-slate-400 leading-tight">Valor CUB mês atual</p>
-                <p className="text-sm font-bold leading-tight">{formatCurrency(cubData.currentValue)}</p>
-              </div>
-              <div className="bg-slate-800 text-white rounded-lg px-3 py-1.5 text-center">
-                <p className="text-xs text-slate-400 leading-tight">Variação CUB mês atual</p>
-                <p className="text-sm font-bold leading-tight">{cubData.monthlyVariation.toFixed(2)}%</p>
-              </div>
-              <div className="bg-slate-800 text-white rounded-lg px-3 py-1.5 text-center">
-                <p className="text-xs text-slate-400 leading-tight">Var Acum. {currentYear}</p>
-                <p className="text-sm font-bold leading-tight">{cubData.yearlyAccumulated.toFixed(2)}%</p>
-              </div>
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-3">
           {(() => {

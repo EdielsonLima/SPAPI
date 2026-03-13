@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS company_settings (
   company_name TEXT    NOT NULL,
   area_m2      NUMERIC(12,2) NOT NULL DEFAULT 0,
   factor       NUMERIC(6,4) NOT NULL DEFAULT 1,
+  status       TEXT    NOT NULL DEFAULT 'ativa',
   updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
@@ -136,6 +137,9 @@ CREATE TABLE IF NOT EXISTS cached_cub (
   data       JSONB     NOT NULL,
   cached_at  TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- ── Migração: adicionar coluna status em company_settings ──────────────────
+ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ativa';
 
 -- =============================================================================
 -- Índices para performance

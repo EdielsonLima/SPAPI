@@ -26,13 +26,13 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { companyId, companyName, areaM2, factor } = body;
+    const { companyId, companyName, areaM2, factor, status } = body;
 
     if (!companyId || !companyName) {
       return NextResponse.json({ error: "companyId and companyName are required" }, { status: 400 });
     }
 
-    await upsertCompanySetting(companyId, companyName, Number(areaM2) || 0, Number(factor) || 1);
+    await upsertCompanySetting(companyId, companyName, Number(areaM2) || 0, Number(factor) || 1, status || "ativa");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error saving company setting:", error);

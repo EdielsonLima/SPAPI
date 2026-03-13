@@ -23,6 +23,7 @@ interface CompanySetting {
   companyName: string;
   areaM2: number;
   factor: number;
+  status: string;
 }
 
 interface EditRow {
@@ -30,6 +31,7 @@ interface EditRow {
   companyName: string;
   areaM2: string;
   factor: string;
+  status: string;
 }
 
 export default function EmpreendimentosPage() {
@@ -64,6 +66,7 @@ export default function EmpreendimentosPage() {
           companyName: s.companyName,
           areaM2: String(s.areaM2),
           factor: String(s.factor),
+          status: s.status || "ativa",
         }))
       );
     } catch {
@@ -90,6 +93,7 @@ export default function EmpreendimentosPage() {
         companyName: company.name,
         areaM2: "0",
         factor: "1",
+        status: "ativa",
       },
     ]);
     setShowAddRow(false);
@@ -111,6 +115,16 @@ export default function EmpreendimentosPage() {
     );
   };
 
+  const toggleStatus = (companyId: number) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.companyId === companyId
+          ? { ...r, status: r.status === "ativa" ? "finalizada" : "ativa" }
+          : r
+      )
+    );
+  };
+
   const handleSaveAll = async () => {
     setSaving(true);
     try {
@@ -124,6 +138,7 @@ export default function EmpreendimentosPage() {
               companyName: r.companyName,
               areaM2: parseFloat(r.areaM2) || 0,
               factor: parseFloat(r.factor) || 1,
+              status: r.status,
             }),
           })
         )
@@ -142,18 +157,26 @@ export default function EmpreendimentosPage() {
       String(r.companyId).includes(search)
   );
 
+  const ativasCount = rows.filter((r) => r.status === "ativa").length;
+  const finalizadasCount = rows.filter((r) => r.status === "finalizada").length;
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-800">Empreendimentos</h1>
           <p className="text-slate-500 mt-1">
-            Configure a metragem (M²) e o fator de conversao de cada empreendimento
+            Configure a metragem (M²), fator e status de cada empreendimento
           </p>
         </div>
-        <Badge variant="secondary" className="text-sm">
-          {rows.length} empreendimentos
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 text-sm">
+            {ativasCount} ativas
+          </Badge>
+          <Badge className="bg-slate-200 text-slate-500 hover:bg-slate-200 text-sm">
+            {finalizadasCount} finalizadas
+          </Badge>
+        </div>
       </div>
 
       <Card className="border-0 shadow-sm">
@@ -230,6 +253,7 @@ export default function EmpreendimentosPage() {
                 <TableRow>
                   <TableHead className="w-20">Cod</TableHead>
                   <TableHead>Empresa</TableHead>
+                  <TableHead className="w-32 text-center">Status</TableHead>
                   <TableHead className="w-40 text-right">M²</TableHead>
                   <TableHead className="w-32 text-right">Fator</TableHead>
                   <TableHead className="w-16"></TableHead>
@@ -241,18 +265,40 @@ export default function EmpreendimentosPage() {
                       <TableRow key={i}>
                         <TableCell><Skeleton className="h-4 w-12" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-20 mx-auto" /></TableCell>
                         <TableCell><Skeleton className="h-8 w-28 ml-auto" /></TableCell>
                         <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-8" /></TableCell>
                       </TableRow>
                     ))
                   : filtered.map((row) => (
-                      <TableRow key={row.companyId} className="hover:bg-slate-50">
+                      <TableRow
+                        key={row.companyId}
+                        className={row.status === "finalizada" ? "bg-slate-50/50 opacity-70 hover:opacity-100" : "hover:bg-slate-50"}
+                      >
                         <TableCell className="font-mono text-sm text-slate-500">
                           {row.companyId}
                         </TableCell>
                         <TableCell className="font-medium">
                           {row.companyName}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <button
+                            onClick={() => toggleStatus(row.companyId)}
+                            className="inline-flex items-center gap-1.5 transition-colors"
+                          >
+                            {row.status === "ativa" ? (
+                              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 cursor-pointer">
+                                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1.5" />
+                                Ativa
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-slate-200 text-slate-500 hover:bg-slate-300 cursor-pointer">
+                                <span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1.5" />
+                                Finalizada
+                              </Badge>
+                            )}
+                          </button>
                         </TableCell>
                         <TableCell className="text-right">
                           <Input
@@ -288,7 +334,7 @@ export default function EmpreendimentosPage() {
                     ))}
                 {!loading && filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                       {rows.length === 0
                         ? "Nenhum empreendimento configurado. Clique em \"Adicionar\" para comecar."
                         : "Nenhum empreendimento encontrado"}
