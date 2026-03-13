@@ -115,6 +115,72 @@ export interface SiengeOutcomeResponse {
   data: SiengeOutcome[];
 }
 
+// ─── Income (Contas a Receber) ──────────────────────────────────────────────
+
+export interface SiengeIncomePaymentCategory {
+  costCenterId: number;
+  costCenterName: string;
+  financialCategoryId: string;
+  financialCategoryName: string;
+  financialCategoryReducer: string;
+  financialCategoryType: string;
+  financialCategoryRate: number;
+  projectId: number;
+  projectName: string;
+}
+
+export interface SiengeIncomePayment {
+  operationTypeId: number;
+  operationTypeName: string;
+  grossAmount: number;
+  monetaryCorrectionAmount: number;
+  interestAmount: number;
+  fineAmount: number;
+  discountAmount: number;
+  taxAmount: number;
+  netAmount: number;
+  calculationDate: string;
+  paymentDate: string;
+  paymentAuthentication: string;
+  sequencialNumber: number;
+  correctedNetAmount: number;
+}
+
+export interface SiengeIncome {
+  companyId: number;
+  companyName: string;
+  projectId: number;
+  projectName: string;
+  clientId: number;
+  clientName: string;
+  billId: number;
+  installmentId: number;
+  documentIdentificationId: string;
+  documentIdentificationName: string;
+  documentNumber: string;
+  forecastDocument: string;
+  consistencyStatus: string;
+  originId: string;
+  originalAmount: number;
+  discountAmount: number;
+  taxAmount: number;
+  dueDate: string;
+  issueDate: string;
+  balanceAmount: number;
+  correctedBalanceAmount: number;
+  authorizationStatus: string;
+  billDate: string;
+  registeredBy: string;
+  registeredDate: string;
+  observation?: string;
+  paymentsCategories: SiengeIncomePaymentCategory[];
+  payments: SiengeIncomePayment[];
+}
+
+export interface SiengeIncomeResponse {
+  data: SiengeIncome[];
+}
+
 export interface SiengeBankMovement {
   bankMovementId: number;
   billId: number;

@@ -111,6 +111,16 @@ CREATE TABLE IF NOT EXISTS cached_bank_movements (
   PRIMARY KEY (start_date, end_date)
 );
 
+-- ── Income Financeiro (Contas a Receber) ────────────────────────────────────
+-- Cache persistente por período (start_date, end_date).
+CREATE TABLE IF NOT EXISTS cached_income (
+  start_date TEXT      NOT NULL,
+  end_date   TEXT      NOT NULL,
+  data       JSONB     NOT NULL,
+  cached_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (start_date, end_date)
+);
+
 -- =============================================================================
 -- Índices para performance
 -- =============================================================================

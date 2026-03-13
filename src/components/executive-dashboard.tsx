@@ -23,6 +23,10 @@ import {
   X,
   Search,
   Save,
+  Users,
+  Banknote,
+  ArrowDownLeft,
+  ArrowUpRight,
 } from "lucide-react";
 import {
   BarChart,
@@ -35,11 +39,12 @@ import {
   Cell,
   LabelList,
 } from "recharts";
-import { SiengeOutcome, SiengeBankMovement } from "@/types/sienge";
+import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge";
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, MONTH_LABELS } from "@/lib/dashboard-utils";
 
-type MainTab = "a-pagar" | "pagas" | "atrasadas";
+type Section = "cp" | "cr";
+type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia";
 type ChartView = "mensal" | "anual";
 
 // === Reusable Multi-Select Filter ===
@@ -210,10 +215,12 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
+  const [section, setSection] = useState<Section>("cp");
   const [selectedYears, setSelectedYears] = useState<Set<string>>(new Set([String(currentYear)]));
   const [selectedDuePeriods, setSelectedDuePeriods] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<MainTab>("a-pagar");
   const [items, setItems] = useState<SiengeOutcome[]>([]);
+  const [incomeItems, setIncomeItems] = useState<SiengeIncome[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -233,14 +240,10 @@ export function ExecutiveDashboard() {
 
   const availableYears = useMemo(() => {
     const arr: string[] = [];
-    if (activeTab === "pagas") {
-      // Contas Pagas: mostra anos passados até o atual
-      for (let y = currentYear - 8; y <= currentYear; y++) arr.push(String(y));
-    } else if (activeTab === "atrasadas") {
-      // Contas Atrasadas: mostra anos passados até o atual (vencimentos em atraso)
+    if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia") {
       for (let y = currentYear - 8; y <= currentYear; y++) arr.push(String(y));
     } else {
-      // Contas a Pagar: mostra ano atual em diante
+      // Contas a Pagar / a Receber: mostra ano atual em diante
       for (let y = currentYear; y <= currentYear + 5; y++) arr.push(String(y));
     }
     return arr;
@@ -257,71 +260,85 @@ export function ExecutiveDashboard() {
   const consistentItems = useMemo(() =>
     items.filter(i => i.consistencyStatus !== 'N'), [items]);
 
+  const consistentIncome = useMemo(() =>
+    incomeItems.filter(i => i.consistencyStatus !== 'N'), [incomeItems]);
+
+  // Active data source based on section
+  const activeItems = section === "cr" ? consistentIncome : consistentItems;
+
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
-    consistentItems.forEach(i => {
+    activeItems.forEach(i => {
       if (i.dueDate) months.add(i.dueDate.substring(5, 7));
     });
     return MONTH_OPTIONS.filter(m => months.has(m));
-  }, [consistentItems]);
+  }, [activeItems]);
 
   const availableDays = useMemo(() => {
     const days = new Set<string>();
-    consistentItems.forEach(i => {
+    activeItems.forEach(i => {
       if (i.dueDate) days.add(i.dueDate.substring(8, 10));
     });
     return Array.from(days).sort();
-  }, [consistentItems]);
+  }, [activeItems]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    if (selectedYears.size === 0) { setItems([]); setBankFees([]); return; }
+    if (selectedYears.size === 0) { setItems([]); setIncomeItems([]); setBankFees([]); return; }
     if (forceRefresh) setRefreshing(true);
     else setLoading(true);
     try {
       const yearsArr = Array.from(selectedYears).map(Number).sort();
-      // Para "Contas Pagas", inclui 2 anos anteriores para capturar títulos
-      // com vencimento em anos anteriores mas pagos no ano selecionado
-      const startYear = activeTab === "pagas" ? yearsArr[0] - 2 : yearsArr[0];
+      const startYear = (activeTab === "pagas" || activeTab === "recebidas") ? yearsArr[0] - 2 : yearsArr[0];
       const startDate = `${startYear}-01-01`;
       const endDate = `${yearsArr[yearsArr.length - 1]}-12-31`;
       const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
-      const outcomeUrl = `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`;
 
-      // Busca outcome + movimentos bancários avulsos em paralelo (para "pagas")
-      const fetches: Promise<Response>[] = [fetch(outcomeUrl)];
-      if (activeTab === "pagas") {
-        const bmUrl = `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`;
-        fetches.push(fetch(bmUrl));
-      }
-
-      const responses = await Promise.all(fetches);
-      if (!responses[0].ok) throw new Error("API error");
-      const outcomeData = await responses[0].json();
-      setItems(outcomeData.data || []);
-
-      // Filtra apenas "Taxas Bancárias" dos movimentos avulsos
-      if (responses[1]?.ok) {
-        const bmData = await responses[1].json();
-        const allBm: SiengeBankMovement[] = bmData.data || [];
-        const fees = allBm.filter(bm =>
-          (bm.financialCategories || []).some(fc =>
-            fc.financialCategoryName?.toLowerCase().includes("taxa") &&
-            fc.financialCategoryName?.toLowerCase().includes("banc")
-          )
-        );
-        setBankFees(fees);
-      } else {
+      if (section === "cr") {
+        // Fetch income data for CR section
+        const incomeUrl = `/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`;
+        const response = await fetch(incomeUrl);
+        if (!response.ok) throw new Error("API error");
+        const incomeData = await response.json();
+        setIncomeItems(incomeData.data || []);
         setBankFees([]);
+      } else {
+        // Fetch outcome data for CP section
+        const outcomeUrl = `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`;
+        const fetches: Promise<Response>[] = [fetch(outcomeUrl)];
+        if (activeTab === "pagas") {
+          const bmUrl = `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`;
+          fetches.push(fetch(bmUrl));
+        }
+
+        const responses = await Promise.all(fetches);
+        if (!responses[0].ok) throw new Error("API error");
+        const outcomeData = await responses[0].json();
+        setItems(outcomeData.data || []);
+
+        if (responses[1]?.ok) {
+          const bmData = await responses[1].json();
+          const allBm: SiengeBankMovement[] = bmData.data || [];
+          const fees = allBm.filter(bm =>
+            (bm.financialCategories || []).some(fc =>
+              fc.financialCategoryName?.toLowerCase().includes("taxa") &&
+              fc.financialCategoryName?.toLowerCase().includes("banc")
+            )
+          );
+          setBankFees(fees);
+        } else {
+          setBankFees([]);
+        }
       }
     } catch {
       setItems([]);
+      setIncomeItems([]);
       setBankFees([]);
       toast.error("Erro ao carregar dados do painel executivo");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedYears, activeTab]);
+  }, [selectedYears, activeTab, section]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -360,9 +377,9 @@ export function ExecutiveDashboard() {
   // === Filter options ===
   const allCompanyNames = useMemo(() => {
     const names = new Set<string>();
-    consistentItems.forEach(i => names.add(i.companyName));
+    activeItems.forEach(i => names.add(i.companyName));
     return Array.from(names).sort();
-  }, [consistentItems]);
+  }, [activeItems]);
 
   // Empresas administrativas/holding excluídas por padrão (não são obras)
   const isExcludedCompany = (name: string) => {
@@ -403,11 +420,11 @@ export function ExecutiveDashboard() {
 
   const allDocTypes = useMemo(() => {
     const types = new Set<string>();
-    consistentItems.forEach(i => {
+    activeItems.forEach(i => {
       if (i.documentIdentificationName) types.add(i.documentIdentificationName);
     });
     return Array.from(types).sort();
-  }, [consistentItems]);
+  }, [activeItems]);
 
   // Auto-initialize docType filter from localStorage or excluding previsão types
   const docTypesInitialized = useRef(false);
@@ -439,10 +456,10 @@ export function ExecutiveDashboard() {
   }, []);
 
   // Valor efetivo: saldo corrigido menos impostos retidos (para bater com relatório Sienge)
-  const effectiveAmount = (i: SiengeOutcome) => i.correctedBalanceAmount - (i.taxAmount || 0);
+  const effectiveAmount = (i: SiengeOutcome | SiengeIncome) => i.correctedBalanceAmount - (i.taxAmount || 0);
 
   // Soma de pagamentos filtrada por tipo de operação e ano do pagamento
-  const paidSum = useCallback((i: SiengeOutcome) =>
+  const paidSum = useCallback((i: SiengeOutcome | SiengeIncome) =>
     (i.payments || [])
       .filter(p =>
         (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
@@ -454,14 +471,14 @@ export function ExecutiveDashboard() {
   // Tipos de operação disponíveis nos dados
   const allOpTypes = useMemo(() => {
     const types = new Set<string>();
-    consistentItems.forEach(i =>
+    activeItems.forEach(i =>
       (i.payments || []).forEach(p => { if (p.operationTypeName) types.add(p.operationTypeName); })
     );
     return Array.from(types).sort();
-  }, [consistentItems]);
+  }, [activeItems]);
 
-  // === Apply filters to items ===
-  const applyFilters = useCallback((list: SiengeOutcome[]) => {
+  // === Apply filters to items (works for both Outcome and Income) ===
+  const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string }>(list: T[]): T[] => {
     let result = list;
     if (selectedCompanies.size > 0) {
       result = result.filter(i => selectedCompanies.has(i.companyName));
@@ -497,10 +514,30 @@ export function ExecutiveDashboard() {
       )
     ), [consistentItems, selectedOpTypes, selectedYears]);
 
+  // === CR Filtered item sets ===
+  const itemsAReceber = useMemo(() =>
+    consistentIncome.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr), [consistentIncome, todayStr]);
+
+  const itemsInadimplencia = useMemo(() =>
+    consistentIncome.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentIncome, todayStr]);
+
+  const itemsRecebidas = useMemo(() =>
+    consistentIncome.filter(i =>
+      (i.payments || []).some(p =>
+        p.netAmount > 0 &&
+        (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
+        p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+      )
+    ), [consistentIncome, selectedOpTypes, selectedYears]);
+
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);
   const filteredAtrasadas = useMemo(() => applyFilters(itemsAtrasadas), [itemsAtrasadas, applyFilters]);
   const filteredPagas = useMemo(() => applyFilters(itemsPagas), [itemsPagas, applyFilters]);
+
+  const filteredAReceber = useMemo(() => applyFilters(itemsAReceber), [itemsAReceber, applyFilters]);
+  const filteredInadimplencia = useMemo(() => applyFilters(itemsInadimplencia), [itemsInadimplencia, applyFilters]);
+  const filteredRecebidas = useMemo(() => applyFilters(itemsRecebidas), [itemsRecebidas, applyFilters]);
 
   // Tarifas bancárias filtradas por ano e empresa selecionados
   const filteredBankFees = useMemo(() => {
@@ -593,8 +630,80 @@ export function ExecutiveDashboard() {
 
   const trends = { pagoDelta: null as number | null, aPagarDelta: null as number | null };
 
+  // === CR KPIs ===
+  const totalAReceber = useMemo(() =>
+    filteredAReceber.reduce((s, i) => s + effectiveAmount(i), 0), [filteredAReceber]);
+
+  const totalInadimplencia = useMemo(() =>
+    filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0), [filteredInadimplencia]);
+
+  const totalRecebido = useMemo(() =>
+    filteredRecebidas.reduce((s, i) => s + paidSum(i), 0), [filteredRecebidas, paidSum]);
+
+  const receberHoje = useMemo(() => {
+    const hoje = new Date().toISOString().split("T")[0];
+    return filteredAReceber
+      .filter(i => i.dueDate === hoje)
+      .reduce((s, i) => s + effectiveAmount(i), 0);
+  }, [filteredAReceber]);
+
+  const receber7dias = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    const futureStr = d.toISOString().split("T")[0];
+    return filteredAReceber
+      .filter(i => i.dueDate <= futureStr)
+      .reduce((s, i) => s + effectiveAmount(i), 0);
+  }, [filteredAReceber]);
+
+  const receber15dias = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 15);
+    const futureStr = d.toISOString().split("T")[0];
+    return filteredAReceber
+      .filter(i => i.dueDate <= futureStr)
+      .reduce((s, i) => s + effectiveAmount(i), 0);
+  }, [filteredAReceber]);
+
+  const receber30dias = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    const futureStr = d.toISOString().split("T")[0];
+    return filteredAReceber
+      .filter(i => i.dueDate <= futureStr)
+      .reduce((s, i) => s + effectiveAmount(i), 0);
+  }, [filteredAReceber]);
+
+  const recebidoHoje = useMemo(() => {
+    const hoje = new Date().toISOString().split("T")[0];
+    return filteredRecebidas.reduce((s, i) =>
+      s + (i.payments || [])
+        .filter(p =>
+          p.paymentDate === hoje &&
+          (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName))
+        )
+        .reduce((ps, p) => ps + p.netAmount, 0)
+    , 0);
+  }, [filteredRecebidas, selectedOpTypes]);
+
+  const recebido7dias = useMemo(() => {
+    const hoje = new Date();
+    const d7 = new Date(hoje);
+    d7.setDate(d7.getDate() - 7);
+    const d7Str = d7.toISOString().split("T")[0];
+    const hojeStr = hoje.toISOString().split("T")[0];
+    return filteredRecebidas.reduce((s, i) =>
+      s + (i.payments || [])
+        .filter(p =>
+          p.paymentDate && p.paymentDate >= d7Str && p.paymentDate <= hojeStr &&
+          (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName))
+        )
+        .reduce((ps, p) => ps + p.netAmount, 0)
+    , 0);
+  }, [filteredRecebidas, selectedOpTypes]);
+
   // === Chart helpers ===
-  function buildCompanyChart(sourceItems: SiengeOutcome[], field: "balance" | "paid") {
+  function buildCompanyChart(sourceItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid") {
     const map = new Map<string, number>();
     sourceItems.forEach(item => {
       const val = field === "balance"
@@ -622,7 +731,7 @@ export function ExecutiveDashboard() {
       .sort((a, b) => b.value - a.value);
   }
 
-  function buildMonthlyChart(filteredItems: SiengeOutcome[], field: "balance" | "paid", skipPastMonths = false) {
+  function buildMonthlyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid", skipPastMonths = false) {
     const currentMonth = new Date().getMonth(); // 0-indexed
     if (field === "paid") {
       // Agrupa pagamentos por paymentDate (data real do pagamento), filtrando pelo ano selecionado
@@ -660,7 +769,7 @@ export function ExecutiveDashboard() {
     }).filter(Boolean) as { month: string; value: number }[];
   }
 
-  function buildAnnualChart(filteredItems: SiengeOutcome[], field: "balance" | "paid") {
+  function buildAnnualChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid") {
     if (field === "paid") {
       // Agrupa pagamentos por ano do paymentDate, filtrando pelo ano selecionado
       const yearMap = new Map<number, number>();
@@ -696,7 +805,7 @@ export function ExecutiveDashboard() {
 
   // === Tab-specific data ===
   // Company chart: applies docType filter + excludes admin/holding companies, but NOT user company selection
-  const applyChartFilters = useCallback((list: SiengeOutcome[]) => {
+  const applyChartFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string }>(list: T[]): T[] => {
     let result = list.filter(i => !isExcludedCompany(i.companyName));
     if (selectedDocTypes.size > 0) {
       result = result.filter(i => selectedDocTypes.has(i.documentIdentificationName));
@@ -719,7 +828,6 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(applyChartFilters(itemsAPagar), "balance"),
         monthly: buildMonthlyChart(filteredAPagar, "balance", true),
         annual: buildAnnualChart(filteredAPagar, "balance"),
-
         color: "hsl(217, 91%, 60%)",
         label: "A Pagar",
       };
@@ -728,22 +836,45 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(applyChartFilters(itemsPagas), "paid"),
         monthly: buildMonthlyChart(filteredPagas, "paid"),
         annual: buildAnnualChart(filteredPagas, "paid"),
-
         color: "hsl(160, 60%, 45%)",
         label: "Pago",
       };
-    } else {
+    } else if (activeTab === "atrasadas") {
       return {
         companyChart: buildCompanyChart(applyChartFilters(itemsAtrasadas), "balance"),
         monthly: buildMonthlyChart(filteredAtrasadas, "balance"),
         annual: buildAnnualChart(filteredAtrasadas, "balance"),
-
         color: "hsl(0, 84%, 60%)",
         label: "Atrasado",
       };
+    } else if (activeTab === "a-receber") {
+      return {
+        companyChart: buildCompanyChart(applyChartFilters(itemsAReceber), "balance"),
+        monthly: buildMonthlyChart(filteredAReceber, "balance", true),
+        annual: buildAnnualChart(filteredAReceber, "balance"),
+        color: "hsl(142, 71%, 45%)",
+        label: "A Receber",
+      };
+    } else if (activeTab === "recebidas") {
+      return {
+        companyChart: buildCompanyChart(applyChartFilters(itemsRecebidas), "paid"),
+        monthly: buildMonthlyChart(filteredRecebidas, "paid"),
+        annual: buildAnnualChart(filteredRecebidas, "paid"),
+        color: "hsl(199, 89%, 48%)",
+        label: "Recebido",
+      };
+    } else {
+      // inadimplencia
+      return {
+        companyChart: buildCompanyChart(applyChartFilters(itemsInadimplencia), "balance"),
+        monthly: buildMonthlyChart(filteredInadimplencia, "balance"),
+        annual: buildAnnualChart(filteredInadimplencia, "balance"),
+        color: "hsl(25, 95%, 53%)",
+        label: "Inadimplente",
+      };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, items, todayStr, selectedCompanies, selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes, filteredBankFees]);
+  }, [activeTab, items, incomeItems, todayStr, selectedCompanies, selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes, filteredBankFees]);
 
   // === Loading State ===
   if (loading) {
@@ -893,6 +1024,114 @@ export function ExecutiveDashboard() {
         gradient: "from-orange-500 to-orange-600",
       },
     ],
+    "a-receber": [
+      {
+        label: "Total a Receber",
+        value: formatCurrency(totalAReceber),
+        subtitle: `${filteredAReceber.length} parcelas`,
+        icon: <Banknote className="h-7 w-7 text-emerald-500" />,
+        iconBg: "bg-emerald-50",
+        gradient: "from-emerald-500 to-emerald-600",
+      },
+      {
+        label: "Vence Hoje",
+        value: formatCurrency(receberHoje),
+        subtitle: (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} - ${filteredAReceber.filter(i => i.dueDate === d.toISOString().split("T")[0]).length} parcelas`; })(),
+        icon: <AlertTriangle className="h-7 w-7 text-amber-500" />,
+        iconBg: "bg-amber-50",
+        gradient: "from-amber-500 to-amber-600",
+      },
+      {
+        label: "Vence em 7 dias",
+        value: formatCurrency(receber7dias),
+        subtitle: (() => { const h = new Date(); const f = new Date(); f.setDate(f.getDate()+7); return `${String(h.getDate()).padStart(2,"0")}/${String(h.getMonth()+1).padStart(2,"0")} a ${String(f.getDate()).padStart(2,"0")}/${String(f.getMonth()+1).padStart(2,"0")}/${f.getFullYear()}`; })(),
+        icon: <CalendarClock className="h-7 w-7 text-teal-500" />,
+        iconBg: "bg-teal-50",
+        gradient: "from-teal-500 to-teal-600",
+      },
+      {
+        label: "Vence em 15 dias",
+        value: formatCurrency(receber15dias),
+        subtitle: (() => { const h = new Date(); const f = new Date(); f.setDate(f.getDate()+15); return `${String(h.getDate()).padStart(2,"0")}/${String(h.getMonth()+1).padStart(2,"0")} a ${String(f.getDate()).padStart(2,"0")}/${String(f.getMonth()+1).padStart(2,"0")}/${f.getFullYear()}`; })(),
+        icon: <CalendarClock className="h-7 w-7 text-cyan-500" />,
+        iconBg: "bg-cyan-50",
+        gradient: "from-cyan-500 to-cyan-600",
+      },
+      {
+        label: "Vence em 30 dias",
+        value: formatCurrency(receber30dias),
+        subtitle: (() => { const h = new Date(); const f = new Date(); f.setDate(f.getDate()+30); return `${String(h.getDate()).padStart(2,"0")}/${String(h.getMonth()+1).padStart(2,"0")} a ${String(f.getDate()).padStart(2,"0")}/${String(f.getMonth()+1).padStart(2,"0")}/${f.getFullYear()}`; })(),
+        icon: <TrendingUp className="h-7 w-7 text-green-500" />,
+        iconBg: "bg-green-50",
+        gradient: "from-green-500 to-green-600",
+      },
+    ],
+    "recebidas": [
+      {
+        label: "Total Recebido",
+        value: formatCurrency(totalRecebido),
+        subtitle: `${filteredRecebidas.length} titulos`,
+        icon: <CheckCircle className="h-7 w-7 text-sky-500" />,
+        iconBg: "bg-sky-50",
+        gradient: "from-sky-500 to-sky-600",
+      },
+      {
+        label: "Recebido Hoje",
+        value: formatCurrency(recebidoHoje),
+        icon: <CalendarClock className="h-7 w-7 text-teal-500" />,
+        iconBg: "bg-teal-50",
+        gradient: "from-teal-500 to-teal-600",
+      },
+      {
+        label: "Recebido Ultimos 7 dias",
+        value: formatCurrency(recebido7dias),
+        icon: <Clock className="h-7 w-7 text-blue-500" />,
+        iconBg: "bg-blue-50",
+        gradient: "from-blue-500 to-blue-600",
+      },
+      {
+        label: "Empresas",
+        value: String(new Set(filteredRecebidas.map(i => i.companyName)).size),
+        subtitle: "com recebimentos",
+        icon: <Building2 className="h-7 w-7 text-slate-500" />,
+        iconBg: "bg-slate-100",
+        gradient: "from-slate-500 to-slate-600",
+      },
+      {
+        label: "Clientes",
+        value: String(new Set(filteredRecebidas.map(i => i.clientName)).size),
+        subtitle: "distintos",
+        icon: <Users className="h-7 w-7 text-sky-500" />,
+        iconBg: "bg-sky-50",
+        gradient: "from-sky-500 to-sky-600",
+      },
+    ],
+    "inadimplencia": [
+      {
+        label: "Total Inadimplente",
+        value: formatCurrency(totalInadimplencia),
+        subtitle: `${filteredInadimplencia.length} parcelas`,
+        icon: <AlertTriangle className="h-7 w-7 text-orange-500" />,
+        iconBg: "bg-orange-50",
+        gradient: "from-orange-500 to-orange-600",
+      },
+      {
+        label: "Empresas",
+        value: String(new Set(filteredInadimplencia.map(i => i.companyName)).size),
+        subtitle: "com inadimplencia",
+        icon: <Building2 className="h-7 w-7 text-orange-400" />,
+        iconBg: "bg-orange-50",
+        gradient: "from-orange-400 to-orange-500",
+      },
+      {
+        label: "Clientes",
+        value: String(new Set(filteredInadimplencia.map(i => i.clientName)).size),
+        subtitle: "inadimplentes",
+        icon: <Users className="h-7 w-7 text-red-500" />,
+        iconBg: "bg-red-50",
+        gradient: "from-red-500 to-red-600",
+      },
+    ],
   };
 
   const kpis = kpiConfigs[activeTab];
@@ -907,11 +1146,14 @@ export function ExecutiveDashboard() {
   const barColorFn = (idx: number, fullName?: string) => {
     const isSelected = selectedCompanies.size > 0 && fullName && selectedCompanies.has(fullName);
     const isDeselected = selectedCompanies.size > 0 && fullName && !selectedCompanies.has(fullName);
-    if (isDeselected) return "#cbd5e1"; // gray for non-selected
+    if (isDeselected) return "#cbd5e1";
 
     if (activeTab === "a-pagar") return isSelected ? "hsl(217, 91%, 50%)" : `hsl(217, 91%, ${55 + idx * 3}%)`;
     if (activeTab === "pagas") return isSelected ? "hsl(160, 60%, 35%)" : `hsl(160, 60%, ${40 + idx * 3}%)`;
-    return isSelected ? "hsl(0, 84%, 45%)" : `hsl(0, 84%, ${50 + idx * 3}%)`;
+    if (activeTab === "atrasadas") return isSelected ? "hsl(0, 84%, 45%)" : `hsl(0, 84%, ${50 + idx * 3}%)`;
+    if (activeTab === "a-receber") return isSelected ? "hsl(142, 71%, 35%)" : `hsl(142, 71%, ${40 + idx * 3}%)`;
+    if (activeTab === "recebidas") return isSelected ? "hsl(199, 89%, 38%)" : `hsl(199, 89%, ${43 + idx * 3}%)`;
+    return isSelected ? "hsl(25, 95%, 43%)" : `hsl(25, 95%, ${48 + idx * 3}%)`;
   };
 
   // Handle bar click on company chart
@@ -993,47 +1235,120 @@ export function ExecutiveDashboard() {
         </div>
       </div>
 
-      {/* Main Tabs + Filters */}
+      {/* Section Toggle (CP / CR) + Main Tabs + Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <Tabs value={activeTab} onValueChange={v => {
-          const tab = v as MainTab;
-          setActiveTab(tab);
-          setSelectedCompanies(defaultCompanies());
-          const defaults = allDocTypes.filter(t => !isExcludedDocType(t));
-          setSelectedDocTypes(new Set(defaults));
-          setSelectedMonths(new Set());
-          setSelectedDays(new Set());
-          setSelectedDuePeriods(new Set());
-          // Para "Contas Pagas" e "Atrasadas" seleciona todos os anos passados, para "A Pagar" apenas o ano atual
-          if (tab === "pagas" || tab === "atrasadas") {
-            const allYears: string[] = [];
-            for (let y = currentYear - 8; y <= currentYear; y++) allYears.push(String(y));
-            setSelectedYears(new Set(allYears));
-          } else {
-            setSelectedYears(new Set([String(currentYear)]));
-          }
-        }}>
-          <TabsList className="h-12 bg-transparent p-0 gap-1">
-            <TabsTrigger value="a-pagar" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "a-pagar" ? "border-blue-500 bg-blue-50 text-blue-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
-              <Clock className="h-4 w-4" />
-              Contas a Pagar
-            </TabsTrigger>
-            <TabsTrigger value="pagas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "pagas" ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
-              <CheckCircle className="h-4 w-4" />
-              Contas Pagas
-            </TabsTrigger>
-            <TabsTrigger value="atrasadas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "atrasadas" ? "border-red-500 bg-red-50 text-red-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
-              <AlertTriangle className="h-4 w-4" />
-              Contas em Atraso
-              {itemsAtrasadas.length > 0 && (
-                <span className="ml-1 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
-                  {itemsAtrasadas.length}
-                </span>
+        <div className="flex items-center gap-3">
+          {/* Section Toggle */}
+          <div className="flex items-center bg-slate-100 rounded-lg p-1 gap-0.5">
+            <button
+              onClick={() => {
+                if (section !== "cp") {
+                  setSection("cp");
+                  setActiveTab("a-pagar");
+                  setSelectedYears(new Set([String(currentYear)]));
+                  setSelectedCompanies(new Set());
+                  setSelectedDocTypes(new Set());
+                  setSelectedMonths(new Set());
+                  setSelectedDays(new Set());
+                  setSelectedDuePeriods(new Set());
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                section === "cp"
+                  ? "bg-white text-red-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <ArrowUpRight className="h-3.5 w-3.5" />
+              CP
+            </button>
+            <button
+              onClick={() => {
+                if (section !== "cr") {
+                  setSection("cr");
+                  setActiveTab("a-receber");
+                  setSelectedYears(new Set([String(currentYear)]));
+                  setSelectedCompanies(new Set());
+                  setSelectedDocTypes(new Set());
+                  setSelectedMonths(new Set());
+                  setSelectedDays(new Set());
+                  setSelectedDuePeriods(new Set());
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                section === "cr"
+                  ? "bg-white text-emerald-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <ArrowDownLeft className="h-3.5 w-3.5" />
+              CR
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <Tabs value={activeTab} onValueChange={v => {
+            const tab = v as MainTab;
+            setActiveTab(tab);
+            setSelectedCompanies(defaultCompanies());
+            const defaults = allDocTypes.filter(t => !isExcludedDocType(t));
+            setSelectedDocTypes(new Set(defaults));
+            setSelectedMonths(new Set());
+            setSelectedDays(new Set());
+            setSelectedDuePeriods(new Set());
+            if (tab === "pagas" || tab === "atrasadas" || tab === "recebidas" || tab === "inadimplencia") {
+              const allYears: string[] = [];
+              for (let y = currentYear - 8; y <= currentYear; y++) allYears.push(String(y));
+              setSelectedYears(new Set(allYears));
+            } else {
+              setSelectedYears(new Set([String(currentYear)]));
+            }
+          }}>
+            <TabsList className="h-12 bg-transparent p-0 gap-1">
+              {section === "cp" ? (
+                <>
+                  <TabsTrigger value="a-pagar" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "a-pagar" ? "border-blue-500 bg-blue-50 text-blue-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                    <Clock className="h-4 w-4" />
+                    Contas a Pagar
+                  </TabsTrigger>
+                  <TabsTrigger value="pagas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "pagas" ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                    <CheckCircle className="h-4 w-4" />
+                    Contas Pagas
+                  </TabsTrigger>
+                  <TabsTrigger value="atrasadas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "atrasadas" ? "border-red-500 bg-red-50 text-red-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                    <AlertTriangle className="h-4 w-4" />
+                    Contas em Atraso
+                    {itemsAtrasadas.length > 0 && (
+                      <span className="ml-1 bg-red-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+                        {itemsAtrasadas.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </>
+              ) : (
+                <>
+                  <TabsTrigger value="a-receber" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "a-receber" ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                    <Banknote className="h-4 w-4" />
+                    Contas a Receber
+                  </TabsTrigger>
+                  <TabsTrigger value="recebidas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "recebidas" ? "border-sky-500 bg-sky-50 text-sky-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                    <CheckCircle className="h-4 w-4" />
+                    Contas Recebidas
+                  </TabsTrigger>
+                  <TabsTrigger value="inadimplencia" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "inadimplencia" ? "border-orange-500 bg-orange-50 text-orange-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                    <AlertTriangle className="h-4 w-4" />
+                    Inadimplencia
+                    {itemsInadimplencia.length > 0 && (
+                      <span className="ml-1 bg-orange-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
+                        {itemsInadimplencia.length}
+                      </span>
+                    )}
+                  </TabsTrigger>
+                </>
               )}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-        <div className={`h-[3px] rounded-full transition-colors ${activeTab === "a-pagar" ? "bg-blue-500" : activeTab === "pagas" ? "bg-emerald-500" : "bg-red-500"}`} />
+            </TabsList>
+          </Tabs>
+        </div>
 
         {/* Filters */}
         <div className="flex items-center gap-2">
@@ -1051,7 +1366,7 @@ export function ExecutiveDashboard() {
               alert("Padrao de empresas salvo!");
             }}
           />
-          {activeTab === "pagas" && allOpTypes.length > 0 && (
+          {(activeTab === "pagas" || activeTab === "recebidas") && allOpTypes.length > 0 && (
             <MultiSelectFilter
               label="Tipo Operação"
               icon={<CheckCircle className="h-4 w-4" />}
@@ -1081,7 +1396,7 @@ export function ExecutiveDashboard() {
               alert("Padrao de tipo documento salvo!");
             }}
           />
-          {([...selectedCompanies].some(n => isExcludedCompany(n)) || selectedCompanies.size !== defaultCompanies().size || selectedMonths.size > 0 || selectedDays.size > 0 || selectedDuePeriods.size > 0 || (activeTab === "pagas" && selectedOpTypes.size > 0 && selectedOpTypes.size !== allOpTypes.length) || selectedDocTypes.size !== allDocTypes.filter(t => !isExcludedDocType(t)).length || [...selectedDocTypes].some(t => isExcludedDocType(t))) && (
+          {([...selectedCompanies].some(n => isExcludedCompany(n)) || selectedCompanies.size !== defaultCompanies().size || selectedMonths.size > 0 || selectedDays.size > 0 || selectedDuePeriods.size > 0 || ((activeTab === "pagas" || activeTab === "recebidas") && selectedOpTypes.size > 0 && selectedOpTypes.size !== allOpTypes.length) || selectedDocTypes.size !== allDocTypes.filter(t => !isExcludedDocType(t)).length || [...selectedDocTypes].some(t => isExcludedDocType(t))) && (
             <Button
               variant="ghost"
               size="sm"

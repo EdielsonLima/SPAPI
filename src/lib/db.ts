@@ -244,6 +244,24 @@ export async function cacheOutcome(startDate: string, endDate: string, data: unk
   );
 }
 
+// ─── Income (Contas a Receber) ───────────────────────────────────────────────
+
+export async function getCachedIncome(startDate: string, endDate: string): Promise<unknown | null> {
+  const result = await pool.query(
+    `SELECT data FROM cached_income WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '24 hours'`,
+    [startDate, endDate]
+  );
+  return result.rows.length > 0 ? result.rows[0].data : null;
+}
+
+export async function cacheIncome(startDate: string, endDate: string, data: unknown) {
+  await pool.query(
+    `INSERT INTO cached_income (start_date, end_date, data, cached_at) VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (start_date, end_date) DO UPDATE SET data = $3, cached_at = NOW()`,
+    [startDate, endDate, JSON.stringify(data)]
+  );
+}
+
 // ─── Bank Movements (Movimentações Bancárias) ────────────────────────────────
 
 export async function getCachedBankMovements(startDate: string, endDate: string): Promise<unknown | null> {
