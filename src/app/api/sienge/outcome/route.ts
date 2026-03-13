@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     const cached = await getCachedOutcome(startDate, endDate);
-    if (cached) return NextResponse.json(cached);
+    if (cached) {
+      const resp = typeof cached.data === "object" && cached.data !== null ? cached.data : { data: cached.data };
+      return NextResponse.json({ ...(resp as Record<string, unknown>), cachedAt: cached.cachedAt });
+    }
   }
 
   const url = new URL(`${SIENGE_BASE}/outcome`);
@@ -50,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     await cacheOutcome(startDate, endDate, data);
-    return NextResponse.json(data);
+    return NextResponse.json({ ...data, cachedAt: new Date().toISOString() });
   } catch (error) {
     console.error("Error fetching outcome:", error);
     return NextResponse.json(

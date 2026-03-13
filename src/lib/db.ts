@@ -228,12 +228,12 @@ export async function invalidatePurchaseOrdersCache(startDate: string, endDate: 
 
 // ─── Outcome (Contas a Pagar) ─────────────────────────────────────────────────
 
-export async function getCachedOutcome(startDate: string, endDate: string): Promise<unknown | null> {
+export async function getCachedOutcome(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
   const result = await pool.query(
-    `SELECT data FROM cached_outcome WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '24 hours'`,
+    `SELECT data, cached_at FROM cached_outcome WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '24 hours'`,
     [startDate, endDate]
   );
-  return result.rows.length > 0 ? result.rows[0].data : null;
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
 }
 
 export async function cacheOutcome(startDate: string, endDate: string, data: unknown) {
@@ -246,12 +246,12 @@ export async function cacheOutcome(startDate: string, endDate: string, data: unk
 
 // ─── Income (Contas a Receber) ───────────────────────────────────────────────
 
-export async function getCachedIncome(startDate: string, endDate: string): Promise<unknown | null> {
+export async function getCachedIncome(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
   const result = await pool.query(
-    `SELECT data FROM cached_income WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '24 hours'`,
+    `SELECT data, cached_at FROM cached_income WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '24 hours'`,
     [startDate, endDate]
   );
-  return result.rows.length > 0 ? result.rows[0].data : null;
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
 }
 
 export async function cacheIncome(startDate: string, endDate: string, data: unknown) {

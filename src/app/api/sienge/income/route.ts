@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     const cached = await getCachedIncome(startDate, endDate);
-    if (cached) return NextResponse.json(cached);
+    if (cached) {
+      const resp = typeof cached.data === "object" && cached.data !== null ? cached.data : { data: cached.data };
+      return NextResponse.json({ ...(resp as Record<string, unknown>), cachedAt: cached.cachedAt });
+    }
   }
 
   const now = new Date();
@@ -84,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     const result = { data: mergedData };
     await cacheIncome(startDate, endDate, result);
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, cachedAt: new Date().toISOString() });
   } catch (error) {
     console.error("Error fetching income:", error);
     return NextResponse.json(

@@ -229,6 +229,8 @@ export function ExecutiveDashboard() {
   const [incomeItems, setIncomeItems] = useState<SiengeIncome[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
+  const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
@@ -325,6 +327,7 @@ export function ExecutiveDashboard() {
             if (!outcomeRes.ok) throw new Error("Outcome API error");
             const outcomeData = await outcomeRes.json();
             setItems(outcomeData.data || []);
+            if (outcomeData.cachedAt) setLastUpdatedCp(outcomeData.cachedAt);
             loadedCpYearsRef.current = yearsKey;
 
             if (bmRes.ok) {
@@ -351,6 +354,7 @@ export function ExecutiveDashboard() {
             if (!incomeRes.ok) throw new Error("Income API error");
             const incomeData = await incomeRes.json();
             setIncomeItems(incomeData.data || []);
+            if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
             loadedCrYearsRef.current = yearsKey;
           })()
         );
@@ -1323,6 +1327,13 @@ export function ExecutiveDashboard() {
           <p className="text-slate-500 mt-1">Visao consolidada das contas</p>
         </div>
         <div className="flex items-center gap-3">
+          {(() => {
+            const ts = section === "cp" ? lastUpdatedCp : lastUpdatedCr;
+            if (!ts) return null;
+            const d = new Date(ts);
+            const formatted = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} às ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+            return <span className="text-xs text-slate-400">Atualizado em {formatted}</span>;
+          })()}
           <Button
             variant="outline"
             size="sm"
