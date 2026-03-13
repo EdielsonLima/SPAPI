@@ -294,63 +294,79 @@ export function ExecutiveDashboard() {
     return Array.from(days).sort();
   }, [activeItems]);
 
+  // Track which year ranges have been loaded for each section
+  const loadedCpYearsRef = useRef<string>("");
+  const loadedCrYearsRef = useRef<string>("");
+  const loadedBmRef = useRef(false);
+
   const fetchData = useCallback(async (forceRefresh = false) => {
     if (selectedYears.size === 0) { setItems([]); setIncomeItems([]); setBankFees([]); return; }
+    const yearsArr = Array.from(selectedYears).map(Number).sort();
+    const startDate = `${yearsArr[0] - 2}-01-01`;
+    const endDate = `${yearsArr[yearsArr.length - 1]}-12-31`;
+    const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
+    const yearsKey = `${startDate}:${endDate}`;
+
     if (forceRefresh) setRefreshing(true);
-    else setLoading(true);
+
     try {
-      const yearsArr = Array.from(selectedYears).map(Number).sort();
-      const startYear = (activeTab === "pagas" || activeTab === "recebidas") ? yearsArr[0] - 2 : yearsArr[0];
-      const startDate = `${startYear}-01-01`;
-      const endDate = `${yearsArr[yearsArr.length - 1]}-12-31`;
-      const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
+      const fetches: Promise<void>[] = [];
 
-      if (section === "cr") {
-        // Fetch income data for CR section
-        const incomeUrl = `/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`;
-        const response = await fetch(incomeUrl);
-        if (!response.ok) throw new Error("API error");
-        const incomeData = await response.json();
-        setIncomeItems(incomeData.data || []);
-        setBankFees([]);
-      } else {
-        // Fetch outcome data for CP section
-        const outcomeUrl = `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`;
-        const fetches: Promise<Response>[] = [fetch(outcomeUrl)];
-        if (activeTab === "pagas") {
-          const bmUrl = `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`;
-          fetches.push(fetch(bmUrl));
-        }
+      // Fetch CP data if needed
+      if (forceRefresh || loadedCpYearsRef.current !== yearsKey) {
+        if (!forceRefresh && items.length === 0) setLoading(true);
+        fetches.push(
+          (async () => {
+            const [outcomeRes, bmRes] = await Promise.all([
+              fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+              fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+            ]);
+            if (!outcomeRes.ok) throw new Error("Outcome API error");
+            const outcomeData = await outcomeRes.json();
+            setItems(outcomeData.data || []);
+            loadedCpYearsRef.current = yearsKey;
 
-        const responses = await Promise.all(fetches);
-        if (!responses[0].ok) throw new Error("API error");
-        const outcomeData = await responses[0].json();
-        setItems(outcomeData.data || []);
+            if (bmRes.ok) {
+              const bmData = await bmRes.json();
+              const allBm: SiengeBankMovement[] = bmData.data || [];
+              const fees = allBm.filter(bm =>
+                (bm.financialCategories || []).some(fc =>
+                  fc.financialCategoryName?.toLowerCase().includes("taxa") &&
+                  fc.financialCategoryName?.toLowerCase().includes("banc")
+                )
+              );
+              setBankFees(fees);
+            }
+            loadedBmRef.current = true;
+          })()
+        );
+      }
 
-        if (responses[1]?.ok) {
-          const bmData = await responses[1].json();
-          const allBm: SiengeBankMovement[] = bmData.data || [];
-          const fees = allBm.filter(bm =>
-            (bm.financialCategories || []).some(fc =>
-              fc.financialCategoryName?.toLowerCase().includes("taxa") &&
-              fc.financialCategoryName?.toLowerCase().includes("banc")
-            )
-          );
-          setBankFees(fees);
-        } else {
-          setBankFees([]);
-        }
+      // Fetch CR data if needed
+      if (forceRefresh || loadedCrYearsRef.current !== yearsKey) {
+        if (!forceRefresh && incomeItems.length === 0) setLoading(true);
+        fetches.push(
+          (async () => {
+            const incomeRes = await fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`);
+            if (!incomeRes.ok) throw new Error("Income API error");
+            const incomeData = await incomeRes.json();
+            setIncomeItems(incomeData.data || []);
+            loadedCrYearsRef.current = yearsKey;
+          })()
+        );
+      }
+
+      if (fetches.length > 0) {
+        await Promise.all(fetches);
       }
     } catch {
-      setItems([]);
-      setIncomeItems([]);
-      setBankFees([]);
       toast.error("Erro ao carregar dados do painel executivo");
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [selectedYears, activeTab, section]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYears]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
