@@ -14,6 +14,7 @@ interface CubResult {
   monthlyVariation: number;
   yearlyAccumulated: number;
   monthlyData: CubMonthData[];
+  source: string;
   cachedAt: string;
 }
 
@@ -71,6 +72,7 @@ function parseMysidePage(html: string): CubResult {
     monthlyVariation: Math.round(latest.monthPct * 100) / 100,
     yearlyAccumulated: Math.round(latest.yearPct * 100) / 100,
     monthlyData,
+    source: "myside",
     cachedAt: new Date().toISOString(),
   };
 }
@@ -89,10 +91,9 @@ export async function GET(request: Request) {
     if (!forceRefresh) {
       const cached = await getCachedCub();
       if (cached) {
-        // Invalidate cache if it has data from old source (missing currentMonth or wrong format)
         const d = cached.data as Record<string, unknown>;
-        const cm = String(d.currentMonth || "");
-        if (cm && cm.includes("/20")) {
+        // Only use cache if it was fetched from myside.com.br (has source field)
+        if (d.source === "myside") {
           return NextResponse.json(cached.data);
         }
       }
