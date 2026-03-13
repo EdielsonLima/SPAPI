@@ -300,7 +300,6 @@ export function ExecutiveDashboard() {
   }, [activeItems]);
 
   // Always fetch the widest possible range so tab switching never causes data loss
-  const dataRangeRef = useRef({ startDate: "", endDate: "" });
   const loadedCpRef = useRef(false);
   const loadedCrRef = useRef(false);
 
@@ -309,7 +308,6 @@ export function ExecutiveDashboard() {
   const maxEndDate = useMemo(() => `${currentYear + 5}-12-31`, [currentYear]);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    const rangeKey = `${maxStartDate}:${maxEndDate}`;
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
 
     const isFirstLoad = !loadedCpRef.current && !loadedCrRef.current;
@@ -365,7 +363,6 @@ export function ExecutiveDashboard() {
       if (fetches.length > 0) {
         await Promise.all(fetches);
       }
-      dataRangeRef.current = { startDate: maxStartDate, endDate: maxEndDate };
     } catch {
       toast.error("Erro ao carregar dados do painel executivo");
     } finally {
