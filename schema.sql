@@ -121,6 +121,15 @@ CREATE TABLE IF NOT EXISTS cached_income (
   PRIMARY KEY (start_date, end_date)
 );
 
+-- ── Configurações de Empresas (M² e Fator) ─────────────────────────────────
+CREATE TABLE IF NOT EXISTS company_settings (
+  company_id   INTEGER PRIMARY KEY REFERENCES cached_companies(id),
+  company_name TEXT    NOT NULL,
+  area_m2      NUMERIC(12,2) NOT NULL DEFAULT 0,
+  factor       NUMERIC(6,4) NOT NULL DEFAULT 1,
+  updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- =============================================================================
 -- Índices para performance
 -- =============================================================================

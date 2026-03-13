@@ -280,6 +280,42 @@ export async function cacheBankMovements(startDate: string, endDate: string, dat
   );
 }
 
+// ─── Company Settings (M² e Fator) ──────────────────────────────────────────
+
+export interface CompanySetting {
+  companyId: number;
+  companyName: string;
+  areaM2: number;
+  factor: number;
+  updatedAt: string;
+}
+
+export async function getCompanySettings(): Promise<CompanySetting[]> {
+  const result = await pool.query(
+    `SELECT company_id, company_name, area_m2, factor, updated_at FROM company_settings ORDER BY company_name`
+  );
+  return result.rows.map((r: { company_id: number; company_name: string; area_m2: string; factor: string; updated_at: string }) => ({
+    companyId: r.company_id,
+    companyName: r.company_name,
+    areaM2: parseFloat(r.area_m2),
+    factor: parseFloat(r.factor),
+    updatedAt: r.updated_at,
+  }));
+}
+
+export async function upsertCompanySetting(companyId: number, companyName: string, areaM2: number, factor: number) {
+  await pool.query(
+    `INSERT INTO company_settings (company_id, company_name, area_m2, factor, updated_at)
+     VALUES ($1, $2, $3, $4, NOW())
+     ON CONFLICT (company_id) DO UPDATE SET company_name = $2, area_m2 = $3, factor = $4, updated_at = NOW()`,
+    [companyId, companyName, areaM2, factor]
+  );
+}
+
+export async function deleteCompanySetting(companyId: number) {
+  await pool.query(`DELETE FROM company_settings WHERE company_id = $1`, [companyId]);
+}
+
 // ─── Confirmações de Chegada de Insumos ───────────────────────────────────────
 
 export interface ArrivalConfirmation {
