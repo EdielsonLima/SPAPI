@@ -370,13 +370,8 @@ export function ExecutiveDashboard() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Reset filters when years change — restore from localStorage if available
+  // Reset time-based filters when years change (keep company/docType stable)
   useEffect(() => {
-    const savedCo = localStorage.getItem("dashboard_default_companies");
-    setSelectedCompanies(savedCo ? new Set(JSON.parse(savedCo)) : defaultCompanies());
-    const savedDoc = localStorage.getItem("dashboard_default_docTypes");
-    if (savedDoc) setSelectedDocTypes(new Set(JSON.parse(savedDoc)));
-    else setSelectedDocTypes(new Set());
     setSelectedMonths(new Set());
     setSelectedDays(new Set());
     setSelectedDuePeriods(new Set());
@@ -1438,9 +1433,7 @@ export function ExecutiveDashboard() {
           <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             setActiveTab(tab);
-            setSelectedCompanies(defaultCompanies());
-            const defaults = allDocTypes.filter(t => !isExcludedDocType(t));
-            setSelectedDocTypes(new Set(defaults));
+            // Only reset time-based filters, keep company and docType selections stable
             setSelectedMonths(new Set());
             setSelectedDays(new Set());
             setSelectedDuePeriods(new Set());
@@ -1626,7 +1619,7 @@ export function ExecutiveDashboard() {
               <div>
                 <CardTitle className="text-lg text-slate-800">Por Empresa</CardTitle>
                 <CardDescription className="text-slate-400">
-                  {seriesLabel} por empresa/obra - clique para filtrar
+                  {seriesLabel} por empresa/obra
                 </CardDescription>
               </div>
             </div>
