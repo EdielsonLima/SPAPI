@@ -529,24 +529,6 @@ export function ExecutiveDashboard() {
     return result;
   }, [selectedCompanies, selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate]);
 
-  // Apply all filters EXCEPT company selection (for company chart - so bars don't disappear on click)
-  const applyFiltersNoCompany = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string }>(list: T[]): T[] => {
-    let result = list;
-    if (selectedDocTypes.size > 0) {
-      result = result.filter(i => selectedDocTypes.has(i.documentIdentificationName));
-    }
-    if (selectedMonths.size > 0) {
-      result = result.filter(i => i.dueDate && selectedMonths.has(i.dueDate.substring(5, 7)));
-    }
-    if (selectedDays.size > 0) {
-      result = result.filter(i => i.dueDate && selectedDays.has(i.dueDate.substring(8, 10)));
-    }
-    if (duePeriodMaxDate) {
-      result = result.filter(i => i.dueDate && i.dueDate <= duePeriodMaxDate);
-    }
-    return result;
-  }, [selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate]);
-
   // === Filtered item sets ===
   const itemsAPagar = useMemo(() =>
     consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr), [consistentItems, todayStr]);
@@ -583,14 +565,6 @@ export function ExecutiveDashboard() {
   const filteredAReceber = useMemo(() => applyFilters(itemsAReceber), [itemsAReceber, applyFilters]);
   const filteredInadimplencia = useMemo(() => applyFilters(itemsInadimplencia), [itemsInadimplencia, applyFilters]);
   const filteredRecebidas = useMemo(() => applyFilters(itemsRecebidas), [itemsRecebidas, applyFilters]);
-
-  // Items filtered WITHOUT company filter (for company chart - bars stay visible when clicked)
-  const chartAPagar = useMemo(() => applyFiltersNoCompany(itemsAPagar), [itemsAPagar, applyFiltersNoCompany]);
-  const chartAtrasadas = useMemo(() => applyFiltersNoCompany(itemsAtrasadas), [itemsAtrasadas, applyFiltersNoCompany]);
-  const chartPagas = useMemo(() => applyFiltersNoCompany(itemsPagas), [itemsPagas, applyFiltersNoCompany]);
-  const chartAReceber = useMemo(() => applyFiltersNoCompany(itemsAReceber), [itemsAReceber, applyFiltersNoCompany]);
-  const chartInadimplencia = useMemo(() => applyFiltersNoCompany(itemsInadimplencia), [itemsInadimplencia, applyFiltersNoCompany]);
-  const chartRecebidas = useMemo(() => applyFiltersNoCompany(itemsRecebidas), [itemsRecebidas, applyFiltersNoCompany]);
 
   // === Delinquents grouped by client ===
   interface DelinquentClient {
@@ -1007,7 +981,7 @@ export function ExecutiveDashboard() {
   const tabData = useMemo(() => {
     if (activeTab === "a-pagar") {
       return {
-        companyChart: buildCompanyChart(chartAPagar, "balance"),
+        companyChart: buildCompanyChart(filteredAPagar, "balance"),
         monthly: buildMonthlyChart(filteredAPagar, "balance", true),
         annual: buildAnnualChart(filteredAPagar, "balance"),
         color: "hsl(217, 91%, 60%)",
@@ -1015,7 +989,7 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "pagas") {
       return {
-        companyChart: buildCompanyChart(chartPagas, "paid"),
+        companyChart: buildCompanyChart(filteredPagas, "paid"),
         monthly: buildMonthlyChart(filteredPagas, "paid"),
         annual: buildAnnualChart(filteredPagas, "paid"),
         color: "hsl(160, 60%, 45%)",
@@ -1023,7 +997,7 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "atrasadas") {
       return {
-        companyChart: buildCompanyChart(chartAtrasadas, "balance"),
+        companyChart: buildCompanyChart(filteredAtrasadas, "balance"),
         monthly: buildMonthlyChart(filteredAtrasadas, "balance"),
         annual: buildAnnualChart(filteredAtrasadas, "balance"),
         color: "hsl(0, 84%, 60%)",
@@ -1031,7 +1005,7 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "a-receber") {
       return {
-        companyChart: buildCompanyChart(chartAReceber, "balance"),
+        companyChart: buildCompanyChart(filteredAReceber, "balance"),
         monthly: buildMonthlyChart(filteredAReceber, "balance", true),
         annual: buildAnnualChart(filteredAReceber, "balance"),
         color: "hsl(142, 71%, 45%)",
@@ -1039,7 +1013,7 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "recebidas") {
       return {
-        companyChart: buildCompanyChart(chartRecebidas, "received"),
+        companyChart: buildCompanyChart(filteredRecebidas, "received"),
         monthly: buildMonthlyChart(filteredRecebidas, "received"),
         annual: buildAnnualChart(filteredRecebidas, "received"),
         color: "hsl(199, 89%, 48%)",
@@ -1048,7 +1022,7 @@ export function ExecutiveDashboard() {
     } else {
       // inadimplencia
       return {
-        companyChart: buildCompanyChart(chartInadimplencia, "balance"),
+        companyChart: buildCompanyChart(filteredInadimplencia, "balance"),
         monthly: buildMonthlyChart(filteredInadimplencia, "balance"),
         annual: buildAnnualChart(filteredInadimplencia, "balance"),
         color: "hsl(25, 95%, 53%)",
@@ -1347,7 +1321,7 @@ export function ExecutiveDashboard() {
     return isSelected ? "hsl(25, 95%, 43%)" : `hsl(25, 95%, ${48 + idx * 3}%)`;
   };
 
-  // Handle bar click on company chart
+  // Handle bar click on company chart - drill down to single company, click again to reset
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleCompanyBarClick = (data: any, _idx: number, e: React.MouseEvent) => {
     if (!data?.fullName) return;
@@ -1355,11 +1329,16 @@ export function ExecutiveDashboard() {
     if (e?.currentTarget instanceof HTMLElement || e?.currentTarget instanceof SVGElement) {
       (e.currentTarget as HTMLElement).blur();
     }
-    // Also blur any focused element inside the chart
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur();
     }
-    toggleInSet(setSelectedCompanies, data.fullName);
+    // If only this company is selected, reset to all companies
+    if (selectedCompanies.size === 1 && selectedCompanies.has(data.fullName)) {
+      setSelectedCompanies(defaultCompanies());
+    } else {
+      // Select only this company
+      setSelectedCompanies(new Set([data.fullName]));
+    }
   };
 
   return (
