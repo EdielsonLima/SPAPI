@@ -331,6 +331,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     }
     return new Set<string>();
   });
+  const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
   const [filterAno, setFilterAno] = useState(String(currentYear));
   const [filterMes, setFilterMes] = useState("all");
   const [filterDia, setFilterDia] = useState<string[]>([]);
@@ -460,6 +461,17 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return Array.from(set).sort();
   }, [items]);
 
+  const tiposBaixa = useMemo(() => {
+    if (!isIncome) return [];
+    const set = new Set<string>();
+    items.forEach((item) => {
+      (item.payments || []).forEach((p) => {
+        if (p.operationTypeName) set.add(p.operationTypeName);
+      });
+    });
+    return Array.from(set).sort();
+  }, [items, isIncome]);
+
   const toggleDia = (dia: string) => {
     setFilterDia((prev) =>
       prev.includes(dia) ? prev.filter((d) => d !== dia) : [...prev, dia]
@@ -580,6 +592,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         if (!filterTipoDoc.has(tipo)) return false;
       }
 
+      if (filterTipoBaixa.size > 0 && isIncome) {
+        const hasType = (item.payments || []).some(p =>
+          p.operationTypeName && filterTipoBaixa.has(p.operationTypeName)
+        );
+        if (!hasType) return false;
+      }
+
       if (filterDia.length > 0) {
         if (isPagas && !isIncome) {
           const hasPayInDay = (item.payments || []).some(p =>
@@ -594,7 +613,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today]);
+  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -763,6 +782,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     filterCentrosCusto.size > 0 ||
     filterCredores.size > 0 ||
     filterTipoDoc.size > 0 ||
+    filterTipoBaixa.size > 0 ||
     filterDia.length > 0 ||
     search !== "";
 
@@ -771,6 +791,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     setFilterCentrosCusto(new Set());
     setFilterCredores(new Set());
     setFilterTipoDoc(new Set());
+    setFilterTipoBaixa(new Set());
     setFilterDia([]);
     setSearch("");
     setPage(0);
@@ -1048,6 +1069,21 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_tipoDoc`, JSON.stringify([...filterTipoDoc])); toast.success("Padrao de tipo documento salvo!"); }}
                 />
               </div>
+
+              {isIncome && tiposBaixa.length > 0 && (
+                <div className="min-w-[180px]">
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Tipo de Baixa</label>
+                  <MultiSelectFilter
+                    label="Tipo Baixa"
+                    icon={<ArrowDown className="h-4 w-4 text-slate-400" />}
+                    allOptions={tiposBaixa}
+                    selected={filterTipoBaixa}
+                    onToggle={(name) => { setFilterTipoBaixa(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
+                    onSelectAll={() => { setFilterTipoBaixa(new Set(tiposBaixa)); setPage(0); }}
+                    onClear={() => { setFilterTipoBaixa(new Set()); setPage(0); }}
+                  />
+                </div>
+              )}
 
               {hasActiveFilters && (
                 <Button variant="ghost" size="sm" onClick={clearFilters} className="text-slate-500 hover:text-slate-700">
