@@ -47,22 +47,11 @@ export async function GET(request: NextRequest) {
     "Content-Type": "application/json",
   };
 
-  // Build URL for bank movements (credit type = income receipts)
-  const buildBankMovUrl = () => {
-    const url = new URL(`${SIENGE_BASE}/bank-movement`);
-    url.searchParams.set("startDate", startDate);
-    url.searchParams.set("endDate", endDate);
-    url.searchParams.set("selectionType", "M");
-    url.searchParams.set("onlyDetachedMovement", "N");
-    return url.toString();
-  };
-
   try {
-    // Fetch income by due date (D), by payment date (P), and bank movements in parallel
-    const [responseD, responseP, responseBM] = await Promise.all([
+    // Fetch income by due date (D) and by payment date (P) in parallel
+    const [responseD, responseP] = await Promise.all([
       fetch(buildUrl("D"), { headers: fetchHeaders, cache: "no-store" }),
       fetch(buildUrl("P"), { headers: fetchHeaders, cache: "no-store" }),
-      fetch(buildBankMovUrl(), { headers: fetchHeaders, cache: "no-store" }),
     ]);
 
     if (!responseD.ok) {
@@ -85,59 +74,62 @@ export async function GET(request: NextRequest) {
           mergedData.push(item);
           existingKeys.add(key);
         } else {
-          // If item exists in D but has payments in P, update it
+          // If item exists in D but has receipts in P, update it
           const idx = mergedData.findIndex(
             (i: { billId: number; installmentId: number }) => `${i.billId}:${i.installmentId}` === key
           );
-          if (idx !== -1 && item.payments?.length > 0 && (!mergedData[idx].payments || mergedData[idx].payments.length === 0)) {
+          if (idx !== -1 && item.receipts?.length > 0 && (!mergedData[idx].receipts || mergedData[idx].receipts.length === 0)) {
             mergedData[idx] = item;
           }
         }
       }
     }
 
-    // Enrich income items with bank movement data (actual net received amounts)
-    const bmDebug = { total: 0, withBillId: 0, matched: 0, types: {} as Record<string, number>, status: "not_fetched" };
-    if (responseBM.ok) {
-      const bmData = await responseBM.json();
-      const bankMovements = bmData.data || [];
-      bmDebug.total = bankMovements.length;
-      bmDebug.status = "ok";
-
-      // Collect all income billIds for matching
-      const incomeBillIds = new Set(mergedData.map((i: { billId: number }) => i.billId));
-
-      // Group bank movements by billId:installmentId (no type filter initially)
-      const bmByBill = new Map<string, number>();
-      for (const bm of bankMovements) {
-        // Count types for debug
-        const t = bm.bankMovementOperationType || "null";
-        bmDebug.types[t] = (bmDebug.types[t] || 0) + 1;
-
-        if (bm.billId) {
-          bmDebug.withBillId++;
-          // Match any movement linked to an income bill
-          if (incomeBillIds.has(bm.billId)) {
-            const key = `${bm.billId}:${bm.installmentId}`;
-            bmByBill.set(key, (bmByBill.get(key) || 0) + bm.bankMovementAmount);
-          }
-        }
-      }
-      bmDebug.matched = bmByBill.size;
-
-      // Attach receivedNetAmount to each income item
-      for (const item of mergedData) {
-        const key = `${item.billId}:${item.installmentId}`;
-        if (bmByBill.has(key)) {
-          item.receivedNetAmount = bmByBill.get(key);
-        }
-      }
-    } else {
-      bmDebug.status = `error_${responseBM.status}`;
+    // Map API's "receipts" field to our "payments" field and calculate receivedNetAmount (Líquido)
+    // The API returns "receipts" array with each receipt having netAmount and bankMovements[]
+    // Líquido = sum of receipt.netAmount where receipt has actual bank movements (excludes "Por Bens")
+    interface IncomeReceipt {
+      netAmount: number;
+      paymentDate?: string;
+      operationTypeName?: string;
+      bankMovements?: unknown[];
+      [key: string]: unknown;
     }
-    console.log("[income] Bank movements debug:", JSON.stringify(bmDebug));
+    for (const item of mergedData) {
+      const receipts: IncomeReceipt[] = item.receipts || [];
+      // Map receipts to payments for frontend compatibility
+      // For Líquido: only receipts with bankMovements contribute (excludes "Por Bens")
+      item.payments = receipts.map((r: IncomeReceipt) => {
+        const hasBankMov = r.bankMovements && r.bankMovements.length > 0;
+        const liquidoAmount = hasBankMov ? (r.netAmount || 0) : 0;
+        return {
+        operationTypeId: r.operationTypeName === "Por Bens" ? 11 : 2,
+        operationTypeName: r.operationTypeName || "Recebimento",
+        netAmount: liquidoAmount,
+        paymentDate: r.paymentDate || "",
+        grossAmount: r.netAmount || 0,
+        monetaryCorrectionAmount: 0,
+        interestAmount: 0,
+        fineAmount: 0,
+        discountAmount: 0,
+        taxAmount: 0,
+        calculationDate: r.paymentDate || "",
+        paymentAuthentication: "",
+        sequencialNumber: 0,
+        correctedNetAmount: r.netAmount || 0,
+      };
+      });
+      // receivedNetAmount = sum of netAmount only for receipts with actual bank movements
+      // "Por Bens" receipts have empty bankMovements[] and should contribute 0
+      item.receivedNetAmount = receipts.reduce((sum: number, r: IncomeReceipt) => {
+        if (r.bankMovements && r.bankMovements.length > 0) {
+          return sum + (r.netAmount || 0);
+        }
+        return sum;
+      }, 0);
+    }
 
-    const result = { data: mergedData, _bmDebug: bmDebug };
+    const result = { data: mergedData };
     await cacheIncome(startDate, endDate, result);
     return NextResponse.json({ ...result, cachedAt: new Date().toISOString() });
   } catch (error) {

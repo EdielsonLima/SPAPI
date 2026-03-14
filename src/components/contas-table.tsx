@@ -116,19 +116,24 @@ function latestPaymentDate(item: ContasItem): string {
 }
 
 function paidTotal(item: ContasItem, yearFilter?: string): number {
+  // For income: use receivedNetAmount (Líquido from receipts with bank movements)
+  if ("receivedNetAmount" in item && typeof (item as SiengeIncome).receivedNetAmount === "number") {
+    const rnAmount = (item as SiengeIncome).receivedNetAmount!;
+    // If year filter, fall through to payments-based calculation
+    if (!yearFilter) return rnAmount;
+    // With year filter: sum payments (mapped from receipts) for that year
+    const payments = (item.payments || [])
+      .filter(p => p.netAmount > 0 && p.paymentDate && p.paymentDate.startsWith(yearFilter));
+    if (payments.length > 0) {
+      return payments.reduce((s, p) => s + p.netAmount, 0);
+    }
+    return 0;
+  }
   // For outcome: use payments array (always populated)
   const payments = (item.payments || [])
     .filter(p => p.netAmount > 0 && (!yearFilter || (p.paymentDate && p.paymentDate.startsWith(yearFilter))));
   if (payments.length > 0) {
     return payments.reduce((s, p) => s + p.netAmount, 0);
-  }
-  // For income: use receivedNetAmount from bank movements (actual Líquido)
-  if ("receivedNetAmount" in item && typeof (item as SiengeIncome).receivedNetAmount === "number") {
-    return (item as SiengeIncome).receivedNetAmount!;
-  }
-  // Last fallback: net = original - discount - tax
-  if (item.correctedBalanceAmount === 0 && item.originalAmount > 0) {
-    return item.originalAmount - (item.discountAmount || 0) - (item.taxAmount || 0);
   }
   return 0;
 }
