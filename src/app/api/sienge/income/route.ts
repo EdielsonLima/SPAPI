@@ -97,7 +97,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Enrich income items with bank movement data (actual net received amounts)
-    let bmDebug = { total: 0, withBillId: 0, matched: 0, types: {} as Record<string, number>, status: "not_fetched" };
+    const bmDebug = { total: 0, withBillId: 0, matched: 0, types: {} as Record<string, number>, status: "not_fetched" };
     if (responseBM.ok) {
       const bmData = await responseBM.json();
       const bankMovements = bmData.data || [];

@@ -751,7 +751,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     const titulos = new Set(weekItems.map((i) => i.billId)).size;
     const credores = new Set(weekItems.map((i) => getCounterpartId(i))).size;
     return { valor, titulos, credores, parcelas: weekItems.length };
-  }, [sorted, isOverdue, isPagas, todayStr]);
+  }, [sorted, isOverdue, isPagas, isIncome, todayStr]);
 
   const hasActiveFilters =
     filterEmpresas.size > 0 ||
