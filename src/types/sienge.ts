@@ -175,6 +175,7 @@ export interface SiengeIncome {
   observation?: string;
   paymentsCategories: SiengeIncomePaymentCategory[];
   payments: SiengeIncomePayment[];
+  receivedNetAmount?: number;
 }
 
 export interface SiengeIncomeResponse {

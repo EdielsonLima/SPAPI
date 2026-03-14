@@ -47,11 +47,22 @@ export async function GET(request: NextRequest) {
     "Content-Type": "application/json",
   };
 
+  // Build URL for bank movements (credit type = income receipts)
+  const buildBankMovUrl = () => {
+    const url = new URL(`${SIENGE_BASE}/bank-movement`);
+    url.searchParams.set("startDate", startDate);
+    url.searchParams.set("endDate", endDate);
+    url.searchParams.set("selectionType", "M");
+    url.searchParams.set("onlyDetachedMovement", "N");
+    return url.toString();
+  };
+
   try {
-    // Fetch both by due date (D) and by payment date (P) to get complete data
-    const [responseD, responseP] = await Promise.all([
+    // Fetch income by due date (D), by payment date (P), and bank movements in parallel
+    const [responseD, responseP, responseBM] = await Promise.all([
       fetch(buildUrl("D"), { headers: fetchHeaders, cache: "no-store" }),
       fetch(buildUrl("P"), { headers: fetchHeaders, cache: "no-store" }),
+      fetch(buildBankMovUrl(), { headers: fetchHeaders, cache: "no-store" }),
     ]);
 
     if (!responseD.ok) {
@@ -81,6 +92,28 @@ export async function GET(request: NextRequest) {
           if (idx !== -1 && item.payments?.length > 0 && (!mergedData[idx].payments || mergedData[idx].payments.length === 0)) {
             mergedData[idx] = item;
           }
+        }
+      }
+    }
+
+    // Enrich income items with bank movement data (actual net received amounts)
+    if (responseBM.ok) {
+      const bmData = await responseBM.json();
+      const bankMovements = bmData.data || [];
+      // Group credit bank movements by billId:installmentId
+      const bmByBill = new Map<string, number>();
+      for (const bm of bankMovements) {
+        // Only credit movements (C = money coming in) linked to a bill
+        if (bm.bankMovementOperationType === "C" && bm.billId) {
+          const key = `${bm.billId}:${bm.installmentId}`;
+          bmByBill.set(key, (bmByBill.get(key) || 0) + bm.bankMovementAmount);
+        }
+      }
+      // Attach receivedNetAmount to each income item
+      for (const item of mergedData) {
+        const key = `${item.billId}:${item.installmentId}`;
+        if (bmByBill.has(key)) {
+          item.receivedNetAmount = bmByBill.get(key);
         }
       }
     }

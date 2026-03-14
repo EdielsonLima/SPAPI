@@ -116,13 +116,17 @@ function latestPaymentDate(item: ContasItem): string {
 }
 
 function paidTotal(item: ContasItem, yearFilter?: string): number {
+  // For outcome: use payments array (always populated)
   const payments = (item.payments || [])
     .filter(p => p.netAmount > 0 && (!yearFilter || (p.paymentDate && p.paymentDate.startsWith(yearFilter))));
   if (payments.length > 0) {
     return payments.reduce((s, p) => s + p.netAmount, 0);
   }
-  // Fallback for income items where API doesn't populate payments array:
-  // net received = original - discount - tax
+  // For income: use receivedNetAmount from bank movements (actual Líquido)
+  if ("receivedNetAmount" in item && typeof (item as SiengeIncome).receivedNetAmount === "number") {
+    return (item as SiengeIncome).receivedNetAmount!;
+  }
+  // Last fallback: net = original - discount - tax
   if (item.correctedBalanceAmount === 0 && item.originalAmount > 0) {
     return item.originalAmount - (item.discountAmount || 0) - (item.taxAmount || 0);
   }
