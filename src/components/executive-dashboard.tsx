@@ -33,6 +33,7 @@ import {
   ArrowUp,
   ArrowDown,
   Ruler,
+  FileDown,
 } from "lucide-react";
 import {
   BarChart,
@@ -49,6 +50,7 @@ import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge"
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS } from "@/lib/dashboard-utils";
+import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 
 type Section = "cp" | "cr";
 type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento";
@@ -1781,6 +1783,40 @@ export function ExecutiveDashboard() {
               )}
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* PDF Export Button */}
+      {activeTab === "a-pagar" && filteredAPagar.length > 0 && (
+        <div className="flex justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 text-slate-600 hover:text-blue-600 hover:border-blue-300"
+            onClick={() => {
+              const now = new Date();
+              const fmtNow = `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+              let periodLabel = "Todas as contas a pagar";
+              if (selectedDuePeriods.size > 0) {
+                const labels: string[] = [];
+                if (selectedDuePeriods.has("hoje")) labels.push("Hoje");
+                if (selectedDuePeriods.has("7dias")) labels.push("7 dias");
+                if (selectedDuePeriods.has("15dias")) labels.push("15 dias");
+                if (selectedDuePeriods.has("30dias")) labels.push("30 dias");
+                periodLabel = `Vencimento: ${labels.join(", ")}`;
+              }
+              generateContasPagarPDF({
+                items: filteredAPagar,
+                totalAPagar,
+                periodLabel,
+                companyName: process.env.NEXT_PUBLIC_COMPANY_NAME || "Empresa",
+                generatedAt: fmtNow,
+              });
+            }}
+          >
+            <FileDown className="h-4 w-4" />
+            Exportar PDF
+          </Button>
         </div>
       )}
 
