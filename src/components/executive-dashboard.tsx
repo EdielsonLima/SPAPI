@@ -272,16 +272,6 @@ export function ExecutiveDashboard() {
     return arr;
   }, [currentYear, activeTab]);
 
-  // Sync selectedYears when switching tabs (availableYears changes)
-  const prevAvailableYearsRef = useRef(availableYears.join(","));
-  useEffect(() => {
-    const key = availableYears.join(",");
-    if (key !== prevAvailableYearsRef.current) {
-      prevAvailableYearsRef.current = key;
-      setSelectedYears(new Set(availableYears));
-    }
-  }, [availableYears]);
-
   const MONTH_OPTIONS = ["01","02","03","04","05","06","07","08","09","10","11","12"];
   const MONTH_NAMES: Record<string, string> = {
     "01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril",
@@ -307,79 +297,47 @@ export function ExecutiveDashboard() {
     return MONTH_OPTIONS.filter(m => months.has(m));
   }, [activeItems]);
 
-  const availableDays = useMemo(() => {
-    const days = new Set<string>();
-    activeItems.forEach(i => {
-      if (i.dueDate) days.add(i.dueDate.substring(8, 10));
-    });
-    return Array.from(days).sort();
-  }, [activeItems]);
-
-  // Track loaded date ranges to avoid redundant fetches
-  const loadedCpRangeRef = useRef("");
-  const loadedCrRangeRef = useRef("");
+  // Fixed date range for data fetching — never changes based on filters
+  const dataLoadedRef = useRef(false);
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    if (selectedYears.size === 0) { setItems([]); setIncomeItems([]); setBankFees([]); return; }
-    const yearsArr = Array.from(selectedYears).map(Number).sort();
-    const startDate = `${yearsArr[0] - 2}-01-01`;
-    const endDate = `${yearsArr[yearsArr.length - 1]}-12-31`;
+    const startDate = `${currentYear - 10}-01-01`;
+    const endDate = `${currentYear + 5}-12-31`;
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
-    const rangeKey = `${startDate}:${endDate}`;
 
-    const isFirstLoad = loadedCpRangeRef.current === "" && loadedCrRangeRef.current === "";
     if (forceRefresh) setRefreshing(true);
-    else if (isFirstLoad) setLoading(true);
+    else if (!dataLoadedRef.current) setLoading(true);
 
     try {
-      const fetches: Promise<void>[] = [];
+      const [outcomeRes, bmRes, incomeRes] = await Promise.all([
+        fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+        fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+        fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+      ]);
 
-      // Only fetch CP if range changed or force refresh
-      if (forceRefresh || loadedCpRangeRef.current !== rangeKey) {
-        fetches.push(
-          (async () => {
-            const [outcomeRes, bmRes] = await Promise.all([
-              fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
-              fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
-            ]);
-            if (!outcomeRes.ok) throw new Error("Outcome API error");
-            const outcomeData = await outcomeRes.json();
-            setItems(outcomeData.data || []);
-            if (outcomeData.cachedAt) setLastUpdatedCp(outcomeData.cachedAt);
-            loadedCpRangeRef.current = rangeKey;
+      if (!outcomeRes.ok) throw new Error("Outcome API error");
+      const outcomeData = await outcomeRes.json();
+      setItems(outcomeData.data || []);
+      if (outcomeData.cachedAt) setLastUpdatedCp(outcomeData.cachedAt);
 
-            if (bmRes.ok) {
-              const bmData = await bmRes.json();
-              const allBm: SiengeBankMovement[] = bmData.data || [];
-              const fees = allBm.filter(bm =>
-                (bm.financialCategories || []).some(fc =>
-                  fc.financialCategoryName?.toLowerCase().includes("taxa") &&
-                  fc.financialCategoryName?.toLowerCase().includes("banc")
-                )
-              );
-              setBankFees(fees);
-            }
-          })()
+      if (bmRes.ok) {
+        const bmData = await bmRes.json();
+        const allBm: SiengeBankMovement[] = bmData.data || [];
+        const fees = allBm.filter(bm =>
+          (bm.financialCategories || []).some(fc =>
+            fc.financialCategoryName?.toLowerCase().includes("taxa") &&
+            fc.financialCategoryName?.toLowerCase().includes("banc")
+          )
         );
+        setBankFees(fees);
       }
 
-      // Only fetch CR if range changed or force refresh
-      if (forceRefresh || loadedCrRangeRef.current !== rangeKey) {
-        fetches.push(
-          (async () => {
-            const incomeRes = await fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`);
-            if (!incomeRes.ok) throw new Error("Income API error");
-            const incomeData = await incomeRes.json();
-            setIncomeItems(incomeData.data || []);
-            if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
-            loadedCrRangeRef.current = rangeKey;
-          })()
-        );
-      }
+      if (!incomeRes.ok) throw new Error("Income API error");
+      const incomeData = await incomeRes.json();
+      setIncomeItems(incomeData.data || []);
+      if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
 
-      if (fetches.length > 0) {
-        await Promise.all(fetches);
-      }
+      dataLoadedRef.current = true;
     } catch {
       toast.error("Erro ao carregar dados do painel executivo");
     } finally {
@@ -387,7 +345,7 @@ export function ExecutiveDashboard() {
       setRefreshing(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYears]);
+  }, [currentYear]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -402,13 +360,6 @@ export function ExecutiveDashboard() {
       .then(data => { if (data?.data) setCompanySettings(data.data); })
       .catch(() => {});
   }, []);
-
-  // Reset time-based filters when years change (keep company/docType stable)
-  useEffect(() => {
-    setSelectedMonths(new Set());
-    setSelectedDays(new Set());
-    setSelectedDuePeriods(new Set());
-  }, [selectedYears]);
 
   const todayStr = useMemo(() => new Date().toISOString().split("T")[0], []);
 
@@ -1430,52 +1381,6 @@ export function ExecutiveDashboard() {
             {refreshing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             Atualizar
           </Button>
-          <MultiSelectFilter
-            label="Anos"
-            icon={<CalendarClock className="h-4 w-4" />}
-            allOptions={availableYears}
-            selected={selectedYears}
-            onToggle={(y) => toggleInSet(setSelectedYears, y)}
-            onSelectAll={() => setSelectedYears(new Set(availableYears))}
-            onClear={() => {
-              const defaultYrs: string[] = [];
-              for (let y = currentYear - 8; y <= currentYear; y++) defaultYrs.push(String(y));
-              setSelectedYears(new Set(defaultYrs));
-            }}
-            activeColor="blue"
-          />
-          <MultiSelectFilter
-            label="Meses"
-            icon={<CalendarClock className="h-4 w-4" />}
-            allOptions={availableMonths}
-            selected={selectedMonths}
-            onToggle={(m) => toggleInSet(setSelectedMonths, m)}
-            onSelectAll={() => setSelectedMonths(new Set(availableMonths))}
-            onClear={() => setSelectedMonths(new Set())}
-            activeColor="blue"
-            labelFn={(v) => MONTH_NAMES[v] || v}
-          />
-          <MultiSelectFilter
-            label="Dias"
-            icon={<CalendarClock className="h-4 w-4" />}
-            allOptions={availableDays}
-            selected={selectedDays}
-            onToggle={(d) => toggleInSet(setSelectedDays, d)}
-            onSelectAll={() => setSelectedDays(new Set(availableDays))}
-            onClear={() => setSelectedDays(new Set())}
-            activeColor="blue"
-          />
-          <MultiSelectFilter
-            label="Vencimento"
-            icon={<Clock className="h-4 w-4" />}
-            allOptions={DUE_PERIOD_OPTIONS}
-            selected={selectedDuePeriods}
-            onToggle={(p) => toggleInSet(setSelectedDuePeriods, p)}
-            onSelectAll={() => setSelectedDuePeriods(new Set(DUE_PERIOD_OPTIONS))}
-            onClear={() => setSelectedDuePeriods(new Set())}
-            activeColor="violet"
-            labelFn={(v) => DUE_PERIOD_LABELS[v] || v}
-          />
         </div>
       </div>
 
@@ -1630,7 +1535,7 @@ export function ExecutiveDashboard() {
             />
           )}
         </div>}
-        {activeTab !== "orcamento" && <div className="flex items-center gap-2">
+        {activeTab !== "orcamento" && <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
             label="Empresas"
             icon={<Building2 className="h-4 w-4" />}
@@ -1675,26 +1580,70 @@ export function ExecutiveDashboard() {
               toast.success("Padrao de tipo documento salvo!");
             }}
           />
-          {([...selectedCompanies].some(n => isExcludedCompany(n)) || selectedCompanies.size !== defaultCompanies().size || selectedMonths.size > 0 || selectedDays.size > 0 || selectedDuePeriods.size > 0 || ((activeTab === "pagas" || activeTab === "recebidas") && selectedOpTypes.size > 0 && selectedOpTypes.size !== allOpTypes.length) || selectedDocTypes.size !== allDocTypes.filter(t => !isExcludedDocType(t)).length || [...selectedDocTypes].some(t => isExcludedDocType(t))) && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const savedCo = localStorage.getItem("dashboard_default_companies");
-                setSelectedCompanies(savedCo ? new Set(JSON.parse(savedCo)) : defaultCompanies());
-                const savedDoc = localStorage.getItem("dashboard_default_docTypes");
-                setSelectedDocTypes(savedDoc ? new Set(JSON.parse(savedDoc)) : new Set(allDocTypes.filter(t => !isExcludedDocType(t))));
-                setSelectedMonths(new Set());
-                setSelectedDays(new Set());
-                setSelectedDuePeriods(new Set());
-                const savedOp = localStorage.getItem("dashboard_default_opTypes");
-                setSelectedOpTypes(savedOp ? new Set(JSON.parse(savedOp)) : new Set(["Pagamento"]));
-              }}
-              className="text-slate-400 px-2"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+          {/* Per-tab filters: Anos/Meses for historical tabs, Vencimento for future tabs */}
+          {(activeTab === "pagas" || activeTab === "recebidas" || activeTab === "atrasadas" || activeTab === "inadimplencia") && (
+            <>
+              <MultiSelectFilter
+                label="Anos"
+                icon={<CalendarClock className="h-4 w-4" />}
+                allOptions={availableYears}
+                selected={selectedYears}
+                onToggle={(y) => toggleInSet(setSelectedYears, y)}
+                onSelectAll={() => setSelectedYears(new Set(availableYears))}
+                onClear={() => {
+                  const defaultYrs: string[] = [];
+                  for (let y = currentYear - 8; y <= currentYear; y++) defaultYrs.push(String(y));
+                  setSelectedYears(new Set(defaultYrs));
+                }}
+                activeColor="blue"
+              />
+              <MultiSelectFilter
+                label="Meses"
+                icon={<CalendarClock className="h-4 w-4" />}
+                allOptions={availableMonths}
+                selected={selectedMonths}
+                onToggle={(m) => toggleInSet(setSelectedMonths, m)}
+                onSelectAll={() => setSelectedMonths(new Set(availableMonths))}
+                onClear={() => setSelectedMonths(new Set())}
+                activeColor="blue"
+                labelFn={(v) => MONTH_NAMES[v] || v}
+              />
+            </>
           )}
+          {(activeTab === "a-pagar" || activeTab === "a-receber") && (
+            <MultiSelectFilter
+              label="Vencimento"
+              icon={<Clock className="h-4 w-4" />}
+              allOptions={DUE_PERIOD_OPTIONS}
+              selected={selectedDuePeriods}
+              onToggle={(p) => toggleInSet(setSelectedDuePeriods, p)}
+              onSelectAll={() => setSelectedDuePeriods(new Set(DUE_PERIOD_OPTIONS))}
+              onClear={() => setSelectedDuePeriods(new Set())}
+              activeColor="violet"
+              labelFn={(v) => DUE_PERIOD_LABELS[v] || v}
+            />
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              const savedCo = localStorage.getItem("dashboard_default_companies");
+              setSelectedCompanies(savedCo ? new Set(JSON.parse(savedCo)) : defaultCompanies());
+              const savedDoc = localStorage.getItem("dashboard_default_docTypes");
+              setSelectedDocTypes(savedDoc ? new Set(JSON.parse(savedDoc)) : new Set(allDocTypes.filter(t => !isExcludedDocType(t))));
+              setSelectedMonths(new Set());
+              setSelectedDays(new Set());
+              setSelectedDuePeriods(new Set());
+              const savedOp = localStorage.getItem("dashboard_default_opTypes");
+              setSelectedOpTypes(savedOp ? new Set(JSON.parse(savedOp)) : new Set(["Pagamento"]));
+              const defaultYrs: string[] = [];
+              for (let y = currentYear - 8; y <= currentYear; y++) defaultYrs.push(String(y));
+              setSelectedYears(new Set(defaultYrs));
+            }}
+            className="text-slate-400 px-2"
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </div>}
       </div>
 
