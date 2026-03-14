@@ -272,6 +272,16 @@ export function ExecutiveDashboard() {
     return arr;
   }, [currentYear, activeTab]);
 
+  // Sync selectedYears when switching tabs (availableYears changes)
+  const prevAvailableYearsRef = useRef(availableYears.join(","));
+  useEffect(() => {
+    const key = availableYears.join(",");
+    if (key !== prevAvailableYearsRef.current) {
+      prevAvailableYearsRef.current = key;
+      setSelectedYears(new Set(availableYears));
+    }
+  }, [availableYears]);
+
   const MONTH_OPTIONS = ["01","02","03","04","05","06","07","08","09","10","11","12"];
   const MONTH_NAMES: Record<string, string> = {
     "01": "Janeiro", "02": "Fevereiro", "03": "Março", "04": "Abril",
@@ -1427,7 +1437,11 @@ export function ExecutiveDashboard() {
             selected={selectedYears}
             onToggle={(y) => toggleInSet(setSelectedYears, y)}
             onSelectAll={() => setSelectedYears(new Set(availableYears))}
-            onClear={() => setSelectedYears(new Set([String(currentYear)]))}
+            onClear={() => {
+              const defaultYrs: string[] = [];
+              for (let y = currentYear - 8; y <= currentYear; y++) defaultYrs.push(String(y));
+              setSelectedYears(new Set(defaultYrs));
+            }}
             activeColor="blue"
           />
           <MultiSelectFilter
