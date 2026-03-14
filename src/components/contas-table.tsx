@@ -130,15 +130,8 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   };
   const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
 
-  // For income: use receivedNetAmount (Líquido from receipts with bank movements)
-  if ("receivedNetAmount" in item && typeof (item as SiengeIncome).receivedNetAmount === "number") {
-    if (!hasFilter) return (item as SiengeIncome).receivedNetAmount!;
-    // With period filter: sum payments for that period
-    const payments = (item.payments || [])
-      .filter(p => p.netAmount > 0 && p.paymentDate && matchesPeriod(p.paymentDate));
-    return payments.reduce((s, p) => s + p.netAmount, 0);
-  }
-  // For outcome: use payments array
+  // Always sum from payments array (mapped from receipts for income)
+  // This ensures consistent totals whether filtering by period or showing all
   const payments = (item.payments || [])
     .filter(p => p.netAmount > 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
   return payments.reduce((s, p) => s + p.netAmount, 0);
