@@ -97,18 +97,34 @@ export async function GET(request: NextRequest) {
     }
 
     // Enrich income items with bank movement data (actual net received amounts)
+    let bmDebug = { total: 0, withBillId: 0, matched: 0, types: {} as Record<string, number>, status: "not_fetched" };
     if (responseBM.ok) {
       const bmData = await responseBM.json();
       const bankMovements = bmData.data || [];
-      // Group credit bank movements by billId:installmentId
+      bmDebug.total = bankMovements.length;
+      bmDebug.status = "ok";
+
+      // Collect all income billIds for matching
+      const incomeBillIds = new Set(mergedData.map((i: { billId: number }) => i.billId));
+
+      // Group bank movements by billId:installmentId (no type filter initially)
       const bmByBill = new Map<string, number>();
       for (const bm of bankMovements) {
-        // Only credit movements (C = money coming in) linked to a bill
-        if (bm.bankMovementOperationType === "C" && bm.billId) {
-          const key = `${bm.billId}:${bm.installmentId}`;
-          bmByBill.set(key, (bmByBill.get(key) || 0) + bm.bankMovementAmount);
+        // Count types for debug
+        const t = bm.bankMovementOperationType || "null";
+        bmDebug.types[t] = (bmDebug.types[t] || 0) + 1;
+
+        if (bm.billId) {
+          bmDebug.withBillId++;
+          // Match any movement linked to an income bill
+          if (incomeBillIds.has(bm.billId)) {
+            const key = `${bm.billId}:${bm.installmentId}`;
+            bmByBill.set(key, (bmByBill.get(key) || 0) + bm.bankMovementAmount);
+          }
         }
       }
+      bmDebug.matched = bmByBill.size;
+
       // Attach receivedNetAmount to each income item
       for (const item of mergedData) {
         const key = `${item.billId}:${item.installmentId}`;
@@ -116,9 +132,12 @@ export async function GET(request: NextRequest) {
           item.receivedNetAmount = bmByBill.get(key);
         }
       }
+    } else {
+      bmDebug.status = `error_${responseBM.status}`;
     }
+    console.log("[income] Bank movements debug:", JSON.stringify(bmDebug));
 
-    const result = { data: mergedData };
+    const result = { data: mergedData, _bmDebug: bmDebug };
     await cacheIncome(startDate, endDate, result);
     return NextResponse.json({ ...result, cachedAt: new Date().toISOString() });
   } catch (error) {
