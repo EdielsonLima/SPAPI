@@ -109,33 +109,39 @@ function daysDiff(dateStr: string) {
   return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function latestPaymentDate(item: ContasItem): string {
-  const dates = (item.payments || []).filter(p => p.paymentDate && p.netAmount > 0).map(p => p.paymentDate);
+function latestPaymentDate(item: ContasItem, yearFilter?: string, monthFilter?: string): string {
+  const dates = (item.payments || [])
+    .filter(p => {
+      if (!p.paymentDate || p.netAmount <= 0) return false;
+      if (yearFilter && yearFilter !== "all" && !p.paymentDate.startsWith(yearFilter)) return false;
+      if (monthFilter && monthFilter !== "all" && p.paymentDate.substring(5, 7) !== monthFilter) return false;
+      return true;
+    })
+    .map(p => p.paymentDate);
   if (dates.length === 0) return "";
   return dates.sort().reverse()[0];
 }
 
-function paidTotal(item: ContasItem, yearFilter?: string): number {
+function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string): number {
+  const matchesPeriod = (paymentDate: string) => {
+    if (yearFilter && yearFilter !== "all" && !paymentDate.startsWith(yearFilter)) return false;
+    if (monthFilter && monthFilter !== "all" && paymentDate.substring(5, 7) !== monthFilter) return false;
+    return true;
+  };
+  const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
+
   // For income: use receivedNetAmount (Líquido from receipts with bank movements)
   if ("receivedNetAmount" in item && typeof (item as SiengeIncome).receivedNetAmount === "number") {
-    const rnAmount = (item as SiengeIncome).receivedNetAmount!;
-    // If year filter, fall through to payments-based calculation
-    if (!yearFilter) return rnAmount;
-    // With year filter: sum payments (mapped from receipts) for that year
+    if (!hasFilter) return (item as SiengeIncome).receivedNetAmount!;
+    // With period filter: sum payments for that period
     const payments = (item.payments || [])
-      .filter(p => p.netAmount > 0 && p.paymentDate && p.paymentDate.startsWith(yearFilter));
-    if (payments.length > 0) {
-      return payments.reduce((s, p) => s + p.netAmount, 0);
-    }
-    return 0;
-  }
-  // For outcome: use payments array (always populated)
-  const payments = (item.payments || [])
-    .filter(p => p.netAmount > 0 && (!yearFilter || (p.paymentDate && p.paymentDate.startsWith(yearFilter))));
-  if (payments.length > 0) {
+      .filter(p => p.netAmount > 0 && p.paymentDate && matchesPeriod(p.paymentDate));
     return payments.reduce((s, p) => s + p.netAmount, 0);
   }
-  return 0;
+  // For outcome: use payments array
+  const payments = (item.payments || [])
+    .filter(p => p.netAmount > 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
+  return payments.reduce((s, p) => s + p.netAmount, 0);
 }
 
 const monthNames = [
@@ -641,12 +647,12 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         case "costEstimationSheet": cmp = (getBuildingsCosts(a)[0]?.costEstimationSheetName || "").localeCompare(getBuildingsCosts(b)[0]?.costEstimationSheetName || ""); break;
         case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
         case "balanceAmount": cmp = a.balanceAmount - b.balanceAmount; break;
-        case "paymentDate": cmp = (latestPaymentDate(a) || "").localeCompare(latestPaymentDate(b) || ""); break;
-        case "paidAmount": cmp = paidTotal(a) - paidTotal(b); break;
+        case "paymentDate": cmp = (latestPaymentDate(a, filterAno, filterMes) || "").localeCompare(latestPaymentDate(b, filterAno, filterMes) || ""); break;
+        case "paidAmount": cmp = paidTotal(a, filterAno, filterMes) - paidTotal(b, filterAno, filterMes); break;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filtered, sortField, sortDir]);
+  }, [filtered, sortField, sortDir, filterAno, filterMes]);
 
   // Group parcelas by billId
   const parcelasByBill = useMemo(() => {
@@ -672,8 +678,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted]
   );
   const totalPaid = useMemo(
-    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno === "all" ? undefined : filterAno), 0),
-    [sorted, filterAno]
+    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno, filterMes), 0),
+    [sorted, filterAno, filterMes]
   );
 
   // Card: Contas a pagar/vencidas hoje
@@ -1159,7 +1165,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             </TableCell>
                             <TableCell className="font-mono text-sm">{formatDate(item.dueDate)}</TableCell>
                             {isPagas && (
-                              <TableCell className="font-mono text-sm text-emerald-600">{formatDate(latestPaymentDate(item) || item.dueDate)}</TableCell>
+                              <TableCell className="font-mono text-sm text-emerald-600">{formatDate(latestPaymentDate(item, filterAno, filterMes) || item.dueDate)}</TableCell>
                             )}
                             {isOverdue && (
                               <TableCell>
@@ -1181,7 +1187,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             <TableCell className="text-right font-mono text-sm">{formatCurrency(item.originalAmount)}</TableCell>
                             {isPagas ? (
                               <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">
-                                {formatCurrency(paidTotal(item, filterAno === "all" ? undefined : filterAno))}
+                                {formatCurrency(paidTotal(item, filterAno, filterMes))}
                               </TableCell>
                             ) : (
                               <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
