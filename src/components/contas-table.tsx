@@ -636,10 +636,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted]
   );
   const totalPaid = useMemo(
-    () => isIncome
-      ? sorted.reduce((sum, item) => sum + item.originalAmount, 0)
-      : sorted.reduce((sum, item) => sum + paidTotal(item, filterAno === "all" ? undefined : filterAno), 0),
-    [sorted, filterAno, isIncome]
+    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno === "all" ? undefined : filterAno), 0),
+    [sorted, filterAno]
   );
 
   // Card: Contas a pagar/vencidas hoje
@@ -651,12 +649,18 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const todayStats = useMemo(() => {
     if (isPagas) {
       if (isIncome) {
-        // Income "recebidas": use dueDate for "today" stats since payments may be empty
-        const todayItems = sorted.filter(i => i.dueDate === todayStr);
-        const valor = todayItems.reduce((s, i) => s + i.originalAmount, 0);
-        const titulos = new Set(todayItems.map(i => i.billId)).size;
-        const credores = new Set(todayItems.map(i => getCounterpartId(i))).size;
-        return { valor, titulos, credores, parcelas: todayItems.length };
+        // Income "recebidas": check payments for today
+        let valor = 0;
+        const billIds = new Set<number>();
+        const credorIds = new Set<number>();
+        sorted.forEach(item => {
+          (item.payments || []).filter(p => p.paymentDate === todayStr && p.netAmount > 0).forEach(p => {
+            valor += p.netAmount;
+            billIds.add(item.billId);
+            credorIds.add(getCounterpartId(item));
+          });
+        });
+        return { valor, titulos: billIds.size, credores: credorIds.size, parcelas: billIds.size };
       }
       // Paid today
       let valor = 0;
@@ -688,12 +692,20 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       d7.setDate(d7.getDate() - 7);
       const d7Str = d7.toISOString().split("T")[0];
       if (isIncome) {
-        // Income: use dueDate range since payments may be empty
-        const weekItems = sorted.filter(i => i.dueDate >= d7Str && i.dueDate <= todayStr);
-        const valor = weekItems.reduce((s, i) => s + i.originalAmount, 0);
-        const titulos = new Set(weekItems.map(i => i.billId)).size;
-        const credores = new Set(weekItems.map(i => getCounterpartId(i))).size;
-        return { valor, titulos, credores, parcelas: weekItems.length };
+        // Income: check payments in last 7 days
+        let valor = 0;
+        const billIds = new Set<number>();
+        const credorIds = new Set<number>();
+        sorted.forEach(item => {
+          (item.payments || []).filter(p =>
+            p.netAmount > 0 && p.paymentDate && p.paymentDate >= d7Str && p.paymentDate <= todayStr
+          ).forEach(p => {
+            valor += p.netAmount;
+            billIds.add(item.billId);
+            credorIds.add(getCounterpartId(item));
+          });
+        });
+        return { valor, titulos: billIds.size, credores: credorIds.size, parcelas: billIds.size };
       }
       let valor = 0;
       const billIds = new Set<number>();
@@ -1116,7 +1128,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             <TableCell className="text-right font-mono text-sm">{formatCurrency(item.originalAmount)}</TableCell>
                             {isPagas ? (
                               <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">
-                                {formatCurrency(isIncome ? item.originalAmount : paidTotal(item, filterAno === "all" ? undefined : filterAno))}
+                                {formatCurrency(paidTotal(item, filterAno === "all" ? undefined : filterAno))}
                               </TableCell>
                             ) : (
                               <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
