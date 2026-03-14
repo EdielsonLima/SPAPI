@@ -47,7 +47,7 @@ export function generateContasPagarPDF(data: PDFData) {
   });
 
   // ─── Header ───────────────────────────────────────────────
-  const headerColor: [number, number, number] = [30, 41, 59]; // slate-800
+  const headerColor: [number, number, number] = [158, 27, 47]; // brand red
 
   doc.setFillColor(...headerColor);
   doc.rect(0, 0, pageWidth, 28, "F");
@@ -71,9 +71,9 @@ export function generateContasPagarPDF(data: PDFData) {
   const boxW = (pageWidth - margin * 2 - 10) / 3;
 
   // Box 1: Total
-  doc.setFillColor(239, 246, 255); // blue-50
+  doc.setFillColor(254, 242, 242); // red-50
   doc.roundedRect(margin, boxY, boxW, boxH, 2, 2, "F");
-  doc.setTextColor(30, 64, 175); // blue-800
+  doc.setTextColor(153, 27, 27); // red-800
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.text("TOTAL A PAGAR", margin + 4, boxY + 6);

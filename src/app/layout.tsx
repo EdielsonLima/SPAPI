@@ -15,6 +15,7 @@ const companySubtitle = process.env.NEXT_PUBLIC_COMPANY_SUBTITLE || "Sistema de 
 export const metadata: Metadata = {
   title: `${companyName} - ${companySubtitle}`,
   description: `${companySubtitle} da construtora ${companyName}`,
+  icons: { icon: "/logo-icon.jpg" },
 };
 
 export default function RootLayout({

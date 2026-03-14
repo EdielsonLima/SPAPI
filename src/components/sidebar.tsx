@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
-  Building2,
   ChevronLeft,
   ChevronRight,
   ChevronDown,
@@ -27,6 +26,7 @@ import {
   CircleCheck,
   UserX,
 } from "lucide-react";
+import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 import {
   Tooltip,
@@ -180,8 +180,8 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex items-center h-16 px-4 border-b border-slate-800">
           <div className="flex items-center gap-3 overflow-hidden">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-700">
-              <Building2 className="h-5 w-5 text-white" />
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white overflow-hidden">
+              <Image src="/logo-icon.jpg" alt="Logo" width={32} height={32} className="object-contain" />
             </div>
             {!collapsed && (
               <div className="flex flex-col min-w-0">
@@ -206,7 +206,7 @@ export function Sidebar() {
                   className={cn(
                     "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
                     active
-                      ? "bg-blue-600/20 text-blue-400 border-l-2 border-blue-400 -ml-px"
+                      ? "bg-red-600/20 text-red-400 border-l-2 border-red-400 -ml-px"
                       : "text-slate-300 hover:bg-slate-800 hover:text-white"
                   )}
                 >
@@ -242,7 +242,7 @@ export function Sidebar() {
                         className={cn(
                           "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 w-full",
                           childActive
-                            ? "bg-blue-600/20 text-blue-400"
+                            ? "bg-red-600/20 text-red-400"
                             : "text-slate-300 hover:bg-slate-800 hover:text-white"
                         )}
                         onClick={() => setCollapsed(false)}
@@ -261,7 +261,7 @@ export function Sidebar() {
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 w-full",
                         childActive
-                          ? "bg-blue-600/10 text-blue-400"
+                          ? "bg-red-600/10 text-red-400"
                           : "text-slate-300 hover:bg-slate-800 hover:text-white"
                       )}
                     >
@@ -292,7 +292,7 @@ export function Sidebar() {
                               className={cn(
                                 "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-200",
                                 childIsActive
-                                  ? "bg-blue-600/20 text-blue-400 font-medium"
+                                  ? "bg-red-600/20 text-red-400 font-medium"
                                   : "text-slate-400 hover:bg-slate-800 hover:text-white"
                               )}
                             >

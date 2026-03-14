@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Building2, Loader2, Lock, User } from "lucide-react";
+import { Loader2, Lock, User } from "lucide-react";
+import Image from "next/image";
 
 export function LoginForm() {
   const [username, setUsername] = useState("");
@@ -44,13 +45,13 @@ export function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-red-950 to-slate-900 p-4">
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.03%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" />
 
       <Card className="w-full max-w-md border-0 shadow-2xl bg-white/95 backdrop-blur-sm relative z-10">
         <CardHeader className="text-center pb-2 pt-8">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-blue-800 shadow-lg">
-            <Building2 className="h-8 w-8 text-white" />
+          <div className="mx-auto mb-4 flex h-20 w-48 items-center justify-center">
+            <Image src="/logo-full.jpg" alt="Silva Packer" width={180} height={75} className="object-contain" priority />
           </div>
           <h1 className="text-2xl font-bold text-slate-800">{process.env.NEXT_PUBLIC_COMPANY_NAME || "Empresa"}</h1>
           <p className="text-sm text-slate-500 mt-1">{process.env.NEXT_PUBLIC_COMPANY_SUBTITLE || "Sistema de Gestao"}</p>
@@ -96,7 +97,7 @@ export function LoginForm() {
                   placeholder="Digite seu usuario"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                  className="pl-10 h-11 border-slate-200 focus:border-red-600 focus:ring-red-600"
                   required
                 />
               </div>
@@ -113,7 +114,7 @@ export function LoginForm() {
                   placeholder="Digite sua senha"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 h-11 border-slate-200 focus:border-blue-500 focus:ring-blue-500"
+                  className="pl-10 h-11 border-slate-200 focus:border-red-600 focus:ring-red-600"
                   required
                 />
               </div>
@@ -128,7 +129,7 @@ export function LoginForm() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium shadow-md"
+              className="w-full h-11 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-800 hover:to-red-900 text-white font-medium shadow-md"
             >
               {loading ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
