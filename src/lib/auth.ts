@@ -1,8 +1,13 @@
 import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import GoogleProvider from "next-auth/providers/google";
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+    }),
     CredentialsProvider({
       name: "Credentials",
       credentials: {
@@ -12,9 +17,6 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         const adminUser = process.env.ADMIN_USERNAME || "admin";
         const adminPass = process.env.ADMIN_PASSWORD || "admin";
-
-        console.log("Credentials received:", credentials);
-        console.log("Expected:", { adminUser, adminPass });
 
         if (
           credentials?.username === adminUser &&
@@ -38,15 +40,21 @@ export const authOptions: NextAuthOptions = {
     maxAge: 8 * 60 * 60, // 8 hours
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, account, profile }) {
       if (user) {
         token.id = user.id;
+      }
+      if (account?.provider === "google" && profile) {
+        token.picture = (profile as { picture?: string }).picture;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         (session.user as { id: string }).id = token.id as string;
+        if (token.picture) {
+          session.user.image = token.picture as string;
+        }
       }
       return session;
     },

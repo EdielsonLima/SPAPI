@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { LogOut, Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
@@ -80,6 +80,7 @@ export function Header() {
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="flex items-center gap-2 h-10 px-2">
             <Avatar className="h-8 w-8">
+              <AvatarImage src={session?.user?.image || undefined} alt={userName} />
               <AvatarFallback className="bg-blue-600 text-white text-xs font-medium">
                 {initials}
               </AvatarFallback>
