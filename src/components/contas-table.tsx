@@ -288,28 +288,28 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [search, setSearch] = useState("");
   const [filterEmpresas, setFilterEmpresas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`contas_${mode}_default_empresas`);
+      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_empresas`);
       if (saved) return new Set(JSON.parse(saved));
     }
     return new Set<string>();
   });
   const [filterCentrosCusto, setFilterCentrosCusto] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`contas_${mode}_default_centrosCusto`);
+      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_centrosCusto`);
       if (saved) return new Set(JSON.parse(saved));
     }
     return new Set<string>();
   });
   const [filterCredores, setFilterCredores] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`contas_${mode}_default_credores`);
+      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_credores`);
       if (saved) return new Set(JSON.parse(saved));
     }
     return new Set<string>();
   });
   const [filterTipoDoc, setFilterTipoDoc] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`contas_${mode}_default_tipoDoc`);
+      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_tipoDoc`);
       if (saved) return new Set(JSON.parse(saved));
     }
     return new Set<string>();
@@ -319,7 +319,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [filterDia, setFilterDia] = useState<string[]>([]);
 
   // API date range: always the full selected year.
-  // For "pagas" mode, fetch 2 years back to capture items with old due dates paid in selected year.
+  // For "pagas" mode, fetch extra years back to capture items with old due dates.
   const { startDate, endDate } = useMemo(() => {
     const yr = filterAno === "all" ? currentYear : parseInt(filterAno, 10);
     const start = isPagas ? yr - 2 : yr;
@@ -473,21 +473,50 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const filtered = useMemo(() => {
     return items.filter((item) => {
       if (isPagas) {
-        // For "pagas" mode: must have payments in the selected year
-        const hasPaidInYear = (item.payments || []).some(p =>
-          p.netAmount > 0 && p.paymentDate &&
-          (filterAno === "all" || p.paymentDate.startsWith(filterAno))
-        );
-        if (!hasPaidInYear) return false;
+        if (isIncome) {
+          // For income "recebidas" mode: item is received when correctedBalanceAmount === 0
+          if (item.correctedBalanceAmount !== 0) return false;
+          if (item.originalAmount <= 0) return false;
 
-        // Month filter: by payment date
-        if (filterMes !== "all") {
-          const hasPayInMonth = (item.payments || []).some(p =>
+          // Check payments array first; if empty, fall back to dueDate for year/month filter
+          const hasPayments = (item.payments || []).some(p => p.netAmount > 0);
+          if (hasPayments) {
+            const hasPaidInYear = (item.payments || []).some(p =>
+              p.netAmount > 0 && p.paymentDate &&
+              (filterAno === "all" || p.paymentDate.startsWith(filterAno))
+            );
+            if (!hasPaidInYear) return false;
+
+            if (filterMes !== "all") {
+              const hasPayInMonth = (item.payments || []).some(p =>
+                p.netAmount > 0 && p.paymentDate &&
+                (filterAno === "all" || p.paymentDate.startsWith(filterAno)) &&
+                p.paymentDate.substring(5, 7) === filterMes
+              );
+              if (!hasPayInMonth) return false;
+            }
+          } else {
+            // No payment records — filter by due date
+            if (filterAno !== "all" && item.dueDate?.substring(0, 4) !== filterAno) return false;
+            if (filterMes !== "all" && item.dueDate?.substring(5, 7) !== filterMes) return false;
+          }
+        } else {
+          // For outcome "pagas" mode: must have payments in the selected year
+          const hasPaidInYear = (item.payments || []).some(p =>
             p.netAmount > 0 && p.paymentDate &&
-            (filterAno === "all" || p.paymentDate.startsWith(filterAno)) &&
-            p.paymentDate.substring(5, 7) === filterMes
+            (filterAno === "all" || p.paymentDate.startsWith(filterAno))
           );
-          if (!hasPayInMonth) return false;
+          if (!hasPaidInYear) return false;
+
+          // Month filter: by payment date
+          if (filterMes !== "all") {
+            const hasPayInMonth = (item.payments || []).some(p =>
+              p.netAmount > 0 && p.paymentDate &&
+              (filterAno === "all" || p.paymentDate.startsWith(filterAno)) &&
+              p.paymentDate.substring(5, 7) === filterMes
+            );
+            if (!hasPayInMonth) return false;
+          }
         }
       } else {
         if (item.balanceAmount === 0) return false;
@@ -535,7 +564,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       }
 
       if (filterDia.length > 0) {
-        if (isPagas) {
+        if (isPagas && !isIncome) {
           const hasPayInDay = (item.payments || []).some(p =>
             p.netAmount > 0 && p.paymentDate && filterDia.includes(p.paymentDate.substring(8, 10))
           );
@@ -548,7 +577,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterAno, filterMes, filterDia, isOverdue, isPagas, today]);
+  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -607,8 +636,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted]
   );
   const totalPaid = useMemo(
-    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno === "all" ? undefined : filterAno), 0),
-    [sorted, filterAno]
+    () => isIncome
+      ? sorted.reduce((sum, item) => sum + item.originalAmount, 0)
+      : sorted.reduce((sum, item) => sum + paidTotal(item, filterAno === "all" ? undefined : filterAno), 0),
+    [sorted, filterAno, isIncome]
   );
 
   // Card: Contas a pagar/vencidas hoje
@@ -619,6 +650,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
   const todayStats = useMemo(() => {
     if (isPagas) {
+      if (isIncome) {
+        // Income "recebidas": use dueDate for "today" stats since payments may be empty
+        const todayItems = sorted.filter(i => i.dueDate === todayStr);
+        const valor = todayItems.reduce((s, i) => s + i.originalAmount, 0);
+        const titulos = new Set(todayItems.map(i => i.billId)).size;
+        const credores = new Set(todayItems.map(i => getCounterpartId(i))).size;
+        return { valor, titulos, credores, parcelas: todayItems.length };
+      }
       // Paid today
       let valor = 0;
       const billIds = new Set<number>();
@@ -637,17 +676,25 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     const titulos = new Set(todayItems.map((i) => i.billId)).size;
     const credores = new Set(todayItems.map((i) => getCounterpartId(i))).size;
     return { valor, titulos, credores, parcelas: todayItems.length };
-  }, [sorted, todayStr, isPagas]);
+  }, [sorted, todayStr, isPagas, isIncome]);
 
   // Card: Contas semana (proximos 7 dias ou ultimos 7 dias)
   const weekStats = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     if (isPagas) {
-      // Paid last 7 days
+      // Paid/received last 7 days
       const d7 = new Date(now);
       d7.setDate(d7.getDate() - 7);
       const d7Str = d7.toISOString().split("T")[0];
+      if (isIncome) {
+        // Income: use dueDate range since payments may be empty
+        const weekItems = sorted.filter(i => i.dueDate >= d7Str && i.dueDate <= todayStr);
+        const valor = weekItems.reduce((s, i) => s + i.originalAmount, 0);
+        const titulos = new Set(weekItems.map(i => i.billId)).size;
+        const credores = new Set(weekItems.map(i => getCounterpartId(i))).size;
+        return { valor, titulos, credores, parcelas: weekItems.length };
+      }
       let valor = 0;
       const billIds = new Set<number>();
       const credorIds = new Set<number>();
@@ -927,7 +974,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   onToggle={(name) => { setFilterEmpresas(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
                   onSelectAll={() => { setFilterEmpresas(new Set(empresaNames)); setPage(0); }}
                   onClear={() => { setFilterEmpresas(new Set()); setPage(0); }}
-                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_empresas`, JSON.stringify([...filterEmpresas])); toast.success("Padrao de empresas salvo!"); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_empresas`, JSON.stringify([...filterEmpresas])); toast.success("Padrao de empresas salvo!"); }}
                 />
               </div>
 
@@ -941,7 +988,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   onToggle={(name) => { setFilterCentrosCusto(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
                   onSelectAll={() => { setFilterCentrosCusto(new Set(centroCustoNames)); setPage(0); }}
                   onClear={() => { setFilterCentrosCusto(new Set()); setPage(0); }}
-                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_centrosCusto`, JSON.stringify([...filterCentrosCusto])); toast.success("Padrao de centros de custo salvo!"); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_centrosCusto`, JSON.stringify([...filterCentrosCusto])); toast.success("Padrao de centros de custo salvo!"); }}
                 />
               </div>
 
@@ -955,7 +1002,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   onToggle={(name) => { setFilterCredores(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
                   onSelectAll={() => { setFilterCredores(new Set(credorNames)); setPage(0); }}
                   onClear={() => { setFilterCredores(new Set()); setPage(0); }}
-                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_credores`, JSON.stringify([...filterCredores])); toast.success(`Padrao de ${counterpartLabelPlural} salvo!`); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_credores`, JSON.stringify([...filterCredores])); toast.success(`Padrao de ${counterpartLabelPlural} salvo!`); }}
                 />
               </div>
 
@@ -969,7 +1016,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   onToggle={(name) => { setFilterTipoDoc(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
                   onSelectAll={() => { setFilterTipoDoc(new Set(tiposDocumento)); setPage(0); }}
                   onClear={() => { setFilterTipoDoc(new Set()); setPage(0); }}
-                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_tipoDoc`, JSON.stringify([...filterTipoDoc])); toast.success("Padrao de tipo documento salvo!"); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_tipoDoc`, JSON.stringify([...filterTipoDoc])); toast.success("Padrao de tipo documento salvo!"); }}
                 />
               </div>
 
@@ -1047,7 +1094,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             </TableCell>
                             <TableCell className="font-mono text-sm">{formatDate(item.dueDate)}</TableCell>
                             {isPagas && (
-                              <TableCell className="font-mono text-sm text-emerald-600">{formatDate(latestPaymentDate(item))}</TableCell>
+                              <TableCell className="font-mono text-sm text-emerald-600">{formatDate(latestPaymentDate(item) || item.dueDate)}</TableCell>
                             )}
                             {isOverdue && (
                               <TableCell>
@@ -1069,7 +1116,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             <TableCell className="text-right font-mono text-sm">{formatCurrency(item.originalAmount)}</TableCell>
                             {isPagas ? (
                               <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">
-                                {formatCurrency(paidTotal(item, filterAno === "all" ? undefined : filterAno))}
+                                {formatCurrency(isIncome ? item.originalAmount : paidTotal(item, filterAno === "all" ? undefined : filterAno))}
                               </TableCell>
                             ) : (
                               <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
