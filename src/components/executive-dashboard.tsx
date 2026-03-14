@@ -496,6 +496,9 @@ export function ExecutiveDashboard() {
     if (selectedDocTypes.size > 0) {
       result = result.filter(i => selectedDocTypes.has(i.documentIdentificationName));
     }
+    if (selectedYears.size > 0) {
+      result = result.filter(i => i.dueDate && selectedYears.has(i.dueDate.substring(0, 4)));
+    }
     if (selectedMonths.size > 0) {
       result = result.filter(i => i.dueDate && selectedMonths.has(i.dueDate.substring(5, 7)));
     }
@@ -506,7 +509,7 @@ export function ExecutiveDashboard() {
       result = result.filter(i => i.dueDate && i.dueDate <= duePeriodMaxDate);
     }
     return result;
-  }, [selectedCompanies, selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate]);
+  }, [selectedCompanies, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate]);
 
   // === Filtered item sets ===
   const itemsAPagar = useMemo(() =>
@@ -1580,36 +1583,32 @@ export function ExecutiveDashboard() {
               toast.success("Padrao de tipo documento salvo!");
             }}
           />
-          {/* Per-tab filters: Anos/Meses for historical tabs, Vencimento for future tabs */}
-          {(activeTab === "pagas" || activeTab === "recebidas" || activeTab === "atrasadas" || activeTab === "inadimplencia") && (
-            <>
-              <MultiSelectFilter
-                label="Anos"
-                icon={<CalendarClock className="h-4 w-4" />}
-                allOptions={availableYears}
-                selected={selectedYears}
-                onToggle={(y) => toggleInSet(setSelectedYears, y)}
-                onSelectAll={() => setSelectedYears(new Set(availableYears))}
-                onClear={() => {
-                  const defaultYrs: string[] = [];
-                  for (let y = currentYear - 8; y <= currentYear; y++) defaultYrs.push(String(y));
-                  setSelectedYears(new Set(defaultYrs));
-                }}
-                activeColor="blue"
-              />
-              <MultiSelectFilter
-                label="Meses"
-                icon={<CalendarClock className="h-4 w-4" />}
-                allOptions={availableMonths}
-                selected={selectedMonths}
-                onToggle={(m) => toggleInSet(setSelectedMonths, m)}
-                onSelectAll={() => setSelectedMonths(new Set(availableMonths))}
-                onClear={() => setSelectedMonths(new Set())}
-                activeColor="blue"
-                labelFn={(v) => MONTH_NAMES[v] || v}
-              />
-            </>
-          )}
+          {/* Time filters for all tabs */}
+          <MultiSelectFilter
+            label="Anos"
+            icon={<CalendarClock className="h-4 w-4" />}
+            allOptions={availableYears}
+            selected={selectedYears}
+            onToggle={(y) => toggleInSet(setSelectedYears, y)}
+            onSelectAll={() => setSelectedYears(new Set(availableYears))}
+            onClear={() => {
+              const defaultYrs: string[] = [];
+              for (let y = currentYear - 8; y <= currentYear; y++) defaultYrs.push(String(y));
+              setSelectedYears(new Set(defaultYrs));
+            }}
+            activeColor="blue"
+          />
+          <MultiSelectFilter
+            label="Meses"
+            icon={<CalendarClock className="h-4 w-4" />}
+            allOptions={availableMonths}
+            selected={selectedMonths}
+            onToggle={(m) => toggleInSet(setSelectedMonths, m)}
+            onSelectAll={() => setSelectedMonths(new Set(availableMonths))}
+            onClear={() => setSelectedMonths(new Set())}
+            activeColor="blue"
+            labelFn={(v) => MONTH_NAMES[v] || v}
+          />
           {(activeTab === "a-pagar" || activeTab === "a-receber") && (
             <MultiSelectFilter
               label="Vencimento"
