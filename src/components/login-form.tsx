@@ -21,17 +21,25 @@ export function LoginForm() {
     setError("");
     setLoading(true);
 
-    const result = await signIn("credentials", {
-      username,
-      password,
-      redirect: false,
-    });
+    try {
+      const result = await signIn("credentials", {
+        username,
+        password,
+        redirect: false,
+      });
 
-    if (result?.error) {
-      setError("Usuario ou senha invalidos");
+      if (result?.error) {
+        setError("Usuario ou senha invalidos");
+        setLoading(false);
+      } else if (result?.ok) {
+        router.push("/dashboard");
+      } else {
+        setError("Erro ao conectar. Tente novamente.");
+        setLoading(false);
+      }
+    } catch {
+      setError("Erro de conexao. Verifique sua internet e tente novamente.");
       setLoading(false);
-    } else {
-      router.push("/dashboard");
     }
   };
 
