@@ -509,31 +509,31 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return items.filter((item) => {
       if (isPagas) {
         if (isIncome) {
-          // For income "recebidas" mode: item is received when correctedBalanceAmount === 0
-          if (item.correctedBalanceAmount !== 0) return false;
+          // For income "recebidas" mode: show items that have any receipt (baixa) in the period
+          // This includes partial payments (correctedBalanceAmount > 0)
           if (item.originalAmount <= 0) return false;
 
-          // Check payments array first; if empty, fall back to dueDate for year/month filter
-          const hasPayments = (item.payments || []).some(p => p.netAmount > 0);
-          if (hasPayments) {
-            const hasPaidInYear = (item.payments || []).some(p =>
-              p.netAmount > 0 && p.paymentDate &&
-              (filterAno === "all" || p.paymentDate.startsWith(filterAno))
-            );
-            if (!hasPaidInYear) return false;
+          const payments = item.payments || [];
+          // Must have at least one receipt with a payment date
+          const hasReceipts = payments.some(p => p.paymentDate);
+          if (!hasReceipts) return false;
 
-            if (filterMes !== "all") {
-              const hasPayInMonth = (item.payments || []).some(p =>
-                p.netAmount > 0 && p.paymentDate &&
-                (filterAno === "all" || p.paymentDate.startsWith(filterAno)) &&
-                p.paymentDate.substring(5, 7) === filterMes
-              );
-              if (!hasPayInMonth) return false;
-            }
-          } else {
-            // No payment records — filter by due date
-            if (filterAno !== "all" && item.dueDate?.substring(0, 4) !== filterAno) return false;
-            if (filterMes !== "all" && item.dueDate?.substring(5, 7) !== filterMes) return false;
+          // Filter by year
+          if (filterAno !== "all") {
+            const hasInYear = payments.some(p =>
+              p.paymentDate && p.paymentDate.startsWith(filterAno)
+            );
+            if (!hasInYear) return false;
+          }
+
+          // Filter by month
+          if (filterMes !== "all") {
+            const hasInMonth = payments.some(p =>
+              p.paymentDate &&
+              (filterAno === "all" || p.paymentDate.startsWith(filterAno)) &&
+              p.paymentDate.substring(5, 7) === filterMes
+            );
+            if (!hasInMonth) return false;
           }
         } else {
           // For outcome "pagas" mode: must have payments in the selected year
