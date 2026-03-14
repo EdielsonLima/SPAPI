@@ -116,9 +116,17 @@ function latestPaymentDate(item: ContasItem): string {
 }
 
 function paidTotal(item: ContasItem, yearFilter?: string): number {
-  return (item.payments || [])
-    .filter(p => p.netAmount > 0 && (!yearFilter || (p.paymentDate && p.paymentDate.startsWith(yearFilter))))
-    .reduce((s, p) => s + p.netAmount, 0);
+  const payments = (item.payments || [])
+    .filter(p => p.netAmount > 0 && (!yearFilter || (p.paymentDate && p.paymentDate.startsWith(yearFilter))));
+  if (payments.length > 0) {
+    return payments.reduce((s, p) => s + p.netAmount, 0);
+  }
+  // Fallback for income items where API doesn't populate payments array:
+  // net received = original - discount - tax
+  if (item.correctedBalanceAmount === 0 && item.originalAmount > 0) {
+    return item.originalAmount - (item.discountAmount || 0) - (item.taxAmount || 0);
+  }
+  return 0;
 }
 
 const monthNames = [
