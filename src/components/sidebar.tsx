@@ -23,6 +23,9 @@ import {
   BarChart3,
   CheckCircle,
   Settings,
+  ArrowDownLeft,
+  CircleCheck,
+  UserX,
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -69,6 +72,21 @@ const menuItems: MenuItem[] = [
         label: "Contas Vencidas",
         href: "/financeiro/contas-vencidas",
         icon: <AlertTriangle className="h-4 w-4" />,
+      },
+      {
+        label: "Contas a Receber",
+        href: "/financeiro/contas-receber",
+        icon: <ArrowDownLeft className="h-4 w-4" />,
+      },
+      {
+        label: "Contas Recebidas",
+        href: "/financeiro/contas-recebidas",
+        icon: <CircleCheck className="h-4 w-4" />,
+      },
+      {
+        label: "Inadimplentes",
+        href: "/financeiro/inadimplentes",
+        icon: <UserX className="h-4 w-4" />,
       },
     ],
   },
@@ -261,7 +279,7 @@ export function Sidebar() {
                     <div
                       className={cn(
                         "overflow-hidden transition-all duration-200",
-                        isOpen ? "max-h-64 mt-1" : "max-h-0"
+                        isOpen ? "max-h-96 mt-1" : "max-h-0"
                       )}
                     >
                       <div className="ml-4 pl-3 border-l border-slate-700 space-y-1">

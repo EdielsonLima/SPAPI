@@ -47,8 +47,25 @@ import {
   FolderOpen,
   Users,
 } from "lucide-react";
-import { SiengeOutcome } from "@/types/sienge";
+import { SiengeOutcome, SiengeIncome } from "@/types/sienge";
 import { toast } from "sonner";
+
+type ContasItem = SiengeOutcome | SiengeIncome;
+
+function getCounterpartName(item: ContasItem): string {
+  if ("creditorName" in item) return item.creditorName || "";
+  return (item as SiengeIncome).clientName || "";
+}
+
+function getCounterpartId(item: ContasItem): number {
+  if ("creditorId" in item) return item.creditorId;
+  return (item as SiengeIncome).clientId;
+}
+
+function getBuildingsCosts(item: ContasItem) {
+  if ("buildingsCosts" in item) return item.buildingsCosts || [];
+  return [];
+}
 
 type SortField =
   | "billId"
@@ -92,13 +109,13 @@ function daysDiff(dateStr: string) {
   return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function latestPaymentDate(item: SiengeOutcome): string {
+function latestPaymentDate(item: ContasItem): string {
   const dates = (item.payments || []).filter(p => p.paymentDate && p.netAmount > 0).map(p => p.paymentDate);
   if (dates.length === 0) return "";
   return dates.sort().reverse()[0];
 }
 
-function paidTotal(item: SiengeOutcome, yearFilter?: string): number {
+function paidTotal(item: ContasItem, yearFilter?: string): number {
   return (item.payments || [])
     .filter(p => p.netAmount > 0 && (!yearFilter || (p.paymentDate && p.paymentDate.startsWith(yearFilter))))
     .reduce((s, p) => s + p.netAmount, 0);
@@ -253,15 +270,20 @@ interface ContasTableProps {
   mode: "a-vencer" | "vencidas" | "pagas";
   title: string;
   subtitle: string;
+  dataSource?: "outcome" | "income";
 }
 
-export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
+export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: ContasTableProps) {
+  const isIncome = dataSource === "income";
+  const counterpartLabel = isIncome ? "Cliente" : "Credor";
+  const counterpartLabelPlural = isIncome ? "clientes" : "credores";
+  const apiEndpoint = isIncome ? "/api/sienge/income" : "/api/sienge/outcome";
   const isOverdue = mode === "vencidas";
   const isPagas = mode === "pagas";
 
   const currentYear = new Date().getFullYear();
 
-  const [items, setItems] = useState<SiengeOutcome[]>([]);
+  const [items, setItems] = useState<ContasItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filterEmpresas, setFilterEmpresas] = useState<Set<string>>(() => {
@@ -351,7 +373,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     setError(false);
     try {
       const res = await fetch(
-        `/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}` +
+        `${apiEndpoint}?startDate=${startDate}&endDate=${endDate}` +
         (forceRefresh ? "&forceRefresh=true" : "")
       );
       if (!res.ok) throw new Error("API error");
@@ -369,7 +391,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate]);
+  }, [startDate, endDate, apiEndpoint]);
 
   // Only fetch on mount. Subsequent fetches are triggered explicitly by the
   // "Buscar" and "Atualizar" buttons so that changing the date inputs does
@@ -406,7 +428,8 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
   const credorNames = useMemo(() => {
     const set = new Set<string>();
     items.forEach((item) => {
-      if (item.creditorName) set.add(item.creditorName);
+      const name = getCounterpartName(item);
+      if (name) set.add(name);
     });
     return Array.from(set).sort();
   }, [items]);
@@ -486,7 +509,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
       if (search) {
         const s = search.toLowerCase();
         const match =
-          item.creditorName?.toLowerCase().includes(s) ||
+          getCounterpartName(item).toLowerCase().includes(s) ||
           item.companyName?.toLowerCase().includes(s) ||
           item.projectName?.toLowerCase().includes(s) ||
           item.documentNumber?.includes(search);
@@ -503,7 +526,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         if (!has) return false;
       }
 
-      if (filterCredores.size > 0 && !filterCredores.has(item.creditorName))
+      if (filterCredores.size > 0 && !filterCredores.has(getCounterpartName(item)))
         return false;
 
       if (filterTipoDoc.size > 0) {
@@ -545,12 +568,12 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         case "billId": cmp = a.billId - b.billId; break;
         case "dueDate": cmp = (a.dueDate || "").localeCompare(b.dueDate || ""); break;
         case "daysOverdue": cmp = daysDiff(a.dueDate) - daysDiff(b.dueDate); break;
-        case "creditorName": cmp = (a.creditorName || "").localeCompare(b.creditorName || ""); break;
+        case "creditorName": cmp = getCounterpartName(a).localeCompare(getCounterpartName(b)); break;
         case "companyName": cmp = (a.companyName || "").localeCompare(b.companyName || ""); break;
         case "projectName": cmp = (a.projectName || "").localeCompare(b.projectName || ""); break;
         case "documentNumber": cmp = (a.documentNumber || "").localeCompare(b.documentNumber || ""); break;
         case "documentType": cmp = (a.documentIdentificationId || "").localeCompare(b.documentIdentificationId || ""); break;
-        case "costEstimationSheet": cmp = (a.buildingsCosts?.[0]?.costEstimationSheetName || "").localeCompare(b.buildingsCosts?.[0]?.costEstimationSheetName || ""); break;
+        case "costEstimationSheet": cmp = (getBuildingsCosts(a)[0]?.costEstimationSheetName || "").localeCompare(getBuildingsCosts(b)[0]?.costEstimationSheetName || ""); break;
         case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
         case "balanceAmount": cmp = a.balanceAmount - b.balanceAmount; break;
         case "paymentDate": cmp = (latestPaymentDate(a) || "").localeCompare(latestPaymentDate(b) || ""); break;
@@ -562,7 +585,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
 
   // Group parcelas by billId
   const parcelasByBill = useMemo(() => {
-    const map = new Map<number, SiengeOutcome[]>();
+    const map = new Map<number, ContasItem[]>();
     sorted.forEach((item) => {
       const list = map.get(item.billId) || [];
       list.push(item);
@@ -604,7 +627,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         (item.payments || []).filter(p => p.paymentDate === todayStr && p.netAmount > 0).forEach(p => {
           valor += p.netAmount;
           billIds.add(item.billId);
-          credorIds.add(item.creditorId);
+          credorIds.add(getCounterpartId(item));
         });
       });
       return { valor, titulos: billIds.size, credores: credorIds.size, parcelas: billIds.size };
@@ -612,7 +635,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     const todayItems = sorted.filter((item) => item.dueDate === todayStr);
     const valor = todayItems.reduce((s, i) => s + (i.balanceAmount || 0), 0);
     const titulos = new Set(todayItems.map((i) => i.billId)).size;
-    const credores = new Set(todayItems.map((i) => i.creditorId)).size;
+    const credores = new Set(todayItems.map((i) => getCounterpartId(i))).size;
     return { valor, titulos, credores, parcelas: todayItems.length };
   }, [sorted, todayStr, isPagas]);
 
@@ -634,7 +657,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         ).forEach(p => {
           valor += p.netAmount;
           billIds.add(item.billId);
-          credorIds.add(item.creditorId);
+          credorIds.add(getCounterpartId(item));
         });
       });
       return { valor, titulos: billIds.size, credores: credorIds.size, parcelas: billIds.size };
@@ -655,7 +678,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
     });
     const valor = weekItems.reduce((s, i) => s + (i.balanceAmount || 0), 0);
     const titulos = new Set(weekItems.map((i) => i.billId)).size;
-    const credores = new Set(weekItems.map((i) => i.creditorId)).size;
+    const credores = new Set(weekItems.map((i) => getCounterpartId(i))).size;
     return { valor, titulos, credores, parcelas: weekItems.length };
   }, [sorted, isOverdue, isPagas, todayStr]);
 
@@ -731,7 +754,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
       <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         <Card className={`border-0 shadow-sm border-l-4 ${isPagas ? "border-l-emerald-500" : isOverdue ? "border-l-red-500" : "border-l-amber-500"}`}>
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isPagas ? "Pago Hoje" : isOverdue ? "Vencidas Hoje" : "A Pagar Hoje"}</div>
+            <div className="text-sm text-slate-500">{isPagas ? (isIncome ? "Recebido Hoje" : "Pago Hoje") : isOverdue ? (isIncome ? "Inadimplentes Hoje" : "Vencidas Hoje") : (isIncome ? "A Receber Hoje" : "A Pagar Hoje")}</div>
             <div className={`text-xl font-bold mt-1 ${isPagas ? "text-emerald-600" : isOverdue ? "text-red-600" : "text-amber-600"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(todayStats.valor)}
             </div>
@@ -739,14 +762,14 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
               <div className="text-xs text-slate-400 mt-1.5 space-x-2">
                 <span>{todayStats.titulos} {todayStats.titulos === 1 ? "titulo" : "titulos"}</span>
                 <span>•</span>
-                <span>{todayStats.credores} {todayStats.credores === 1 ? "credor" : "credores"}</span>
+                <span>{todayStats.credores} {todayStats.credores === 1 ? counterpartLabel.toLowerCase() : counterpartLabelPlural}</span>
               </div>
             )}
           </CardContent>
         </Card>
         <Card className={`border-0 shadow-sm border-l-4 ${isPagas ? "border-l-teal-400" : isOverdue ? "border-l-orange-400" : "border-l-blue-400"}`}>
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isPagas ? "Pago ultimos 7 dias" : isOverdue ? "Vencidas ultimos 7 dias" : "A Pagar em 7 dias"}</div>
+            <div className="text-sm text-slate-500">{isPagas ? (isIncome ? "Recebido ultimos 7 dias" : "Pago ultimos 7 dias") : isOverdue ? (isIncome ? "Inadimplentes ultimos 7 dias" : "Vencidas ultimos 7 dias") : (isIncome ? "A Receber em 7 dias" : "A Pagar em 7 dias")}</div>
             <div className={`text-xl font-bold mt-1 ${isPagas ? "text-teal-600" : isOverdue ? "text-orange-600" : "text-blue-600"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(weekStats.valor)}
             </div>
@@ -754,7 +777,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
               <div className="text-xs text-slate-400 mt-1.5 space-x-2">
                 <span>{weekStats.titulos} {weekStats.titulos === 1 ? "titulo" : "titulos"}</span>
                 <span>•</span>
-                <span>{weekStats.credores} {weekStats.credores === 1 ? "credor" : "credores"}</span>
+                <span>{weekStats.credores} {weekStats.credores === 1 ? counterpartLabel.toLowerCase() : counterpartLabelPlural}</span>
               </div>
             )}
           </CardContent>
@@ -774,7 +797,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         </Card>
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isPagas ? "Total Pago" : "Valor Original"}</div>
+            <div className="text-sm text-slate-500">{isPagas ? (isIncome ? "Total Recebido" : "Total Pago") : "Valor Original"}</div>
             <div className={`text-xl font-bold mt-1 ${isPagas ? "text-emerald-600" : "text-blue-600"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(isPagas ? totalPaid : totalAmount)}
             </div>
@@ -782,15 +805,15 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
         </Card>
         <Card className={`border-0 shadow-sm ${isOverdue ? "border-l-4 border-l-red-500" : ""}`}>
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isPagas ? "Credores" : "Saldo Pendente"}</div>
+            <div className="text-sm text-slate-500">{isPagas ? counterpartLabelPlural.charAt(0).toUpperCase() + counterpartLabelPlural.slice(1) : "Saldo Pendente"}</div>
             <div className={`text-xl font-bold mt-1 ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : isPagas
-                ? `${new Set(sorted.map((i) => i.creditorId)).size}`
+                ? `${new Set(sorted.map((i) => getCounterpartId(i))).size}`
                 : formatCurrency(totalBalance)}
             </div>
             {!loading && !isPagas && (
               <div className="text-xs text-slate-400 mt-1.5">
-                {new Set(sorted.map((i) => i.creditorId)).size} credores
+                {new Set(sorted.map((i) => getCounterpartId(i))).size} {counterpartLabelPlural}
               </div>
             )}
             {!loading && isPagas && (
@@ -923,16 +946,16 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
               </div>
 
               <div className="min-w-[220px]">
-                <label className="text-xs font-medium text-slate-500 mb-1 block">Credor</label>
+                <label className="text-xs font-medium text-slate-500 mb-1 block">{counterpartLabel}</label>
                 <MultiSelectFilter
-                  label="Credor"
+                  label={counterpartLabel}
                   icon={<Users className="h-4 w-4 text-slate-400" />}
                   allOptions={credorNames}
                   selected={filterCredores}
                   onToggle={(name) => { setFilterCredores(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
                   onSelectAll={() => { setFilterCredores(new Set(credorNames)); setPage(0); }}
                   onClear={() => { setFilterCredores(new Set()); setPage(0); }}
-                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_credores`, JSON.stringify([...filterCredores])); toast.success("Padrao de credores salvo!"); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${mode}_default_credores`, JSON.stringify([...filterCredores])); toast.success(`Padrao de ${counterpartLabelPlural} salvo!`); }}
                 />
               </div>
 
@@ -973,14 +996,14 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                   {isOverdue && (
                     <SortableHead field="daysOverdue" className="min-w-[80px]">Dias Atraso</SortableHead>
                   )}
-                  <SortableHead field="creditorName" className="min-w-[200px]">Credor</SortableHead>
+                  <SortableHead field="creditorName" className="min-w-[200px]">{counterpartLabel}</SortableHead>
                   <SortableHead field="companyName" className="min-w-[150px]">Empresa</SortableHead>
                   <SortableHead field="costEstimationSheet" className="min-w-[180px]">Item Orcamento</SortableHead>
                   <SortableHead field="billId" className="min-w-[80px]">Titulo</SortableHead>
                   <SortableHead field="documentType" className="min-w-[80px]">Tipo Doc.</SortableHead>
                   <SortableHead field="originalAmount" className="text-right min-w-[120px]">Valor Original</SortableHead>
                   {isPagas ? (
-                    <SortableHead field="paidAmount" className="text-right min-w-[120px]">Valor Pago</SortableHead>
+                    <SortableHead field="paidAmount" className="text-right min-w-[120px]">{isIncome ? "Valor Recebido" : "Valor Pago"}</SortableHead>
                   ) : (
                     <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>
                   )}
@@ -1031,12 +1054,12 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                 <Badge variant="destructive" className="text-xs font-mono">{Math.abs(days)}d</Badge>
                               </TableCell>
                             )}
-                            <TableCell className={`max-w-[250px] truncate ${isExpanded ? "font-bold text-blue-900" : "font-medium"}`} title={item.creditorName}>{item.creditorName}</TableCell>
+                            <TableCell className={`max-w-[250px] truncate ${isExpanded ? "font-bold text-blue-900" : "font-medium"}`} title={getCounterpartName(item)}>{getCounterpartName(item)}</TableCell>
                             <TableCell className="text-sm max-w-[180px] truncate" title={item.companyName}>{item.companyName}</TableCell>
-                            <TableCell className="text-sm max-w-[200px] truncate" title={item.buildingsCosts?.map((bc) => bc.costEstimationSheetName).filter(Boolean).join(", ") || "-"}>
-                              {item.buildingsCosts?.[0]?.costEstimationSheetName || "-"}
-                              {item.buildingsCosts && item.buildingsCosts.length > 1 && (
-                                <Badge variant="secondary" className="text-[10px] ml-1">+{item.buildingsCosts.length - 1}</Badge>
+                            <TableCell className="text-sm max-w-[200px] truncate" title={getBuildingsCosts(item).map((bc) => bc.costEstimationSheetName).filter(Boolean).join(", ") || "-"}>
+                              {getBuildingsCosts(item)[0]?.costEstimationSheetName || "-"}
+                              {getBuildingsCosts(item).length > 1 && (
+                                <Badge variant="secondary" className="text-[10px] ml-1">+{getBuildingsCosts(item).length - 1}</Badge>
                               )}
                             </TableCell>
                             <TableCell className="font-mono text-sm">{item.billId}</TableCell>
@@ -1072,7 +1095,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                   {isPagas && (item.payments || []).length > 0 && (
                                     <>
                                       <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
-                                        Pagamentos do Titulo {item.billId} — {item.creditorName}
+                                        Pagamentos do Titulo {item.billId} — {getCounterpartName(item)}
                                         <Badge className="bg-emerald-100 text-emerald-700 text-xs">{(item.payments || []).filter(p => p.netAmount > 0).length} pagamentos</Badge>
                                         <span className="text-slate-400">|</span>
                                         <span className="font-mono">Total: {formatCurrency(paidTotal(item))}</span>
@@ -1106,7 +1129,7 @@ export function ContasTable({ mode, title, subtitle }: ContasTableProps) {
                                   {!isPagas && totalParcelas > 1 && (
                                     <>
                                       <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
-                                        Parcelas do Titulo {item.billId} — {item.creditorName}
+                                        Parcelas do Titulo {item.billId} — {getCounterpartName(item)}
                                         <Badge variant="secondary" className="text-xs">{totalParcelas} parcelas</Badge>
                                         <span className="text-slate-400">|</span>
                                         <span className="font-mono">Total: {formatCurrency(billParcelas.reduce((s, p) => s + (p.balanceAmount || 0), 0))}</span>
