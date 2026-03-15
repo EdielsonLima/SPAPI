@@ -150,16 +150,26 @@ CREATE TABLE IF NOT EXISTS cub_override (
 
 -- ── Exclusão de Títulos (ignorar títulos nos cálculos financeiros) ────────
 CREATE TABLE IF NOT EXISTS bill_exclusions (
-  company_id   INTEGER NOT NULL,
-  bill_id      INTEGER NOT NULL,
-  company_name TEXT    NOT NULL,
-  reason       TEXT    NOT NULL DEFAULT '',
-  created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+  company_id      INTEGER NOT NULL,
+  bill_id         INTEGER NOT NULL,
+  company_name    TEXT    NOT NULL,
+  client_name     TEXT    NOT NULL DEFAULT '',
+  due_date        TEXT    NOT NULL DEFAULT '',
+  original_amount NUMERIC(14,2) NOT NULL DEFAULT 0,
+  observation     TEXT    NOT NULL DEFAULT '',
+  reason          TEXT    NOT NULL DEFAULT '',
+  created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
   PRIMARY KEY (company_id, bill_id)
 );
 
 -- ── Migração: adicionar coluna status em company_settings ──────────────────
 ALTER TABLE company_settings ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'ativa';
+
+-- ── Migração: adicionar colunas extras em bill_exclusions ─────────────────
+ALTER TABLE bill_exclusions ADD COLUMN IF NOT EXISTS client_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE bill_exclusions ADD COLUMN IF NOT EXISTS due_date TEXT NOT NULL DEFAULT '';
+ALTER TABLE bill_exclusions ADD COLUMN IF NOT EXISTS original_amount NUMERIC(14,2) NOT NULL DEFAULT 0;
+ALTER TABLE bill_exclusions ADD COLUMN IF NOT EXISTS observation TEXT NOT NULL DEFAULT '';
 
 -- =============================================================================
 -- Índices para performance

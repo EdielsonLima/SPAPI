@@ -26,13 +26,17 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { companyId, billId, companyName, reason } = body;
+    const { companyId, billId, companyName, clientName, dueDate, originalAmount, observation, reason } = body;
 
     if (!companyId || !billId || !companyName) {
       return NextResponse.json({ error: "companyId, billId and companyName are required" }, { status: 400 });
     }
 
-    await addBillExclusion(Number(companyId), Number(billId), companyName, reason || "");
+    await addBillExclusion(
+      Number(companyId), Number(billId), companyName,
+      clientName || "", dueDate || "", Number(originalAmount) || 0,
+      observation || "", reason || ""
+    );
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error adding bill exclusion:", error);

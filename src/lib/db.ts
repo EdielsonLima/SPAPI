@@ -379,6 +379,10 @@ export interface BillExclusion {
   companyId: number;
   billId: number;
   companyName: string;
+  clientName: string;
+  dueDate: string;
+  originalAmount: number;
+  observation: string;
   reason: string;
   createdAt: string;
 }
@@ -386,18 +390,26 @@ export interface BillExclusion {
 export async function getBillExclusions(): Promise<BillExclusion[]> {
   const { rows } = await pool.query(
     `SELECT company_id AS "companyId", bill_id AS "billId", company_name AS "companyName",
+            client_name AS "clientName", due_date AS "dueDate",
+            original_amount AS "originalAmount", observation,
             reason, created_at AS "createdAt"
      FROM bill_exclusions ORDER BY company_name, bill_id`
   );
   return rows;
 }
 
-export async function addBillExclusion(companyId: number, billId: number, companyName: string, reason: string) {
+export async function addBillExclusion(
+  companyId: number, billId: number, companyName: string,
+  clientName: string, dueDate: string, originalAmount: number,
+  observation: string, reason: string
+) {
   await pool.query(
-    `INSERT INTO bill_exclusions (company_id, bill_id, company_name, reason)
-     VALUES ($1, $2, $3, $4)
-     ON CONFLICT (company_id, bill_id) DO UPDATE SET company_name = $3, reason = $4, created_at = NOW()`,
-    [companyId, billId, companyName, reason]
+    `INSERT INTO bill_exclusions (company_id, bill_id, company_name, client_name, due_date, original_amount, observation, reason)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     ON CONFLICT (company_id, bill_id) DO UPDATE SET
+       company_name = $3, client_name = $4, due_date = $5, original_amount = $6,
+       observation = $7, reason = $8, created_at = NOW()`,
+    [companyId, billId, companyName, clientName, dueDate, originalAmount, observation, reason]
   );
 }
 

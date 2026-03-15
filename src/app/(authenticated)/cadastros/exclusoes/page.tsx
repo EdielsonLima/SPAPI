@@ -29,8 +29,29 @@ interface BillExclusion {
   companyId: number;
   billId: number;
   companyName: string;
+  clientName: string;
+  dueDate: string;
+  originalAmount: number;
+  observation: string;
   reason: string;
   createdAt: string;
+}
+
+function formatCurrency(value: number): string {
+  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
+function formatDateBR(dateStr: string): string {
+  if (!dateStr) return "-";
+  try {
+    if (dateStr.includes("T")) {
+      return new Date(dateStr).toLocaleDateString("pt-BR");
+    }
+    const [y, m, d] = dateStr.split("-");
+    return `${d}/${m}/${y}`;
+  } catch {
+    return dateStr;
+  }
 }
 
 export default function ExclusoesPage() {
@@ -43,6 +64,10 @@ export default function ExclusoesPage() {
   // Form state
   const [selectedCompanyId, setSelectedCompanyId] = useState("");
   const [newBillId, setNewBillId] = useState("");
+  const [newClientName, setNewClientName] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
+  const [newOriginalAmount, setNewOriginalAmount] = useState("");
+  const [newObservation, setNewObservation] = useState("");
   const [newReason, setNewReason] = useState("");
 
   const fetchData = useCallback(async () => {
@@ -74,9 +99,20 @@ export default function ExclusoesPage() {
       (e) =>
         e.companyName.toLowerCase().includes(s) ||
         String(e.billId).includes(s) ||
-        e.reason.toLowerCase().includes(s)
+        e.clientName.toLowerCase().includes(s) ||
+        e.reason.toLowerCase().includes(s) ||
+        e.observation.toLowerCase().includes(s)
     );
   }, [exclusions, search]);
+
+  const resetForm = () => {
+    setNewBillId("");
+    setNewClientName("");
+    setNewDueDate("");
+    setNewOriginalAmount("");
+    setNewObservation("");
+    setNewReason("");
+  };
 
   const handleAdd = async () => {
     if (!selectedCompanyId || !newBillId) {
@@ -96,7 +132,6 @@ export default function ExclusoesPage() {
       return;
     }
 
-    // Check if already exists
     if (exclusions.some((e) => e.companyId === company.id && e.billId === billId)) {
       toast.error("Este titulo ja esta na lista de exclusoes");
       return;
@@ -104,32 +139,31 @@ export default function ExclusoesPage() {
 
     setSaving(true);
     try {
+      const payload = {
+        companyId: company.id,
+        billId,
+        companyName: company.name,
+        clientName: newClientName.trim(),
+        dueDate: newDueDate,
+        originalAmount: parseFloat(newOriginalAmount) || 0,
+        observation: newObservation.trim(),
+        reason: newReason.trim(),
+      };
+
       const res = await fetch("/api/bill-exclusions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          companyId: company.id,
-          billId,
-          companyName: company.name,
-          reason: newReason.trim(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error("API error");
 
       setExclusions((prev) => [
         ...prev,
-        {
-          companyId: company.id,
-          billId,
-          companyName: company.name,
-          reason: newReason.trim(),
-          createdAt: new Date().toISOString(),
-        },
+        { ...payload, createdAt: new Date().toISOString() },
       ]);
 
-      setNewBillId("");
-      setNewReason("");
+      resetForm();
       toast.success(`Titulo ${billId} da empresa ${company.name} adicionado a lista de exclusoes`);
     } catch {
       toast.error("Erro ao salvar exclusao");
@@ -155,14 +189,6 @@ export default function ExclusoesPage() {
     }
   };
 
-  const formatDate = (dateStr: string) => {
-    try {
-      return new Date(dateStr).toLocaleDateString("pt-BR");
-    } catch {
-      return dateStr;
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div>
@@ -181,9 +207,9 @@ export default function ExclusoesPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="min-w-[250px] flex-1">
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Empresa</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="lg:col-span-2">
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Empresa *</label>
               <Select value={selectedCompanyId} onValueChange={setSelectedCompanyId}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecione a empresa" />
@@ -198,8 +224,8 @@ export default function ExclusoesPage() {
               </Select>
             </div>
 
-            <div className="w-[140px]">
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Titulo (Bill ID)</label>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Titulo (Bill ID) *</label>
               <Input
                 type="number"
                 placeholder="Ex: 109"
@@ -209,23 +235,67 @@ export default function ExclusoesPage() {
               />
             </div>
 
-            <div className="min-w-[200px] flex-1">
-              <label className="text-xs font-medium text-slate-500 mb-1 block">Motivo (opcional)</label>
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Cliente</label>
               <Input
-                placeholder="Ex: Titulo cancelado"
+                placeholder="Nome do cliente"
+                value={newClientName}
+                onChange={(e) => setNewClientName(e.target.value)}
+                className="h-10"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Dt. Vencimento</label>
+              <Input
+                type="date"
+                value={newDueDate}
+                onChange={(e) => setNewDueDate(e.target.value)}
+                className="h-10"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Valor Original</label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder="0,00"
+                value={newOriginalAmount}
+                onChange={(e) => setNewOriginalAmount(e.target.value)}
+                className="h-10"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Observacao</label>
+              <Input
+                placeholder="Observacao sobre o titulo"
+                value={newObservation}
+                onChange={(e) => setNewObservation(e.target.value)}
+                className="h-10"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-500 mb-1 block">Motivo da Exclusao</label>
+              <Input
+                placeholder="Ex: Lancamento indevido"
                 value={newReason}
                 onChange={(e) => setNewReason(e.target.value)}
                 className="h-10"
               />
             </div>
+          </div>
 
+          <div className="mt-4 flex justify-end">
             <Button
               onClick={handleAdd}
               disabled={saving || !selectedCompanyId || !newBillId}
               className="h-10 bg-red-700 hover:bg-red-800"
             >
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-              Adicionar
+              Adicionar Exclusao
             </Button>
           </div>
         </CardContent>
@@ -241,10 +311,10 @@ export default function ExclusoesPage() {
                 {exclusions.length} {exclusions.length === 1 ? "titulo" : "titulos"}
               </Badge>
             </div>
-            <div className="relative w-64">
+            <div className="relative w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Buscar empresa ou titulo..."
+                placeholder="Buscar empresa, titulo ou cliente..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 h-9"
@@ -265,42 +335,54 @@ export default function ExclusoesPage() {
               <p>{exclusions.length === 0 ? "Nenhum titulo excluido" : "Nenhum resultado encontrado"}</p>
             </div>
           ) : (
-            <Table>
-              <TableHeader className="bg-slate-50">
-                <TableRow>
-                  <TableHead className="text-xs">Empresa</TableHead>
-                  <TableHead className="text-xs w-[100px]">Titulo</TableHead>
-                  <TableHead className="text-xs">Motivo</TableHead>
-                  <TableHead className="text-xs w-[120px]">Data</TableHead>
-                  <TableHead className="text-xs w-[60px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((e) => (
-                  <TableRow key={`${e.companyId}:${e.billId}`} className="hover:bg-slate-50/50">
-                    <TableCell className="text-sm">
-                      <span className="text-slate-400 text-xs mr-1">{e.companyId} -</span>
-                      {e.companyName}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className="font-mono">{e.billId}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm text-slate-500">{e.reason || "-"}</TableCell>
-                    <TableCell className="text-sm text-slate-400">{formatDate(e.createdAt)}</TableCell>
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
-                        onClick={() => handleDelete(e.companyId, e.billId)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-slate-50">
+                  <TableRow>
+                    <TableHead className="text-xs">Empresa</TableHead>
+                    <TableHead className="text-xs w-[80px]">Titulo</TableHead>
+                    <TableHead className="text-xs">Cliente</TableHead>
+                    <TableHead className="text-xs w-[110px]">Vencimento</TableHead>
+                    <TableHead className="text-xs text-right w-[130px]">Valor Original</TableHead>
+                    <TableHead className="text-xs">Observacao</TableHead>
+                    <TableHead className="text-xs">Motivo</TableHead>
+                    <TableHead className="text-xs w-[100px]">Excluido em</TableHead>
+                    <TableHead className="text-xs w-[50px]" />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((e) => (
+                    <TableRow key={`${e.companyId}:${e.billId}`} className="hover:bg-slate-50/50">
+                      <TableCell className="text-sm">
+                        <span className="text-slate-400 text-xs mr-1">{e.companyId} -</span>
+                        {e.companyName}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="font-mono">{e.billId}</Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">{e.clientName || "-"}</TableCell>
+                      <TableCell className="text-sm font-mono">{formatDateBR(e.dueDate)}</TableCell>
+                      <TableCell className="text-sm text-right font-mono">
+                        {e.originalAmount > 0 ? formatCurrency(e.originalAmount) : "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-slate-500 max-w-[200px] truncate">{e.observation || "-"}</TableCell>
+                      <TableCell className="text-sm text-slate-500 max-w-[200px] truncate">{e.reason || "-"}</TableCell>
+                      <TableCell className="text-sm text-slate-400">{formatDateBR(e.createdAt)}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-red-400 hover:text-red-600 hover:bg-red-50"
+                          onClick={() => handleDelete(e.companyId, e.billId)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
