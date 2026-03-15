@@ -302,6 +302,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [items, setItems] = useState<ContasItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
   const [filterEmpresas, setFilterEmpresas] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_empresas`);
@@ -417,6 +418,17 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, []);
 
+  useEffect(() => {
+    fetch("/api/bill-exclusions")
+      .then(res => res.json())
+      .then(json => {
+        const set = new Set<string>();
+        ((json.data || []) as { companyId: number; billId: number }[]).forEach(e => set.add(`${e.companyId}:${e.billId}`));
+        setExclusionSet(set);
+      })
+      .catch(() => {});
+  }, []);
+
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -501,6 +513,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   // Filter
   const filtered = useMemo(() => {
     return items.filter((item) => {
+      // Exclude bills configured in Configuracoes > Exclusao de Titulos
+      if (exclusionSet.size > 0 && exclusionSet.has(`${item.companyId}:${item.billId}`)) return false;
+
       if (isPagas) {
         if (isIncome) {
           // For income "recebidas" mode: show items that have any receipt (baixa) in the period
@@ -613,7 +628,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today]);
+  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
 
   // Sort
   const handleSort = (field: SortField) => {

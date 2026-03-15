@@ -25,6 +25,7 @@ import {
   ArrowDownLeft,
   CircleCheck,
   UserX,
+  Ban,
 } from "lucide-react";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
@@ -129,6 +130,11 @@ const menuItems: MenuItem[] = [
         label: "Empreendimentos",
         href: "/cadastros/empreendimentos",
         icon: <Ruler className="h-4 w-4" />,
+      },
+      {
+        label: "Exclusao de Titulos",
+        href: "/cadastros/exclusoes",
+        icon: <Ban className="h-4 w-4" />,
       },
     ],
   },
