@@ -21,7 +21,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Trash2, Loader2, Plus, Ban, RefreshCw } from "lucide-react";
+import { Search, Trash2, Loader2, Plus, Ban } from "lucide-react";
 import { SiengeCompany } from "@/types/sienge";
 import { toast } from "sonner";
 
@@ -69,32 +69,6 @@ export default function ExclusoesPage() {
   const [newOriginalAmount, setNewOriginalAmount] = useState("");
   const [newObservation, setNewObservation] = useState("");
   const [newReason, setNewReason] = useState("");
-  const [lookingUp, setLookingUp] = useState(false);
-
-  const lookupBill = useCallback(async (companyId: string, billId: string) => {
-    if (!companyId || !billId) return;
-    const bid = parseInt(billId, 10);
-    if (isNaN(bid) || bid <= 0) return;
-
-    setLookingUp(true);
-    try {
-      const res = await fetch(`/api/sienge/bill-lookup?companyId=${companyId}&billId=${bid}`);
-      const data = await res.json();
-      if (data.found) {
-        setNewClientName(data.clientName || "");
-        setNewDueDate(data.dueDate || "");
-        setNewOriginalAmount(data.originalAmount ? String(data.originalAmount) : "");
-        setNewObservation(data.observation || "");
-        toast.success("Dados do titulo carregados automaticamente");
-      } else {
-        toast.info("Titulo nao encontrado no Sienge");
-      }
-    } catch {
-      toast.error("Erro ao buscar dados do titulo");
-    } finally {
-      setLookingUp(false);
-    }
-  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -252,27 +226,13 @@ export default function ExclusoesPage() {
 
             <div>
               <label className="text-xs font-medium text-slate-500 mb-1 block">Titulo (Bill ID) *</label>
-              <div className="flex gap-1">
-                <Input
-                  type="number"
-                  placeholder="Ex: 109"
-                  value={newBillId}
-                  onChange={(e) => setNewBillId(e.target.value)}
-                  onBlur={() => lookupBill(selectedCompanyId, newBillId)}
-                  className="h-10"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-10 w-10 shrink-0"
-                  disabled={lookingUp || !selectedCompanyId || !newBillId}
-                  onClick={() => lookupBill(selectedCompanyId, newBillId)}
-                  title="Buscar dados do titulo"
-                >
-                  {lookingUp ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-                </Button>
-              </div>
+              <Input
+                type="number"
+                placeholder="Ex: 109"
+                value={newBillId}
+                onChange={(e) => setNewBillId(e.target.value)}
+                className="h-10"
+              />
             </div>
 
             <div>
