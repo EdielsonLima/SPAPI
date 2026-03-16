@@ -227,7 +227,7 @@ export function ExecutiveDashboard() {
   const [section, setSection] = useState<Section>("cp");
   const [selectedYears, setSelectedYears] = useState<Set<string>>(() => {
     const years: string[] = [];
-    for (let y = currentYear - 8; y <= currentYear; y++) years.push(String(y));
+    for (let y = currentYear - 10; y <= currentYear; y++) years.push(String(y));
     return new Set(years);
   });
   const [selectedDuePeriods, setSelectedDuePeriods] = useState<Set<string>>(new Set());
@@ -266,7 +266,7 @@ export function ExecutiveDashboard() {
   const availableYears = useMemo(() => {
     const arr: string[] = [];
     if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia") {
-      for (let y = currentYear - 8; y <= currentYear; y++) arr.push(String(y));
+      for (let y = currentYear - 10; y <= currentYear; y++) arr.push(String(y));
     } else {
       // Contas a Pagar / a Receber: mostra ano atual em diante
       for (let y = currentYear; y <= currentYear + 5; y++) arr.push(String(y));
@@ -1683,7 +1683,7 @@ export function ExecutiveDashboard() {
             onSelectAll={() => setSelectedYears(new Set(availableYears))}
             onClear={() => {
               const defaultYrs: string[] = [];
-              for (let y = currentYear - 8; y <= currentYear; y++) defaultYrs.push(String(y));
+              for (let y = currentYear - 10; y <= currentYear; y++) defaultYrs.push(String(y));
               setSelectedYears(new Set(defaultYrs));
             }}
             activeColor="blue"
@@ -1727,7 +1727,7 @@ export function ExecutiveDashboard() {
               const savedOp = localStorage.getItem("dashboard_default_opTypes");
               setSelectedOpTypes(savedOp ? new Set(JSON.parse(savedOp)) : new Set(["Pagamento"]));
               const defaultYrs: string[] = [];
-              for (let y = currentYear - 8; y <= currentYear; y++) defaultYrs.push(String(y));
+              for (let y = currentYear - 10; y <= currentYear; y++) defaultYrs.push(String(y));
               setSelectedYears(new Set(defaultYrs));
             }}
             className="text-slate-400 px-2"
