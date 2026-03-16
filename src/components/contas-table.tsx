@@ -494,12 +494,20 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   };
 
   // Static year/month lists; day count depends on selected month
-  const anosDisponiveis = useMemo(
-    () => isPagas
-      ? Array.from({ length: 9 }, (_, i) => String(currentYear - 8 + i))
-      : Array.from({ length: 5 }, (_, i) => String(currentYear - 2 + i)),
-    [currentYear, isPagas]
-  );
+  const anosDisponiveis = useMemo(() => {
+    if (isPagas) {
+      return Array.from({ length: 11 }, (_, i) => String(currentYear - 10 + i));
+    }
+    // Para a-receber/vencidas: extrair anos dos dados reais
+    const years = new Set<string>();
+    items.forEach(i => {
+      if (i.dueDate) years.add(i.dueDate.substring(0, 4));
+    });
+    if (years.size === 0) {
+      return Array.from({ length: 6 }, (_, i) => String(currentYear + i));
+    }
+    return Array.from(years).sort();
+  }, [currentYear, isPagas, items]);
 
   const mesesDisponiveis = ["01","02","03","04","05","06","07","08","09","10","11","12"];
 
