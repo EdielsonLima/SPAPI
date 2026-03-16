@@ -700,7 +700,7 @@ export function ExecutiveDashboard() {
       }
 
       const client = map.get(key)!;
-      client.totalOverdue += item.correctedBalanceAmount;
+      client.totalOverdue += item.correctedBalanceAmount + calcEncargos(item);
       client.installments += 1;
       client.items.push(item);
 
@@ -732,6 +732,21 @@ export function ExecutiveDashboard() {
     today.setHours(0, 0, 0, 0);
     const d = new Date(dateStr + "T00:00:00");
     return Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+  };
+
+  // Calcula encargos (multa + juros) para itens inadimplentes - mesma fórmula de contas-table.tsx
+  const calcEncargos = (item: SiengeIncome) => {
+    if (!item.dueDate) return 0;
+    const due = new Date(item.dueDate + "T00:00:00");
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    let dias = Math.max(0, Math.floor((hoje.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
+    if (dias <= 0) return 0;
+    if (dias > 365) dias = dias - 1;
+    const saldo = item.correctedBalanceAmount || 0;
+    const multa = saldo * 0.02;
+    const juros = (saldo + multa) * 0.01 * (dias / 30);
+    return multa + juros;
   };
 
   // === Overdue grouped by creditor (CP) ===
@@ -894,7 +909,7 @@ export function ExecutiveDashboard() {
     filteredAReceber.reduce((s, i) => s + effectiveAmount(i), 0), [filteredAReceber]);
 
   const totalInadimplencia = useMemo(() =>
-    filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0), [filteredInadimplencia]);
+    filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i) + calcEncargos(i), 0), [filteredInadimplencia]);
 
   const totalRecebido = useMemo(() =>
     filteredRecebidas.reduce((s, i) => s + receivedSum(i), 0), [filteredRecebidas, receivedSum]);
@@ -1404,6 +1419,16 @@ export function ExecutiveDashboard() {
         icon: <Building2 className="h-7 w-7 text-orange-400" />,
         iconBg: "bg-orange-50",
         gradient: "from-orange-400 to-orange-500",
+      },
+      {
+        label: "% Inadimplência",
+        value: totalAReceber + totalInadimplencia > 0
+          ? ((totalInadimplencia / (totalAReceber + totalInadimplencia)) * 100).toFixed(1) + "%"
+          : "0%",
+        subtitle: "da carteira",
+        icon: <TrendingDown className="h-7 w-7 text-red-400" />,
+        iconBg: "bg-red-50",
+        gradient: "from-red-400 to-red-500",
       },
       {
         label: "Clientes",
@@ -2366,7 +2391,7 @@ export function ExecutiveDashboard() {
                         </TableRow>
                         {isExpanded && (
                           <TableRow className="bg-slate-50/50">
-                            <TableCell colSpan={6} className="p-0">
+                            <TableCell colSpan={8} className="p-0">
                               <div className="px-8 py-3">
                                 <table className="w-full text-sm">
                                   <thead>
@@ -2376,7 +2401,10 @@ export function ExecutiveDashboard() {
                                       <th className="text-left py-2 font-semibold">Vencimento</th>
                                       <th className="text-center py-2 font-semibold">Dias Atraso</th>
                                       <th className="text-right py-2 font-semibold">Valor Original</th>
-                                      <th className="text-right py-2 font-semibold">Saldo</th>
+                                      <th className="text-right py-2 font-semibold">Saldo Atual</th>
+                                      <th className="text-right py-2 font-semibold">Acréscimo</th>
+                                      <th className="text-right py-2 font-semibold">Desconto</th>
+                                      <th className="text-right py-2 font-semibold">Total</th>
                                       <th className="text-left py-2 font-semibold">Empresa</th>
                                       <th className="text-left py-2 font-semibold">Empreendimento</th>
                                     </tr>
@@ -2399,7 +2427,10 @@ export function ExecutiveDashboard() {
                                             </span>
                                           </td>
                                           <td className="py-2 text-right tabular-nums text-slate-600">{formatCurrency(item.originalAmount)}</td>
-                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600">{formatCurrency(item.correctedBalanceAmount)}</td>
+                                          <td className="py-2 text-right tabular-nums text-slate-800">{formatCurrency(item.correctedBalanceAmount)}</td>
+                                          <td className="py-2 text-right tabular-nums text-red-600">{formatCurrency(calcEncargos(item))}</td>
+                                          <td className="py-2 text-right tabular-nums text-slate-500">{formatCurrency(item.discountAmount || 0)}</td>
+                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600">{formatCurrency(item.correctedBalanceAmount + calcEncargos(item))}</td>
                                           <td className="py-2 text-slate-600 text-xs">{item.companyName}</td>
                                           <td className="py-2 text-slate-600 text-xs">{item.projectName}</td>
                                         </tr>
@@ -2423,7 +2454,7 @@ export function ExecutiveDashboard() {
                 <span><strong className="text-slate-700">{filteredInadimplencia.length}</strong> parcelas</span>
               </div>
               <div className="text-sm font-bold text-red-600">
-                Total: {formatCurrency(filteredInadimplencia.reduce((s, i) => s + i.correctedBalanceAmount, 0))}
+                Total: {formatCurrency(filteredInadimplencia.reduce((s, i) => s + i.correctedBalanceAmount + calcEncargos(i), 0))}
               </div>
             </div>
           </CardContent>
