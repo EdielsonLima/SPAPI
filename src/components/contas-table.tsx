@@ -339,10 +339,12 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   // API date range: always the full selected year.
   // For "pagas/recebidas" mode, fetch extra years back to capture items with old due dates
   // that were paid/received in the selected year.
+  // For "a-receber/vencidas" mode, extend endDate to include future parcels.
   const { startDate, endDate } = useMemo(() => {
     const yr = filterAno === "all" ? currentYear : parseInt(filterAno, 10);
     const start = isPagas ? yr - 10 : yr;
-    return { startDate: `${start}-01-01`, endDate: `${yr}-12-31` };
+    const end = isPagas ? yr : yr + 5;
+    return { startDate: `${start}-01-01`, endDate: `${end}-12-31` };
   }, [filterAno, currentYear, isPagas]);
   const [sortField, setSortField] = useState<SortField>(isPagas ? "paymentDate" : "dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
