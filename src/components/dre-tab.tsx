@@ -85,6 +85,25 @@ const KPI_LINES = [
   { key: "variacao_caixa", label: "Variacao de Caixa" },
 ];
 
+// Detail record for level 3 (creditor/client within a financial account)
+interface AccountDetail {
+  name: string;
+  amount: number;
+}
+
+// Level 2: financial account accumulator
+interface AccountAccum {
+  name: string;
+  amount: number;
+  details: Record<string, AccountDetail>; // keyed by creditor/client name
+}
+
+// Level 1: DRE category accumulator
+interface CategoryAccum {
+  total: number;
+  accounts: Record<string, AccountAccum>; // keyed by financialCategoryId
+}
+
 export function DreTab({
   outcomeItems,
   incomeItems,
@@ -96,6 +115,7 @@ export function DreTab({
   const [dreMappings, setDreMappings] = useState<Record<string, DreMappingItem[]>>({});
   const [loadingMappings, setLoadingMappings] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [dreMode, setDreMode] = useState<"simples" | "completa">("simples");
 
   useEffect(() => {
@@ -115,12 +135,20 @@ export function DreTab({
     });
   }, []);
 
+  const toggleAccountExpand = useCallback((key: string) => {
+    setExpandedAccounts(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   // Build DRE data
   const dreData = useMemo(() => {
     if (Object.keys(dreMappings).length === 0) return null;
 
     // Build lookup: financialCategoryId -> dreCategory
-    // Store both original and string-coerced versions for robust matching
     const fcToDre: Record<string, string> = {};
     for (const [cat, accounts] of Object.entries(dreMappings)) {
       for (const acc of accounts) {
@@ -129,67 +157,37 @@ export function DreTab({
     }
 
     // Initialize accumulators
-    const accum: Record<string, { total: number; accounts: Record<string, { name: string; amount: number }> }> = {};
+    const accum: Record<string, CategoryAccum> = {};
     for (const cat of DRE_INPUT_CATEGORIES) {
       accum[cat] = { total: 0, accounts: {} };
     }
 
-    const matchesFilters = (paymentDate: string, companyName: string) => {
-      if (!paymentDate) return false;
-      const year = paymentDate.substring(0, 4);
-      const month = paymentDate.substring(5, 7);
+    const matchesFilters = (date: string, companyName: string) => {
+      if (!date) return false;
+      const year = date.substring(0, 4);
+      const month = date.substring(5, 7);
       if (selectedYears.size > 0 && !selectedYears.has(year)) return false;
       if (selectedMonths.size > 0 && !selectedMonths.has(month)) return false;
       if (selectedCompanies.size > 0 && !selectedCompanies.has(companyName)) return false;
       return true;
     };
 
-    const addToAccum = (dreCat: string, fcId: string, fcName: string, amount: number) => {
+    const addToAccum = (dreCat: string, fcId: string, fcName: string, amount: number, detailName: string) => {
       if (!accum[dreCat]) return;
       accum[dreCat].total += amount;
       if (!accum[dreCat].accounts[fcId]) {
-        accum[dreCat].accounts[fcId] = { name: fcName, amount: 0 };
+        accum[dreCat].accounts[fcId] = { name: fcName, amount: 0, details: {} };
       }
       accum[dreCat].accounts[fcId].amount += amount;
+      // Level 3: track by creditor/client
+      const dKey = detailName || "Sem identificacao";
+      if (!accum[dreCat].accounts[fcId].details[dKey]) {
+        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0 };
+      }
+      accum[dreCat].accounts[fcId].details[dKey].amount += amount;
     };
 
-    // Debug: log data shapes
-    const sampleOutcome = outcomeItems[0];
-    const sampleIncome = incomeItems[0];
-    console.log("[DRE DEBUG] Lookup keys:", Object.keys(fcToDre));
-    console.log("[DRE DEBUG] outcomeItems count:", outcomeItems.length);
-    console.log("[DRE DEBUG] incomeItems count:", incomeItems.length);
-    console.log("[DRE DEBUG] bankFees count:", bankFees.length);
-    if (sampleOutcome) {
-      console.log("[DRE DEBUG] Sample outcome paymentsCategories:", sampleOutcome.paymentsCategories);
-      console.log("[DRE DEBUG] Sample outcome payments:", sampleOutcome.payments?.length, sampleOutcome.payments?.[0]);
-    }
-    if (sampleIncome) {
-      console.log("[DRE DEBUG] Sample income paymentsCategories:", sampleIncome.paymentsCategories);
-      console.log("[DRE DEBUG] Sample income payments:", sampleIncome.payments?.length, sampleIncome.payments?.[0]);
-    }
-    // Collect all unique financialCategoryIds from data
-    const allFcIds = new Set<string>();
-    for (const item of outcomeItems) {
-      for (const pc of (item.paymentsCategories || [])) {
-        allFcIds.add(String(pc.financialCategoryId));
-      }
-    }
-    for (const item of incomeItems) {
-      for (const pc of (item.paymentsCategories || [])) {
-        allFcIds.add(String(pc.financialCategoryId));
-      }
-    }
-    console.log("[DRE DEBUG] All unique financialCategoryIds in data:", Array.from(allFcIds).sort());
-    // Check which mapped IDs match
-    const mappedKeys = Object.keys(fcToDre);
-    const matchedKeys = mappedKeys.filter(k => allFcIds.has(k));
-    const unmatchedKeys = mappedKeys.filter(k => !allFcIds.has(k));
-    console.log("[DRE DEBUG] Matched mapped IDs:", matchedKeys);
-    console.log("[DRE DEBUG] Unmatched mapped IDs:", unmatchedKeys);
-
     // Process outcome (expenses) - these flow as NEGATIVE into expense categories
-    let outcomeMatchCount = 0;
     for (const item of outcomeItems) {
       for (const payment of (item.payments || [])) {
         if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
@@ -197,34 +195,54 @@ export function DreTab({
         for (const pc of (item.paymentsCategories || [])) {
           const dreCat = fcToDre[String(pc.financialCategoryId)];
           if (!dreCat) continue;
-          outcomeMatchCount++;
           const rate = (pc.financialCategoryRate || 100) / 100;
           const allocated = payment.netAmount * rate;
-          // Expenses are negative in DRE
           const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign);
+          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign, item.creditorName || "");
         }
       }
     }
 
-    // Process income (revenue) - these flow as POSITIVE into revenue categories
-    let incomeMatchCount = 0;
+    // Process income (revenue) - use grossAmount to include all receipts
     for (const item of incomeItems) {
+      const pcs = item.paymentsCategories || [];
+      if (pcs.length === 0) continue;
+
+      // Check if any paymentsCategory matches a DRE mapping
+      const matchingPcs = pcs.filter(pc => fcToDre[String(pc.financialCategoryId)]);
+      if (matchingPcs.length === 0) continue;
+
+      // Try payment-level approach (receipts)
+      let itemContributed = false;
       for (const payment of (item.payments || [])) {
-        if (payment.netAmount <= 0) continue;
+        // Use grossAmount (original receipt amount) since netAmount can be 0 for "Por Bens"
+        const amount = payment.grossAmount || payment.netAmount || 0;
+        if (amount <= 0) continue;
         if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
 
-        for (const pc of (item.paymentsCategories || [])) {
+        for (const pc of matchingPcs) {
           const dreCat = fcToDre[String(pc.financialCategoryId)];
           if (!dreCat) continue;
-          incomeMatchCount++;
+          itemContributed = true;
           const rate = (pc.financialCategoryRate || 100) / 100;
-          const allocated = payment.netAmount * rate;
-          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated);
+          const allocated = amount * rate;
+          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated, item.clientName || "");
+        }
+      }
+
+      // Fallback: if no payments matched but item has receivedNetAmount, use dueDate for filtering
+      if (!itemContributed && item.receivedNetAmount && item.receivedNetAmount > 0) {
+        if (!matchesFilters(item.dueDate, item.companyName)) continue;
+
+        for (const pc of matchingPcs) {
+          const dreCat = fcToDre[String(pc.financialCategoryId)];
+          if (!dreCat) continue;
+          const rate = (pc.financialCategoryRate || 100) / 100;
+          const allocated = item.receivedNetAmount * rate;
+          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated, item.clientName || "");
         }
       }
     }
-    console.log("[DRE DEBUG] Outcome matches:", outcomeMatchCount, "Income matches:", incomeMatchCount);
 
     // Process bank movements (fees -> usually despesas_financeiras)
     for (const bm of bankFees) {
@@ -233,11 +251,11 @@ export function DreTab({
       if (selectedMonths.size > 0 && !selectedMonths.has(bm.bankMovementDate.substring(5, 7))) continue;
 
       for (const fc of (bm.financialCategories || [])) {
-        const dreCat = fcToDre[fc.financialCategoryId];
+        const dreCat = fcToDre[String(fc.financialCategoryId)];
         if (!dreCat) continue;
         const amount = Math.abs(bm.bankMovementAmount);
         const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-        addToAccum(dreCat, fc.financialCategoryId, fc.financialCategoryName, amount * sign);
+        addToAccum(dreCat, String(fc.financialCategoryId), fc.financialCategoryName, amount * sign, "Movimento Bancario");
       }
     }
 
@@ -352,13 +370,13 @@ export function DreTab({
                 const value = getValue(line);
                 const isCalculated = line.type === "calculated";
                 const isExpanded = expandedCategories.has(line.key);
-                const accounts = accum[line.key]?.accounts || {};
-                const hasAccounts = Object.keys(accounts).length > 0;
+                const categoryAccounts = accum[line.key]?.accounts || {};
+                const hasAccounts = Object.keys(categoryAccounts).length > 0;
                 const canExpand = dreMode === "completa" && !isCalculated && hasAccounts;
 
                 return (
                   <React.Fragment key={line.key}>
-                    {/* Main Row */}
+                    {/* Level 1: DRE Category Row */}
                     <div
                       className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-3 transition-colors ${
                         isCalculated
@@ -393,29 +411,72 @@ export function DreTab({
                       </span>
                     </div>
 
-                    {/* Sub-accounts */}
+                    {/* Level 2: Sub-accounts (financial categories) */}
                     {isExpanded && hasAccounts && (
                       <div className="bg-slate-50/50 border-l-4 border-l-slate-200">
-                        {Object.entries(accounts)
+                        {Object.entries(categoryAccounts)
                           .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
-                          .map(([fcId, { name, amount }]) => (
-                            <div
-                              key={fcId}
-                              className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5"
-                            >
-                              <span className="w-6" />
-                              <span className="text-xs text-slate-500 pl-4">
-                                <span className="text-slate-400 font-mono mr-2">{fcId}</span>
-                                {name}
-                              </span>
-                              <span className={`text-xs text-right tabular-nums ${
-                                amount < 0 ? "text-red-500" : "text-slate-600"
-                              }`}>
-                                {formatCurrency(Math.abs(amount))}
-                                {amount < 0 && <span className="ml-0.5">-</span>}
-                              </span>
-                            </div>
-                          ))}
+                          .map(([fcId, acct]) => {
+                            const accountKey = `${line.key}:${fcId}`;
+                            const isAccountExpanded = expandedAccounts.has(accountKey);
+                            const hasDetails = Object.keys(acct.details).length > 1 ||
+                              (Object.keys(acct.details).length === 1 && !acct.details["Sem identificacao"]);
+
+                            return (
+                              <React.Fragment key={fcId}>
+                                {/* Level 2 row */}
+                                <div
+                                  className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 ${
+                                    hasDetails ? "cursor-pointer hover:bg-slate-100/50" : ""
+                                  }`}
+                                  onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
+                                >
+                                  <span className="w-6 flex items-center justify-center">
+                                    {hasDetails && (
+                                      isAccountExpanded
+                                        ? <ChevronDown className="h-3 w-3 text-slate-300" />
+                                        : <ChevronRight className="h-3 w-3 text-slate-300" />
+                                    )}
+                                  </span>
+                                  <span className="text-xs text-slate-500 pl-4">
+                                    <span className="text-slate-400 font-mono mr-2">{fcId}</span>
+                                    {acct.name}
+                                  </span>
+                                  <span className={`text-xs text-right tabular-nums ${
+                                    acct.amount < 0 ? "text-red-500" : "text-slate-600"
+                                  }`}>
+                                    {formatCurrency(Math.abs(acct.amount))}
+                                    {acct.amount < 0 && <span className="ml-0.5">-</span>}
+                                  </span>
+                                </div>
+
+                                {/* Level 3: Details (creditor/client) */}
+                                {isAccountExpanded && hasDetails && (
+                                  <div className="bg-slate-100/30">
+                                    {Object.entries(acct.details)
+                                      .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
+                                      .map(([detailKey, detail]) => (
+                                        <div
+                                          key={detailKey}
+                                          className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1"
+                                        >
+                                          <span className="w-6" />
+                                          <span className="text-[11px] text-slate-400 pl-10 truncate">
+                                            {detail.name}
+                                          </span>
+                                          <span className={`text-[11px] text-right tabular-nums ${
+                                            detail.amount < 0 ? "text-red-400" : "text-slate-500"
+                                          }`}>
+                                            {formatCurrency(Math.abs(detail.amount))}
+                                            {detail.amount < 0 && <span className="ml-0.5">-</span>}
+                                          </span>
+                                        </div>
+                                      ))}
+                                  </div>
+                                )}
+                              </React.Fragment>
+                            );
+                          })}
                       </div>
                     )}
                   </React.Fragment>
