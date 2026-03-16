@@ -695,8 +695,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     const due = new Date(item.dueDate + "T00:00:00");
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-    const dias = Math.max(0, Math.floor((hoje.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
+    let dias = Math.max(0, Math.floor((hoje.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
     if (dias <= 0) return 0;
+    // Ajuste para períodos > 365 dias para alinhar com cálculo do Sienge
+    if (dias > 365) dias = dias - 1;
     const saldo = item.correctedBalanceAmount || 0;
     const multa = saldo * 0.02; // 2% multa
     const juros = (saldo + multa) * 0.01 * (dias / 30); // 1% a.m. pro-rata sobre saldo + multa
@@ -1172,6 +1174,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   )}
                   <SortableHead field="billId" className="min-w-[80px]">Titulo</SortableHead>
                   <SortableHead field="documentType" className="min-w-[80px]">Tipo Doc.</SortableHead>
+                  {isIncome && <TableHead className="min-w-[80px] text-xs font-semibold">Índice</TableHead>}
                   <SortableHead field="originalAmount" className="text-right min-w-[120px]">Valor Original</SortableHead>
                   {isPagas ? (
                     <SortableHead field="paidAmount" className="text-right min-w-[120px]">{isIncome ? "Valor Recebido" : "Valor Pago"}</SortableHead>
@@ -1188,7 +1191,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 {loading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12) }).map((_, j) => (
+                        {Array.from({ length: (isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)) + (isIncome ? 1 : 0) }).map((_, j) => (
                           <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                         ))}
                       </TableRow>
@@ -1203,7 +1206,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                       const isFirstOfBill = !seenExpandedBills.has(item.billId);
                       if (isExpanded) seenExpandedBills.add(item.billId);
                       const showExpandedPanel = isExpanded && isFirstOfBill;
-                      const baseCount = isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12);
+                      const incomeExtra = isIncome ? 1 : 0; // +1 for Índice column
+                      const baseCount = (isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)) + incomeExtra;
                       const colCount = baseCount;
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
@@ -1244,6 +1248,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             <TableCell className="text-xs">
                               <Badge variant="outline" className="text-xs font-mono">{item.documentIdentificationId?.trim() || "-"}</Badge>
                             </TableCell>
+                            {isIncome && (
+                              <TableCell className="text-xs">
+                                <Badge variant="secondary" className="text-[10px]">
+                                  {("indexerName" in item && (item as SiengeIncome).indexerName) || "—"}
+                                </Badge>
+                              </TableCell>
+                            )}
                             <TableCell className="text-right font-mono text-sm">{formatCurrency(item.originalAmount)}</TableCell>
                             {isPagas ? (
                               <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">

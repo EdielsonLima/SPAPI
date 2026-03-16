@@ -106,6 +106,8 @@ export interface SiengeOutcome {
   registeredBy: string;
   registeredDate: string;
   observation?: string;
+  indexerId?: number;
+  indexerName?: string;
   paymentsCategories: SiengeOutcomePaymentCategory[];
   payments: SiengeOutcomePayment[];
   buildingsCosts: SiengeOutcomeBuildingCost[];
@@ -173,6 +175,8 @@ export interface SiengeIncome {
   registeredBy: string;
   registeredDate: string;
   observation?: string;
+  indexerId?: number;
+  indexerName?: string;
   paymentsCategories: SiengeIncomePaymentCategory[];
   payments: SiengeIncomePayment[];
   receivedNetAmount?: number;
