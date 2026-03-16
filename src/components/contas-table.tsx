@@ -665,7 +665,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         case "documentType": cmp = (a.documentIdentificationId || "").localeCompare(b.documentIdentificationId || ""); break;
         case "costEstimationSheet": cmp = (getBuildingsCosts(a)[0]?.costEstimationSheetName || "").localeCompare(getBuildingsCosts(b)[0]?.costEstimationSheetName || ""); break;
         case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
-        case "balanceAmount": cmp = a.balanceAmount - b.balanceAmount; break;
+        case "balanceAmount": cmp = a.correctedBalanceAmount - b.correctedBalanceAmount; break;
         case "paymentDate": cmp = (latestPaymentDate(a, filterAno, filterMes) || "").localeCompare(latestPaymentDate(b, filterAno, filterMes) || ""); break;
         case "paidAmount": cmp = paidTotal(a, filterAno, filterMes) - paidTotal(b, filterAno, filterMes); break;
       }
@@ -693,7 +693,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted]
   );
   const totalBalance = useMemo(
-    () => sorted.reduce((sum, item) => sum + (item.balanceAmount || 0), 0),
+    () => sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0), 0),
     [sorted]
   );
   const totalPaid = useMemo(
@@ -737,7 +737,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       return { valor, titulos: billIds.size, credores: credorIds.size, parcelas: billIds.size };
     }
     const todayItems = sorted.filter((item) => item.dueDate === todayStr);
-    const valor = todayItems.reduce((s, i) => s + (i.balanceAmount || 0), 0);
+    const valor = todayItems.reduce((s, i) => s + (i.correctedBalanceAmount || 0), 0);
     const titulos = new Set(todayItems.map((i) => i.billId)).size;
     const credores = new Set(todayItems.map((i) => getCounterpartId(i))).size;
     return { valor, titulos, credores, parcelas: todayItems.length };
@@ -796,7 +796,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       const d = new Date(item.dueDate + "T00:00:00");
       return isOverdue ? d >= limit && d <= yesterday : d >= tomorrow && d <= limit;
     });
-    const valor = weekItems.reduce((s, i) => s + (i.balanceAmount || 0), 0);
+    const valor = weekItems.reduce((s, i) => s + (i.correctedBalanceAmount || 0), 0);
     const titulos = new Set(weekItems.map((i) => i.billId)).size;
     const credores = new Set(weekItems.map((i) => getCounterpartId(i))).size;
     return { valor, titulos, credores, parcelas: weekItems.length };
@@ -1210,7 +1210,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                               </TableCell>
                             ) : (
                               <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
-                                {formatCurrency(item.balanceAmount)}
+                                {formatCurrency(item.correctedBalanceAmount)}
                               </TableCell>
                             )}
                           </TableRow>
@@ -1269,7 +1269,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                         Parcelas do Titulo {item.billId} — {getCounterpartName(item)}
                                         <Badge variant="secondary" className="text-xs">{totalParcelas} parcelas</Badge>
                                         <span className="text-slate-400">|</span>
-                                        <span className="font-mono">Total: {formatCurrency(billParcelas.reduce((s, p) => s + (p.balanceAmount || 0), 0))}</span>
+                                        <span className="font-mono">Total: {formatCurrency(billParcelas.reduce((s, p) => s + (p.correctedBalanceAmount || 0), 0))}</span>
                                       </div>
                                       <Table>
                                         <TableHeader className="bg-blue-100/50">
@@ -1299,7 +1299,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                                 <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.issueDate)}</TableCell>
                                                 <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(parcela.originalAmount)}</TableCell>
                                                 <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaidItem ? "text-green-600" : isOverdue ? "text-red-600" : "text-slate-800"}`}>
-                                                  {formatCurrency(parcela.balanceAmount)}
+                                                  {formatCurrency(parcela.correctedBalanceAmount)}
                                                 </TableCell>
                                                 <TableCell className="text-xs py-1.5">
                                                   {isPaidItem ? (
