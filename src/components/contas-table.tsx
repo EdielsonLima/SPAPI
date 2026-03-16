@@ -350,6 +350,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(0);
   const [expandedBills, setExpandedBills] = useState<Set<number>>(new Set());
+  const [subSort, setSubSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "installmentId", dir: "asc" });
   const perPage = 25;
 
   const [billNotes, setBillNotes] = useState<Record<number, string | null>>({});
@@ -1145,9 +1146,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                     <SortableHead field="paidAmount" className="text-right min-w-[120px]">{isIncome ? "Valor Recebido" : "Valor Pago"}</SortableHead>
                   ) : (
                     <>
-                      <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>
                       <TableHead className="text-right min-w-[110px] text-xs font-semibold">Correção</TableHead>
                       <TableHead className="text-right min-w-[70px] text-xs font-semibold">%</TableHead>
+                      <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>
                     </>
                   )}
                 </TableRow>
@@ -1219,9 +1220,6 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                               </TableCell>
                             ) : (
                               <>
-                                <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
-                                  {formatCurrency(item.correctedBalanceAmount)}
-                                </TableCell>
                                 <TableCell className="text-right font-mono text-sm text-amber-600">
                                   {formatCurrency(item.correctedBalanceAmount - item.balanceAmount)}
                                 </TableCell>
@@ -1229,6 +1227,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                   {item.balanceAmount > 0
                                     ? `${(((item.correctedBalanceAmount - item.balanceAmount) / item.balanceAmount) * 100).toFixed(1)}%`
                                     : "-"}
+                                </TableCell>
+                                <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
+                                  {formatCurrency(item.correctedBalanceAmount)}
                                 </TableCell>
                               </>
                             )}
@@ -1282,7 +1283,42 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                       </Table>
                                     </>
                                   )}
-                                  {!isPagas && totalParcelas > 1 && (
+                                  {!isPagas && totalParcelas > 1 && (() => {
+                                    const sortedParcelas = [...billParcelas].sort((a, b) => {
+                                      let cmp = 0;
+                                      switch (subSort.field) {
+                                        case "installmentId": cmp = a.installmentId - b.installmentId; break;
+                                        case "dueDate": cmp = (a.dueDate || "").localeCompare(b.dueDate || ""); break;
+                                        case "daysOverdue": cmp = daysDiff(a.dueDate) - daysDiff(b.dueDate); break;
+                                        case "issueDate": cmp = (a.issueDate || "").localeCompare(b.issueDate || ""); break;
+                                        case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
+                                        case "correction": cmp = (a.correctedBalanceAmount - a.balanceAmount) - (b.correctedBalanceAmount - b.balanceAmount); break;
+                                        case "correctionPct": {
+                                          const pctA = a.balanceAmount > 0 ? (a.correctedBalanceAmount - a.balanceAmount) / a.balanceAmount : 0;
+                                          const pctB = b.balanceAmount > 0 ? (b.correctedBalanceAmount - b.balanceAmount) / b.balanceAmount : 0;
+                                          cmp = pctA - pctB; break;
+                                        }
+                                        case "balanceAmount": cmp = a.correctedBalanceAmount - b.correctedBalanceAmount; break;
+                                        default: cmp = 0;
+                                      }
+                                      return subSort.dir === "asc" ? cmp : -cmp;
+                                    });
+                                    const SubSortHead = ({ field, children, className = "" }: { field: string; children: React.ReactNode; className?: string }) => (
+                                      <TableHead
+                                        className={`text-xs h-8 py-1 cursor-pointer select-none hover:bg-blue-200/50 ${className}`}
+                                        onClick={() => setSubSort(prev => prev.field === field ? { field, dir: prev.dir === "asc" ? "desc" : "asc" } : { field, dir: "asc" })}
+                                      >
+                                        <span className="flex items-center gap-1 whitespace-nowrap">
+                                          {children}
+                                          {subSort.field === field ? (
+                                            subSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                                          ) : (
+                                            <ArrowUpDown className="h-3 w-3 opacity-30" />
+                                          )}
+                                        </span>
+                                      </TableHead>
+                                    );
+                                    return (
                                     <>
                                       <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
                                         Parcelas do Titulo {item.billId} — {getCounterpartName(item)}
@@ -1293,19 +1329,23 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                       <Table>
                                         <TableHeader className="bg-blue-100/50">
                                           <TableRow className="border-b border-blue-200/50">
-                                            <TableHead className="text-xs h-8 py-1">Parcela</TableHead>
-                                            <TableHead className="text-xs h-8 py-1">Vencimento</TableHead>
-                                            {isOverdue && <TableHead className="text-xs h-8 py-1">Dias Atraso</TableHead>}
-                                            <TableHead className="text-xs h-8 py-1">Emissao</TableHead>
-                                            <TableHead className="text-xs text-right h-8 py-1">Valor Original</TableHead>
-                                            <TableHead className="text-xs text-right h-8 py-1">Saldo</TableHead>
+                                            <SubSortHead field="installmentId">Parcela</SubSortHead>
+                                            <SubSortHead field="dueDate">Vencimento</SubSortHead>
+                                            {isOverdue && <SubSortHead field="daysOverdue">Dias Atraso</SubSortHead>}
+                                            <SubSortHead field="issueDate">Emissao</SubSortHead>
+                                            <SubSortHead field="originalAmount" className="text-right">Valor Original</SubSortHead>
+                                            <SubSortHead field="correction" className="text-right">Correção</SubSortHead>
+                                            <SubSortHead field="correctionPct" className="text-right">%</SubSortHead>
+                                            <SubSortHead field="balanceAmount" className="text-right">Saldo</SubSortHead>
                                             <TableHead className="text-xs h-8 py-1">Status</TableHead>
                                           </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                          {billParcelas.map((parcela) => {
+                                          {sortedParcelas.map((parcela) => {
                                             const pDays = daysDiff(parcela.dueDate);
                                             const isPaidItem = parcela.balanceAmount === 0;
+                                            const correcao = parcela.correctedBalanceAmount - parcela.balanceAmount;
+                                            const correcaoPct = parcela.balanceAmount > 0 ? (correcao / parcela.balanceAmount) * 100 : 0;
                                             return (
                                               <TableRow key={`sub-${parcela.billId}-${parcela.installmentId}`} className="border-b border-blue-100/50">
                                                 <TableCell className="font-mono text-xs py-1.5">{parcela.installmentId}</TableCell>
@@ -1317,6 +1357,12 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                                 )}
                                                 <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.issueDate)}</TableCell>
                                                 <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(parcela.originalAmount)}</TableCell>
+                                                <TableCell className="text-right font-mono text-xs py-1.5 text-amber-600">
+                                                  {formatCurrency(correcao)}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono text-xs py-1.5 text-amber-600">
+                                                  {isPaidItem ? "-" : `${correcaoPct.toFixed(1)}%`}
+                                                </TableCell>
                                                 <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaidItem ? "text-green-600" : isOverdue ? "text-red-600" : "text-slate-800"}`}>
                                                   {formatCurrency(parcela.correctedBalanceAmount)}
                                                 </TableCell>
@@ -1335,7 +1381,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                         </TableBody>
                                       </Table>
                                     </>
-                                  )}
+                                    );
+                                  })()}
                                   {!loadingNotes.has(item.billId) && !billNotes[item.billId] && (
                                     <div className="text-xs text-slate-400">Nenhuma observacao registrada para este titulo.</div>
                                   )}
