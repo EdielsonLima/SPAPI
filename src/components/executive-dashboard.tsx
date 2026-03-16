@@ -594,11 +594,19 @@ export function ExecutiveDashboard() {
     if (selectedDocNumbers.size > 0) result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
     return result;
   }, [itemsInadimplencia, applyFilters, selectedDocNumbers]);
+  // Recebidas: filtro alinhado com a página Contas Recebidas (contas-table)
+  // NÃO aplica selectedDocTypes (PREVISÃO etc.) nem filtra por dueDate year
+  // O filtro de ano/mês já é aplicado via paymentDate em itemsRecebidas e receivedSum
   const filteredRecebidas = useMemo(() => {
-    let result = applyFilters(itemsRecebidas);
-    if (selectedDocNumbers.size > 0) result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
+    let result = itemsRecebidas;
+    if (selectedCompanies.size > 0) {
+      result = result.filter(i => selectedCompanies.has(i.companyName));
+    }
+    if (selectedDocNumbers.size > 0) {
+      result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
+    }
     return result;
-  }, [itemsRecebidas, applyFilters, selectedDocNumbers]);
+  }, [itemsRecebidas, selectedCompanies, selectedDocNumbers]);
 
   // === Budget vs Actual (Orçado vs Realizado) ===
   const budgetData = useMemo(() => {
