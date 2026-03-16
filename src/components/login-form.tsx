@@ -50,11 +50,10 @@ export function LoginForm() {
 
       <Card className="w-full max-w-md border-0 shadow-2xl bg-white/95 backdrop-blur-sm relative z-10">
         <CardHeader className="text-center pb-2 pt-8">
-          <div className="mx-auto mb-4 flex h-20 w-48 items-center justify-center">
-            <Image src="/logo-full.jpg" alt="Silva Packer" width={180} height={75} className="object-contain" priority />
+          <div className="mx-auto mb-2 flex h-24 w-52 items-center justify-center">
+            <Image src="/logo-full.jpg" alt="Silva Packer" width={200} height={90} className="object-contain" priority />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">{process.env.NEXT_PUBLIC_COMPANY_NAME || "Empresa"}</h1>
-          <p className="text-sm text-slate-500 mt-1">{process.env.NEXT_PUBLIC_COMPANY_SUBTITLE || "Sistema de Gestao"}</p>
+          <p className="text-sm text-slate-500">{process.env.NEXT_PUBLIC_COMPANY_SUBTITLE || "Sistema de Gestao"}</p>
         </CardHeader>
         <CardContent className="px-8 pb-8">
           {/* Google Login */}
