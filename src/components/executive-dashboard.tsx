@@ -662,6 +662,21 @@ export function ExecutiveDashboard() {
     return { totalBudget, totalRealized, totalToRealize };
   }, [budgetData]);
 
+  // Calcula encargos (multa + juros) para itens inadimplentes - mesma fórmula de contas-table.tsx
+  const calcEncargos = (item: SiengeIncome) => {
+    if (!item.dueDate) return 0;
+    const due = new Date(item.dueDate + "T00:00:00");
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    let dias = Math.max(0, Math.floor((hoje.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
+    if (dias <= 0) return 0;
+    if (dias > 365) dias = dias - 1;
+    const saldo = item.correctedBalanceAmount || 0;
+    const multa = saldo * 0.02;
+    const juros = (saldo + multa) * 0.01 * (dias / 30);
+    return multa + juros;
+  };
+
   // === Delinquents grouped by client ===
   interface DelinquentClient {
     clientName: string;
@@ -732,21 +747,6 @@ export function ExecutiveDashboard() {
     today.setHours(0, 0, 0, 0);
     const d = new Date(dateStr + "T00:00:00");
     return Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-  };
-
-  // Calcula encargos (multa + juros) para itens inadimplentes - mesma fórmula de contas-table.tsx
-  const calcEncargos = (item: SiengeIncome) => {
-    if (!item.dueDate) return 0;
-    const due = new Date(item.dueDate + "T00:00:00");
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    let dias = Math.max(0, Math.floor((hoje.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
-    if (dias <= 0) return 0;
-    if (dias > 365) dias = dias - 1;
-    const saldo = item.correctedBalanceAmount || 0;
-    const multa = saldo * 0.02;
-    const juros = (saldo + multa) * 0.01 * (dias / 30);
-    return multa + juros;
   };
 
   // === Overdue grouped by creditor (CP) ===
