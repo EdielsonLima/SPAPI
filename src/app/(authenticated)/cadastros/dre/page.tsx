@@ -64,7 +64,7 @@ export default function DrePage() {
       const mappingsData = await mappingsRes.json();
       const plansData = await plansRes.json();
       setMappings(mappingsData.data || {});
-      setFinancialPlans(plansData.results || plansData.data || []);
+      setFinancialPlans(Array.isArray(plansData) ? plansData : plansData.results || plansData.data || []);
     } catch {
       toast.error("Erro ao carregar dados");
     } finally {
