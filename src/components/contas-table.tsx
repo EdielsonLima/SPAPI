@@ -1182,7 +1182,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                     <>
                       <TableHead className="text-right min-w-[110px] text-xs font-semibold">Correção</TableHead>
                       <TableHead className="text-right min-w-[70px] text-xs font-semibold">%</TableHead>
-                      <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>
+                      <SortableHead field="balanceAmount" className="text-right min-w-[120px]">{isOverdue ? "Total" : "Saldo"}</SortableHead>
                     </>
                   )}
                 </TableRow>
@@ -1271,7 +1271,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                     : "-"}
                                 </TableCell>
                                 <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
-                                  {formatCurrency(item.correctedBalanceAmount)}
+                                  {formatCurrency(isOverdue ? item.correctedBalanceAmount + calcEncargos(item) : item.correctedBalanceAmount)}
                                 </TableCell>
                               </>
                             )}
