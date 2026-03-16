@@ -1422,8 +1422,8 @@ export function ExecutiveDashboard() {
       },
       {
         label: "% Inadimplência",
-        value: totalAReceber > 0
-          ? ((totalInadimplencia / totalAReceber) * 100).toFixed(1) + "%"
+        value: (totalAReceber + totalInadimplencia) > 0
+          ? ((totalInadimplencia / (totalAReceber + totalInadimplencia)) * 100).toFixed(1) + "%"
           : "0%",
         subtitle: "do total a receber",
         icon: <TrendingDown className="h-7 w-7 text-red-400" />,
