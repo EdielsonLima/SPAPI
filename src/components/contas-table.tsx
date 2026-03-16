@@ -332,7 +332,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return new Set<string>();
   });
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
-  const [filterAno, setFilterAno] = useState(String(currentYear));
+  const [filterAno, setFilterAno] = useState(isOverdue ? "all" : String(currentYear));
   const [filterMes, setFilterMes] = useState("all");
   const [filterDia, setFilterDia] = useState<string[]>([]);
 
@@ -342,7 +342,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   // For "a-receber/vencidas" mode, extend endDate to include future parcels.
   const { startDate, endDate } = useMemo(() => {
     const yr = filterAno === "all" ? currentYear : parseInt(filterAno, 10);
-    const start = isPagas ? yr - 10 : yr;
+    const start = isPagas ? yr - 10 : isOverdue ? yr - 10 : yr;
     const end = isPagas ? yr : yr + 5;
     return { startDate: `${start}-01-01`, endDate: `${end}-12-31` };
   }, [filterAno, currentYear, isPagas]);
