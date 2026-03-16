@@ -546,8 +546,12 @@ export function ExecutiveDashboard() {
 
   const itemsRecebidas = useMemo(() =>
     consistentIncome.filter(i =>
-      i.originalAmount > 0 && i.correctedBalanceAmount === 0
-    ), [consistentIncome]);
+      i.originalAmount > 0 && (i.payments || []).some(p =>
+        p.netAmount > 0 &&
+        (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
+        p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+      )
+    ), [consistentIncome, selectedOpTypes, selectedYears]);
 
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);
@@ -859,7 +863,7 @@ export function ExecutiveDashboard() {
     filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0), [filteredInadimplencia]);
 
   const totalRecebido = useMemo(() =>
-    filteredRecebidas.reduce((s, i) => s + i.originalAmount, 0), [filteredRecebidas]);
+    filteredRecebidas.reduce((s, i) => s + paidSum(i), 0), [filteredRecebidas, paidSum]);
 
   const receberHoje = useMemo(() => {
     const hoje = new Date().toISOString().split("T")[0];
@@ -897,10 +901,13 @@ export function ExecutiveDashboard() {
 
   const recebidoHoje = useMemo(() => {
     const hoje = new Date().toISOString().split("T")[0];
-    return filteredRecebidas
-      .filter(i => i.dueDate === hoje)
-      .reduce((s, i) => s + i.originalAmount, 0);
-  }, [filteredRecebidas]);
+    return filteredRecebidas.reduce((s, i) => {
+      return s + (i.payments || [])
+        .filter(p => p.paymentDate === hoje && p.netAmount > 0 &&
+          (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)))
+        .reduce((ps, p) => ps + p.netAmount, 0);
+    }, 0);
+  }, [filteredRecebidas, selectedOpTypes]);
 
   const recebido7dias = useMemo(() => {
     const hoje = new Date();
@@ -908,10 +915,13 @@ export function ExecutiveDashboard() {
     d7.setDate(d7.getDate() - 7);
     const d7Str = d7.toISOString().split("T")[0];
     const hojeStr = hoje.toISOString().split("T")[0];
-    return filteredRecebidas
-      .filter(i => i.dueDate >= d7Str && i.dueDate <= hojeStr)
-      .reduce((s, i) => s + i.originalAmount, 0);
-  }, [filteredRecebidas]);
+    return filteredRecebidas.reduce((s, i) => {
+      return s + (i.payments || [])
+        .filter(p => p.paymentDate >= d7Str && p.paymentDate <= hojeStr && p.netAmount > 0 &&
+          (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)))
+        .reduce((ps, p) => ps + p.netAmount, 0);
+    }, 0);
+  }, [filteredRecebidas, selectedOpTypes]);
 
   // === Chart helpers ===
   function buildCompanyChart(sourceItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received") {
@@ -919,9 +929,7 @@ export function ExecutiveDashboard() {
     sourceItems.forEach(item => {
       const val = field === "balance"
         ? effectiveAmount(item)
-        : field === "received"
-          ? item.originalAmount
-          : paidSum(item);
+        : paidSum(item);
       if (val > 0) {
         map.set(item.companyName, (map.get(item.companyName) || 0) + val);
       }
@@ -972,10 +980,22 @@ export function ExecutiveDashboard() {
       }).filter(Boolean) as { month: string; value: number }[];
     }
     if (field === "received") {
-      // Agrupa por dueDate e usa originalAmount
+      // Agrupa recebimentos por paymentDate e soma netAmount (igual à página Contas Recebidas)
+      const monthTotals = new Map<number, number>();
+      filteredItems.forEach(item => {
+        (item.payments || [])
+          .filter(p =>
+            p.netAmount > 0 &&
+            (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
+            p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+          )
+          .forEach(p => {
+            const m = new Date(p.paymentDate + "T00:00:00").getMonth();
+            monthTotals.set(m, (monthTotals.get(m) || 0) + p.netAmount);
+          });
+      });
       return MONTH_LABELS.map((label, idx) => {
-        const monthItems = filteredItems.filter(i => new Date(i.dueDate + "T00:00:00").getMonth() === idx);
-        const value = monthItems.reduce((s, i) => s + i.originalAmount, 0);
+        const value = monthTotals.get(idx) || 0;
         if (value === 0 && idx > currentMonth) return null;
         return { month: label, value };
       }).filter(Boolean) as { month: string; value: number }[];
@@ -1018,8 +1038,16 @@ export function ExecutiveDashboard() {
     if (field === "received") {
       const yearMap = new Map<number, number>();
       filteredItems.forEach(item => {
-        const y = new Date(item.dueDate + "T00:00:00").getFullYear();
-        yearMap.set(y, (yearMap.get(y) || 0) + item.originalAmount);
+        (item.payments || [])
+          .filter(p =>
+            p.netAmount > 0 &&
+            (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
+            p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+          )
+          .forEach(p => {
+            const y = new Date(p.paymentDate + "T00:00:00").getFullYear();
+            yearMap.set(y, (yearMap.get(y) || 0) + p.netAmount);
+          });
       });
       return Array.from(yearMap.entries())
         .sort((a, b) => a[0] - b[0])
