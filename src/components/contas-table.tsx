@@ -1180,7 +1180,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                     <SortableHead field="paidAmount" className="text-right min-w-[120px]">{isIncome ? "Valor Recebido" : "Valor Pago"}</SortableHead>
                   ) : (
                     <>
-                      {isOverdue && <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>}
+                      {isOverdue && (
+                        <>
+                          <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo Atual</SortableHead>
+                          <SortableHead field="daysOverdue" className="text-right min-w-[60px]">Dias</SortableHead>
+                          <TableHead className="text-right min-w-[110px] text-xs font-semibold">Acréscimo</TableHead>
+                          <TableHead className="text-right min-w-[100px] text-xs font-semibold">Desconto</TableHead>
+                        </>
+                      )}
                       <TableHead className="text-right min-w-[110px] text-xs font-semibold">Correção</TableHead>
                       <TableHead className="text-right min-w-[70px] text-xs font-semibold">%</TableHead>
                       {isOverdue ? (
@@ -1196,7 +1203,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 {loading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: (isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)) + (isIncome ? 1 : 0) + (isOverdue ? 1 : 0) }).map((_, j) => (
+                        {Array.from({ length: (isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)) + (isIncome ? 1 : 0) + (isOverdue ? 4 : 0) }).map((_, j) => (
                           <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                         ))}
                       </TableRow>
@@ -1212,7 +1219,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                       if (isExpanded) seenExpandedBills.add(item.billId);
                       const showExpandedPanel = isExpanded && isFirstOfBill;
                       const incomeExtra = isIncome ? 1 : 0; // +1 for Índice column
-                      const overdueExtra = isOverdue ? 1 : 0; // +1 for Saldo column (overdue has both Saldo + Total)
+                      const overdueExtra = isOverdue ? 4 : 0; // +4 for Saldo Atual, Dias, Acréscimo, Desconto columns
                       const baseCount = (isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)) + incomeExtra + overdueExtra;
                       const colCount = baseCount;
                       return (
@@ -1268,11 +1275,26 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                               </TableCell>
                             ) : (
                               <>
-                                {isOverdue && (
-                                  <TableCell className="text-right font-mono text-sm font-medium text-slate-800">
-                                    {formatCurrency(item.correctedBalanceAmount)}
-                                  </TableCell>
-                                )}
+                                {isOverdue && (() => {
+                                  const daysOver = Math.abs(daysDiff(item.dueDate));
+                                  const encargos = calcEncargos(item);
+                                  return (
+                                    <>
+                                      <TableCell className="text-right font-mono text-sm font-medium text-slate-800">
+                                        {formatCurrency(item.correctedBalanceAmount)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono text-sm text-slate-600">
+                                        {daysOver}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono text-sm text-red-600">
+                                        {formatCurrency(encargos)}
+                                      </TableCell>
+                                      <TableCell className="text-right font-mono text-sm text-slate-500">
+                                        {formatCurrency(item.discountAmount || 0)}
+                                      </TableCell>
+                                    </>
+                                  );
+                                })()}
                                 <TableCell className="text-right font-mono text-sm text-amber-600">
                                   {formatCurrency(item.correctedBalanceAmount - item.balanceAmount)}
                                 </TableCell>
