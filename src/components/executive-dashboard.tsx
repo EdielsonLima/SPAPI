@@ -34,6 +34,7 @@ import {
   ArrowDown,
   Ruler,
   FileDown,
+  BarChart3,
 } from "lucide-react";
 import {
   BarChart,
@@ -51,9 +52,10 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS } from "@/lib/dashboard-utils";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
+import { DreTab } from "@/components/dre-tab";
 
 type Section = "cp" | "cr";
-type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento";
+type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "dre";
 type ChartView = "mensal" | "anual";
 
 // === Reusable Multi-Select Filter ===
@@ -1448,6 +1450,7 @@ export function ExecutiveDashboard() {
       },
     ],
     orcamento: [],
+    dre: [],
   };
 
   const kpis = kpiConfigs[activeTab];
@@ -1562,10 +1565,24 @@ export function ExecutiveDashboard() {
               <Ruler className="h-3.5 w-3.5" />
               Orçamento
             </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                setActiveTab("dre");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "dre"
+                  ? "bg-white text-teal-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              DRE
+            </button>
           </div>
 
           {/* Tabs */}
-          {activeTab !== "orcamento" && <Tabs value={activeTab} onValueChange={v => {
+          {activeTab !== "orcamento" && activeTab !== "dre" && <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             setActiveTab(tab);
             // Only reset time-based filters, keep company, docType and year selections stable
@@ -1652,7 +1669,44 @@ export function ExecutiveDashboard() {
             />
           )}
         </div>}
-        {activeTab !== "orcamento" && <div className="flex items-center gap-2 flex-wrap">
+        {activeTab === "dre" && <div className="flex items-center gap-2 flex-wrap">
+          <MultiSelectFilter
+            label="Empresas"
+            icon={<Building2 className="h-4 w-4" />}
+            allOptions={allCompanyNames}
+            selected={selectedCompanies}
+            onToggle={(name) => toggleInSet(setSelectedCompanies, name)}
+            onSelectAll={() => setSelectedCompanies(new Set(allCompanyNames))}
+            onClear={() => setSelectedCompanies(defaultCompanies())}
+            activeColor="blue"
+            onSaveDefault={() => {
+              localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
+              toast.success("Padrao de empresas salvo!");
+            }}
+          />
+          <MultiSelectFilter
+            label="Anos"
+            icon={<CalendarClock className="h-4 w-4" />}
+            allOptions={availableYears}
+            selected={selectedYears}
+            onToggle={(y) => toggleInSet(setSelectedYears, y)}
+            onSelectAll={() => setSelectedYears(new Set(availableYears))}
+            onClear={() => setSelectedYears(new Set())}
+            activeColor="violet"
+          />
+          <MultiSelectFilter
+            label="Meses"
+            icon={<CalendarClock className="h-4 w-4" />}
+            allOptions={MONTH_OPTIONS}
+            selected={selectedMonths}
+            onToggle={(m) => toggleInSet(setSelectedMonths, m)}
+            onSelectAll={() => setSelectedMonths(new Set(MONTH_OPTIONS))}
+            onClear={() => setSelectedMonths(new Set())}
+            activeColor="amber"
+            labelFn={(m) => MONTH_NAMES[m] || m}
+          />
+        </div>}
+        {activeTab !== "orcamento" && activeTab !== "dre" && <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
             label="Empresas"
             icon={<Building2 className="h-4 w-4" />}
@@ -1914,7 +1968,7 @@ export function ExecutiveDashboard() {
       )}
 
       {/* KPI Cards */}
-      {activeTab !== "orcamento" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {activeTab !== "orcamento" && activeTab !== "dre" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
@@ -2468,6 +2522,18 @@ export function ExecutiveDashboard() {
         </Card>
       )}
       </>)}
+
+      {/* DRE Tab */}
+      {activeTab === "dre" && (
+        <DreTab
+          outcomeItems={consistentItems}
+          incomeItems={consistentIncome}
+          bankFees={bankFees}
+          selectedYears={selectedYears}
+          selectedMonths={selectedMonths}
+          selectedCompanies={selectedCompanies}
+        />
+      )}
 
     </div>
   );

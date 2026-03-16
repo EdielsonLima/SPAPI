@@ -136,6 +136,11 @@ const menuItems: MenuItem[] = [
         href: "/cadastros/exclusoes",
         icon: <Ban className="h-4 w-4" />,
       },
+      {
+        label: "DRE",
+        href: "/cadastros/dre",
+        icon: <BarChart3 className="h-4 w-4" />,
+      },
     ],
   },
 ];

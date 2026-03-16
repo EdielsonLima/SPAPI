@@ -171,6 +171,16 @@ ALTER TABLE bill_exclusions ADD COLUMN IF NOT EXISTS due_date TEXT NOT NULL DEFA
 ALTER TABLE bill_exclusions ADD COLUMN IF NOT EXISTS original_amount NUMERIC(14,2) NOT NULL DEFAULT 0;
 ALTER TABLE bill_exclusions ADD COLUMN IF NOT EXISTS observation TEXT NOT NULL DEFAULT '';
 
+-- ── Mapeamentos DRE (associação contas plano financeiro → categorias DRE) ──
+CREATE TABLE IF NOT EXISTS dre_mappings (
+  id                  SERIAL PRIMARY KEY,
+  dre_category        VARCHAR(50)  NOT NULL,
+  financial_plan_id   VARCHAR(50)  NOT NULL,
+  financial_plan_name VARCHAR(255) NOT NULL,
+  created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
+  UNIQUE(dre_category, financial_plan_id)
+);
+
 -- =============================================================================
 -- Índices para performance
 -- =============================================================================

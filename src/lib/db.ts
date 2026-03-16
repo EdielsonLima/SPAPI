@@ -417,6 +417,44 @@ export async function deleteBillExclusion(companyId: number, billId: number) {
   await pool.query(`DELETE FROM bill_exclusions WHERE company_id = $1 AND bill_id = $2`, [companyId, billId]);
 }
 
+// ─── DRE Mappings ─────────────────────────────────────────────────────────────
+
+export interface DreMappingRow {
+  dreCategory: string;
+  financialPlanId: string;
+  financialPlanName: string;
+}
+
+export async function getDreMappings(): Promise<Record<string, DreMappingRow[]>> {
+  const { rows } = await pool.query(
+    `SELECT dre_category AS "dreCategory", financial_plan_id AS "financialPlanId",
+            financial_plan_name AS "financialPlanName"
+     FROM dre_mappings ORDER BY dre_category, financial_plan_name`
+  );
+  const map: Record<string, DreMappingRow[]> = {};
+  for (const row of rows) {
+    if (!map[row.dreCategory]) map[row.dreCategory] = [];
+    map[row.dreCategory].push(row);
+  }
+  return map;
+}
+
+export async function addDreMapping(dreCategory: string, financialPlanId: string, financialPlanName: string) {
+  await pool.query(
+    `INSERT INTO dre_mappings (dre_category, financial_plan_id, financial_plan_name)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (dre_category, financial_plan_id) DO NOTHING`,
+    [dreCategory, financialPlanId, financialPlanName]
+  );
+}
+
+export async function deleteDreMapping(dreCategory: string, financialPlanId: string) {
+  await pool.query(
+    `DELETE FROM dre_mappings WHERE dre_category = $1 AND financial_plan_id = $2`,
+    [dreCategory, financialPlanId]
+  );
+}
+
 // ─── Confirmações de Chegada de Insumos ───────────────────────────────────────
 
 export interface ArrivalConfirmation {
