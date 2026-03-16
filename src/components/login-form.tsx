@@ -56,7 +56,7 @@ export function LoginForm() {
         </CardHeader>
         <CardContent className="px-8 pb-8">
           {/* Google Login */}
-          <div className="mt-4" />
+          <div className="mt-10" />
           <Button
             type="button"
             variant="outline"
