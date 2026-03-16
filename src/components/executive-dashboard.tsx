@@ -260,6 +260,7 @@ export function ExecutiveDashboard() {
     return new Set(["Pagamento"]);
   });
   const [bankFees, setBankFees] = useState<SiengeBankMovement[]>([]);
+  const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
   const availableYears = useMemo(() => {
@@ -282,10 +283,16 @@ export function ExecutiveDashboard() {
 
   // === Exclui itens inconsistentes para bater com relatório Sienge ===
   const consistentItems = useMemo(() =>
-    items.filter(i => i.consistencyStatus !== 'N'), [items]);
+    items.filter(i =>
+      i.consistencyStatus !== 'N' &&
+      !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
+    ), [items, exclusionSet]);
 
   const consistentIncome = useMemo(() =>
-    incomeItems.filter(i => i.consistencyStatus !== 'N'), [incomeItems]);
+    incomeItems.filter(i =>
+      i.consistencyStatus !== 'N' &&
+      !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
+    ), [incomeItems, exclusionSet]);
 
   // Active data source based on section
   const activeItems = section === "cr" ? consistentIncome : consistentItems;
@@ -349,6 +356,17 @@ export function ExecutiveDashboard() {
   }, [currentYear]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    fetch("/api/bill-exclusions")
+      .then(res => res.json())
+      .then(json => {
+        const set = new Set<string>();
+        ((json.data || []) as { companyId: number; billId: number }[]).forEach(e => set.add(`${e.companyId}:${e.billId}`));
+        setExclusionSet(set);
+      })
+      .catch(() => {});
+  }, []);
 
   // Fetch CUB data and company settings on mount
   useEffect(() => {
