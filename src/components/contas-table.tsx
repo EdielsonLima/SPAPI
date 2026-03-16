@@ -1135,14 +1135,20 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   )}
                   <SortableHead field="creditorName" className="min-w-[200px]">{counterpartLabel}</SortableHead>
                   <SortableHead field="companyName" className="min-w-[150px]">Empresa</SortableHead>
-                  <SortableHead field="costEstimationSheet" className="min-w-[180px]">Item Orcamento</SortableHead>
+                  {!isIncome && (
+                    <SortableHead field="costEstimationSheet" className="min-w-[180px]">Item Orcamento</SortableHead>
+                  )}
                   <SortableHead field="billId" className="min-w-[80px]">Titulo</SortableHead>
                   <SortableHead field="documentType" className="min-w-[80px]">Tipo Doc.</SortableHead>
                   <SortableHead field="originalAmount" className="text-right min-w-[120px]">Valor Original</SortableHead>
                   {isPagas ? (
                     <SortableHead field="paidAmount" className="text-right min-w-[120px]">{isIncome ? "Valor Recebido" : "Valor Pago"}</SortableHead>
                   ) : (
-                    <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>
+                    <>
+                      <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo</SortableHead>
+                      <TableHead className="text-right min-w-[110px] text-xs font-semibold">Correção</TableHead>
+                      <TableHead className="text-right min-w-[70px] text-xs font-semibold">%</TableHead>
+                    </>
                   )}
                 </TableRow>
               </TableHeader>
@@ -1150,7 +1156,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 {loading
                   ? Array.from({ length: 8 }).map((_, i) => (
                       <TableRow key={i}>
-                        {Array.from({ length: isPagas ? 11 : isOverdue ? 11 : 10 }).map((_, j) => (
+                        {Array.from({ length: isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12) }).map((_, j) => (
                           <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                         ))}
                       </TableRow>
@@ -1165,7 +1171,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                       const isFirstOfBill = !seenExpandedBills.has(item.billId);
                       if (isExpanded) seenExpandedBills.add(item.billId);
                       const showExpandedPanel = isExpanded && isFirstOfBill;
-                      const colCount = isPagas ? 11 : isOverdue ? 11 : 10;
+                      const baseCount = isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12);
+                      const colCount = baseCount;
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
                           <TableRow
@@ -1193,12 +1200,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             )}
                             <TableCell className={`max-w-[250px] truncate ${isExpanded ? "font-bold text-blue-900" : "font-medium"}`} title={getCounterpartName(item)}>{getCounterpartName(item)}</TableCell>
                             <TableCell className="text-sm max-w-[180px] truncate" title={item.companyName}>{item.companyName}</TableCell>
-                            <TableCell className="text-sm max-w-[200px] truncate" title={getBuildingsCosts(item).map((bc) => bc.costEstimationSheetName).filter(Boolean).join(", ") || "-"}>
-                              {getBuildingsCosts(item)[0]?.costEstimationSheetName || "-"}
-                              {getBuildingsCosts(item).length > 1 && (
-                                <Badge variant="secondary" className="text-[10px] ml-1">+{getBuildingsCosts(item).length - 1}</Badge>
-                              )}
-                            </TableCell>
+                            {!isIncome && (
+                              <TableCell className="text-sm max-w-[200px] truncate" title={getBuildingsCosts(item).map((bc) => bc.costEstimationSheetName).filter(Boolean).join(", ") || "-"}>
+                                {getBuildingsCosts(item)[0]?.costEstimationSheetName || "-"}
+                                {getBuildingsCosts(item).length > 1 && (
+                                  <Badge variant="secondary" className="text-[10px] ml-1">+{getBuildingsCosts(item).length - 1}</Badge>
+                                )}
+                              </TableCell>
+                            )}
                             <TableCell className="font-mono text-sm">{item.billId}</TableCell>
                             <TableCell className="text-xs">
                               <Badge variant="outline" className="text-xs font-mono">{item.documentIdentificationId?.trim() || "-"}</Badge>
@@ -1209,9 +1218,19 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                 {formatCurrency(paidTotal(item, filterAno, filterMes))}
                               </TableCell>
                             ) : (
-                              <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
-                                {formatCurrency(item.correctedBalanceAmount)}
-                              </TableCell>
+                              <>
+                                <TableCell className={`text-right font-mono text-sm font-medium ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
+                                  {formatCurrency(item.correctedBalanceAmount)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-sm text-amber-600">
+                                  {formatCurrency(item.correctedBalanceAmount - item.balanceAmount)}
+                                </TableCell>
+                                <TableCell className="text-right font-mono text-xs text-amber-600">
+                                  {item.balanceAmount > 0
+                                    ? `${(((item.correctedBalanceAmount - item.balanceAmount) / item.balanceAmount) * 100).toFixed(1)}%`
+                                    : "-"}
+                                </TableCell>
+                              </>
                             )}
                           </TableRow>
                           {showExpandedPanel && (
@@ -1330,7 +1349,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                     })()}
                 {!loading && error && (
                   <TableRow>
-                    <TableCell colSpan={isPagas ? 11 : isOverdue ? 11 : 10} className="text-center py-12">
+                    <TableCell colSpan={isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-3 bg-red-50 rounded-full">
                           <AlertCircle className="h-8 w-8 text-red-400" />
@@ -1348,7 +1367,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 )}
                 {!loading && !error && paginatedItems.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={isPagas ? 11 : isOverdue ? 11 : 10} className="text-center py-12">
+                    <TableCell colSpan={isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)} className="text-center py-12">
                       <div className="flex flex-col items-center gap-3">
                         <div className="p-3 bg-slate-100 rounded-full">
                           <FileText className="h-8 w-8 text-slate-300" />
