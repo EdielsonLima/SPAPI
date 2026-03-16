@@ -49,14 +49,14 @@ export function LoginForm() {
       <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20width%3D%2260%22%20height%3D%2260%22%20viewBox%3D%220%200%2060%2060%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cg%20fill%3D%22none%22%20fill-rule%3D%22evenodd%22%3E%3Cg%20fill%3D%22%23ffffff%22%20fill-opacity%3D%220.03%22%3E%3Cpath%20d%3D%22M36%2034v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6%2034v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6%204V0H4v4H0v2h4v4h2V6h4V4H6z%22%2F%3E%3C%2Fg%3E%3C%2Fg%3E%3C%2Fsvg%3E')] opacity-50" />
 
       <Card className="w-full max-w-md border-0 shadow-2xl bg-white/95 backdrop-blur-sm relative z-10">
-        <CardHeader className="text-center pb-4 pt-8">
-          <div className="mx-auto mb-1 flex h-32 w-56 items-center justify-center">
+        <CardHeader className="text-center pb-2 pt-6">
+          <div className="mx-auto flex h-32 w-56 items-center justify-center">
             <Image src="/logo-full.jpg" alt="Silva Packer" width={220} height={120} className="object-contain" priority />
           </div>
-          <p className="text-sm text-slate-500">{process.env.NEXT_PUBLIC_COMPANY_SUBTITLE || "Sistema de Gestao"}</p>
         </CardHeader>
         <CardContent className="px-8 pb-8">
           {/* Google Login */}
+          <div className="mt-4" />
           <Button
             type="button"
             variant="outline"
@@ -136,6 +136,7 @@ export function LoginForm() {
               {loading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
+          <p className="text-xs text-slate-400 text-center mt-6">{process.env.NEXT_PUBLIC_COMPANY_SUBTITLE || "Sistema de Gestao"}</p>
         </CardContent>
       </Card>
     </div>
