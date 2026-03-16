@@ -251,6 +251,7 @@ export function ExecutiveDashboard() {
   const [showOverdueTable, setShowOverdueTable] = useState(false);
   const [expandedCreditors, setExpandedCreditors] = useState<Set<string>>(new Set());
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
+  const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("dashboard_default_opTypes");
@@ -487,6 +488,15 @@ export function ExecutiveDashboard() {
     return Array.from(types).sort();
   }, [activeItems]);
 
+  // Números de documento disponíveis nos dados de income (CR)
+  const allDocNumbers = useMemo(() => {
+    const nums = new Set<string>();
+    consistentIncome.forEach(i => {
+      if (i.documentNumber) nums.add(i.documentNumber);
+    });
+    return Array.from(nums).sort();
+  }, [consistentIncome]);
+
   // === Apply filters to items (works for both Outcome and Income) ===
   const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string }>(list: T[]): T[] => {
     let result = list;
@@ -544,9 +554,21 @@ export function ExecutiveDashboard() {
   const filteredAtrasadas = useMemo(() => applyFilters(itemsAtrasadas), [itemsAtrasadas, applyFilters]);
   const filteredPagas = useMemo(() => applyFilters(itemsPagas), [itemsPagas, applyFilters]);
 
-  const filteredAReceber = useMemo(() => applyFilters(itemsAReceber), [itemsAReceber, applyFilters]);
-  const filteredInadimplencia = useMemo(() => applyFilters(itemsInadimplencia), [itemsInadimplencia, applyFilters]);
-  const filteredRecebidas = useMemo(() => applyFilters(itemsRecebidas), [itemsRecebidas, applyFilters]);
+  const filteredAReceber = useMemo(() => {
+    let result = applyFilters(itemsAReceber);
+    if (selectedDocNumbers.size > 0) result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
+    return result;
+  }, [itemsAReceber, applyFilters, selectedDocNumbers]);
+  const filteredInadimplencia = useMemo(() => {
+    let result = applyFilters(itemsInadimplencia);
+    if (selectedDocNumbers.size > 0) result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
+    return result;
+  }, [itemsInadimplencia, applyFilters, selectedDocNumbers]);
+  const filteredRecebidas = useMemo(() => {
+    let result = applyFilters(itemsRecebidas);
+    if (selectedDocNumbers.size > 0) result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
+    return result;
+  }, [itemsRecebidas, applyFilters, selectedDocNumbers]);
 
   // === Budget vs Actual (Orçado vs Realizado) ===
   const budgetData = useMemo(() => {
@@ -1569,6 +1591,22 @@ export function ExecutiveDashboard() {
               }}
             />
           )}
+          {(activeTab === "recebidas" || activeTab === "a-receber" || activeTab === "inadimplencia") && allDocNumbers.length > 0 && (
+            <MultiSelectFilter
+              label="Nº Documento"
+              icon={<FileText className="h-4 w-4" />}
+              allOptions={allDocNumbers}
+              selected={selectedDocNumbers}
+              onToggle={(name) => toggleInSet(setSelectedDocNumbers, name)}
+              onSelectAll={() => setSelectedDocNumbers(new Set(allDocNumbers))}
+              onClear={() => setSelectedDocNumbers(new Set())}
+              activeColor="cyan"
+              onSaveDefault={() => {
+                localStorage.setItem("dashboard_default_docNumbers", JSON.stringify([...selectedDocNumbers]));
+                toast.success("Padrao de numero documento salvo!");
+              }}
+            />
+          )}
           <MultiSelectFilter
             label="Tipo Doc."
             icon={<FileText className="h-4 w-4" />}
@@ -1633,6 +1671,7 @@ export function ExecutiveDashboard() {
               setSelectedMonths(new Set());
               setSelectedDays(new Set());
               setSelectedDuePeriods(new Set());
+              setSelectedDocNumbers(new Set());
               const savedOp = localStorage.getItem("dashboard_default_opTypes");
               setSelectedOpTypes(savedOp ? new Set(JSON.parse(savedOp)) : new Set(["Pagamento"]));
               const defaultYrs: string[] = [];
