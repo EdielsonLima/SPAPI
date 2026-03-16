@@ -290,7 +290,6 @@ export function ExecutiveDashboard() {
 
   const consistentIncome = useMemo(() =>
     incomeItems.filter(i =>
-      i.consistencyStatus !== 'N' &&
       !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
     ), [incomeItems, exclusionSet]);
 
