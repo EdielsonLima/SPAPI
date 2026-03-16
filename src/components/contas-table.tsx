@@ -699,7 +699,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     if (dias <= 0) return 0;
     const saldo = item.correctedBalanceAmount || 0;
     const multa = saldo * 0.02; // 2% multa
-    const juros = saldo * 0.01 * (dias / 30); // 1% a.m. pro-rata
+    const juros = (saldo + multa) * 0.01 * (dias / 30); // 1% a.m. pro-rata sobre saldo + multa
     return multa + juros;
   }, [isOverdue]);
 
@@ -892,7 +892,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
+      <div className={`grid gap-4 md:grid-cols-3 ${isOverdue ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
         <Card className={`border-0 shadow-sm border-l-4 ${isPagas ? "border-l-emerald-500" : isOverdue ? "border-l-red-500" : "border-l-amber-500"}`}>
           <CardContent className="p-4">
             <div className="text-sm text-slate-500">{isPagas ? (isIncome ? "Recebido Hoje" : "Pago Hoje") : isOverdue ? (isIncome ? "Inadimplentes Hoje" : "Vencidas Hoje") : (isIncome ? "A Receber Hoje" : "A Pagar Hoje")}</div>
