@@ -372,7 +372,7 @@ export function DreTab({
                 const isExpanded = expandedCategories.has(line.key);
                 const categoryAccounts = accum[line.key]?.accounts || {};
                 const hasAccounts = Object.keys(categoryAccounts).length > 0;
-                const canExpand = dreMode === "completa" && !isCalculated && hasAccounts;
+                const canExpand = !isCalculated && hasAccounts;
 
                 return (
                   <React.Fragment key={line.key}>
