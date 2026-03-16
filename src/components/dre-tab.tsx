@@ -120,10 +120,11 @@ export function DreTab({
     if (Object.keys(dreMappings).length === 0) return null;
 
     // Build lookup: financialCategoryId -> dreCategory
+    // Store both original and string-coerced versions for robust matching
     const fcToDre: Record<string, string> = {};
     for (const [cat, accounts] of Object.entries(dreMappings)) {
       for (const acc of accounts) {
-        fcToDre[acc.financialPlanId] = cat;
+        fcToDre[String(acc.financialPlanId)] = cat;
       }
     }
 
@@ -152,38 +153,78 @@ export function DreTab({
       accum[dreCat].accounts[fcId].amount += amount;
     };
 
+    // Debug: log data shapes
+    const sampleOutcome = outcomeItems[0];
+    const sampleIncome = incomeItems[0];
+    console.log("[DRE DEBUG] Lookup keys:", Object.keys(fcToDre));
+    console.log("[DRE DEBUG] outcomeItems count:", outcomeItems.length);
+    console.log("[DRE DEBUG] incomeItems count:", incomeItems.length);
+    console.log("[DRE DEBUG] bankFees count:", bankFees.length);
+    if (sampleOutcome) {
+      console.log("[DRE DEBUG] Sample outcome paymentsCategories:", sampleOutcome.paymentsCategories);
+      console.log("[DRE DEBUG] Sample outcome payments:", sampleOutcome.payments?.length, sampleOutcome.payments?.[0]);
+    }
+    if (sampleIncome) {
+      console.log("[DRE DEBUG] Sample income paymentsCategories:", sampleIncome.paymentsCategories);
+      console.log("[DRE DEBUG] Sample income payments:", sampleIncome.payments?.length, sampleIncome.payments?.[0]);
+    }
+    // Collect all unique financialCategoryIds from data
+    const allFcIds = new Set<string>();
+    for (const item of outcomeItems) {
+      for (const pc of (item.paymentsCategories || [])) {
+        allFcIds.add(String(pc.financialCategoryId));
+      }
+    }
+    for (const item of incomeItems) {
+      for (const pc of (item.paymentsCategories || [])) {
+        allFcIds.add(String(pc.financialCategoryId));
+      }
+    }
+    console.log("[DRE DEBUG] All unique financialCategoryIds in data:", Array.from(allFcIds).sort());
+    // Check which mapped IDs match
+    const mappedKeys = Object.keys(fcToDre);
+    const matchedKeys = mappedKeys.filter(k => allFcIds.has(k));
+    const unmatchedKeys = mappedKeys.filter(k => !allFcIds.has(k));
+    console.log("[DRE DEBUG] Matched mapped IDs:", matchedKeys);
+    console.log("[DRE DEBUG] Unmatched mapped IDs:", unmatchedKeys);
+
     // Process outcome (expenses) - these flow as NEGATIVE into expense categories
+    let outcomeMatchCount = 0;
     for (const item of outcomeItems) {
       for (const payment of (item.payments || [])) {
         if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
 
         for (const pc of (item.paymentsCategories || [])) {
-          const dreCat = fcToDre[pc.financialCategoryId];
+          const dreCat = fcToDre[String(pc.financialCategoryId)];
           if (!dreCat) continue;
+          outcomeMatchCount++;
           const rate = (pc.financialCategoryRate || 100) / 100;
           const allocated = payment.netAmount * rate;
           // Expenses are negative in DRE
           const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-          addToAccum(dreCat, pc.financialCategoryId, pc.financialCategoryName, allocated * sign);
+          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign);
         }
       }
     }
 
     // Process income (revenue) - these flow as POSITIVE into revenue categories
+    let incomeMatchCount = 0;
     for (const item of incomeItems) {
       for (const payment of (item.payments || [])) {
         if (payment.netAmount <= 0) continue;
         if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
 
         for (const pc of (item.paymentsCategories || [])) {
-          const dreCat = fcToDre[pc.financialCategoryId];
+          const dreCat = fcToDre[String(pc.financialCategoryId)];
           if (!dreCat) continue;
+          incomeMatchCount++;
           const rate = (pc.financialCategoryRate || 100) / 100;
           const allocated = payment.netAmount * rate;
-          addToAccum(dreCat, pc.financialCategoryId, pc.financialCategoryName, allocated);
+          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated);
         }
       }
     }
+    console.log("[DRE DEBUG] Outcome matches:", outcomeMatchCount, "Income matches:", incomeMatchCount);
 
     // Process bank movements (fees -> usually despesas_financeiras)
     for (const bm of bankFees) {
