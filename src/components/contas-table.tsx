@@ -689,6 +689,20 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const totalPages = Math.ceil(sorted.length / perPage);
   const paginatedItems = sorted.slice(page * perPage, (page + 1) * perPage);
 
+  // Calcula encargos (juros 1% a.m. + multa 2%) para inadimplentes
+  const calcEncargos = useCallback((item: ContasItem) => {
+    if (!isOverdue || !item.dueDate) return 0;
+    const due = new Date(item.dueDate + "T00:00:00");
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const dias = Math.max(0, Math.floor((hoje.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
+    if (dias <= 0) return 0;
+    const saldo = item.correctedBalanceAmount || 0;
+    const multa = saldo * 0.02; // 2% multa
+    const juros = saldo * 0.01 * (dias / 30); // 1% a.m. pro-rata
+    return multa + juros;
+  }, [isOverdue]);
+
   const totalAmount = useMemo(
     () => sorted.reduce((sum, item) => sum + (item.originalAmount || 0), 0),
     [sorted]
@@ -700,6 +714,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const totalPaid = useMemo(
     () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno, filterMes), 0),
     [sorted, filterAno, filterMes]
+  );
+  const totalComEncargos = useMemo(
+    () => isOverdue ? sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) + calcEncargos(item), 0) : 0,
+    [sorted, isOverdue, calcEncargos]
   );
 
   // Card: Contas a pagar/vencidas hoje
@@ -946,6 +964,19 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
             )}
           </CardContent>
         </Card>
+        {isOverdue && (
+          <Card className="border-0 shadow-sm border-l-4 border-l-orange-500">
+            <CardContent className="p-4">
+              <div className="text-sm text-slate-500">Total com Encargos</div>
+              <div className="text-xl font-bold mt-1 text-orange-600">
+                {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(totalComEncargos)}
+              </div>
+              <div className="text-xs text-slate-400 mt-1.5">
+                Juros 1% a.m. + Multa 2%
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Filters + Table */}
