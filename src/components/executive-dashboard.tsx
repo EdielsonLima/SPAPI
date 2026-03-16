@@ -1422,10 +1422,10 @@ export function ExecutiveDashboard() {
       },
       {
         label: "% Inadimplência",
-        value: totalAReceber + totalInadimplencia > 0
-          ? ((totalInadimplencia / (totalAReceber + totalInadimplencia)) * 100).toFixed(1) + "%"
+        value: totalAReceber > 0
+          ? ((totalInadimplencia / totalAReceber) * 100).toFixed(1) + "%"
           : "0%",
-        subtitle: "da carteira",
+        subtitle: "do total a receber",
         icon: <TrendingDown className="h-7 w-7 text-red-400" />,
         iconBg: "bg-red-50",
         gradient: "from-red-400 to-red-500",
