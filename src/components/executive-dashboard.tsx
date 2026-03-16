@@ -911,6 +911,10 @@ export function ExecutiveDashboard() {
   const totalInadimplencia = useMemo(() =>
     filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i) + calcEncargos(i), 0), [filteredInadimplencia]);
 
+  // Saldo inadimplente sem encargos - usado para cálculo de % inadimplência
+  const saldoInadimplencia = useMemo(() =>
+    filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0), [filteredInadimplencia]);
+
   const totalRecebido = useMemo(() =>
     filteredRecebidas.reduce((s, i) => s + receivedSum(i), 0), [filteredRecebidas, receivedSum]);
 
@@ -1422,8 +1426,8 @@ export function ExecutiveDashboard() {
       },
       {
         label: "% Inadimplência",
-        value: (totalAReceber + totalInadimplencia) > 0
-          ? ((totalInadimplencia / (totalAReceber + totalInadimplencia)) * 100).toFixed(1) + "%"
+        value: (totalAReceber + saldoInadimplencia) > 0
+          ? ((saldoInadimplencia / (totalAReceber + saldoInadimplencia)) * 100).toFixed(1) + "%"
           : "0%",
         subtitle: "do total a receber",
         icon: <TrendingDown className="h-7 w-7 text-red-400" />,
