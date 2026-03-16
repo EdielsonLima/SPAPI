@@ -479,6 +479,16 @@ export function ExecutiveDashboard() {
       .reduce((s, p) => s + p.netAmount, 0),
     [selectedOpTypes, selectedYears]);
 
+  // Soma de recebimentos filtrada apenas por ano (opType do CP não se aplica ao CR)
+  const receivedSum = useCallback((i: SiengeIncome) =>
+    (i.payments || [])
+      .filter(p =>
+        p.netAmount > 0 &&
+        p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+      )
+      .reduce((s, p) => s + p.netAmount, 0),
+    [selectedYears]);
+
   // Tipos de operação disponíveis nos dados
   const allOpTypes = useMemo(() => {
     const types = new Set<string>();
@@ -548,10 +558,9 @@ export function ExecutiveDashboard() {
     consistentIncome.filter(i =>
       i.originalAmount > 0 && (i.payments || []).some(p =>
         p.netAmount > 0 &&
-        (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
         p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
       )
-    ), [consistentIncome, selectedOpTypes, selectedYears]);
+    ), [consistentIncome, selectedYears]);
 
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);
@@ -863,7 +872,7 @@ export function ExecutiveDashboard() {
     filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0), [filteredInadimplencia]);
 
   const totalRecebido = useMemo(() =>
-    filteredRecebidas.reduce((s, i) => s + paidSum(i), 0), [filteredRecebidas, paidSum]);
+    filteredRecebidas.reduce((s, i) => s + receivedSum(i), 0), [filteredRecebidas, receivedSum]);
 
   const receberHoje = useMemo(() => {
     const hoje = new Date().toISOString().split("T")[0];
@@ -903,11 +912,10 @@ export function ExecutiveDashboard() {
     const hoje = new Date().toISOString().split("T")[0];
     return filteredRecebidas.reduce((s, i) => {
       return s + (i.payments || [])
-        .filter(p => p.paymentDate === hoje && p.netAmount > 0 &&
-          (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)))
+        .filter(p => p.paymentDate === hoje && p.netAmount > 0)
         .reduce((ps, p) => ps + p.netAmount, 0);
     }, 0);
-  }, [filteredRecebidas, selectedOpTypes]);
+  }, [filteredRecebidas]);
 
   const recebido7dias = useMemo(() => {
     const hoje = new Date();
@@ -917,11 +925,10 @@ export function ExecutiveDashboard() {
     const hojeStr = hoje.toISOString().split("T")[0];
     return filteredRecebidas.reduce((s, i) => {
       return s + (i.payments || [])
-        .filter(p => p.paymentDate >= d7Str && p.paymentDate <= hojeStr && p.netAmount > 0 &&
-          (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)))
+        .filter(p => p.paymentDate >= d7Str && p.paymentDate <= hojeStr && p.netAmount > 0)
         .reduce((ps, p) => ps + p.netAmount, 0);
     }, 0);
-  }, [filteredRecebidas, selectedOpTypes]);
+  }, [filteredRecebidas]);
 
   // === Chart helpers ===
   function buildCompanyChart(sourceItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received") {
@@ -929,7 +936,9 @@ export function ExecutiveDashboard() {
     sourceItems.forEach(item => {
       const val = field === "balance"
         ? effectiveAmount(item)
-        : paidSum(item);
+        : field === "received"
+          ? receivedSum(item as SiengeIncome)
+          : paidSum(item);
       if (val > 0) {
         map.set(item.companyName, (map.get(item.companyName) || 0) + val);
       }
@@ -986,7 +995,6 @@ export function ExecutiveDashboard() {
         (item.payments || [])
           .filter(p =>
             p.netAmount > 0 &&
-            (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
             p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
           )
           .forEach(p => {
@@ -1041,7 +1049,6 @@ export function ExecutiveDashboard() {
         (item.payments || [])
           .filter(p =>
             p.netAmount > 0 &&
-            (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
             p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
           )
           .forEach(p => {
