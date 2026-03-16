@@ -85,21 +85,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Debug: log first income item structure for DRE diagnostics
-    if (mergedData.length > 0) {
-      const sample = mergedData[0];
-      console.log("[INCOME DEBUG] First item keys:", Object.keys(sample));
-      console.log("[INCOME DEBUG] Has paymentsCategories:", !!(sample.paymentsCategories && sample.paymentsCategories.length > 0));
-      if (sample.paymentsCategories && sample.paymentsCategories.length > 0) {
-        console.log("[INCOME DEBUG] Sample PC:", JSON.stringify(sample.paymentsCategories[0]));
+    // Map API's "receiptsCategories" to "paymentsCategories" for frontend compatibility
+    // Sienge income API uses "receiptsCategories" while outcome uses "paymentsCategories"
+    for (const item of mergedData) {
+      if (!item.paymentsCategories && item.receiptsCategories) {
+        item.paymentsCategories = item.receiptsCategories;
       }
-      console.log("[INCOME DEBUG] Has receipts:", !!(sample.receipts && sample.receipts.length > 0));
-      // Count items with paymentsCategories
-      let withPC = 0;
-      for (const item of mergedData) {
-        if (item.paymentsCategories && item.paymentsCategories.length > 0) withPC++;
-      }
-      console.log("[INCOME DEBUG] Items with paymentsCategories:", withPC, "/", mergedData.length);
     }
 
     // Map API's "receipts" field to our "payments" field and calculate receivedNetAmount (Líquido)

@@ -37,20 +37,21 @@ export async function GET() {
     const items = data.data || [];
 
     // Collect diagnostics
+    // IMPORTANT: Sienge income API uses "receiptsCategories" not "paymentsCategories"
     const sampleItem = items[0];
     const sampleKeys = sampleItem ? Object.keys(sampleItem) : [];
-    const samplePC = sampleItem?.paymentsCategories?.[0] || null;
+    const sampleRC = sampleItem?.receiptsCategories?.[0] || null;
     const sampleReceipt = sampleItem?.receipts?.[0] || null;
 
-    let withPC = 0;
+    let withRC = 0;
     let withReceipts = 0;
     const allFcIds = new Set<string>();
 
     for (const item of items) {
-      if (item.paymentsCategories?.length > 0) {
-        withPC++;
-        for (const pc of item.paymentsCategories) {
-          allFcIds.add(String(pc.financialCategoryId));
+      if (item.receiptsCategories?.length > 0) {
+        withRC++;
+        for (const rc of item.receiptsCategories) {
+          allFcIds.add(String(rc.financialCategoryId));
         }
       }
       if (item.receipts?.length > 0) withReceipts++;
@@ -58,10 +59,10 @@ export async function GET() {
 
     return NextResponse.json({
       totalItems: items.length,
-      itemsWithPaymentsCategories: withPC,
+      itemsWithReceiptsCategories: withRC,
       itemsWithReceipts: withReceipts,
       sampleItemKeys: sampleKeys,
-      samplePaymentsCategory: samplePC,
+      sampleReceiptsCategory: sampleRC,
       sampleReceipt: sampleReceipt ? {
         paymentDate: sampleReceipt.paymentDate,
         netAmount: sampleReceipt.netAmount,
@@ -75,7 +76,7 @@ export async function GET() {
         clientName: sampleItem.clientName,
         dueDate: sampleItem.dueDate,
         originalAmount: sampleItem.originalAmount,
-        paymentsCategoriesCount: sampleItem.paymentsCategories?.length || 0,
+        receiptsCategoriesCount: sampleItem.receiptsCategories?.length || 0,
         receiptsCount: sampleItem.receipts?.length || 0,
       } : null,
     });
