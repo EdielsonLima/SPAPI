@@ -391,10 +391,10 @@ export function DreTab({
                 <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
                   {kpi.label}
                 </span>
-                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                <Badge variant="outline" className={`text-xs px-2 py-0.5 ${
                   isPositive ? "border-emerald-200 text-emerald-700" : "border-red-200 text-red-700"
                 }`}>
-                  {isPositive ? <TrendingUp className="h-2.5 w-2.5 mr-0.5" /> : <TrendingDown className="h-2.5 w-2.5 mr-0.5" />}
+                  {isPositive ? <TrendingUp className="h-3.5 w-3.5 mr-1" /> : <TrendingDown className="h-3.5 w-3.5 mr-1" />}
                   {margin}
                 </Badge>
               </div>
