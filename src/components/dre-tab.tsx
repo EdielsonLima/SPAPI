@@ -238,28 +238,95 @@ export function DreTab({
       accum[dreCat].accounts[fcId].details[dKey].amount += amount;
     };
 
+    const matchesFilters = (date: string, companyName: string) => {
+      if (!date) return false;
+      const year = date.substring(0, 4);
+      const month = date.substring(5, 7);
+      if (selectedYears.size > 0 && !selectedYears.has(year)) return false;
+      if (selectedMonths.size > 0 && !selectedMonths.has(month)) return false;
+      if (selectedCompanies.size > 0 && !selectedCompanies.has(companyName)) return false;
+      return true;
+    };
+
+    // Helper: add Level 3 detail only (does NOT change Level 1+2 totals)
+    const addDetailOnly = (dreCat: string, fcId: string, detailName: string, detailAmount: number) => {
+      if (!accum[dreCat]?.accounts[fcId]) return;
+      const dKey = detailName || "Sem identificacao";
+      if (!accum[dreCat].accounts[fcId].details[dKey]) {
+        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0 };
+      }
+      accum[dreCat].accounts[fcId].details[dKey].amount += detailAmount;
+    };
+
     // PRIMARY SOURCE: Excel data from database (matches Power BI exactly)
     if (excelSupplementary && Object.keys(excelSupplementary).length > 0) {
+      // Step 1: Populate Level 1+2 totals from Excel (authoritative)
       for (const [fcId, data] of Object.entries(excelSupplementary)) {
         const excelItem = data as { name: string; amount: number; dreCategory: string };
-        // Use dreCategory from Excel if available, otherwise look up in mappings
         const dreCat = excelItem.dreCategory || fcToDre[fcId];
         if (!dreCat || !accum[dreCat]) continue;
-        // Excel data already has correct accounting signs (negative for expenses)
-        addToAccum(dreCat, fcId, excelItem.name, excelItem.amount, "Excel/Power BI");
+        addToAccum(dreCat, fcId, excelItem.name, excelItem.amount, "");
+      }
+
+      // Step 2: Enrich Level 3 with Sienge details (creditor/client names)
+      const excelFcIds = new Set(Object.keys(excelSupplementary));
+
+      for (const item of outcomeItems) {
+        for (const payment of (item.payments || [])) {
+          if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
+          for (const pc of (item.paymentsCategories || [])) {
+            const fcId = String(pc.financialCategoryId);
+            if (!excelFcIds.has(fcId)) continue;
+            const dreCat = fcToDre[fcId];
+            if (!dreCat) continue;
+            const rate = (pc.financialCategoryRate || 100) / 100;
+            const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
+            addDetailOnly(dreCat, fcId, item.creditorName || "", payment.netAmount * rate * sign);
+          }
+        }
+      }
+
+      for (const item of incomeItems) {
+        const pcs = item.paymentsCategories || [];
+        if (pcs.length === 0) continue;
+        for (const payment of (item.payments || [])) {
+          const amount = payment.netAmount || 0;
+          if (amount <= 0) continue;
+          if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
+          for (const pc of pcs) {
+            const fcId = String(pc.financialCategoryId);
+            if (!excelFcIds.has(fcId)) continue;
+            const dreCat = fcToDre[fcId];
+            if (!dreCat) continue;
+            const rate = (pc.financialCategoryRate || 100) / 100;
+            addDetailOnly(dreCat, fcId, item.clientName || "", amount * rate);
+          }
+        }
+      }
+
+      for (const bm of bankFees) {
+        if (!bm.bankMovementDate) continue;
+        if (!matchesFilters(bm.bankMovementDate, bm.companyName)) continue;
+        for (const fc of (bm.financialCategories || [])) {
+          const fcId = String(fc.financialCategoryId);
+          if (!excelFcIds.has(fcId)) continue;
+          const dreCat = fcToDre[fcId];
+          if (!dreCat) continue;
+          const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
+          addDetailOnly(dreCat, fcId, "Movimento Bancario", Math.abs(bm.bankMovementAmount) * sign);
+        }
+      }
+
+      // Step 3: Remove placeholder "Sem identificacao" entries if real details exist
+      for (const cat of Object.values(accum)) {
+        for (const acct of Object.values(cat.accounts)) {
+          if (Object.keys(acct.details).length > 1 && acct.details["Sem identificacao"]) {
+            delete acct.details["Sem identificacao"];
+          }
+        }
       }
     } else {
       // FALLBACK: Sienge API data (when Excel data not available)
-      const matchesFilters = (date: string, companyName: string) => {
-        if (!date) return false;
-        const year = date.substring(0, 4);
-        const month = date.substring(5, 7);
-        if (selectedYears.size > 0 && !selectedYears.has(year)) return false;
-        if (selectedMonths.size > 0 && !selectedMonths.has(month)) return false;
-        if (selectedCompanies.size > 0 && !selectedCompanies.has(companyName)) return false;
-        return true;
-      };
-
       for (const item of outcomeItems) {
         for (const payment of (item.payments || [])) {
           if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
