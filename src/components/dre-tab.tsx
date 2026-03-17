@@ -649,12 +649,12 @@ export function DreTab({
                                       : <ChevronRight className="h-3 w-3 text-slate-300" />
                                   )}
                                 </span>
-                                <span className="text-xs text-slate-500 pl-4">
-                                  <span className="text-slate-400 font-mono mr-2">{fcId}</span>
+                                <span className="text-xs text-slate-700 pl-4">
+                                  <span className="text-slate-500 font-mono mr-2">{fcId}</span>
                                   {acct.name}
                                 </span>
                                 <span className={`text-xs text-right tabular-nums ${
-                                  acct.amount < 0 ? "text-red-500" : "text-slate-600"
+                                  acct.amount < 0 ? "text-red-600 font-medium" : "text-slate-800 font-medium"
                                 }`}>
                                   {formatCurrency(Math.abs(acct.amount))}
                                   {acct.amount < 0 && <span className="ml-0.5">-</span>}
@@ -693,11 +693,11 @@ export function DreTab({
                                         className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1"
                                       >
                                         <span className="w-6" />
-                                        <span className="text-[11px] text-slate-400 pl-10 truncate">
+                                        <span className="text-[11px] text-slate-700 pl-10 truncate">
                                           {detail.name}
                                         </span>
                                         <span className={`text-[11px] text-right tabular-nums ${
-                                          detail.amount < 0 ? "text-red-400" : "text-slate-500"
+                                          detail.amount < 0 ? "text-red-600" : "text-slate-700"
                                         }`}>
                                           {formatCurrency(Math.abs(detail.amount))}
                                           {detail.amount < 0 && <span className="ml-0.5">-</span>}
