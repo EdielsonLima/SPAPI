@@ -203,7 +203,7 @@ export function DreTab({
       }
     }
 
-    // Process income (revenue) - use grossAmount to include all receipts
+    // Process income (revenue) - use netAmount (only receipts with bank movements)
     for (const item of incomeItems) {
       const pcs = item.paymentsCategories || [];
       if (pcs.length === 0) continue;
@@ -212,33 +212,17 @@ export function DreTab({
       const matchingPcs = pcs.filter(pc => fcToDre[String(pc.financialCategoryId)]);
       if (matchingPcs.length === 0) continue;
 
-      // Try payment-level approach (receipts)
-      let itemContributed = false;
       for (const payment of (item.payments || [])) {
-        // Use grossAmount (original receipt amount) since netAmount can be 0 for "Por Bens"
-        const amount = payment.grossAmount || payment.netAmount || 0;
+        // Use netAmount: only counts receipts with actual bank movements (excludes "Por Bens")
+        const amount = payment.netAmount || 0;
         if (amount <= 0) continue;
         if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
 
         for (const pc of matchingPcs) {
           const dreCat = fcToDre[String(pc.financialCategoryId)];
           if (!dreCat) continue;
-          itemContributed = true;
           const rate = (pc.financialCategoryRate || 100) / 100;
           const allocated = amount * rate;
-          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated, item.clientName || "");
-        }
-      }
-
-      // Fallback: if no payments matched but item has receivedNetAmount, use dueDate for filtering
-      if (!itemContributed && item.receivedNetAmount && item.receivedNetAmount > 0) {
-        if (!matchesFilters(item.dueDate, item.companyName)) continue;
-
-        for (const pc of matchingPcs) {
-          const dreCat = fcToDre[String(pc.financialCategoryId)];
-          if (!dreCat) continue;
-          const rate = (pc.financialCategoryRate || 100) / 100;
-          const allocated = item.receivedNetAmount * rate;
           addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated, item.clientName || "");
         }
       }
