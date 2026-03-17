@@ -132,19 +132,21 @@ function parseExcel(year: string, companyFilter?: string) {
       let rowTotal = 0;
       for (const cm of colMappings) {
         const val = parseFloat(String(rowData[cm.colIndex])) || 0;
+        if (val !== 0) {
+          companyAccounts.push({
+            companyId,
+            companyName,
+            accountId,
+            accountName,
+            dreCategory: currentDreCategory,
+            amount: val,
+            month: String(cm.monthIndex + 1).padStart(2, "0"),
+          });
+        }
         rowTotal += val;
       }
 
       if (rowTotal !== 0) {
-        companyAccounts.push({
-          companyId,
-          companyName,
-          accountId,
-          accountName,
-          dreCategory: currentDreCategory,
-          amount: rowTotal,
-        });
-
         if (!aggregated[accountId]) {
           aggregated[accountId] = {
             accountId, accountName,
@@ -205,6 +207,7 @@ export async function POST(request: NextRequest) {
       financialPlanName: ca.accountName,
       dreCategory: ca.dreCategory,
       amount: ca.amount,
+      month: ca.month,
     }));
     await saveDreExcelData(year, dbAccounts);
     return NextResponse.json({
