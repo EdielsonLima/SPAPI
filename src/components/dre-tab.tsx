@@ -137,7 +137,7 @@ export function DreTab({
     if (selectedYears.size === 0) return;
     setLoadingExcel(true);
     try {
-      const year = Array.from(selectedYears)[0];
+      const year = Array.from(selectedYears).sort().pop();
       const res = await fetch(`/api/dre-excel-validation?year=${year}`);
       if (!res.ok) throw new Error("Failed");
       const json = await res.json();

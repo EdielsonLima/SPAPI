@@ -7,7 +7,7 @@ import fs from "fs";
 
 export const maxDuration = 30; // allow up to 30s for large Excel parsing
 
-const EXCEL_PATH = "C:\\Users\\Usuario\\OneDrive - DTCONSULTORIAS\\SILVA PACKER\\DRE\\SP\\DEMOSTRATIVO RESULTADO COMPLETO.xlsx";
+const EXCEL_PATH = "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/SP/DEMOSTRATIVO RESULTADO COMPLETO.xlsx";
 
 // Months in the Jan-Sep section: col indices in the row array
 const JAN_SEP_COLS = [6, 8, 9, 11, 12, 14, 15, 16, 17];
@@ -211,6 +211,7 @@ export async function GET(request: NextRequest) {
     const result = parseExcel(year, company);
     return NextResponse.json(result);
   } catch (error) {
+    console.error("DRE Excel validation error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
