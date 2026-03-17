@@ -52,6 +52,7 @@ interface CompanyAccountData {
   accountName: string;
   dreCategory: string;
   amount: number;
+  month: string;
 }
 
 function parseExcel(year: string, companyFilter?: string) {
