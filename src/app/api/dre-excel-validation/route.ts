@@ -6,9 +6,15 @@ export const maxDuration = 30; // allow up to 30s for large Excel parsing
 
 const EXCEL_PATH = "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/SP/DEMOSTRATIVO RESULTADO COMPLETO.xlsx";
 
-// Months in the Jan-Sep section: col indices in the row array
-const JAN_SEP_COLS = [6, 8, 9, 11, 12, 14, 15, 16, 17];
-const OCT_DEC_COLS = [6, 8, 9];
+// Data columns in the Excel (columns that contain month headers/values)
+const DATA_COLS = [6, 8, 9, 11, 12, 14, 15, 16, 17];
+
+// Month name -> 0-based month index
+const MONTH_MAP: Record<string, number> = {
+  "Janeiro": 0, "Fevereiro": 1, "Março": 2, "Abril": 3,
+  "Maio": 4, "Junho": 5, "Julho": 6, "Agosto": 7,
+  "Setembro": 8, "Outubro": 9, "Novembro": 10, "Dezembro": 11,
+};
 
 // Map DRE group codes to our internal category keys
 const GROUP_TO_CATEGORY: Record<string, string> = {
@@ -38,11 +44,17 @@ interface AccountData {
   companies: string[];    // which companies contributed
 }
 
-interface CompanyBlock {
+// Describes which columns in a header section contain months of the target year
+interface ColMonthMapping {
+  colIndex: number;
+  monthIndex: number; // 0-11
+}
+
+interface SectionBlock {
   headerRow: number;
-  octHeaderRow: number;
   companyId: string;
   companyName: string;
+  colMappings: ColMonthMapping[]; // which cols have months for our target year
 }
 
 function parseExcel(year: string, companyFilter?: string) {
@@ -57,39 +69,46 @@ function parseExcel(year: string, companyFilter?: string) {
   const ws = wb.Sheets[wb.SheetNames[0]];
   const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
-  // Find all company blocks for the requested year
-  const blocks: CompanyBlock[] = [];
+  // Find ALL header rows and determine which columns contain months of the target year
+  const blocks: SectionBlock[] = [];
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
-    if (String(row[6]) === `Janeiro/${year}` && String(row[0]) === "Código") {
-      // Find company info above this header
-      let companyId = "";
-      let companyName = "";
-      for (let j = i - 1; j >= Math.max(0, i - 10); j--) {
-        if (String(data[j][0]).startsWith("Empresa")) {
-          const full = String(data[j][4]);
-          const match = full.match(/^(\d+)\s*-\s*(.+)/);
-          if (match) {
-            companyId = match[1];
-            companyName = match[2].trim();
-          } else {
-            companyName = full;
-          }
-          break;
+    if (String(row[0]).trim() !== "Código") continue;
+
+    // Parse month headers from data columns
+    const colMappings: ColMonthMapping[] = [];
+    for (const col of DATA_COLS) {
+      const header = String(row[col]).trim();
+      const match = header.match(/^(\w+)\/(\d{4})$/);
+      if (match && match[2] === year) {
+        const monthIdx = MONTH_MAP[match[1]];
+        if (monthIdx !== undefined) {
+          colMappings.push({ colIndex: col, monthIndex: monthIdx });
         }
       }
-
-      // Find the Oct-Dec header for this block
-      let octHeaderRow = -1;
-      for (let j = i + 200; j < Math.min(i + 350, data.length); j++) {
-        if (String(data[j][6]) === `Outubro/${year}` && String(data[j][0]) === "Código") {
-          octHeaderRow = j;
-          break;
-        }
-      }
-
-      blocks.push({ headerRow: i, octHeaderRow, companyId, companyName });
     }
+
+    // Skip if no columns match our target year
+    if (colMappings.length === 0) continue;
+
+    // Find company info above this header
+    let companyId = "";
+    let companyName = "";
+    for (let j = i - 1; j >= Math.max(0, i - 10); j--) {
+      if (String(data[j][0]).startsWith("Empresa")) {
+        const full = String(data[j][4]);
+        const m = full.match(/^(\d+)\s*-\s*(.+)/);
+        if (m) {
+          companyId = m[1];
+          companyName = m[2].trim();
+        } else {
+          companyName = full;
+        }
+        break;
+      }
+    }
+
+    blocks.push({ headerRow: i, companyId, companyName, colMappings });
   }
 
   // Apply company filter if provided
@@ -102,14 +121,9 @@ function parseExcel(year: string, companyFilter?: string) {
   let currentDreCategory = "";
   let currentDreCategoryLabel = "";
 
-  function processRows(
-    startRow: number,
-    endRow: number,
-    colIndices: number[],
-    monthOffset: number,
-    companyName: string
-  ) {
-    for (let i = startRow; i < endRow; i++) {
+  function processSection(block: SectionBlock) {
+    const startRow = block.headerRow + 1;
+    for (let i = startRow; i < Math.min(startRow + 300, data.length); i++) {
       const row = data[i];
       if (!row) break;
       const code = String(row[0]).trim();
@@ -147,17 +161,17 @@ function parseExcel(year: string, companyFilter?: string) {
         };
       }
 
-      // Sum values for the relevant months
-      for (let ci = 0; ci < colIndices.length; ci++) {
-        const val = parseFloat(String(row[colIndices[ci]])) || 0;
+      // Sum values for each column that maps to our target year
+      for (const cm of block.colMappings) {
+        const val = parseFloat(String(row[cm.colIndex])) || 0;
         if (val !== 0) {
-          accounts[accountId].monthly[monthOffset + ci] += val;
+          accounts[accountId].monthly[cm.monthIndex] += val;
           accounts[accountId].yearTotal += val;
         }
       }
 
-      if (!accounts[accountId].companies.includes(companyName)) {
-        accounts[accountId].companies.push(companyName);
+      if (!accounts[accountId].companies.includes(block.companyName)) {
+        accounts[accountId].companies.push(block.companyName);
       }
     }
   }
@@ -165,22 +179,19 @@ function parseExcel(year: string, companyFilter?: string) {
   for (const block of filteredBlocks) {
     currentDreCategory = "";
     currentDreCategoryLabel = "";
+    processSection(block);
+  }
 
-    // Process Jan-Sep
-    processRows(block.headerRow + 1, block.headerRow + 300, JAN_SEP_COLS, 0, block.companyName);
-
-    // Process Oct-Dec
-    if (block.octHeaderRow > 0) {
-      currentDreCategory = "";
-      currentDreCategoryLabel = "";
-      processRows(block.octHeaderRow + 1, block.octHeaderRow + 300, OCT_DEC_COLS, 9, block.companyName);
-    }
+  // Get unique companies
+  const companyMap = new Map<string, string>();
+  for (const block of filteredBlocks) {
+    companyMap.set(block.companyId, block.companyName);
   }
 
   return {
     year,
-    companies: filteredBlocks.map(b => ({ id: b.companyId, name: b.companyName })),
-    totalCompanies: filteredBlocks.length,
+    companies: Array.from(companyMap.entries()).map(([id, name]) => ({ id, name })),
+    totalCompanies: companyMap.size,
     accounts: Object.values(accounts).sort((a, b) => a.accountId.localeCompare(b.accountId)),
     // Summary grouped by DRE category
     categories: Object.values(
