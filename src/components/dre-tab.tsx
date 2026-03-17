@@ -197,26 +197,40 @@ export function DreTab({
     Promise.all(
       years.map(year =>
         fetch(`/api/dre-supplementary?year=${year}&monthly=true${companiesQuery}${monthsQuery}`)
-          .then(r => r.ok ? r.json() : null)
-          .catch(() => null)
+          .then(r => {
+            if (!r.ok) {
+              console.error(`DRE Completa fetch error: ${r.status} for year ${year}`);
+              return null;
+            }
+            return r.json();
+          })
+          .catch(err => {
+            console.error("DRE Completa fetch failed:", err);
+            return null;
+          })
       )
     ).then(results => {
       const merged: Record<string, { name: string; dreCategory: string; months: Record<string, number> }> = {};
       for (const json of results) {
         if (!json?.data) continue;
-        const year = json.year as string;
+        const yr = json.year as string;
         for (const [fcId, item] of Object.entries(json.data)) {
-          const d = item as { name: string; dreCategory: string; months: Record<string, number> };
+          const d = item as { name: string; dreCategory: string; months?: Record<string, number> };
           if (!merged[fcId]) {
             merged[fcId] = { name: d.name, dreCategory: d.dreCategory, months: {} };
           }
-          for (const [m, amt] of Object.entries(d.months)) {
-            const key = `${m}/${year}`;
-            merged[fcId].months[key] = (merged[fcId].months[key] || 0) + amt;
+          if (d.months && typeof d.months === "object") {
+            for (const [m, amt] of Object.entries(d.months)) {
+              const key = `${m}/${yr}`;
+              merged[fcId].months[key] = (merged[fcId].months[key] || 0) + (amt as number);
+            }
           }
         }
       }
       setMonthlyData(Object.keys(merged).length > 0 ? merged : null);
+    }).catch(err => {
+      console.error("DRE Completa processing error:", err);
+      setMonthlyData(null);
     }).finally(() => setLoadingMonthly(false));
   }, [dreMode, selectedYears, selectedCompanies, selectedMonths]);
 
@@ -548,23 +562,23 @@ export function DreTab({
               <h3 className="text-sm font-bold text-slate-700">DRE - Demonstracao do Resultado</h3>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-slate-100 rounded-md p-0.5">
+              <div className="flex items-center gap-1 bg-slate-200 rounded-lg p-1">
                 <button
                   onClick={() => setDreMode("simples")}
-                  className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
                     dreMode === "simples"
-                      ? "bg-white text-slate-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
+                      ? "bg-slate-800 text-white shadow-md"
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   DRE Simples
                 </button>
                 <button
                   onClick={() => setDreMode("completa")}
-                  className={`px-3 py-1 text-xs font-medium rounded transition-all ${
+                  className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
                     dreMode === "completa"
-                      ? "bg-white text-slate-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-700"
+                      ? "bg-slate-800 text-white shadow-md"
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
                   }`}
                 >
                   DRE Completa
