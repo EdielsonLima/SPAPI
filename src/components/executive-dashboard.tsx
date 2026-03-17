@@ -262,6 +262,7 @@ export function ExecutiveDashboard() {
     return new Set(["Pagamento"]);
   });
   const [bankFees, setBankFees] = useState<SiengeBankMovement[]>([]);
+  const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>([]);
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
@@ -332,6 +333,7 @@ export function ExecutiveDashboard() {
       if (bmRes.ok) {
         const bmData = await bmRes.json();
         const allBm: SiengeBankMovement[] = bmData.data || [];
+        setAllBankMovements(allBm);
         const fees = allBm.filter(bm =>
           (bm.financialCategories || []).some(fc =>
             fc.financialCategoryName?.toLowerCase().includes("taxa") &&
@@ -2528,7 +2530,7 @@ export function ExecutiveDashboard() {
         <DreTab
           outcomeItems={consistentItems}
           incomeItems={consistentIncome}
-          bankFees={bankFees}
+          bankFees={allBankMovements}
           selectedYears={selectedYears}
           selectedMonths={selectedMonths}
           selectedCompanies={selectedCompanies}
