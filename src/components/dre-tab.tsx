@@ -273,6 +273,7 @@ export function DreTab({
       if (!bm.bankMovementDate) continue;
       if (selectedYears.size > 0 && !selectedYears.has(bm.bankMovementDate.substring(0, 4))) continue;
       if (selectedMonths.size > 0 && !selectedMonths.has(bm.bankMovementDate.substring(5, 7))) continue;
+      if (selectedCompanies.size > 0 && !selectedCompanies.has(bm.companyName)) continue;
 
       for (const fc of (bm.financialCategories || [])) {
         const dreCat = fcToDre[String(fc.financialCategoryId)];
