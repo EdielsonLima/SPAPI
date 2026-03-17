@@ -496,7 +496,9 @@ export function DreTab({
                       showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
                     } ${
                       isCalculated
-                        ? "bg-teal-50/80 border-l-4 border-l-teal-500"
+                        ? value < 0
+                          ? "bg-red-50/80 border-l-4 border-l-red-500"
+                          : "bg-teal-50/80 border-l-4 border-l-teal-500"
                         : "hover:bg-slate-50/50 border-l-4 border-l-transparent"
                     } ${canExpand ? "cursor-pointer" : ""}`}
                     onClick={canExpand ? () => toggleExpand(line.key) : undefined}
@@ -510,14 +512,18 @@ export function DreTab({
                     </span>
                     <span className={`text-sm ${
                       isCalculated
-                        ? "font-bold text-teal-800"
+                        ? value < 0
+                          ? "font-bold text-red-700"
+                          : "font-bold text-teal-800"
                         : "font-medium text-slate-700"
                     }`}>
                       {line.label}
                     </span>
                     <span className={`text-sm text-right tabular-nums ${
                       isCalculated
-                        ? "font-bold text-teal-800"
+                        ? value < 0
+                          ? "font-bold text-red-700"
+                          : "font-bold text-teal-800"
                         : value < 0
                           ? "font-semibold text-red-600"
                           : "font-semibold text-slate-800"
