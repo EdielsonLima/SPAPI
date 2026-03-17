@@ -135,11 +135,15 @@ export function DreTab({
       .finally(() => setLoadingMappings(false));
   }, []);
 
-  // Auto-fetch supplementary DRE data from database (synced from Excel locally)
+  // Fetch DRE data from Excel/DB (primary source, filtered by company)
   useEffect(() => {
     if (selectedYears.size === 0) return;
     const year = Array.from(selectedYears).sort().pop();
-    fetch(`/api/dre-supplementary?year=${year}`)
+    let url = `/api/dre-supplementary?year=${year}`;
+    if (selectedCompanies.size > 0) {
+      url += `&companies=${encodeURIComponent(Array.from(selectedCompanies).join(","))}`;
+    }
+    fetch(url)
       .then(r => r.ok ? r.json() : null)
       .then(json => {
         if (!json?.data || Object.keys(json.data).length === 0) {
@@ -149,7 +153,7 @@ export function DreTab({
         setExcelSupplementary(json.data);
       })
       .catch(() => setExcelSupplementary(null));
-  }, [selectedYears]);
+  }, [selectedYears, selectedCompanies]);
 
   const fetchExcelData = useCallback(async () => {
     if (selectedYears.size === 0) return;
@@ -202,7 +206,7 @@ export function DreTab({
     });
   }, []);
 
-  // Build DRE data
+  // Build DRE data - uses Excel data as primary source when available, falls back to Sienge API
   const dreData = useMemo(() => {
     if (Object.keys(dreMappings).length === 0) return null;
 
@@ -220,16 +224,6 @@ export function DreTab({
       accum[cat] = { total: 0, accounts: {} };
     }
 
-    const matchesFilters = (date: string, companyName: string) => {
-      if (!date) return false;
-      const year = date.substring(0, 4);
-      const month = date.substring(5, 7);
-      if (selectedYears.size > 0 && !selectedYears.has(year)) return false;
-      if (selectedMonths.size > 0 && !selectedMonths.has(month)) return false;
-      if (selectedCompanies.size > 0 && !selectedCompanies.has(companyName)) return false;
-      return true;
-    };
-
     const addToAccum = (dreCat: string, fcId: string, fcName: string, amount: number, detailName: string) => {
       if (!accum[dreCat]) return;
       accum[dreCat].total += amount;
@@ -237,7 +231,6 @@ export function DreTab({
         accum[dreCat].accounts[fcId] = { name: fcName, amount: 0, details: {} };
       }
       accum[dreCat].accounts[fcId].amount += amount;
-      // Level 3: track by creditor/client
       const dKey = detailName || "Sem identificacao";
       if (!accum[dreCat].accounts[fcId].details[dKey]) {
         accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0 };
@@ -245,76 +238,71 @@ export function DreTab({
       accum[dreCat].accounts[fcId].details[dKey].amount += amount;
     };
 
-    // Process outcome (expenses) - these flow as NEGATIVE into expense categories
-    for (const item of outcomeItems) {
-      for (const payment of (item.payments || [])) {
-        if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
-
-        for (const pc of (item.paymentsCategories || [])) {
-          const dreCat = fcToDre[String(pc.financialCategoryId)];
-          if (!dreCat) continue;
-          const rate = (pc.financialCategoryRate || 100) / 100;
-          const allocated = payment.netAmount * rate;
-          const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign, item.creditorName || "");
-        }
-      }
-    }
-
-    // Process income (revenue) - use netAmount (only receipts with bank movements)
-    for (const item of incomeItems) {
-      const pcs = item.paymentsCategories || [];
-      if (pcs.length === 0) continue;
-
-      // Check if any paymentsCategory matches a DRE mapping
-      const matchingPcs = pcs.filter(pc => fcToDre[String(pc.financialCategoryId)]);
-      if (matchingPcs.length === 0) continue;
-
-      for (const payment of (item.payments || [])) {
-        // Use netAmount: only counts receipts with actual bank movements (excludes "Por Bens")
-        const amount = payment.netAmount || 0;
-        if (amount <= 0) continue;
-        if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
-
-        for (const pc of matchingPcs) {
-          const dreCat = fcToDre[String(pc.financialCategoryId)];
-          if (!dreCat) continue;
-          const rate = (pc.financialCategoryRate || 100) / 100;
-          const allocated = amount * rate;
-          addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated, item.clientName || "");
-        }
-      }
-    }
-
-    // Process bank movements (fees -> usually despesas_financeiras)
-    for (const bm of bankFees) {
-      if (!bm.bankMovementDate) continue;
-      if (selectedYears.size > 0 && !selectedYears.has(bm.bankMovementDate.substring(0, 4))) continue;
-      if (selectedMonths.size > 0 && !selectedMonths.has(bm.bankMovementDate.substring(5, 7))) continue;
-      if (selectedCompanies.size > 0 && !selectedCompanies.has(bm.companyName)) continue;
-
-      for (const fc of (bm.financialCategories || [])) {
-        const dreCat = fcToDre[String(fc.financialCategoryId)];
-        if (!dreCat) continue;
-        const amount = Math.abs(bm.bankMovementAmount);
+    // PRIMARY SOURCE: Excel data from database (matches Power BI exactly)
+    if (excelSupplementary && Object.keys(excelSupplementary).length > 0) {
+      for (const [fcId, data] of Object.entries(excelSupplementary)) {
+        const excelItem = data as { name: string; amount: number; dreCategory: string };
+        // Use dreCategory from Excel if available, otherwise look up in mappings
+        const dreCat = excelItem.dreCategory || fcToDre[fcId];
+        if (!dreCat || !accum[dreCat]) continue;
         const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-        addToAccum(dreCat, String(fc.financialCategoryId), fc.financialCategoryName, amount * sign, "Movimento Bancario");
+        addToAccum(dreCat, fcId, excelItem.name, excelItem.amount * sign, "Excel/Power BI");
       }
-    }
+    } else {
+      // FALLBACK: Sienge API data (when Excel data not available)
+      const matchesFilters = (date: string, companyName: string) => {
+        if (!date) return false;
+        const year = date.substring(0, 4);
+        const month = date.substring(5, 7);
+        if (selectedYears.size > 0 && !selectedYears.has(year)) return false;
+        if (selectedMonths.size > 0 && !selectedMonths.has(month)) return false;
+        if (selectedCompanies.size > 0 && !selectedCompanies.has(companyName)) return false;
+        return true;
+      };
 
-    // Supplement with Excel data: for mapped accounts with R$0 from Sienge, use Excel values
-    if (excelSupplementary) {
-      for (const [cat, mappedAccounts] of Object.entries(dreMappings)) {
-        if (!accum[cat]) continue;
-        for (const acc of mappedAccounts) {
-          const fcId = String(acc.financialPlanId);
-          const currentAmount = accum[cat].accounts[fcId]?.amount || 0;
-          if (currentAmount === 0 && excelSupplementary[fcId]) {
-            const excelAmount = excelSupplementary[fcId].amount;
-            if (excelAmount !== 0) {
-              addToAccum(cat, fcId, acc.financialPlanName || excelSupplementary[fcId].name, excelAmount, "Fonte: Excel");
-            }
+      for (const item of outcomeItems) {
+        for (const payment of (item.payments || [])) {
+          if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
+          for (const pc of (item.paymentsCategories || [])) {
+            const dreCat = fcToDre[String(pc.financialCategoryId)];
+            if (!dreCat) continue;
+            const rate = (pc.financialCategoryRate || 100) / 100;
+            const allocated = payment.netAmount * rate;
+            const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
+            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign, item.creditorName || "");
           }
+        }
+      }
+
+      for (const item of incomeItems) {
+        const pcs = item.paymentsCategories || [];
+        if (pcs.length === 0) continue;
+        const matchingPcs = pcs.filter(pc => fcToDre[String(pc.financialCategoryId)]);
+        if (matchingPcs.length === 0) continue;
+        for (const payment of (item.payments || [])) {
+          const amount = payment.netAmount || 0;
+          if (amount <= 0) continue;
+          if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
+          for (const pc of matchingPcs) {
+            const dreCat = fcToDre[String(pc.financialCategoryId)];
+            if (!dreCat) continue;
+            const rate = (pc.financialCategoryRate || 100) / 100;
+            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, amount * rate, item.clientName || "");
+          }
+        }
+      }
+
+      for (const bm of bankFees) {
+        if (!bm.bankMovementDate) continue;
+        if (selectedYears.size > 0 && !selectedYears.has(bm.bankMovementDate.substring(0, 4))) continue;
+        if (selectedMonths.size > 0 && !selectedMonths.has(bm.bankMovementDate.substring(5, 7))) continue;
+        if (selectedCompanies.size > 0 && !selectedCompanies.has(bm.companyName)) continue;
+        for (const fc of (bm.financialCategories || [])) {
+          const dreCat = fcToDre[String(fc.financialCategoryId)];
+          if (!dreCat) continue;
+          const amount = Math.abs(bm.bankMovementAmount);
+          const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
+          addToAccum(dreCat, String(fc.financialCategoryId), fc.financialCategoryName, amount * sign, "Movimento Bancario");
         }
       }
     }

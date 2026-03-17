@@ -455,41 +455,49 @@ export async function deleteDreMapping(dreCategory: string, financialPlanId: str
   );
 }
 
-// ─── DRE Excel Supplementary Cache ────────────────────────────────────────────
+// ─── DRE Excel Data (primary source, per company) ────────────────────────────
 
-export interface DreExcelSupplementaryRow {
-  year: string;
+export interface DreExcelAccount {
   financialPlanId: string;
   financialPlanName: string;
+  dreCategory: string;
   amount: number;
+  companyName: string;
 }
 
-export async function getDreExcelSupplementary(year: string): Promise<Record<string, { name: string; amount: number }>> {
-  const { rows } = await pool.query(
-    `SELECT financial_plan_id, financial_plan_name, amount
-     FROM dre_excel_supplementary WHERE year = $1`,
-    [year]
-  );
-  const map: Record<string, { name: string; amount: number }> = {};
-  for (const row of rows) {
-    map[row.financial_plan_id] = {
-      name: row.financial_plan_name,
-      amount: parseFloat(row.amount),
-    };
+export async function getDreExcelData(year: string, companyNames?: string[]): Promise<DreExcelAccount[]> {
+  let query = `SELECT financial_plan_id AS "financialPlanId", financial_plan_name AS "financialPlanName",
+                      dre_category AS "dreCategory", amount, company_name AS "companyName"
+               FROM dre_excel_supplementary WHERE year = $1`;
+  const params: (string | string[])[] = [year];
+
+  if (companyNames && companyNames.length > 0) {
+    query += ` AND company_name = ANY($2)`;
+    params.push(companyNames);
   }
-  return map;
+
+  const { rows } = await pool.query(query, params);
+  return rows.map(r => ({ ...r, amount: parseFloat(r.amount) }));
 }
 
-export async function saveDreExcelSupplementary(year: string, accounts: { financialPlanId: string; financialPlanName: string; amount: number }[]) {
-  // Delete old data for the year
+export async function saveDreExcelData(year: string, accounts: {
+  companyId: string;
+  companyName: string;
+  financialPlanId: string;
+  financialPlanName: string;
+  dreCategory: string;
+  amount: number;
+}[]) {
   await pool.query(`DELETE FROM dre_excel_supplementary WHERE year = $1`, [year]);
-  // Insert new data
   for (const acc of accounts) {
     if (acc.amount === 0) continue;
     await pool.query(
-      `INSERT INTO dre_excel_supplementary (year, financial_plan_id, financial_plan_name, amount)
-       VALUES ($1, $2, $3, $4)`,
-      [year, acc.financialPlanId, acc.financialPlanName, acc.amount]
+      `INSERT INTO dre_excel_supplementary (year, company_id, company_name, financial_plan_id, financial_plan_name, dre_category, amount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (year, company_id, financial_plan_id) DO UPDATE SET
+         amount = dre_excel_supplementary.amount + $7,
+         cached_at = NOW()`,
+      [year, acc.companyId, acc.companyName, acc.financialPlanId, acc.financialPlanName, acc.dreCategory, acc.amount]
     );
   }
 }
