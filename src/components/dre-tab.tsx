@@ -245,8 +245,8 @@ export function DreTab({
         // Use dreCategory from Excel if available, otherwise look up in mappings
         const dreCat = excelItem.dreCategory || fcToDre[fcId];
         if (!dreCat || !accum[dreCat]) continue;
-        const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-        addToAccum(dreCat, fcId, excelItem.name, excelItem.amount * sign, "Excel/Power BI");
+        // Excel data already has correct accounting signs (negative for expenses)
+        addToAccum(dreCat, fcId, excelItem.name, excelItem.amount, "Excel/Power BI");
       }
     } else {
       // FALLBACK: Sienge API data (when Excel data not available)
