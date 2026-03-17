@@ -455,7 +455,7 @@ export async function deleteDreMapping(dreCategory: string, financialPlanId: str
   );
 }
 
-// ─── DRE Excel Data (primary source, per company) ────────────────────────────
+// ─── DRE Excel Data (primary source, per company, per month) ─────────────────
 
 export interface DreExcelAccount {
   financialPlanId: string;
@@ -463,17 +463,26 @@ export interface DreExcelAccount {
   dreCategory: string;
   amount: number;
   companyName: string;
+  month: string;
 }
 
-export async function getDreExcelData(year: string, companyNames?: string[]): Promise<DreExcelAccount[]> {
+export async function getDreExcelData(year: string, companyNames?: string[], months?: string[]): Promise<DreExcelAccount[]> {
   let query = `SELECT financial_plan_id AS "financialPlanId", financial_plan_name AS "financialPlanName",
-                      dre_category AS "dreCategory", amount, company_name AS "companyName"
+                      dre_category AS "dreCategory", amount, company_name AS "companyName", month
                FROM dre_excel_supplementary WHERE year = $1`;
   const params: (string | string[])[] = [year];
+  let paramIdx = 2;
 
   if (companyNames && companyNames.length > 0) {
-    query += ` AND company_name = ANY($2)`;
+    query += ` AND company_name = ANY($${paramIdx})`;
     params.push(companyNames);
+    paramIdx++;
+  }
+
+  if (months && months.length > 0) {
+    query += ` AND month = ANY($${paramIdx})`;
+    params.push(months);
+    paramIdx++;
   }
 
   const { rows } = await pool.query(query, params);
@@ -487,17 +496,18 @@ export async function saveDreExcelData(year: string, accounts: {
   financialPlanName: string;
   dreCategory: string;
   amount: number;
+  month: string;
 }[]) {
   await pool.query(`DELETE FROM dre_excel_supplementary WHERE year = $1`, [year]);
   for (const acc of accounts) {
     if (acc.amount === 0) continue;
     await pool.query(
-      `INSERT INTO dre_excel_supplementary (year, company_id, company_name, financial_plan_id, financial_plan_name, dre_category, amount)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (year, company_id, financial_plan_id) DO UPDATE SET
-         amount = dre_excel_supplementary.amount + $7,
+      `INSERT INTO dre_excel_supplementary (year, month, company_id, company_name, financial_plan_id, financial_plan_name, dre_category, amount)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (year, month, company_id, financial_plan_id) DO UPDATE SET
+         amount = dre_excel_supplementary.amount + $8,
          cached_at = NOW()`,
-      [year, acc.companyId, acc.companyName, acc.financialPlanId, acc.financialPlanName, acc.dreCategory, acc.amount]
+      [year, acc.month, acc.companyId, acc.companyName, acc.financialPlanId, acc.financialPlanName, acc.dreCategory, acc.amount]
     );
   }
 }

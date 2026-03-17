@@ -1,17 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDreExcelData, saveDreExcelData } from "@/lib/db";
 
-// GET: Fetch DRE data from Excel cache, optionally filtered by companies
+// GET: Fetch DRE data from Excel cache, optionally filtered by companies and months
+// Supports ?monthly=true to return per-month breakdown for DRE Completa view
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const year = searchParams.get("year") || String(new Date().getFullYear());
-  const companiesParam = searchParams.get("companies"); // comma-separated company names
+  const companiesParam = searchParams.get("companies");
+  const monthsParam = searchParams.get("months");
+  const monthly = searchParams.get("monthly") === "true";
 
   try {
     const companyNames = companiesParam ? companiesParam.split(",").map(s => s.trim()) : undefined;
-    const rows = await getDreExcelData(year, companyNames);
+    const months = monthsParam ? monthsParam.split(",").map(s => s.trim()) : undefined;
+    const rows = await getDreExcelData(year, companyNames, months);
 
-    // Aggregate by financial plan ID (sum across companies)
+    if (monthly) {
+      // Return per-month breakdown: { fcId: { name, dreCategory, months: { "01": amount, "02": amount, ... } } }
+      const byAccount: Record<string, { name: string; dreCategory: string; months: Record<string, number> }> = {};
+      for (const row of rows) {
+        const key = row.financialPlanId;
+        if (!byAccount[key]) {
+          byAccount[key] = { name: row.financialPlanName, dreCategory: row.dreCategory, months: {} };
+        }
+        byAccount[key].months[row.month] = (byAccount[key].months[row.month] || 0) + row.amount;
+      }
+      return NextResponse.json({ data: byAccount, year, monthly: true, rowCount: rows.length });
+    }
+
+    // Default: aggregate all months into yearly total (backwards compatible)
     const byAccount: Record<string, { name: string; amount: number; dreCategory: string }> = {};
     for (const row of rows) {
       const key = row.financialPlanId;

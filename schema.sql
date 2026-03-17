@@ -181,9 +181,13 @@ CREATE TABLE IF NOT EXISTS dre_mappings (
   UNIQUE(dre_category, financial_plan_id)
 );
 
--- ── Dados DRE do Excel (fonte principal, por empresa) ──────────────────────────
+-- ── Dados DRE do Excel (fonte principal, por empresa, por mês) ──────────────────
+-- Migration: drop old table (no month column) and recreate with month in PK
+-- Data will be repopulated by sync script (node scripts/sync-excel-to-production.js)
+DROP TABLE IF EXISTS dre_excel_supplementary;
 CREATE TABLE IF NOT EXISTS dre_excel_supplementary (
   year                VARCHAR(4)   NOT NULL,
+  month               VARCHAR(2)   NOT NULL DEFAULT '00',
   company_id          VARCHAR(10)  NOT NULL DEFAULT '',
   company_name        VARCHAR(200) NOT NULL DEFAULT '',
   financial_plan_id   VARCHAR(20)  NOT NULL,
@@ -191,9 +195,10 @@ CREATE TABLE IF NOT EXISTS dre_excel_supplementary (
   dre_category        VARCHAR(50)  NOT NULL DEFAULT '',
   amount              NUMERIC(18,2) NOT NULL DEFAULT 0,
   cached_at           TIMESTAMP NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (year, company_id, financial_plan_id)
+  PRIMARY KEY (year, month, company_id, financial_plan_id)
 );
 CREATE INDEX IF NOT EXISTS idx_dre_excel_supp_year ON dre_excel_supplementary(year);
+CREATE INDEX IF NOT EXISTS idx_dre_excel_supp_year_month ON dre_excel_supplementary(year, month);
 
 -- =============================================================================
 -- Índices para performance

@@ -88,6 +88,12 @@ const KPI_LINES = [
   { key: "variacao_caixa", label: "Variacao de Caixa" },
 ];
 
+const MONTH_NAMES: Record<string, string> = {
+  "01": "jan", "02": "fev", "03": "mar", "04": "abr",
+  "05": "mai", "06": "jun", "07": "jul", "08": "ago",
+  "09": "set", "10": "out", "11": "nov", "12": "dez",
+};
+
 // Detail record for level 3 (creditor/client within a financial account)
 interface AccountDetail {
   name: string;
@@ -126,6 +132,9 @@ export function DreTab({
   const [showExcel, setShowExcel] = useState(false);
   // Excel as supplementary data source for accounts not available in Sienge API
   const [excelSupplementary, setExcelSupplementary] = useState<Record<string, { name: string; amount: number }> | null>(null);
+  // Monthly data for DRE Completa view
+  const [monthlyData, setMonthlyData] = useState<Record<string, { name: string; dreCategory: string; months: Record<string, number> }> | null>(null);
+  const [loadingMonthly, setLoadingMonthly] = useState(false);
 
   useEffect(() => {
     fetch("/api/dre-mappings")
@@ -169,6 +178,47 @@ export function DreTab({
       }
     });
   }, [selectedYears, selectedCompanies]);
+
+  // Fetch monthly breakdown for DRE Completa view
+  useEffect(() => {
+    if (dreMode !== "completa" || selectedYears.size === 0) {
+      setMonthlyData(null);
+      return;
+    }
+    setLoadingMonthly(true);
+    const years = Array.from(selectedYears);
+    const companiesQuery = selectedCompanies.size > 0
+      ? `&companies=${encodeURIComponent(Array.from(selectedCompanies).join(","))}`
+      : "";
+    const monthsQuery = selectedMonths.size > 0
+      ? `&months=${encodeURIComponent(Array.from(selectedMonths).join(","))}`
+      : "";
+
+    Promise.all(
+      years.map(year =>
+        fetch(`/api/dre-supplementary?year=${year}&monthly=true${companiesQuery}${monthsQuery}`)
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      )
+    ).then(results => {
+      const merged: Record<string, { name: string; dreCategory: string; months: Record<string, number> }> = {};
+      for (const json of results) {
+        if (!json?.data) continue;
+        const year = json.year as string;
+        for (const [fcId, item] of Object.entries(json.data)) {
+          const d = item as { name: string; dreCategory: string; months: Record<string, number> };
+          if (!merged[fcId]) {
+            merged[fcId] = { name: d.name, dreCategory: d.dreCategory, months: {} };
+          }
+          for (const [m, amt] of Object.entries(d.months)) {
+            const key = `${m}/${year}`;
+            merged[fcId].months[key] = (merged[fcId].months[key] || 0) + amt;
+          }
+        }
+      }
+      setMonthlyData(Object.keys(merged).length > 0 ? merged : null);
+    }).finally(() => setLoadingMonthly(false));
+  }, [dreMode, selectedYears, selectedCompanies, selectedMonths]);
 
   const fetchExcelData = useCallback(async () => {
     if (selectedYears.size === 0) return;
@@ -546,6 +596,185 @@ export function DreTab({
             </div>
           </div>
 
+          {dreMode === "completa" ? (
+            /* ══════ DRE COMPLETA: Monthly columns ══════ */
+            (() => {
+              if (loadingMonthly) return (
+                <div className="flex items-center justify-center py-12 gap-2 text-slate-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span className="text-sm">Carregando dados mensais...</span>
+                </div>
+              );
+              if (!monthlyData) return (
+                <div className="py-12 text-center text-sm text-slate-400">
+                  Nenhum dado mensal disponivel para o periodo selecionado.
+                </div>
+              );
+
+              // Determine which month columns exist in the data
+              const allMonthKeys = new Set<string>();
+              for (const item of Object.values(monthlyData)) {
+                for (const k of Object.keys(item.months)) allMonthKeys.add(k);
+              }
+              const monthCols = Array.from(allMonthKeys).sort((a, b) => {
+                const [ma, ya] = a.split("/");
+                const [mb, yb] = b.split("/");
+                return ya === yb ? ma.localeCompare(mb) : ya.localeCompare(yb);
+              });
+
+              // Build per-category, per-month totals
+              const catMonthTotals: Record<string, Record<string, number>> = {};
+              for (const cat of DRE_INPUT_CATEGORIES) catMonthTotals[cat] = {};
+              for (const [, item] of Object.entries(monthlyData)) {
+                const cat = item.dreCategory;
+                if (!catMonthTotals[cat]) continue;
+                for (const [m, amt] of Object.entries(item.months)) {
+                  catMonthTotals[cat][m] = (catMonthTotals[cat][m] || 0) + amt;
+                }
+              }
+
+              // Calculated lines per month
+              const calcMonth = (key: string, m: string): number => {
+                const get = (k: string) => catMonthTotals[k]?.[m] || 0;
+                switch (key) {
+                  case "lucro_bruto": return get("receita_operacional") + get("custo_variavel");
+                  case "lucro_operacional": return calcMonth("lucro_bruto", m) + get("custo_fixo");
+                  case "lucro_liquido": return calcMonth("lucro_operacional", m) + get("despesas_financeiras") + get("despesas_tributarias");
+                  case "saldo": return calcMonth("lucro_liquido", m) + get("imobilizacoes") + get("retiradas");
+                  case "variacao_caixa": return calcMonth("saldo", m) + get("entradas_nao_operacionais") + get("saidas_nao_operacionais");
+                  default: return 0;
+                }
+              };
+
+              const getLineMonthVal = (line: DreLineConfig, m: string): number => {
+                if (line.type === "calculated") return calcMonth(line.key, m);
+                return catMonthTotals[line.key]?.[m] || 0;
+              };
+
+              const getLineTotal = (line: DreLineConfig): number => {
+                return monthCols.reduce((sum, m) => sum + getLineMonthVal(line, m), 0);
+              };
+
+              const fmtVal = (v: number) => {
+                const formatted = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v));
+                return v < 0 ? `-${formatted}` : formatted;
+              };
+
+              const colWidth = `${Math.max(100, Math.floor(700 / monthCols.length))}px`;
+
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="bg-slate-800 text-white">
+                        <th className="text-left px-4 py-2.5 font-semibold sticky left-0 bg-slate-800 min-w-[220px]">CONTA</th>
+                        {monthCols.map(m => {
+                          const [month, year] = m.split("/");
+                          return (
+                            <th key={m} className="text-right px-3 py-2.5 font-semibold" style={{ minWidth: colWidth }}>
+                              {MONTH_NAMES[month]}-{year}
+                            </th>
+                          );
+                        })}
+                        <th className="text-right px-4 py-2.5 font-bold min-w-[120px]">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {DRE_LINES.map((line, idx) => {
+                        const isCalc = line.type === "calculated";
+                        const total = getLineTotal(line);
+                        const isExpanded = expandedCategories.has(line.key);
+                        const lineAccounts = !isCalc && monthlyData
+                          ? Object.entries(monthlyData).filter(([, d]) => d.dreCategory === line.key)
+                          : [];
+                        const canExpand = !isCalc && lineAccounts.length > 0;
+
+                        return (
+                          <React.Fragment key={line.key}>
+                            <tr
+                              className={`${
+                                isCalc
+                                  ? total < 0
+                                    ? "bg-red-50 font-bold"
+                                    : "bg-teal-50 font-bold"
+                                  : idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"
+                              } ${canExpand ? "cursor-pointer hover:bg-slate-100" : ""}`}
+                              onClick={canExpand ? () => toggleExpand(line.key) : undefined}
+                            >
+                              <td className={`px-4 py-2 sticky left-0 ${
+                                isCalc
+                                  ? total < 0 ? "bg-red-50 text-red-700" : "bg-teal-50 text-teal-800"
+                                  : idx % 2 === 0 ? "bg-white" : "bg-slate-50"
+                              }`}>
+                                <div className="flex items-center gap-1">
+                                  {canExpand && (
+                                    isExpanded
+                                      ? <ChevronDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
+                                      : <ChevronRight className="h-3 w-3 text-slate-400 flex-shrink-0" />
+                                  )}
+                                  <span className={isCalc ? "" : "font-medium text-slate-700"}>
+                                    {line.label}
+                                  </span>
+                                </div>
+                              </td>
+                              {monthCols.map(m => {
+                                const v = getLineMonthVal(line, m);
+                                return (
+                                  <td key={m} className={`text-right px-3 py-2 tabular-nums ${
+                                    isCalc
+                                      ? v < 0 ? "text-red-700" : "text-teal-800"
+                                      : v < 0 ? "text-red-600" : "text-slate-800"
+                                  }`}>
+                                    {v !== 0 ? fmtVal(v) : ""}
+                                  </td>
+                                );
+                              })}
+                              <td className={`text-right px-4 py-2 font-bold tabular-nums ${
+                                isCalc
+                                  ? total < 0 ? "text-red-700" : "text-teal-800"
+                                  : total < 0 ? "text-red-600" : "text-slate-900"
+                              }`}>
+                                {fmtVal(total)}
+                              </td>
+                            </tr>
+                            {/* Expanded sub-accounts */}
+                            {isExpanded && lineAccounts.map(([fcId, acctData]) => {
+                              const acctTotal = Object.values(acctData.months).reduce((s, v) => s + v, 0);
+                              return (
+                                <tr key={fcId} className="bg-slate-50/80">
+                                  <td className="px-4 py-1.5 pl-8 sticky left-0 bg-slate-50/80 text-slate-600">
+                                    <span className="text-slate-400 font-mono mr-1.5">{fcId}</span>
+                                    {acctData.name}
+                                  </td>
+                                  {monthCols.map(m => {
+                                    const v = acctData.months[m] || 0;
+                                    return (
+                                      <td key={m} className={`text-right px-3 py-1.5 tabular-nums ${
+                                        v < 0 ? "text-red-500" : "text-slate-600"
+                                      }`}>
+                                        {v !== 0 ? fmtVal(v) : ""}
+                                      </td>
+                                    );
+                                  })}
+                                  <td className={`text-right px-4 py-1.5 font-medium tabular-nums ${
+                                    acctTotal < 0 ? "text-red-600" : "text-slate-700"
+                                  }`}>
+                                    {fmtVal(acctTotal)}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              );
+            })()
+          ) : (
+            /* ══════ DRE SIMPLES: Original view ══════ */
+            <>
           {/* Table Header */}
           <div className={`grid items-center px-6 py-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider ${
             showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
@@ -730,6 +959,8 @@ export function DreTab({
               );
             })}
           </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
