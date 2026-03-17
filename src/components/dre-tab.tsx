@@ -135,23 +135,18 @@ export function DreTab({
       .finally(() => setLoadingMappings(false));
   }, []);
 
-  // Auto-fetch Excel data as supplementary source for accounts missing from Sienge API
+  // Auto-fetch supplementary DRE data from database (synced from Excel locally)
   useEffect(() => {
     if (selectedYears.size === 0) return;
     const year = Array.from(selectedYears).sort().pop();
-    fetch(`/api/dre-excel-validation?year=${year}`)
+    fetch(`/api/dre-supplementary?year=${year}`)
       .then(r => r.ok ? r.json() : null)
       .then(json => {
-        if (!json) return;
-        const byAccount: Record<string, { name: string; amount: number }> = {};
-        for (const acc of json.accounts || []) {
-          const siengeId = acc.accountId.replace(/\./g, "");
-          byAccount[siengeId] = {
-            name: acc.accountName,
-            amount: (byAccount[siengeId]?.amount || 0) + acc.yearTotal,
-          };
+        if (!json?.data || Object.keys(json.data).length === 0) {
+          setExcelSupplementary(null);
+          return;
         }
-        setExcelSupplementary(byAccount);
+        setExcelSupplementary(json.data);
       })
       .catch(() => setExcelSupplementary(null));
   }, [selectedYears]);
