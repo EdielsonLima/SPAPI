@@ -51,7 +51,8 @@ function parseExcel(year: string, companyFilter?: string) {
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const XLSX = require("xlsx");
-  const wb = XLSX.readFile(EXCEL_PATH);
+  const fileBuffer = fs.readFileSync(EXCEL_PATH);
+  const wb = XLSX.read(fileBuffer);
   const ws = wb.Sheets[wb.SheetNames[0]];
   const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
