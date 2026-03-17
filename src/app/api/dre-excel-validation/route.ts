@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const XLSX = require("xlsx");
 import fs from "fs";
 
 export const maxDuration = 30; // allow up to 30s for large Excel parsing
@@ -53,6 +51,8 @@ function parseExcel(year: string, companyFilter?: string) {
     throw new Error(`Excel file not found: ${EXCEL_PATH}`);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const XLSX = require("xlsx");
   const wb = XLSX.readFile(EXCEL_PATH);
   const ws = wb.Sheets[wb.SheetNames[0]];
   const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
