@@ -182,6 +182,7 @@ CREATE TABLE IF NOT EXISTS dre_mappings (
 );
 
 -- ── Dados DRE do Excel (fonte principal, por empresa) ──────────────────────────
+DROP TABLE IF EXISTS dre_excel_supplementary;
 CREATE TABLE IF NOT EXISTS dre_excel_supplementary (
   year                VARCHAR(4)   NOT NULL,
   company_id          VARCHAR(10)  NOT NULL DEFAULT '',
