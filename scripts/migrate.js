@@ -36,6 +36,31 @@ async function migrate() {
     console.log("[migrate] Running schema.sql...");
     await pool.query(sql);
     console.log("[migrate] Done — all tables ready.");
+
+    // Migration: ensure dre_excel_supplementary has month column in PK
+    try {
+      const { rows } = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'dre_excel_supplementary' AND column_name = 'month'
+      `);
+      if (rows.length === 0) {
+        console.log("[migrate] Adding month column to dre_excel_supplementary...");
+        await pool.query(`ALTER TABLE dre_excel_supplementary ADD COLUMN month VARCHAR(2) NOT NULL DEFAULT '00'`);
+      }
+      // Check if PK includes month (4 columns = correct, 3 = old)
+      const pkCols = await pool.query(`
+        SELECT COUNT(*) as cnt FROM information_schema.key_column_usage
+        WHERE table_name = 'dre_excel_supplementary' AND constraint_name LIKE '%pkey%'
+      `);
+      if (parseInt(pkCols.rows[0].cnt) < 4) {
+        console.log("[migrate] Recreating PK with month column...");
+        await pool.query(`ALTER TABLE dre_excel_supplementary DROP CONSTRAINT IF EXISTS dre_excel_supplementary_pkey`);
+        await pool.query(`ALTER TABLE dre_excel_supplementary ADD PRIMARY KEY (year, month, company_id, financial_plan_id)`);
+        console.log("[migrate] PK updated successfully.");
+      }
+    } catch (pkErr) {
+      console.log("[migrate] PK migration note:", pkErr.message);
+    }
   } catch (err) {
     console.error("[migrate] Error:", err.message);
     process.exit(1);

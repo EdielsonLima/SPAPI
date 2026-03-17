@@ -498,15 +498,24 @@ export async function saveDreExcelData(year: string, accounts: {
   amount: number;
   month: string;
 }[]) {
-  await pool.query(`DELETE FROM dre_excel_supplementary WHERE year = $1`, [year]);
+  // Aggregate duplicates in memory (same year+month+company+account)
+  const agg = new Map<string, { companyId: string; companyName: string; financialPlanId: string; financialPlanName: string; dreCategory: string; amount: number; month: string }>();
   for (const acc of accounts) {
     if (acc.amount === 0) continue;
+    const key = `${acc.month}|${acc.companyId}|${acc.financialPlanId}`;
+    const existing = agg.get(key);
+    if (existing) {
+      existing.amount += acc.amount;
+    } else {
+      agg.set(key, { ...acc });
+    }
+  }
+
+  await pool.query(`DELETE FROM dre_excel_supplementary WHERE year = $1`, [year]);
+  for (const acc of agg.values()) {
     await pool.query(
       `INSERT INTO dre_excel_supplementary (year, month, company_id, company_name, financial_plan_id, financial_plan_name, dre_category, amount)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       ON CONFLICT (year, month, company_id, financial_plan_id) DO UPDATE SET
-         amount = dre_excel_supplementary.amount + $8,
-         cached_at = NOW()`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [year, acc.month, acc.companyId, acc.companyName, acc.financialPlanId, acc.financialPlanName, acc.dreCategory, acc.amount]
     );
   }
