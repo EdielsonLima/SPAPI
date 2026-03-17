@@ -136,23 +136,38 @@ export function DreTab({
   }, []);
 
   // Fetch DRE data from Excel/DB (primary source, filtered by company)
+  // Fetches ALL selected years in parallel and aggregates results
   useEffect(() => {
     if (selectedYears.size === 0) return;
-    const year = Array.from(selectedYears).sort().pop();
-    let url = `/api/dre-supplementary?year=${year}`;
-    if (selectedCompanies.size > 0) {
-      url += `&companies=${encodeURIComponent(Array.from(selectedCompanies).join(","))}`;
-    }
-    fetch(url)
-      .then(r => r.ok ? r.json() : null)
-      .then(json => {
-        if (!json?.data || Object.keys(json.data).length === 0) {
-          setExcelSupplementary(null);
-          return;
+    const years = Array.from(selectedYears);
+    const companiesQuery = selectedCompanies.size > 0
+      ? `&companies=${encodeURIComponent(Array.from(selectedCompanies).join(","))}`
+      : "";
+
+    Promise.all(
+      years.map(year =>
+        fetch(`/api/dre-supplementary?year=${year}${companiesQuery}`)
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      )
+    ).then(results => {
+      const merged: Record<string, { name: string; amount: number; dreCategory: string }> = {};
+      for (const json of results) {
+        if (!json?.data) continue;
+        for (const [fcId, item] of Object.entries(json.data)) {
+          const d = item as { name: string; amount: number; dreCategory: string };
+          if (!merged[fcId]) {
+            merged[fcId] = { name: d.name, amount: 0, dreCategory: d.dreCategory };
+          }
+          merged[fcId].amount += d.amount;
         }
-        setExcelSupplementary(json.data);
-      })
-      .catch(() => setExcelSupplementary(null));
+      }
+      if (Object.keys(merged).length === 0) {
+        setExcelSupplementary(null);
+      } else {
+        setExcelSupplementary(merged);
+      }
+    });
   }, [selectedYears, selectedCompanies]);
 
   const fetchExcelData = useCallback(async () => {
