@@ -124,6 +124,8 @@ export function DreTab({
   const [excelCategoryTotals, setExcelCategoryTotals] = useState<Record<string, number> | null>(null);
   const [loadingExcel, setLoadingExcel] = useState(false);
   const [showExcel, setShowExcel] = useState(false);
+  // Excel as supplementary data source for accounts not available in Sienge API
+  const [excelSupplementary, setExcelSupplementary] = useState<Record<string, { name: string; amount: number }> | null>(null);
 
   useEffect(() => {
     fetch("/api/dre-mappings")
@@ -132,6 +134,27 @@ export function DreTab({
       .catch(() => {})
       .finally(() => setLoadingMappings(false));
   }, []);
+
+  // Auto-fetch Excel data as supplementary source for accounts missing from Sienge API
+  useEffect(() => {
+    if (selectedYears.size === 0) return;
+    const year = Array.from(selectedYears).sort().pop();
+    fetch(`/api/dre-excel-validation?year=${year}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (!json) return;
+        const byAccount: Record<string, { name: string; amount: number }> = {};
+        for (const acc of json.accounts || []) {
+          const siengeId = acc.accountId.replace(/\./g, "");
+          byAccount[siengeId] = {
+            name: acc.accountName,
+            amount: (byAccount[siengeId]?.amount || 0) + acc.yearTotal,
+          };
+        }
+        setExcelSupplementary(byAccount);
+      })
+      .catch(() => setExcelSupplementary(null));
+  }, [selectedYears]);
 
   const fetchExcelData = useCallback(async () => {
     if (selectedYears.size === 0) return;
@@ -284,6 +307,23 @@ export function DreTab({
       }
     }
 
+    // Supplement with Excel data: for mapped accounts with R$0 from Sienge, use Excel values
+    if (excelSupplementary) {
+      for (const [cat, mappedAccounts] of Object.entries(dreMappings)) {
+        if (!accum[cat]) continue;
+        for (const acc of mappedAccounts) {
+          const fcId = String(acc.financialPlanId);
+          const currentAmount = accum[cat].accounts[fcId]?.amount || 0;
+          if (currentAmount === 0 && excelSupplementary[fcId]) {
+            const excelAmount = excelSupplementary[fcId].amount;
+            if (excelAmount !== 0) {
+              addToAccum(cat, fcId, acc.financialPlanName || excelSupplementary[fcId].name, excelAmount, "Fonte: Excel");
+            }
+          }
+        }
+      }
+    }
+
     // Compute calculated lines
     const lucroBruto = accum.receita_operacional.total + accum.custo_variavel.total;
     const lucroOperacional = lucroBruto + accum.custo_fixo.total;
@@ -300,7 +340,7 @@ export function DreTab({
     };
 
     return { accum, calculated, receitaOperacional: accum.receita_operacional.total };
-  }, [dreMappings, outcomeItems, incomeItems, bankFees, selectedYears, selectedMonths, selectedCompanies]);
+  }, [dreMappings, outcomeItems, incomeItems, bankFees, selectedYears, selectedMonths, selectedCompanies, excelSupplementary]);
 
   if (loadingMappings) {
     return (
