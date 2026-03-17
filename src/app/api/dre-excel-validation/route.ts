@@ -79,7 +79,7 @@ function parseExcel(year: string, companyFilter?: string) {
     const colMappings: ColMonthMapping[] = [];
     for (const col of DATA_COLS) {
       const header = String(row[col]).trim();
-      const match = header.match(/^(\w+)\/(\d{4})$/);
+      const match = header.match(/^([^/]+)\/(\d{4})$/);
       if (match && match[2] === year) {
         const monthIdx = MONTH_MAP[match[1]];
         if (monthIdx !== undefined) {
