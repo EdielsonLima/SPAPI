@@ -182,9 +182,8 @@ CREATE TABLE IF NOT EXISTS dre_mappings (
 );
 
 -- ── Dados DRE do Excel (fonte principal, por empresa, por mês) ──────────────────
--- Migration: drop old table (no month column) and recreate with month in PK
--- Data will be repopulated by sync script (node scripts/sync-excel-to-production.js)
-DROP TABLE IF EXISTS dre_excel_supplementary;
+-- NOTE: Do NOT drop this table — it contains synced Excel data repopulated by sync script
+-- To migrate schema, use ALTER TABLE instead of DROP+CREATE
 CREATE TABLE IF NOT EXISTS dre_excel_supplementary (
   year                VARCHAR(4)   NOT NULL,
   month               VARCHAR(2)   NOT NULL DEFAULT '00',
