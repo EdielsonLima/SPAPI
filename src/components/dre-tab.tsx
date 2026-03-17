@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge";
 import { formatCurrency } from "@/lib/dashboard-utils";
+import { toast } from "sonner";
 
 interface DreMappingItem {
   financialPlanId: string;
@@ -155,7 +156,9 @@ export function DreTab({
       }
       setExcelCategoryTotals(byCat);
       setShowExcel(true);
-    } catch {
+    } catch (err) {
+      console.error("Excel validation error:", err);
+      toast.error("Erro ao carregar dados do Excel. Verifique se o arquivo existe e o servidor foi reiniciado.");
       setExcelData(null);
       setExcelCategoryTotals(null);
     } finally {

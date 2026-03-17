@@ -1,20 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import * as XLSX from "xlsx";
-import * as fs from "fs";
-import * as path from "path";
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const XLSX = require("xlsx");
+import fs from "fs";
 
-const EXCEL_PATH = path.join(
-  "C:",
-  "Users",
-  "Usuario",
-  "OneDrive - DTCONSULTORIAS",
-  "SILVA PACKER",
-  "DRE",
-  "SP",
-  "DEMOSTRATIVO RESULTADO COMPLETO.xlsx"
-);
+export const maxDuration = 30; // allow up to 30s for large Excel parsing
+
+const EXCEL_PATH = "C:\\Users\\Usuario\\OneDrive - DTCONSULTORIAS\\SILVA PACKER\\DRE\\SP\\DEMOSTRATIVO RESULTADO COMPLETO.xlsx";
 
 // Months in the Jan-Sep section: col indices in the row array
 const JAN_SEP_COLS = [6, 8, 9, 11, 12, 14, 15, 16, 17];
