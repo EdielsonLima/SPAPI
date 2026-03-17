@@ -260,12 +260,18 @@ export function DreTab({
 
     // PRIMARY SOURCE: Excel data from database (matches Power BI exactly)
     if (excelSupplementary && Object.keys(excelSupplementary).length > 0) {
-      // Step 1: Populate Level 1+2 totals from Excel (authoritative)
+      // Step 1: Populate Level 1+2 totals from Excel (authoritative, no Level 3 placeholder)
+      const excelFcToDre: Record<string, string> = {};
       for (const [fcId, data] of Object.entries(excelSupplementary)) {
         const excelItem = data as { name: string; amount: number; dreCategory: string };
         const dreCat = excelItem.dreCategory || fcToDre[fcId];
         if (!dreCat || !accum[dreCat]) continue;
-        addToAccum(dreCat, fcId, excelItem.name, excelItem.amount, "");
+        excelFcToDre[fcId] = dreCat;
+        accum[dreCat].total += excelItem.amount;
+        if (!accum[dreCat].accounts[fcId]) {
+          accum[dreCat].accounts[fcId] = { name: excelItem.name, amount: 0, details: {} };
+        }
+        accum[dreCat].accounts[fcId].amount += excelItem.amount;
       }
 
       // Step 2: Enrich Level 3 with Sienge details (creditor/client names)
@@ -277,7 +283,7 @@ export function DreTab({
           for (const pc of (item.paymentsCategories || [])) {
             const fcId = String(pc.financialCategoryId);
             if (!excelFcIds.has(fcId)) continue;
-            const dreCat = fcToDre[fcId];
+            const dreCat = excelFcToDre[fcId] || fcToDre[fcId];
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
             const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
@@ -296,7 +302,7 @@ export function DreTab({
           for (const pc of pcs) {
             const fcId = String(pc.financialCategoryId);
             if (!excelFcIds.has(fcId)) continue;
-            const dreCat = fcToDre[fcId];
+            const dreCat = excelFcToDre[fcId] || fcToDre[fcId];
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
             addDetailOnly(dreCat, fcId, item.clientName || "", amount * rate);
@@ -310,19 +316,10 @@ export function DreTab({
         for (const fc of (bm.financialCategories || [])) {
           const fcId = String(fc.financialCategoryId);
           if (!excelFcIds.has(fcId)) continue;
-          const dreCat = fcToDre[fcId];
+          const dreCat = excelFcToDre[fcId] || fcToDre[fcId];
           if (!dreCat) continue;
           const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
           addDetailOnly(dreCat, fcId, "Movimento Bancario", Math.abs(bm.bankMovementAmount) * sign);
-        }
-      }
-
-      // Step 3: Remove placeholder "Sem identificacao" entries if real details exist
-      for (const cat of Object.values(accum)) {
-        for (const acct of Object.values(cat.accounts)) {
-          if (Object.keys(acct.details).length > 1 && acct.details["Sem identificacao"]) {
-            delete acct.details["Sem identificacao"];
-          }
         }
       }
     } else {
