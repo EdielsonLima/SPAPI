@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { saveDreExcelSupplementary } from "@/lib/db";
 import fs from "fs";
 
 export const maxDuration = 30; // allow up to 30s for large Excel parsing
@@ -206,6 +207,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result);
   } catch (error) {
     console.error("DRE Excel validation error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+// POST: Parse Excel and save supplementary data to database (run locally to sync to DB)
+export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const year = searchParams.get("year") || String(new Date().getFullYear());
+
+  try {
+    const result = parseExcel(year);
+    // Save all accounts to the database
+    const accounts = result.accounts.map((acc: AccountData) => ({
+      financialPlanId: acc.accountId.replace(/\./g, ""),
+      financialPlanName: acc.accountName,
+      amount: acc.yearTotal,
+    }));
+    await saveDreExcelSupplementary(year, accounts);
+    return NextResponse.json({
+      message: `Synced ${accounts.length} accounts for year ${year} to database`,
+      accountCount: accounts.length,
+    });
+  } catch (error) {
+    console.error("DRE Excel sync error:", error);
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json({ error: message }, { status: 500 });
   }

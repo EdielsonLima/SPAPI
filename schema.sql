@@ -181,6 +181,16 @@ CREATE TABLE IF NOT EXISTS dre_mappings (
   UNIQUE(dre_category, financial_plan_id)
 );
 
+-- ── Dados Suplementares DRE (Excel → DB para contas sem dados na API Sienge) ──
+CREATE TABLE IF NOT EXISTS dre_excel_supplementary (
+  year                VARCHAR(4)   NOT NULL,
+  financial_plan_id   VARCHAR(20)  NOT NULL,
+  financial_plan_name VARCHAR(200) NOT NULL,
+  amount              NUMERIC(18,2) NOT NULL DEFAULT 0,
+  cached_at           TIMESTAMP NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (year, financial_plan_id)
+);
+
 -- =============================================================================
 -- Índices para performance
 -- =============================================================================

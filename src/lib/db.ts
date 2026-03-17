@@ -455,6 +455,45 @@ export async function deleteDreMapping(dreCategory: string, financialPlanId: str
   );
 }
 
+// ─── DRE Excel Supplementary Cache ────────────────────────────────────────────
+
+export interface DreExcelSupplementaryRow {
+  year: string;
+  financialPlanId: string;
+  financialPlanName: string;
+  amount: number;
+}
+
+export async function getDreExcelSupplementary(year: string): Promise<Record<string, { name: string; amount: number }>> {
+  const { rows } = await pool.query(
+    `SELECT financial_plan_id, financial_plan_name, amount
+     FROM dre_excel_supplementary WHERE year = $1`,
+    [year]
+  );
+  const map: Record<string, { name: string; amount: number }> = {};
+  for (const row of rows) {
+    map[row.financial_plan_id] = {
+      name: row.financial_plan_name,
+      amount: parseFloat(row.amount),
+    };
+  }
+  return map;
+}
+
+export async function saveDreExcelSupplementary(year: string, accounts: { financialPlanId: string; financialPlanName: string; amount: number }[]) {
+  // Delete old data for the year
+  await pool.query(`DELETE FROM dre_excel_supplementary WHERE year = $1`, [year]);
+  // Insert new data
+  for (const acc of accounts) {
+    if (acc.amount === 0) continue;
+    await pool.query(
+      `INSERT INTO dre_excel_supplementary (year, financial_plan_id, financial_plan_name, amount)
+       VALUES ($1, $2, $3, $4)`,
+      [year, acc.financialPlanId, acc.financialPlanName, acc.amount]
+    );
+  }
+}
+
 // ─── Confirmações de Chegada de Insumos ───────────────────────────────────────
 
 export interface ArrivalConfirmation {
