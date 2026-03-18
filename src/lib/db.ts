@@ -474,8 +474,8 @@ export async function getDreExcelData(year: string, companyNames?: string[], mon
   let paramIdx = 2;
 
   if (companyNames && companyNames.length > 0) {
-    query += ` AND company_name = ANY($${paramIdx})`;
-    params.push(companyNames);
+    query += ` AND LOWER(company_name) = ANY($${paramIdx})`;
+    params.push(companyNames.map(n => n.toLowerCase()));
     paramIdx++;
   }
 
