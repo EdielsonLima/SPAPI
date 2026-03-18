@@ -14,6 +14,9 @@ import {
   BarChart3,
   FileSpreadsheet,
   Loader2,
+  Lightbulb,
+  AlertTriangle,
+  CheckCircle,
 } from "lucide-react";
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge";
 import { formatCurrency } from "@/lib/dashboard-utils";
@@ -786,7 +789,7 @@ export function DreTab({
             /* ══════ DRE SIMPLES: Original view ══════ */
             <>
           {/* Table Header */}
-          <div className={`grid items-center px-6 py-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider ${
+          <div className={`grid items-center px-6 py-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider max-w-4xl ${
             showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
           }`}>
             <span className="w-6" />
@@ -810,7 +813,7 @@ export function DreTab({
                 <React.Fragment key={line.key}>
                   {/* Level 1: DRE Category Row */}
                   <div
-                    className={`grid items-center px-6 py-3 transition-colors ${
+                    className={`grid items-center px-6 py-3 transition-colors max-w-4xl ${
                       showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
                     } ${
                       isCalculated
@@ -891,7 +894,7 @@ export function DreTab({
                             <React.Fragment key={fcId}>
                               {/* Level 2 row */}
                               <div
-                                className={`grid items-center px-6 py-1.5 ${
+                                className={`grid items-center px-6 py-1.5 max-w-4xl ${
                                   showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
                                 } ${hasDetails ? "cursor-pointer hover:bg-slate-100/50" : ""}`}
                                 onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
@@ -944,7 +947,7 @@ export function DreTab({
                                     .map(([detailKey, detail]) => (
                                       <div
                                         key={detailKey}
-                                        className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1"
+                                        className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1 max-w-4xl"
                                       >
                                         <span className="w-6" />
                                         <span className="text-[11px] text-slate-700 pl-10 truncate">
@@ -973,6 +976,114 @@ export function DreTab({
           )}
         </CardContent>
       </Card>
+
+      {/* ══════ INSIGHTS CONTABEIS ══════ */}
+      {receitaOperacional !== 0 && (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-0">
+            <div className="flex items-center gap-2 px-6 py-3 border-b border-slate-100">
+              <Lightbulb className="h-5 w-5 text-amber-500" />
+              <h3 className="text-sm font-bold text-slate-700">Insights da DRE</h3>
+            </div>
+            <div className="px-6 py-4 space-y-3">
+              {(() => {
+                const rec = receitaOperacional;
+                const lb = calculated.lucro_bruto || 0;
+                const lo = calculated.lucro_operacional || 0;
+                const ll = calculated.lucro_liquido || 0;
+                const saldo = calculated.saldo || 0;
+                const vc = calculated.variacao_caixa || 0;
+                const cv = accum.custo_variavel?.total || 0;
+                const cf = accum.custo_fixo?.total || 0;
+                const df = accum.despesas_financeiras?.total || 0;
+                const dt = accum.despesas_tributarias?.total || 0;
+                const imob = accum.imobilizacoes?.total || 0;
+                const ret = accum.retiradas?.total || 0;
+
+                const margBruta = (lb / rec) * 100;
+                const margOp = (lo / rec) * 100;
+                const margLiq = (ll / rec) * 100;
+                const pesoCv = (Math.abs(cv) / rec) * 100;
+                const pesoCf = (Math.abs(cf) / rec) * 100;
+                const pesoDf = (Math.abs(df) / rec) * 100;
+                const pesoDt = (Math.abs(dt) / rec) * 100;
+
+                const insights: { icon: "check" | "alert" | "info"; text: string }[] = [];
+
+                // Margem bruta
+                if (margBruta >= 30) {
+                  insights.push({ icon: "check", text: `Margem bruta de ${margBruta.toFixed(1)}% indica boa eficiencia na operacao. Os custos variaveis representam ${pesoCv.toFixed(1)}% da receita.` });
+                } else if (margBruta >= 15) {
+                  insights.push({ icon: "info", text: `Margem bruta de ${margBruta.toFixed(1)}% esta dentro da media. Os custos variaveis (${pesoCv.toFixed(1)}% da receita) merecem atencao para otimizacao.` });
+                } else {
+                  insights.push({ icon: "alert", text: `Margem bruta de apenas ${margBruta.toFixed(1)}% e preocupante. Custos variaveis consomem ${pesoCv.toFixed(1)}% da receita — avalie renegociacao com fornecedores e revisao de precificacao.` });
+                }
+
+                // Margem operacional
+                if (margOp >= 15) {
+                  insights.push({ icon: "check", text: `Margem operacional de ${margOp.toFixed(1)}% demonstra eficiencia na gestao de custos fixos (${pesoCf.toFixed(1)}% da receita).` });
+                } else if (margOp >= 5) {
+                  insights.push({ icon: "info", text: `Margem operacional de ${margOp.toFixed(1)}%. Os custos fixos representam ${pesoCf.toFixed(1)}% da receita — busque oportunidades de reducao de overhead.` });
+                } else {
+                  insights.push({ icon: "alert", text: `Margem operacional de ${margOp.toFixed(1)}% deixa pouca margem de seguranca. Custos fixos de ${pesoCf.toFixed(1)}% da receita precisam ser revisados.` });
+                }
+
+                // Diferenca entre lucro bruto e operacional (peso do custo fixo)
+                if (pesoCf > pesoCv) {
+                  insights.push({ icon: "alert", text: `Custos fixos (${formatCurrency(Math.abs(cf))}) superam custos variaveis (${formatCurrency(Math.abs(cv))}) — estrutura de custo pesada que aumenta o ponto de equilibrio.` });
+                }
+
+                // Despesas financeiras
+                if (pesoDf > 5) {
+                  insights.push({ icon: "alert", text: `Despesas financeiras representam ${pesoDf.toFixed(1)}% da receita (${formatCurrency(Math.abs(df))}). Avalie renegociacao de dividas e reducao de endividamento.` });
+                } else if (pesoDf > 2) {
+                  insights.push({ icon: "info", text: `Despesas financeiras em ${pesoDf.toFixed(1)}% da receita — nivel moderado. Monitore a evolucao do custo da divida.` });
+                }
+
+                // Carga tributaria
+                if (pesoDt > 15) {
+                  insights.push({ icon: "alert", text: `Carga tributaria de ${pesoDt.toFixed(1)}% da receita e elevada. Considere revisao do planejamento tributario e aproveitamento de beneficios fiscais.` });
+                } else if (pesoDt > 8) {
+                  insights.push({ icon: "info", text: `Despesas tributarias representam ${pesoDt.toFixed(1)}% da receita. Revise periodicamente o enquadramento tributario.` });
+                }
+
+                // Margem liquida
+                if (margLiq < 0) {
+                  insights.push({ icon: "alert", text: `Resultado liquido negativo (${formatCurrency(Math.abs(ll))}). A operacao nao esta gerando lucro suficiente para cobrir despesas financeiras e tributarias.` });
+                } else if (margLiq >= 10) {
+                  insights.push({ icon: "check", text: `Margem liquida de ${margLiq.toFixed(1)}% e saudavel, mostrando boa rentabilidade apos todas as deducoes.` });
+                }
+
+                // Saldo vs Lucro liquido (imobilizacoes e retiradas)
+                if (ll > 0 && saldo < ll * 0.5) {
+                  const consumo = Math.abs(imob) + Math.abs(ret);
+                  insights.push({ icon: "info", text: `Imobilizacoes (${formatCurrency(Math.abs(imob))}) e retiradas (${formatCurrency(Math.abs(ret))}) consomem ${((consumo / ll) * 100).toFixed(0)}% do lucro liquido — acompanhe o impacto no caixa.` });
+                }
+
+                // Variacao de caixa
+                if (vc < 0) {
+                  insights.push({ icon: "alert", text: `Variacao de caixa negativa de ${formatCurrency(Math.abs(vc))}. O caixa da empresa esta diminuindo — revise entradas/saidas nao operacionais e controle o fluxo de caixa.` });
+                } else if (vc > 0) {
+                  insights.push({ icon: "check", text: `Variacao de caixa positiva de ${formatCurrency(vc)}. A empresa esta acumulando caixa no periodo.` });
+                }
+
+                return insights.map((insight, i) => (
+                  <div key={i} className={`flex items-start gap-3 p-3 rounded-lg text-sm ${
+                    insight.icon === "check" ? "bg-emerald-50 text-emerald-800" :
+                    insight.icon === "alert" ? "bg-amber-50 text-amber-800" :
+                    "bg-blue-50 text-blue-800"
+                  }`}>
+                    {insight.icon === "check" && <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-600" />}
+                    {insight.icon === "alert" && <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />}
+                    {insight.icon === "info" && <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600" />}
+                    <span>{insight.text}</span>
+                  </div>
+                ));
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
