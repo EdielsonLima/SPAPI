@@ -620,14 +620,13 @@ export function ExecutiveDashboard() {
     return companySettings.filter(cs => selectedCompanies.size === 0 || selectedCompanies.has(cs.companyName)).map(cs => {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
-      // Sum payments for this company using same filters as Contas Pagas (paidSum)
+      // Sum payments for this company — must match Contas Pagas logic (no operationType filter)
       let realized = 0;
       consistentItems.forEach(item => {
         if (item.companyName === cs.companyName) {
           (item.payments || []).forEach(p => {
             if (
               p.netAmount > 0 &&
-              (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
               p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
             ) {
               realized += p.netAmount;
@@ -656,7 +655,7 @@ export function ExecutiveDashboard() {
       if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
       return b.budget - a.budget;
     });
-  }, [cubData, companySettings, consistentItems, selectedOpTypes, selectedYears, selectedCompanies]);
+  }, [cubData, companySettings, consistentItems, selectedYears, selectedCompanies]);
 
   const budgetTotals = useMemo(() => {
     const activeRows = budgetData.filter(r => r.status === "Ativa");
