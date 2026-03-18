@@ -858,14 +858,15 @@ export function DreTab({
                         </div>
                       )}
                     </span>
-                    <span className={`text-[13px] ${
+                    <span className={`text-[13px] flex items-center min-w-0 ${
                       isCalculated
                         ? value < 0
                           ? "font-bold text-red-800"
                           : "font-bold text-emerald-800"
                         : "font-semibold text-slate-700 tracking-tight"
                     }`}>
-                      {line.label}
+                      <span className="truncate pr-3">{line.label}</span>
+                      <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                     </span>
                     <span className={`text-[14px] text-right tabular-nums ${
                       isCalculated
@@ -935,9 +936,12 @@ export function DreTab({
                                       : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
                                   )}
                                 </span>
-                                <span className="text-[12px] font-medium text-slate-600 pl-3">
-                                  <span className="text-slate-400 font-mono text-[11px] mr-2 bg-slate-100 py-0.5 px-1.5 rounded-md border border-slate-200/60">{fcId}</span>
-                                  {acct.name}
+                                <span className="text-[12px] font-medium text-slate-600 pl-3 flex items-center min-w-0">
+                                  <span className="truncate pr-3">
+                                    <span className="text-slate-400 font-mono text-[11px] mr-2 bg-slate-100 py-0.5 px-1.5 rounded-md border border-slate-200/60">{fcId}</span>
+                                    {acct.name}
+                                  </span>
+                                  <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                                 </span>
                                 <span className={`text-[12px] text-right tabular-nums ${
                                   acct.amount < 0 ? "text-red-600 font-semibold" : "text-slate-700 font-semibold"
@@ -979,11 +983,12 @@ export function DreTab({
                                         className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5"
                                       >
                                         <span className="w-6" />
-                                        <div className="flex items-center pl-10 pr-4">
+                                        <div className="flex items-center pl-10 pr-4 min-w-0">
                                           <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mr-2 flex-shrink-0" />
-                                          <span className="text-[11px] font-medium text-slate-500 truncate" title={detail.name}>
+                                          <span className="text-[11px] font-medium text-slate-500 truncate pr-3" title={detail.name}>
                                             {detail.name}
                                           </span>
+                                          <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                                         </div>
                                         <span className={`text-[11px] text-right tabular-nums font-medium ${
                                           detail.amount < 0 ? "text-red-500" : "text-slate-600"
