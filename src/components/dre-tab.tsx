@@ -756,17 +756,17 @@ export function DreTab({
           ) : (
             /* ══════ DRE SIMPLES: Original view ══════ */
             <>
+          {/* Table */}
+          <div className="mx-6 my-4 border border-slate-200 rounded-xl overflow-hidden max-w-4xl">
           {/* Table Header */}
-          <div className="border-b border-slate-200/80 bg-slate-50/80">
-            <div className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-4 max-w-4xl mx-auto text-[11px] font-bold text-slate-500 uppercase tracking-widest">
-              <span className="w-8" />
-              <span>Conta</span>
-              <span className="text-right">Realizado</span>
-            </div>
+          <div className="grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 bg-slate-800 text-[11px] font-bold text-white uppercase tracking-widest">
+            <span className="w-8" />
+            <span>Conta</span>
+            <span className="text-right">Realizado</span>
           </div>
 
           {/* Table Body */}
-          <div className="divide-y divide-slate-100/80 max-w-4xl mx-auto">
+          <div className="divide-y divide-slate-200/80">
             {DRE_LINES.map(line => {
               const value = getValue(line);
               const isCalculated = line.type === "calculated";
@@ -779,18 +779,15 @@ export function DreTab({
                 <React.Fragment key={line.key}>
                   {/* Level 1: DRE Category Row */}
                   <div
-                    className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-3.5 transition-all duration-200 ${
+                    className={`grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 transition-all duration-200 ${
                       isCalculated
                         ? value < 0
-                          ? "bg-red-50/40 relative font-semibold"
-                          : "bg-emerald-50/40 relative font-semibold"
-                        : "bg-white hover:bg-slate-50/80"
+                          ? "bg-red-50/60 relative font-semibold border-l-4 border-l-red-400"
+                          : "bg-emerald-50/60 relative font-semibold border-l-4 border-l-emerald-400"
+                        : "bg-white hover:bg-slate-50/80 border-l-4 border-l-transparent"
                     } ${canExpand ? "cursor-pointer" : ""}`}
                     onClick={canExpand ? () => toggleExpand(line.key) : undefined}
                   >
-                    {isCalculated && (
-                      <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${value < 0 ? "bg-red-400" : "bg-emerald-400"}`} />
-                    )}
                     <span className="w-8 flex items-center justify-center">
                       {canExpand && (
                         <div className={`p-1 rounded-md transition-colors ${isExpanded ? "bg-slate-200/60" : "hover:bg-slate-200/60"}`}>
@@ -827,7 +824,7 @@ export function DreTab({
 
                   {/* Level 2: Sub-accounts (financial categories) */}
                   {isExpanded && hasAccounts && (
-                    <div className="bg-slate-50/80 border-l border-l-slate-200 ml-[18px]">
+                    <div className="bg-slate-50/50 border-l-4 border-l-slate-200">
                       {Object.entries(categoryAccounts)
                         .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
                         .map(([fcId, acct]) => {
@@ -840,7 +837,7 @@ export function DreTab({
                             <React.Fragment key={fcId}>
                               {/* Level 2 row */}
                               <div
-                                className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-2 transition-colors ${
+                                className={`grid grid-cols-[auto_1fr_180px] items-center px-5 py-2 transition-colors border-b border-slate-100 last:border-b-0 ${
                                   hasDetails ? "cursor-pointer hover:bg-slate-100/80" : ""
                                 }`}
                                 onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
@@ -903,6 +900,7 @@ export function DreTab({
                 </React.Fragment>
               );
             })}
+          </div>
           </div>
             </>
           )}
