@@ -12,7 +12,6 @@ import {
   TrendingDown,
   Settings,
   BarChart3,
-  FileSpreadsheet,
   Loader2,
   Lightbulb,
   AlertTriangle,
@@ -20,7 +19,6 @@ import {
 } from "lucide-react";
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge";
 import { formatCurrency } from "@/lib/dashboard-utils";
-import { toast } from "sonner";
 
 interface DreMappingItem {
   financialPlanId: string;
@@ -130,10 +128,6 @@ export function DreTab({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
   const [dreMode, setDreMode] = useState<"simples" | "completa">("simples");
-  const [excelData, setExcelData] = useState<Record<string, number> | null>(null);
-  const [excelCategoryTotals, setExcelCategoryTotals] = useState<Record<string, number> | null>(null);
-  const [loadingExcel, setLoadingExcel] = useState(false);
-  const [showExcel, setShowExcel] = useState(false);
   // Excel as supplementary data source for accounts not available in Sienge API
   const [excelSupplementary, setExcelSupplementary] = useState<Record<string, { name: string; amount: number }> | null>(null);
   // Monthly data for DRE Completa view
@@ -233,39 +227,6 @@ export function DreTab({
       setMonthlyData(null);
     }).finally(() => setLoadingMonthly(false));
   }, [dreMode, selectedYears, selectedMonths]);
-
-  const fetchExcelData = useCallback(async () => {
-    if (selectedYears.size === 0) return;
-    setLoadingExcel(true);
-    try {
-      const year = Array.from(selectedYears).sort().pop();
-      const res = await fetch(`/api/dre-excel-validation?year=${year}`);
-      if (!res.ok) throw new Error("Failed");
-      const json = await res.json();
-      // Build lookup: accountId (dotted) -> yearTotal
-      const byAccount: Record<string, number> = {};
-      for (const acc of json.accounts || []) {
-        // Convert dotted ID to Sienge format (remove dots): "1.01.01.02" -> "1010102"
-        const siengeId = acc.accountId.replace(/\./g, "");
-        byAccount[siengeId] = (byAccount[siengeId] || 0) + acc.yearTotal;
-      }
-      setExcelData(byAccount);
-      // Build category totals
-      const byCat: Record<string, number> = {};
-      for (const cat of json.categories || []) {
-        byCat[cat.category] = cat.total;
-      }
-      setExcelCategoryTotals(byCat);
-      setShowExcel(true);
-    } catch (err) {
-      console.error("Excel validation error:", err);
-      toast.error("Erro ao carregar dados do Excel. Verifique se o arquivo existe e o servidor foi reiniciado.");
-      setExcelData(null);
-      setExcelCategoryTotals(null);
-    } finally {
-      setLoadingExcel(false);
-    }
-  }, [selectedYears]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpandedCategories(prev => {
@@ -592,20 +553,6 @@ export function DreTab({
                 </button>
               </div>
               <Button
-                variant={showExcel ? "default" : "outline"}
-                size="sm"
-                className={`gap-2 text-xs font-medium h-9 rounded-xl transition-all shadow-sm ${showExcel ? "bg-violet-600 hover:bg-violet-700 text-white shadow-violet-200" : "bg-white border-slate-200 hover:bg-slate-50"}`}
-                onClick={() => {
-                  if (showExcel) { setShowExcel(false); }
-                  else if (excelData) { setShowExcel(true); }
-                  else { fetchExcelData(); }
-                }}
-                disabled={loadingExcel}
-              >
-                {loadingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 text-violet-500" />}
-                {showExcel ? "Ocultar Excel" : "Comparar Excel"}
-              </Button>
-              <Button
                 variant="outline"
                 size="sm"
                 className="gap-2 text-xs font-medium h-9 rounded-xl bg-white border-slate-200 hover:bg-slate-50 shadow-sm transition-all"
@@ -810,18 +757,16 @@ export function DreTab({
             /* ══════ DRE SIMPLES: Original view ══════ */
             <>
           {/* Table Header */}
-          <div className={`grid items-center px-6 py-4 bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-widest ${
-            showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
-          }`}>
-            <span className="w-8" />
-            <span>Conta</span>
-            <span className="text-right">Realizado</span>
-            {showExcel && <span className="text-right text-violet-600">Excel / Power BI</span>}
-            {showExcel && <span className="text-right">Diferença</span>}
+          <div className="border-b border-slate-200/80 bg-slate-50/80">
+            <div className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-4 max-w-4xl mx-auto text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+              <span className="w-8" />
+              <span>Conta</span>
+              <span className="text-right">Realizado</span>
+            </div>
           </div>
 
           {/* Table Body */}
-          <div className="divide-y divide-slate-100/80">
+          <div className="divide-y divide-slate-100/80 max-w-4xl mx-auto">
             {DRE_LINES.map(line => {
               const value = getValue(line);
               const isCalculated = line.type === "calculated";
@@ -834,9 +779,7 @@ export function DreTab({
                 <React.Fragment key={line.key}>
                   {/* Level 1: DRE Category Row */}
                   <div
-                    className={`grid items-center px-6 py-3.5 transition-all duration-200 ${
-                      showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
-                    } ${
+                    className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-3.5 transition-all duration-200 ${
                       isCalculated
                         ? value < 0
                           ? "bg-red-50/40 relative font-semibold"
@@ -880,33 +823,6 @@ export function DreTab({
                       {formatCurrency(Math.abs(value))}
                       {value < 0 && <span className="text-xs ml-0.5 font-bold text-red-500">-</span>}
                     </span>
-                    {showExcel && (() => {
-                      const excelVal = excelCategoryTotals?.[line.key] ?? null;
-                      if (excelVal === null) return <><span /><span /></>;
-                      const diff = value - excelVal;
-                      const pct = excelVal !== 0 ? Math.abs(diff / excelVal) * 100 : 0;
-                      const isClose = pct < 1;
-                      return (
-                        <>
-                          <span className="text-[14px] text-right tabular-nums font-bold text-violet-700 bg-violet-50/50 py-1 px-2 rounded-md ml-auto line-clamp-1 max-w-fit">
-                            {formatCurrency(Math.abs(excelVal))}
-                            {excelVal < 0 && <span className="text-xs ml-0.5">-</span>}
-                          </span>
-                          <span className={`text-[12px] text-right tabular-nums font-semibold flex flex-col items-end justify-center ${
-                            isClose ? "text-emerald-600" : "text-amber-600"
-                          }`}>
-                            {Math.abs(diff) < 0.01 ? (
-                              <Badge variant="outline" className="bg-emerald-50 border-emerald-200 text-emerald-600 text-[10px] px-1.5 py-0 h-5">OK</Badge>
-                            ) : (
-                              <>
-                                <span>{diff > 0 ? "+" : ""}{formatCurrency(diff)}</span>
-                                <span className="text-[10px] opacity-70 leading-none">({pct.toFixed(1)}%)</span>
-                              </>
-                            )}
-                          </span>
-                        </>
-                      );
-                    })()}
                   </div>
 
                   {/* Level 2: Sub-accounts (financial categories) */}
@@ -924,9 +840,9 @@ export function DreTab({
                             <React.Fragment key={fcId}>
                               {/* Level 2 row */}
                               <div
-                                className={`grid items-center px-6 py-2 transition-colors ${
-                                  showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
-                                } ${hasDetails ? "cursor-pointer hover:bg-slate-100/80" : ""}`}
+                                className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-2 transition-colors ${
+                                  hasDetails ? "cursor-pointer hover:bg-slate-100/80" : ""
+                                }`}
                                 onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
                               >
                                 <span className="w-6 flex items-center justify-center">
@@ -949,27 +865,6 @@ export function DreTab({
                                   {formatCurrency(Math.abs(acct.amount))}
                                   {acct.amount < 0 && <span className="ml-0.5">-</span>}
                                 </span>
-                                {showExcel && (() => {
-                                  const excelVal = excelData?.[fcId] ?? null;
-                                  if (excelVal === null) return <><span /><span /></>;
-                                  const diff = acct.amount - excelVal;
-                                  const isClose = Math.abs(diff) < Math.max(1, Math.abs(excelVal) * 0.01);
-                                  return (
-                                    <>
-                                      <span className="text-[12px] text-right tabular-nums font-semibold text-violet-600/80">
-                                        {formatCurrency(Math.abs(excelVal))}
-                                        {excelVal < 0 && <span className="ml-0.5">-</span>}
-                                      </span>
-                                      <span className={`text-[11px] text-right tabular-nums font-medium ${
-                                        isClose ? "text-emerald-500" : "text-amber-500"
-                                      }`}>
-                                        {Math.abs(diff) < 0.01 ? "OK" : (
-                                          `${diff > 0 ? "+" : ""}${formatCurrency(diff)}`
-                                        )}
-                                      </span>
-                                    </>
-                                  );
-                                })()}
                               </div>
 
                               {/* Level 3: Details (creditor/client) */}
