@@ -48,7 +48,7 @@ const DRE_INPUT_CATEGORIES = [
   "saidas_nao_operacionais",
 ] as const;
 
-// Categories where values should be negative (expenses/outflows)
+// VALIDATED 2026-03-17 — DO NOT MODIFY without explicit user request (matches Power BI)
 const NEGATIVE_CATEGORIES = new Set([
   "custo_variavel",
   "custo_fixo",
@@ -66,6 +66,7 @@ interface DreLineConfig {
   number: number;
 }
 
+// VALIDATED 2026-03-17 — DO NOT MODIFY order/composition without explicit user request
 const DRE_LINES: DreLineConfig[] = [
   { key: "receita_operacional", label: "RECEITA OPERACIONAL", type: "input", number: 1 },
   { key: "custo_variavel", label: "CUSTO VARIAVEL", type: "input", number: 2 },
@@ -449,7 +450,7 @@ export function DreTab({
       }
     }
 
-    // Compute calculated lines
+    // VALIDATED 2026-03-17 — DO NOT MODIFY formulas without explicit user request (matches Power BI)
     const lucroBruto = accum.receita_operacional.total + accum.custo_variavel.total;
     const lucroOperacional = lucroBruto + accum.custo_fixo.total;
     const lucroLiquido = lucroOperacional + accum.despesas_financeiras.total + accum.despesas_tributarias.total;
@@ -512,9 +513,9 @@ export function DreTab({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* KPI Cards - top highlight row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
         {KPI_LINES.map(kpi => {
           const value = calculated[kpi.key] || 0;
           const margin = getMargin(value);
@@ -523,28 +524,33 @@ export function DreTab({
           return (
             <div
               key={kpi.key}
-              className={`relative rounded-xl p-4 shadow-sm border overflow-hidden ${
+              className={`relative rounded-2xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border bg-white overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] hover:-translate-y-1 ${
                 isPositive
-                  ? "bg-gradient-to-br from-emerald-50 via-white to-emerald-50/30 border-emerald-100"
-                  : "bg-gradient-to-br from-red-50 via-white to-red-50/30 border-red-100"
+                  ? "border-emerald-100/60"
+                  : "border-red-100/60"
               }`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
+              {/* Decorative top gradient line */}
+              <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${
+                isPositive ? "from-emerald-400 to-teal-400" : "from-red-400 to-rose-400"
+              }`} />
+              
+              <div className="flex items-center justify-between mb-4 mt-1">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
                   {kpi.label}
                 </span>
-                <Badge variant="outline" className={`text-xs px-2 py-0.5 ${
-                  isPositive ? "border-emerald-200 text-emerald-700" : "border-red-200 text-red-700"
+                <Badge variant="outline" className={`text-xs px-2 py-0.5 font-medium rounded-full shadow-sm ${
+                  isPositive ? "bg-emerald-50/80 border-emerald-200/50 text-emerald-700" : "bg-red-50/80 border-red-200/50 text-red-700"
                 }`}>
                   {isPositive ? <TrendingUp className="h-3.5 w-3.5 mr-1" /> : <TrendingDown className="h-3.5 w-3.5 mr-1" />}
                   {margin}
                 </Badge>
               </div>
-              <div className={`text-lg font-bold tabular-nums ${
-                isPositive ? "text-emerald-700" : "text-red-600"
+              <div className={`text-2xl font-black tabular-nums tracking-tight ${
+                isPositive ? "text-slate-800" : "text-slate-800"
               }`}>
                 {formatCurrency(Math.abs(value))}
-                {!isPositive && <span className="text-xs ml-0.5">-</span>}
+                {!isPositive && <span className="text-sm font-bold text-red-500 ml-1">-</span>}
               </div>
             </div>
           );
@@ -552,32 +558,34 @@ export function DreTab({
       </div>
 
       {/* DRE Table - full width */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden">
         <CardContent className="p-0">
           {/* Toggle */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-slate-500" />
-              <h3 className="text-sm font-bold text-slate-700">DRE - Demonstracao do Resultado</h3>
+          <div className="flex items-center justify-between px-6 py-4 bg-white/50 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-slate-100 rounded-lg">
+                <BarChart3 className="h-5 w-5 text-slate-600" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">DRE <span className="text-slate-400 font-medium ml-1">Demonstração do Resultado</span></h3>
             </div>
             <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-slate-200 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
                 <button
                   onClick={() => setDreMode("simples")}
-                  className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
                     dreMode === "simples"
-                      ? "bg-slate-800 text-white shadow-md"
-                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                      ? "bg-white text-slate-800 shadow-[0_2px_8px_rgb(0,0,0,0.08)]"
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                   }`}
                 >
                   DRE Simples
                 </button>
                 <button
                   onClick={() => setDreMode("completa")}
-                  className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
                     dreMode === "completa"
-                      ? "bg-slate-800 text-white shadow-md"
-                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-100"
+                      ? "bg-white text-slate-800 shadow-[0_2px_8px_rgb(0,0,0,0.08)]"
+                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
                   }`}
                 >
                   DRE Completa
@@ -586,7 +594,7 @@ export function DreTab({
               <Button
                 variant={showExcel ? "default" : "outline"}
                 size="sm"
-                className={`gap-1.5 text-xs h-7 ${showExcel ? "bg-violet-600 hover:bg-violet-700 text-white" : ""}`}
+                className={`gap-2 text-xs font-medium h-9 rounded-xl transition-all shadow-sm ${showExcel ? "bg-violet-600 hover:bg-violet-700 text-white shadow-violet-200" : "bg-white border-slate-200 hover:bg-slate-50"}`}
                 onClick={() => {
                   if (showExcel) { setShowExcel(false); }
                   else if (excelData) { setShowExcel(true); }
@@ -594,16 +602,16 @@ export function DreTab({
                 }}
                 disabled={loadingExcel}
               >
-                {loadingExcel ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileSpreadsheet className="h-3 w-3" />}
+                {loadingExcel ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4 text-violet-500" />}
                 {showExcel ? "Ocultar Excel" : "Comparar Excel"}
               </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-1.5 text-xs h-7"
+                className="gap-2 text-xs font-medium h-9 rounded-xl bg-white border-slate-200 hover:bg-slate-50 shadow-sm transition-all"
                 onClick={() => window.open("/cadastros/dre", "_blank")}
               >
-                <Settings className="h-3 w-3" />
+                <Settings className="h-4 w-4 text-slate-500" />
                 Configurar
               </Button>
             </div>
@@ -676,23 +684,23 @@ export function DreTab({
               const colWidth = `${Math.max(100, Math.floor(700 / monthCols.length))}px`;
 
               return (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto rounded-xl border border-slate-200/60 shadow-sm m-6">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-slate-800 text-white">
-                        <th className="text-left px-4 py-2.5 font-semibold sticky left-0 bg-slate-800 min-w-[220px]">CONTA</th>
+                        <th className="text-left px-5 py-3.5 font-semibold sticky left-0 bg-slate-800 min-w-[220px] uppercase tracking-wider text-[11px] border-b border-slate-700">CONTA</th>
                         {monthCols.map(m => {
                           const [month, year] = m.split("/");
                           return (
-                            <th key={m} className="text-right px-3 py-2.5 font-semibold" style={{ minWidth: colWidth }}>
+                            <th key={m} className="text-right px-4 py-3.5 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-700" style={{ minWidth: colWidth }}>
                               {MONTH_NAMES[month]}-{year}
                             </th>
                           );
                         })}
-                        <th className="text-right px-4 py-2.5 font-bold min-w-[120px]">Total</th>
+                        <th className="text-right px-5 py-3.5 font-bold min-w-[120px] uppercase tracking-wider text-[11px] border-b border-slate-700">Total</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-100/80">
                       {DRE_LINES.map((line, idx) => {
                         const isCalc = line.type === "calculated";
                         const total = getLineTotal(line);
@@ -708,24 +716,35 @@ export function DreTab({
                               className={`${
                                 isCalc
                                   ? total < 0
-                                    ? "bg-red-50 font-bold"
-                                    : "bg-teal-50 font-bold"
-                                  : idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"
-                              } ${canExpand ? "cursor-pointer hover:bg-slate-100" : ""}`}
+                                    ? "bg-red-50/40 relative font-semibold"
+                                    : "bg-emerald-50/40 relative font-semibold"
+                                  : "bg-white hover:bg-slate-50/80"
+                              } ${canExpand ? "cursor-pointer transition-colors" : ""}`}
                               onClick={canExpand ? () => toggleExpand(line.key) : undefined}
                             >
-                              <td className={`px-4 py-2 sticky left-0 ${
+                              <td className={`px-5 py-3.5 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] ${
                                 isCalc
-                                  ? total < 0 ? "bg-red-50 text-red-700" : "bg-teal-50 text-teal-800"
-                                  : idx % 2 === 0 ? "bg-white" : "bg-slate-50"
+                                  ? total < 0 ? "bg-[#fef2f2]" : "bg-[#f0fdf4]"
+                                  : "bg-white"
                               }`}>
-                                <div className="flex items-center gap-1">
+                                {isCalc && (
+                                  <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${total < 0 ? "bg-red-400" : "bg-emerald-400"}`} />
+                                )}
+                                <div className="flex items-center gap-1.5 ">
                                   {canExpand && (
-                                    isExpanded
-                                      ? <ChevronDown className="h-3 w-3 text-slate-400 flex-shrink-0" />
-                                      : <ChevronRight className="h-3 w-3 text-slate-400 flex-shrink-0" />
+                                    <div className={`p-1 rounded-md transition-colors flex-shrink-0 ${isExpanded ? "bg-slate-200/60" : "hover:bg-slate-200/60"}`}>
+                                      {isExpanded 
+                                        ? <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
+                                        : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                                      }
+                                    </div>
                                   )}
-                                  <span className={isCalc ? "" : "font-medium text-slate-700"}>
+                                  {!canExpand && !isCalc && <div className="w-[20px]" />}
+                                  <span className={`text-[13px] ${
+                                    isCalc
+                                      ? total < 0 ? "font-bold text-red-800" : "font-bold text-emerald-800"
+                                      : "font-semibold text-slate-700 tracking-tight"
+                                  }`}>
                                     {line.label}
                                   </span>
                                 </div>
@@ -733,19 +752,19 @@ export function DreTab({
                               {monthCols.map(m => {
                                 const v = getLineMonthVal(line, m);
                                 return (
-                                  <td key={m} className={`text-right px-3 py-2 tabular-nums ${
+                                  <td key={m} className={`text-right px-4 py-3.5 text-[13px] tabular-nums ${
                                     isCalc
-                                      ? v < 0 ? "text-red-700" : "text-teal-800"
-                                      : v < 0 ? "text-red-600" : "text-slate-800"
+                                      ? v < 0 ? "text-red-700 font-semibold" : "text-emerald-700 font-semibold"
+                                      : v < 0 ? "text-red-600 font-medium" : "text-slate-700 font-medium"
                                   }`}>
                                     {v !== 0 ? fmtVal(v) : ""}
                                   </td>
                                 );
                               })}
-                              <td className={`text-right px-4 py-2 font-bold tabular-nums ${
+                              <td className={`text-right px-5 py-3.5 font-bold text-[14px] tabular-nums ${
                                 isCalc
-                                  ? total < 0 ? "text-red-700" : "text-teal-800"
-                                  : total < 0 ? "text-red-600" : "text-slate-900"
+                                  ? total < 0 ? "text-red-700" : "text-emerald-700"
+                                  : total < 0 ? "text-red-600" : "text-slate-800"
                               }`}>
                                 {fmtVal(total)}
                               </td>
@@ -754,22 +773,24 @@ export function DreTab({
                             {isExpanded && lineAccounts.map(([fcId, acctData]) => {
                               const acctTotal = Object.values(acctData.months).reduce((s, v) => s + v, 0);
                               return (
-                                <tr key={fcId} className="bg-slate-50/80">
-                                  <td className="px-4 py-1.5 pl-8 sticky left-0 bg-slate-50/80 text-slate-600">
-                                    <span className="text-slate-400 font-mono mr-1.5">{fcId}</span>
-                                    {acctData.name}
+                                <tr key={fcId} className="bg-slate-50/80 border-t border-slate-100/80">
+                                  <td className="px-5 py-2.5 pl-11 sticky left-0 bg-[#f8fafc] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] border-l-[3px] border-l-slate-200/80">
+                                    <div className="flex items-center text-[12px] font-medium text-slate-600">
+                                      <span className="text-slate-400 font-mono text-[11px] mr-2 bg-white py-0.5 px-1.5 rounded-md border border-slate-200/60 shadow-sm">{fcId}</span>
+                                      {acctData.name}
+                                    </div>
                                   </td>
                                   {monthCols.map(m => {
                                     const v = acctData.months[m] || 0;
                                     return (
-                                      <td key={m} className={`text-right px-3 py-1.5 tabular-nums ${
-                                        v < 0 ? "text-red-500" : "text-slate-600"
+                                      <td key={m} className={`text-right px-4 py-2.5 text-[12px] tabular-nums ${
+                                        v < 0 ? "text-red-500 font-medium" : "text-slate-600"
                                       }`}>
                                         {v !== 0 ? fmtVal(v) : ""}
                                       </td>
                                     );
                                   })}
-                                  <td className={`text-right px-4 py-1.5 font-medium tabular-nums ${
+                                  <td className={`text-right px-5 py-2.5 font-semibold text-[13px] tabular-nums ${
                                     acctTotal < 0 ? "text-red-600" : "text-slate-700"
                                   }`}>
                                     {fmtVal(acctTotal)}
@@ -789,18 +810,18 @@ export function DreTab({
             /* ══════ DRE SIMPLES: Original view ══════ */
             <>
           {/* Table Header */}
-          <div className={`grid items-center px-6 py-2 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider max-w-4xl ${
+          <div className={`grid items-center px-6 py-4 bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-widest ${
             showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
           }`}>
-            <span className="w-6" />
+            <span className="w-8" />
             <span>Conta</span>
             <span className="text-right">Realizado</span>
-            {showExcel && <span className="text-right text-violet-600">Excel/Power BI</span>}
-            {showExcel && <span className="text-right">Diferenca</span>}
+            {showExcel && <span className="text-right text-violet-600">Excel / Power BI</span>}
+            {showExcel && <span className="text-right">Diferença</span>}
           </div>
 
           {/* Table Body */}
-          <div className="divide-y divide-slate-50">
+          <div className="divide-y divide-slate-100/80">
             {DRE_LINES.map(line => {
               const value = getValue(line);
               const isCalculated = line.type === "calculated";
@@ -813,44 +834,50 @@ export function DreTab({
                 <React.Fragment key={line.key}>
                   {/* Level 1: DRE Category Row */}
                   <div
-                    className={`grid items-center px-6 py-3 transition-colors max-w-4xl ${
+                    className={`grid items-center px-6 py-3.5 transition-all duration-200 ${
                       showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
                     } ${
                       isCalculated
                         ? value < 0
-                          ? "bg-red-50/80 border-l-4 border-l-red-500"
-                          : "bg-teal-50/80 border-l-4 border-l-teal-500"
-                        : "hover:bg-slate-50/50 border-l-4 border-l-transparent"
+                          ? "bg-red-50/40 relative font-semibold"
+                          : "bg-emerald-50/40 relative font-semibold"
+                        : "bg-white hover:bg-slate-50/80"
                     } ${canExpand ? "cursor-pointer" : ""}`}
                     onClick={canExpand ? () => toggleExpand(line.key) : undefined}
                   >
-                    <span className="w-6 flex items-center justify-center">
+                    {isCalculated && (
+                      <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${value < 0 ? "bg-red-400" : "bg-emerald-400"}`} />
+                    )}
+                    <span className="w-8 flex items-center justify-center">
                       {canExpand && (
-                        isExpanded
-                          ? <ChevronDown className="h-4 w-4 text-slate-400" />
-                          : <ChevronRight className="h-4 w-4 text-slate-400" />
+                        <div className={`p-1 rounded-md transition-colors ${isExpanded ? "bg-slate-200/60" : "hover:bg-slate-200/60"}`}>
+                          {isExpanded 
+                            ? <ChevronDown className="h-4 w-4 text-slate-500" />
+                            : <ChevronRight className="h-4 w-4 text-slate-400" />
+                          }
+                        </div>
                       )}
                     </span>
-                    <span className={`text-sm ${
+                    <span className={`text-[13px] ${
                       isCalculated
                         ? value < 0
-                          ? "font-bold text-red-700"
-                          : "font-bold text-teal-800"
-                        : "font-medium text-slate-700"
+                          ? "font-bold text-red-800"
+                          : "font-bold text-emerald-800"
+                        : "font-semibold text-slate-700 tracking-tight"
                     }`}>
                       {line.label}
                     </span>
-                    <span className={`text-sm text-right tabular-nums ${
+                    <span className={`text-[14px] text-right tabular-nums ${
                       isCalculated
                         ? value < 0
                           ? "font-bold text-red-700"
-                          : "font-bold text-teal-800"
+                          : "font-bold text-emerald-700"
                         : value < 0
                           ? "font-semibold text-red-600"
                           : "font-semibold text-slate-800"
                     }`}>
                       {formatCurrency(Math.abs(value))}
-                      {value < 0 && <span className="text-xs ml-0.5">-</span>}
+                      {value < 0 && <span className="text-xs ml-0.5 font-bold text-red-500">-</span>}
                     </span>
                     {showExcel && (() => {
                       const excelVal = excelCategoryTotals?.[line.key] ?? null;
@@ -860,17 +887,19 @@ export function DreTab({
                       const isClose = pct < 1;
                       return (
                         <>
-                          <span className="text-sm text-right tabular-nums font-semibold text-violet-700">
+                          <span className="text-[14px] text-right tabular-nums font-bold text-violet-700 bg-violet-50/50 py-1 px-2 rounded-md ml-auto line-clamp-1 max-w-fit">
                             {formatCurrency(Math.abs(excelVal))}
                             {excelVal < 0 && <span className="text-xs ml-0.5">-</span>}
                           </span>
-                          <span className={`text-xs text-right tabular-nums font-medium ${
+                          <span className={`text-[12px] text-right tabular-nums font-semibold flex flex-col items-end justify-center ${
                             isClose ? "text-emerald-600" : "text-amber-600"
                           }`}>
-                            {Math.abs(diff) < 0.01 ? "OK" : (
+                            {Math.abs(diff) < 0.01 ? (
+                              <Badge variant="outline" className="bg-emerald-50 border-emerald-200 text-emerald-600 text-[10px] px-1.5 py-0 h-5">OK</Badge>
+                            ) : (
                               <>
-                                {diff > 0 ? "+" : ""}{formatCurrency(diff)}
-                                <span className="ml-1 text-[10px] opacity-70">({pct.toFixed(1)}%)</span>
+                                <span>{diff > 0 ? "+" : ""}{formatCurrency(diff)}</span>
+                                <span className="text-[10px] opacity-70 leading-none">({pct.toFixed(1)}%)</span>
                               </>
                             )}
                           </span>
@@ -881,7 +910,7 @@ export function DreTab({
 
                   {/* Level 2: Sub-accounts (financial categories) */}
                   {isExpanded && hasAccounts && (
-                    <div className="bg-slate-50/50 border-l-4 border-l-slate-200">
+                    <div className="bg-slate-50/80 border-l border-l-slate-200 ml-[18px]">
                       {Object.entries(categoryAccounts)
                         .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
                         .map(([fcId, acct]) => {
@@ -894,24 +923,24 @@ export function DreTab({
                             <React.Fragment key={fcId}>
                               {/* Level 2 row */}
                               <div
-                                className={`grid items-center px-6 py-1.5 max-w-4xl ${
+                                className={`grid items-center px-6 py-2 transition-colors ${
                                   showExcel ? "grid-cols-[auto_1fr_160px_160px_120px]" : "grid-cols-[auto_1fr_180px]"
-                                } ${hasDetails ? "cursor-pointer hover:bg-slate-100/50" : ""}`}
+                                } ${hasDetails ? "cursor-pointer hover:bg-slate-100/80" : ""}`}
                                 onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
                               >
                                 <span className="w-6 flex items-center justify-center">
                                   {hasDetails && (
                                     isAccountExpanded
-                                      ? <ChevronDown className="h-3 w-3 text-slate-300" />
-                                      : <ChevronRight className="h-3 w-3 text-slate-300" />
+                                      ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                                      : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
                                   )}
                                 </span>
-                                <span className="text-xs text-slate-700 pl-4">
-                                  <span className="text-slate-500 font-mono mr-2">{fcId}</span>
+                                <span className="text-[12px] font-medium text-slate-600 pl-3">
+                                  <span className="text-slate-400 font-mono text-[11px] mr-2 bg-slate-100 py-0.5 px-1.5 rounded-md border border-slate-200/60">{fcId}</span>
                                   {acct.name}
                                 </span>
-                                <span className={`text-xs text-right tabular-nums ${
-                                  acct.amount < 0 ? "text-red-600 font-medium" : "text-slate-800 font-medium"
+                                <span className={`text-[12px] text-right tabular-nums ${
+                                  acct.amount < 0 ? "text-red-600 font-semibold" : "text-slate-700 font-semibold"
                                 }`}>
                                   {formatCurrency(Math.abs(acct.amount))}
                                   {acct.amount < 0 && <span className="ml-0.5">-</span>}
@@ -923,12 +952,12 @@ export function DreTab({
                                   const isClose = Math.abs(diff) < Math.max(1, Math.abs(excelVal) * 0.01);
                                   return (
                                     <>
-                                      <span className="text-xs text-right tabular-nums text-violet-600">
+                                      <span className="text-[12px] text-right tabular-nums font-semibold text-violet-600/80">
                                         {formatCurrency(Math.abs(excelVal))}
                                         {excelVal < 0 && <span className="ml-0.5">-</span>}
                                       </span>
-                                      <span className={`text-[10px] text-right tabular-nums ${
-                                        isClose ? "text-emerald-600" : "text-amber-600"
+                                      <span className={`text-[11px] text-right tabular-nums font-medium ${
+                                        isClose ? "text-emerald-500" : "text-amber-500"
                                       }`}>
                                         {Math.abs(diff) < 0.01 ? "OK" : (
                                           `${diff > 0 ? "+" : ""}${formatCurrency(diff)}`
@@ -941,20 +970,23 @@ export function DreTab({
 
                               {/* Level 3: Details (creditor/client) */}
                               {isAccountExpanded && hasDetails && (
-                                <div className="bg-slate-100/30">
+                                <div className="bg-slate-100/50 py-1 box-shadow-inner border-y border-slate-100/80">
                                   {Object.entries(acct.details)
                                     .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
                                     .map(([detailKey, detail]) => (
                                       <div
                                         key={detailKey}
-                                        className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1 max-w-4xl"
+                                        className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5"
                                       >
                                         <span className="w-6" />
-                                        <span className="text-[11px] text-slate-700 pl-10 truncate">
-                                          {detail.name}
-                                        </span>
-                                        <span className={`text-[11px] text-right tabular-nums ${
-                                          detail.amount < 0 ? "text-red-600" : "text-slate-700"
+                                        <div className="flex items-center pl-10 pr-4">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mr-2 flex-shrink-0" />
+                                          <span className="text-[11px] font-medium text-slate-500 truncate" title={detail.name}>
+                                            {detail.name}
+                                          </span>
+                                        </div>
+                                        <span className={`text-[11px] text-right tabular-nums font-medium ${
+                                          detail.amount < 0 ? "text-red-500" : "text-slate-600"
                                         }`}>
                                           {formatCurrency(Math.abs(detail.amount))}
                                           {detail.amount < 0 && <span className="ml-0.5">-</span>}
@@ -979,13 +1011,15 @@ export function DreTab({
 
       {/* ══════ INSIGHTS CONTABEIS ══════ */}
       {receitaOperacional !== 0 && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden mt-6">
           <CardContent className="p-0">
-            <div className="flex items-center gap-2 px-6 py-3 border-b border-slate-100">
-              <Lightbulb className="h-5 w-5 text-amber-500" />
-              <h3 className="text-sm font-bold text-slate-700">Insights da DRE</h3>
+            <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-amber-50 to-white border-b border-amber-100/50">
+              <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
+                <Lightbulb className="h-5 w-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">Insights da DRE <span className="text-slate-400 font-medium ml-1">Análise Automática</span></h3>
             </div>
-            <div className="px-6 py-4 space-y-3">
+            <div className="px-6 py-5 space-y-3 bg-white/50">
               {(() => {
                 const rec = receitaOperacional;
                 const lb = calculated.lucro_bruto || 0;
@@ -1068,15 +1102,15 @@ export function DreTab({
                 }
 
                 return insights.map((insight, i) => (
-                  <div key={i} className={`flex items-start gap-3 p-3 rounded-lg text-sm ${
-                    insight.icon === "check" ? "bg-emerald-50 text-emerald-800" :
-                    insight.icon === "alert" ? "bg-amber-50 text-amber-800" :
-                    "bg-blue-50 text-blue-800"
+                  <div key={i} className={`flex items-start gap-3.5 p-4 rounded-xl text-[13px] border shadow-sm transition-all hover:shadow-md ${
+                    insight.icon === "check" ? "bg-emerald-50/50 border-emerald-100 text-emerald-900" :
+                    insight.icon === "alert" ? "bg-amber-50/50 border-amber-200/60 text-amber-900" :
+                    "bg-blue-50/50 border-blue-100 text-blue-900"
                   }`}>
-                    {insight.icon === "check" && <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-600" />}
-                    {insight.icon === "alert" && <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />}
-                    {insight.icon === "info" && <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-600" />}
-                    <span>{insight.text}</span>
+                    {insight.icon === "check" && <CheckCircle className="h-5 w-5 mt-0.5 flex-shrink-0 text-emerald-500" />}
+                    {insight.icon === "alert" && <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-500" />}
+                    {insight.icon === "info" && <Lightbulb className="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-500" />}
+                    <span className="leading-relaxed font-medium">{insight.text}</span>
                   </div>
                 ));
               })()}
