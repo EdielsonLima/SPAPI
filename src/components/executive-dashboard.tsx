@@ -620,16 +620,18 @@ export function ExecutiveDashboard() {
     return companySettings.filter(cs => selectedCompanies.size === 0 || selectedCompanies.has(cs.companyName)).map(cs => {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
-      // Sum payments for this company — must match Contas Pagas logic (no operationType filter)
+      // Sum payments for this company using valor líquido (netAmount - taxAmount)
+      // to match Sienge "Contas Pagas Sintético" Líquido column
       let realized = 0;
       consistentItems.forEach(item => {
         if (item.companyName === cs.companyName) {
           (item.payments || []).forEach(p => {
+            const liquidoValue = p.netAmount - (p.taxAmount || 0);
             if (
-              p.netAmount > 0 &&
+              liquidoValue > 0 &&
               p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
             ) {
-              realized += p.netAmount;
+              realized += liquidoValue;
             }
           });
         }

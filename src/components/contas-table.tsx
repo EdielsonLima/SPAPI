@@ -130,11 +130,11 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   };
   const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
 
-  // Always sum from payments array (mapped from receipts for income)
-  // This ensures consistent totals whether filtering by period or showing all
+  // Always sum from payments array using valor líquido (netAmount - taxAmount)
+  // to match Sienge "Contas Pagas Sintético" Líquido column
   const payments = (item.payments || [])
     .filter(p => p.netAmount > 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
-  return payments.reduce((s, p) => s + p.netAmount, 0);
+  return payments.reduce((s, p) => s + (p.netAmount - (p.taxAmount || 0)), 0);
 }
 
 const monthNames = [
