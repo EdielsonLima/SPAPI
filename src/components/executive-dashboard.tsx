@@ -621,10 +621,12 @@ export function ExecutiveDashboard() {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
       // Sum payments for this company using valor líquido (netAmount - taxAmount)
-      // No docType/opType filter — matches Contas Pagas paidTotal logic exactly
+      // Always excludes previsão documents (hardcoded, not dependent on filter state)
       let realized = 0;
       consistentItems.forEach(item => {
         if (item.companyName !== cs.companyName) return;
+        const docName = (item.documentIdentificationName || "").toUpperCase();
+        if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
         (item.payments || []).forEach(p => {
           const liquidoValue = p.netAmount - (p.taxAmount || 0);
           if (
