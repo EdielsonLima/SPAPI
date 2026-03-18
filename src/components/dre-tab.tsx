@@ -833,11 +833,14 @@ export function DreTab({
                           const hasDetails = Object.keys(acct.details).length > 1 ||
                             (Object.keys(acct.details).length === 1 && !acct.details["Sem identificacao"]);
 
+                          const catTotal = Math.abs(value);
+                          const pct = catTotal > 0 ? (Math.abs(acct.amount) / catTotal) * 100 : 0;
+
                           return (
                             <React.Fragment key={fcId}>
                               {/* Level 2 row */}
                               <div
-                                className={`grid grid-cols-[auto_1fr_180px] items-center px-5 py-2 transition-colors border-b border-slate-100 last:border-b-0 ${
+                                className={`grid grid-cols-[auto_1fr_60px_180px] items-center px-5 py-2 transition-colors border-b border-slate-100 last:border-b-0 ${
                                   hasDetails ? "cursor-pointer hover:bg-slate-100/80" : ""
                                 }`}
                                 onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
@@ -855,6 +858,9 @@ export function DreTab({
                                     {acct.name}
                                   </span>
                                   <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
+                                </span>
+                                <span className="text-[11px] text-right tabular-nums text-slate-400 font-medium">
+                                  {pct >= 0.1 ? `${pct.toFixed(1)}%` : "<0.1%"}
                                 </span>
                                 <span className={`text-[12px] text-right tabular-nums ${
                                   acct.amount < 0 ? "text-red-600 font-semibold" : "text-slate-700 font-semibold"
