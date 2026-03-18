@@ -621,20 +621,20 @@ export function ExecutiveDashboard() {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
       // Sum payments for this company using valor líquido (netAmount - taxAmount)
-      // to match Sienge "Contas Pagas Sintético" Líquido column
+      // Applies selectedDocTypes filter to match Contas Pagas (excludes PREVISÃO etc.)
       let realized = 0;
       consistentItems.forEach(item => {
-        if (item.companyName === cs.companyName) {
-          (item.payments || []).forEach(p => {
-            const liquidoValue = p.netAmount - (p.taxAmount || 0);
-            if (
-              liquidoValue > 0 &&
-              p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
-            ) {
-              realized += liquidoValue;
-            }
-          });
-        }
+        if (item.companyName !== cs.companyName) return;
+        if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName)) return;
+        (item.payments || []).forEach(p => {
+          const liquidoValue = p.netAmount - (p.taxAmount || 0);
+          if (
+            liquidoValue > 0 &&
+            p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+          ) {
+            realized += liquidoValue;
+          }
+        });
       });
 
       const toRealize = budget - realized;
@@ -657,7 +657,7 @@ export function ExecutiveDashboard() {
       if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
       return b.budget - a.budget;
     });
-  }, [cubData, companySettings, consistentItems, selectedYears, selectedCompanies]);
+  }, [cubData, companySettings, consistentItems, selectedYears, selectedCompanies, selectedDocTypes]);
 
   const budgetTotals = useMemo(() => {
     const activeRows = budgetData.filter(r => r.status === "Ativa");
@@ -1655,6 +1655,20 @@ export function ExecutiveDashboard() {
               toast.success("Padrao de empresas salvo!");
             }}
           />
+          <MultiSelectFilter
+            label="Tipo Doc."
+            icon={<FileText className="h-4 w-4" />}
+            allOptions={allDocTypes}
+            selected={selectedDocTypes}
+            onToggle={(name) => toggleInSet(setSelectedDocTypes, name)}
+            onSelectAll={() => setSelectedDocTypes(new Set(allDocTypes))}
+            onClear={() => setSelectedDocTypes(new Set())}
+            activeColor="violet"
+            onSaveDefault={() => {
+              localStorage.setItem("dashboard_default_docTypes", JSON.stringify([...selectedDocTypes]));
+              toast.success("Padrao de tipo documento salvo!");
+            }}
+          />
           {allOpTypes.length > 0 && (
             <MultiSelectFilter
               label="Tipo Operação"
@@ -1839,51 +1853,109 @@ export function ExecutiveDashboard() {
         <div className="space-y-6">
           {/* CUB Info Bar */}
           {cubData && (
-            <div className="flex items-center gap-3">
-              <div className="bg-slate-800 text-white rounded-lg px-4 py-2 text-center">
-                <p className="text-xs text-slate-400">Valor CUB mês atual</p>
-                <p className="text-lg font-bold">{formatCurrency(cubData.currentValue)}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-sm rounded-2xl p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">CUB SC (Mês Atual)</p>
+                  <p className="text-2xl font-bold text-white tabular-nums">{formatCurrency(cubData.currentValue)}</p>
+                </div>
+                <div className="p-3 bg-slate-700/50 rounded-xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-blue-500/10" />
+                  <Building2 className="h-5 w-5 text-blue-400 relative z-10" />
+                </div>
               </div>
-              <div className="bg-slate-800 text-white rounded-lg px-4 py-2 text-center">
-                <p className="text-xs text-slate-400">Variação CUB mês atual</p>
-                <p className="text-lg font-bold">{cubData.monthlyVariation.toFixed(2)}%</p>
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-sm rounded-2xl p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Variação no Mês</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-2xl font-bold text-white tabular-nums">{Math.abs(cubData.monthlyVariation).toFixed(2)}%</p>
+                    <div className={`flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded-md ${
+                      cubData.monthlyVariation > 0 ? "bg-emerald-500/20 text-emerald-400" :
+                      cubData.monthlyVariation < 0 ? "bg-rose-500/20 text-rose-400" : "bg-slate-700 text-slate-300"
+                    }`}>
+                      {cubData.monthlyVariation > 0 ? <TrendingUp className="h-3 w-3 mr-1" /> :
+                       cubData.monthlyVariation < 0 ? <TrendingDown className="h-3 w-3 mr-1" /> : null}
+                      {cubData.monthlyVariation > 0 ? "ALTA" : cubData.monthlyVariation < 0 ? "BAIXA" : "NEUTRO"}
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 bg-slate-700/50 rounded-xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-emerald-500/10" />
+                  <BarChart3 className="h-5 w-5 text-emerald-400 relative z-10" />
+                </div>
               </div>
-              <div className="bg-slate-800 text-white rounded-lg px-4 py-2 text-center">
-                <p className="text-xs text-slate-400">Var Acum. {currentYear}</p>
-                <p className="text-lg font-bold">{cubData.yearlyAccumulated.toFixed(2)}%</p>
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-sm rounded-2xl p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Variação Ano ({currentYear})</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-2xl font-bold text-white tabular-nums">{Math.abs(cubData.yearlyAccumulated).toFixed(2)}%</p>
+                    <div className={`flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded-md ${
+                      cubData.yearlyAccumulated > 0 ? "bg-emerald-500/20 text-emerald-400" :
+                      cubData.yearlyAccumulated < 0 ? "bg-rose-500/20 text-rose-400" : "bg-slate-700 text-slate-300"
+                    }`}>
+                      {cubData.yearlyAccumulated > 0 ? <TrendingUp className="h-3 w-3 mr-1" /> :
+                       cubData.yearlyAccumulated < 0 ? <TrendingDown className="h-3 w-3 mr-1" /> : null}
+                      {cubData.yearlyAccumulated > 0 ? "ALTA" : cubData.yearlyAccumulated < 0 ? "BAIXA" : "NEUTRO"}
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 bg-slate-700/50 rounded-xl relative overflow-hidden">
+                  <div className="absolute inset-0 bg-violet-500/10" />
+                  <TrendingUp className="h-5 w-5 text-violet-400 relative z-10" />
+                </div>
               </div>
             </div>
           )}
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Card className="border-0 shadow-sm overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-blue-500 to-blue-600" />
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Orçamento</p>
-                <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(budgetTotals.totalBudget)}</p>
+            <Card className="border border-blue-100 bg-gradient-to-b from-blue-50 to-white shadow-[0_8px_30px_rgb(59,130,246,0.06)] rounded-2xl overflow-hidden relative group hover:shadow-[0_8px_30px_rgb(59,130,246,0.12)] transition-all duration-300">
+              <CardContent className="pt-6 pb-6 px-7">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-blue-600/80 uppercase tracking-widest">Orçamento Total</p>
+                    <p className="text-3xl font-black text-blue-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalBudget)}</p>
+                  </div>
+                  <div className="p-3 bg-white shadow-sm ring-1 ring-blue-100 rounded-xl">
+                    <Banknote className="h-6 w-6 text-blue-500" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
-            <Card className="border-0 shadow-sm overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-emerald-500 to-emerald-600" />
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Realizado</p>
-                <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(budgetTotals.totalRealized)}</p>
+            <Card className="border border-emerald-100 bg-gradient-to-b from-emerald-50 to-white shadow-[0_8px_30px_rgb(16,185,129,0.06)] rounded-2xl overflow-hidden relative group hover:shadow-[0_8px_30px_rgb(16,185,129,0.12)] transition-all duration-300">
+              <CardContent className="pt-6 pb-6 px-7">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Custo Realizado</p>
+                    <p className="text-3xl font-black text-emerald-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalRealized)}</p>
+                  </div>
+                  <div className="p-3 bg-white shadow-sm ring-1 ring-emerald-100 rounded-xl">
+                    <CheckCircle className="h-6 w-6 text-emerald-500" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
-            <Card className="border-0 shadow-sm overflow-hidden">
-              <div className="h-1 bg-gradient-to-r from-amber-500 to-amber-600" />
-              <CardContent className="pt-4 pb-4">
-                <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">A Realizar</p>
-                <p className="text-2xl font-bold text-slate-800 mt-1">{formatCurrency(budgetTotals.totalToRealize)}</p>
-                <p className="text-xs text-slate-400 mt-1">Valor não contabiliza obras finalizadas e saldos negativos</p>
+            <Card className="border border-amber-100 bg-gradient-to-b from-amber-50 to-white shadow-[0_8px_30px_rgb(245,158,11,0.06)] rounded-2xl overflow-hidden relative group hover:shadow-[0_8px_30px_rgb(245,158,11,0.12)] transition-all duration-300">
+              <CardContent className="pt-6 pb-5 px-7">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-amber-600/80 uppercase tracking-widest">Saldo a Realizar</p>
+                    <p className="text-3xl font-black text-amber-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalToRealize)}</p>
+                    <p className="text-[11px] font-medium text-amber-900/40 mt-1.5 leading-tight max-w-[220px]">
+                      Não contabiliza obras finalizadas nem saldos negativos
+                    </p>
+                  </div>
+                  <div className="p-3 bg-white shadow-sm ring-1 ring-amber-100 rounded-xl">
+                    <Clock className="h-6 w-6 text-amber-500" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
 
           {/* Budget Table */}
-          <Card className="border-0 shadow-sm">
-            <CardContent className="px-0 pb-0 pt-0">
+          <Card className="border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden mt-2">
+            <CardContent className="p-0">
               {budgetData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                   <Ruler className="h-12 w-12 mb-3 text-slate-300" />
@@ -1893,40 +1965,51 @@ export function ExecutiveDashboard() {
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader className="bg-slate-100/80">
-                      <TableRow>
-                        <TableHead className="font-semibold">Empreendimento</TableHead>
-                        <TableHead className="text-center font-semibold w-20">Fator</TableHead>
-                        <TableHead className="text-right font-semibold">Orçamento</TableHead>
-                        <TableHead className="text-right font-semibold">Realizado</TableHead>
-                        <TableHead className="text-right font-semibold">À Realizar</TableHead>
-                        <TableHead className="text-center font-semibold w-24">% Real</TableHead>
-                        <TableHead className="text-center font-semibold w-24">Status</TableHead>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-b border-slate-200/60">
+                        <TableHead className="font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11 px-6">Empreendimento</TableHead>
+                        <TableHead className="text-center font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11 w-20">Fator</TableHead>
+                        <TableHead className="text-right font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11">Orçamento</TableHead>
+                        <TableHead className="text-right font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11">Realizado</TableHead>
+                        <TableHead className="text-right font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11">À Realizar</TableHead>
+                        <TableHead className="text-center font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11 w-28">% Real</TableHead>
+                        <TableHead className="text-center font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11 w-32">Status</TableHead>
                       </TableRow>
                     </TableHeader>
-                    <TableBody>
-                      {budgetData.map((row) => (
-                        <TableRow key={row.companyId} className={`${row.status === "Finalizada" ? "bg-slate-100/80 hover:bg-slate-100 text-slate-400" : "hover:bg-slate-50"}`}>
-                          <TableCell className="font-medium">{row.companyName}</TableCell>
-                          <TableCell className="text-center text-slate-500">{row.factor.toFixed(2)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatCurrency(row.budget)}</TableCell>
-                          <TableCell className="text-right font-mono text-sm">{formatCurrency(row.realized)}</TableCell>
-                          <TableCell className={`text-right font-mono text-sm ${row.toRealize < 0 ? "text-red-600" : ""}`}>
-                            {row.toRealize < 0 && <TrendingDown className="inline h-3 w-3 mr-1" />}
-                            {formatCurrency(row.toRealize)}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <span className={`text-sm font-semibold ${row.percentReal >= 100 ? "text-emerald-600" : row.percentReal >= 70 ? "text-amber-600" : "text-blue-600"}`}>
-                              {row.percentReal.toFixed(2)}%
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge variant={row.status === "Ativa" ? "default" : "secondary"} className={row.status === "Ativa" ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100" : "bg-slate-200 text-slate-600"}>
-                              {row.status}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                    <TableBody className="divide-y divide-slate-100/80">
+                      {budgetData.map((row) => {
+                        const isFinalizada = row.status === "Finalizada";
+                        return (
+                          <TableRow key={row.companyId} className={`transition-colors h-14 ${isFinalizada ? "bg-slate-50/50 hover:bg-slate-50" : "bg-white hover:bg-slate-50/80"}`}>
+                            <TableCell className={`px-6 font-semibold text-[13px] ${isFinalizada ? "text-slate-400" : "text-slate-800"}`}>{row.companyName}</TableCell>
+                            <TableCell className="text-center text-slate-400 text-[13px] font-medium">{row.factor.toFixed(2)}</TableCell>
+                            <TableCell className={`text-right tabular-nums text-[13px] ${isFinalizada ? "text-slate-400 font-medium" : "text-slate-600 font-semibold"}`}>{formatCurrency(row.budget)}</TableCell>
+                            <TableCell className={`text-right tabular-nums text-[13px] ${isFinalizada ? "text-slate-400 font-medium" : "text-slate-600 font-semibold"}`}>{formatCurrency(row.realized)}</TableCell>
+                            <TableCell className={`text-right tabular-nums text-[13px] font-bold ${row.toRealize < 0 ? (isFinalizada ? "text-rose-400" : "text-rose-600") : (isFinalizada ? "text-slate-400" : "text-slate-800")}`}>
+                              {row.toRealize < 0 && <TrendingDown className="inline h-3.5 w-3.5 mr-1" />}
+                              {formatCurrency(row.toRealize)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[12px] font-bold tabular-nums ${row.percentReal >= 100 ? "bg-amber-100/50 text-amber-700" : row.percentReal >= 70 ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"} ${isFinalizada ? "opacity-60 grayscale-[0.5]" : ""}`}>
+                                {row.percentReal.toFixed(1)}%
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center px-4">
+                              {isFinalizada ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200/80">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                  FINALIZADA
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-500/20">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                  ATIVA
+                                </span>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
