@@ -701,7 +701,7 @@ export function DreTab({
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100/80">
-                      {DRE_LINES.map((line, idx) => {
+                      {DRE_LINES.map((line) => {
                         const isCalc = line.type === "calculated";
                         const total = getLineTotal(line);
                         const isExpanded = expandedCategories.has(line.key);
