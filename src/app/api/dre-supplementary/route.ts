@@ -7,13 +7,15 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const year = searchParams.get("year") || String(new Date().getFullYear());
   const companiesParam = searchParams.get("companies");
+  const excludeParam = searchParams.get("excludeCompanies");
   const monthsParam = searchParams.get("months");
   const monthly = searchParams.get("monthly") === "true";
 
   try {
     const companyNames = companiesParam ? companiesParam.split(",").map(s => s.trim()) : undefined;
+    const excludeCompanies = excludeParam ? excludeParam.split(",").map(s => s.trim()) : undefined;
     const months = monthsParam ? monthsParam.split(",").map(s => s.trim()) : undefined;
-    const rows = await getDreExcelData(year, companyNames, months);
+    const rows = await getDreExcelData(year, companyNames, months, excludeCompanies);
 
     if (monthly) {
       // Return per-month breakdown: { fcId: { name, dreCategory, months: { "01": amount, "02": amount, ... } } }

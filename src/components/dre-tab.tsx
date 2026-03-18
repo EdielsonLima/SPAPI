@@ -144,18 +144,16 @@ export function DreTab({
       .finally(() => setLoadingMappings(false));
   }, []);
 
-  // Fetch DRE data from Excel/DB (primary source, filtered by company)
-  // Fetches ALL selected years in parallel and aggregates results
+  // Fetch DRE data from Excel/DB (primary source)
+  // DRE shows ALL companies from Excel (no company filter) to match Power BI
+  // Excludes only "holding/administradora" companies like Power BI does
   useEffect(() => {
     if (selectedYears.size === 0) return;
     const years = Array.from(selectedYears);
-    const companiesQuery = selectedCompanies.size > 0
-      ? `&companies=${encodeURIComponent(Array.from(selectedCompanies).join(","))}`
-      : "";
 
     Promise.all(
       years.map(year =>
-        fetch(`/api/dre-supplementary?year=${year}${companiesQuery}`)
+        fetch(`/api/dre-supplementary?year=${year}&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}`)
           .then(r => r.ok ? r.json() : null)
           .catch(() => null)
       )
@@ -177,9 +175,10 @@ export function DreTab({
         setExcelSupplementary(merged);
       }
     });
-  }, [selectedYears, selectedCompanies]);
+  }, [selectedYears]);
 
   // Fetch monthly breakdown for DRE Completa view
+  // Also fetches ALL companies (no filter) to match Power BI
   useEffect(() => {
     if (dreMode !== "completa" || selectedYears.size === 0) {
       setMonthlyData(null);
@@ -187,16 +186,13 @@ export function DreTab({
     }
     setLoadingMonthly(true);
     const years = Array.from(selectedYears);
-    const companiesQuery = selectedCompanies.size > 0
-      ? `&companies=${encodeURIComponent(Array.from(selectedCompanies).join(","))}`
-      : "";
     const monthsQuery = selectedMonths.size > 0
       ? `&months=${encodeURIComponent(Array.from(selectedMonths).join(","))}`
       : "";
 
     Promise.all(
       years.map(year =>
-        fetch(`/api/dre-supplementary?year=${year}&monthly=true${companiesQuery}${monthsQuery}`)
+        fetch(`/api/dre-supplementary?year=${year}&monthly=true&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}${monthsQuery}`)
           .then(r => {
             if (!r.ok) {
               console.error(`DRE Completa fetch error: ${r.status} for year ${year}`);
@@ -232,7 +228,7 @@ export function DreTab({
       console.error("DRE Completa processing error:", err);
       setMonthlyData(null);
     }).finally(() => setLoadingMonthly(false));
-  }, [dreMode, selectedYears, selectedCompanies, selectedMonths]);
+  }, [dreMode, selectedYears, selectedMonths]);
 
   const fetchExcelData = useCallback(async () => {
     if (selectedYears.size === 0) return;

@@ -466,7 +466,7 @@ export interface DreExcelAccount {
   month: string;
 }
 
-export async function getDreExcelData(year: string, companyNames?: string[], months?: string[]): Promise<DreExcelAccount[]> {
+export async function getDreExcelData(year: string, companyNames?: string[], months?: string[], excludeCompanies?: string[]): Promise<DreExcelAccount[]> {
   let query = `SELECT financial_plan_id AS "financialPlanId", financial_plan_name AS "financialPlanName",
                       dre_category AS "dreCategory", amount, company_name AS "companyName", month
                FROM dre_excel_supplementary WHERE year = $1`;
@@ -476,6 +476,12 @@ export async function getDreExcelData(year: string, companyNames?: string[], mon
   if (companyNames && companyNames.length > 0) {
     query += ` AND LOWER(company_name) = ANY($${paramIdx})`;
     params.push(companyNames.map(n => n.toLowerCase()));
+    paramIdx++;
+  }
+
+  if (excludeCompanies && excludeCompanies.length > 0) {
+    query += ` AND LOWER(company_name) != ALL($${paramIdx})`;
+    params.push(excludeCompanies.map(n => n.toLowerCase()));
     paramIdx++;
   }
 
