@@ -621,11 +621,10 @@ export function ExecutiveDashboard() {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
       // Sum payments for this company using valor líquido (netAmount - taxAmount)
-      // Applies selectedDocTypes filter to match Contas Pagas (excludes PREVISÃO etc.)
+      // No docType/opType filter — matches Contas Pagas paidTotal logic exactly
       let realized = 0;
       consistentItems.forEach(item => {
         if (item.companyName !== cs.companyName) return;
-        if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName)) return;
         (item.payments || []).forEach(p => {
           const liquidoValue = p.netAmount - (p.taxAmount || 0);
           if (
@@ -657,7 +656,7 @@ export function ExecutiveDashboard() {
       if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
       return b.budget - a.budget;
     });
-  }, [cubData, companySettings, consistentItems, selectedYears, selectedCompanies, selectedDocTypes]);
+  }, [cubData, companySettings, consistentItems, selectedYears, selectedCompanies]);
 
   const budgetTotals = useMemo(() => {
     const activeRows = budgetData.filter(r => r.status === "Ativa");
@@ -1653,20 +1652,6 @@ export function ExecutiveDashboard() {
             onSaveDefault={() => {
               localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
               toast.success("Padrao de empresas salvo!");
-            }}
-          />
-          <MultiSelectFilter
-            label="Tipo Doc."
-            icon={<FileText className="h-4 w-4" />}
-            allOptions={allDocTypes}
-            selected={selectedDocTypes}
-            onToggle={(name) => toggleInSet(setSelectedDocTypes, name)}
-            onSelectAll={() => setSelectedDocTypes(new Set(allDocTypes))}
-            onClear={() => setSelectedDocTypes(new Set())}
-            activeColor="violet"
-            onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_docTypes", JSON.stringify([...selectedDocTypes]));
-              toast.success("Padrao de tipo documento salvo!");
             }}
           />
           {allOpTypes.length > 0 && (
