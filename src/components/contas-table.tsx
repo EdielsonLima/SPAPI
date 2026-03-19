@@ -122,6 +122,8 @@ function latestPaymentDate(item: ContasItem, yearFilter?: string, monthFilter?: 
   return dates.sort().reverse()[0];
 }
 
+// ▼▼▼ VALIDATED 2026-03-18 — paidTotal — DO NOT MODIFY without explicit user request ▼▼▼
+// Valor líquido = netAmount - taxAmount (matches Sienge "Contas Pagas Sintético" Líquido column)
 function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string): number {
   const matchesPeriod = (paymentDate: string) => {
     if (yearFilter && yearFilter !== "all" && !paymentDate.startsWith(yearFilter)) return false;
@@ -136,6 +138,7 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
     .filter(p => p.netAmount > 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
   return payments.reduce((s, p) => s + (p.netAmount - (p.taxAmount || 0)), 0);
 }
+// ▲▲▲ END VALIDATED — paidTotal ▲▲▲
 
 const monthNames = [
   "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",

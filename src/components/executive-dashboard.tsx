@@ -228,6 +228,10 @@ export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
   const [section, setSection] = useState<Section>("cp");
   const [selectedYears, setSelectedYears] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("dashboard_default_years");
+      if (saved) return new Set(JSON.parse(saved));
+    }
     const years: string[] = [];
     for (let y = currentYear - 10; y <= currentYear; y++) years.push(String(y));
     return new Set(years);
@@ -613,6 +617,10 @@ export function ExecutiveDashboard() {
   }, [itemsRecebidas, selectedCompanies, selectedDocNumbers]);
 
   // === Budget vs Actual (Orçado vs Realizado) ===
+  // ▼▼▼ VALIDATED 2026-03-18 — Budget vs Realizado — DO NOT MODIFY without explicit user request ▼▼▼
+  // Realizado = sum of (netAmount - taxAmount) for non-previsão payments
+  // Must match "Contas Pagas" page values exactly
+  // Orçado = areaM2 * factor * cubValue
   const budgetData = useMemo(() => {
     if (!cubData || companySettings.length === 0) return [];
     const cubValue = cubData.currentValue;
@@ -659,6 +667,7 @@ export function ExecutiveDashboard() {
       return b.budget - a.budget;
     });
   }, [cubData, companySettings, consistentItems, selectedYears, selectedCompanies]);
+  // ▲▲▲ END VALIDATED — Budget vs Realizado ▲▲▲
 
   const budgetTotals = useMemo(() => {
     const activeRows = budgetData.filter(r => r.status === "Ativa");
@@ -1697,6 +1706,10 @@ export function ExecutiveDashboard() {
             onSelectAll={() => setSelectedYears(new Set(availableYears))}
             onClear={() => setSelectedYears(new Set())}
             activeColor="violet"
+            onSaveDefault={() => {
+              localStorage.setItem("dashboard_default_years", JSON.stringify([...selectedYears]));
+              toast.success("Padrão de anos salvo!");
+            }}
           />
           <MultiSelectFilter
             label="Meses"
@@ -1785,6 +1798,10 @@ export function ExecutiveDashboard() {
               setSelectedYears(new Set(defaultYrs));
             }}
             activeColor="blue"
+            onSaveDefault={() => {
+              localStorage.setItem("dashboard_default_years", JSON.stringify([...selectedYears]));
+              toast.success("Padrão de anos salvo!");
+            }}
           />
           <MultiSelectFilter
             label="Meses"

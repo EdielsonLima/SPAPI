@@ -14,6 +14,25 @@
 Qualquer alteracao nessas areas deve ser confirmada com o usuario antes de ser feita.
 Os valores da DRE foram validados contra o Power BI e batem 100%.
 
+## Orcamento - Regras Criticas (Validado em 2026-03-18)
+
+### NAO ALTERAR sem pedido explicito do usuario:
+- Formula do Realizado em `src/components/executive-dashboard.tsx` (budgetData useMemo):
+  - Valor liquido = `netAmount - taxAmount` (nunca usar netAmount sozinho)
+  - Exclusao hardcoded de documentos de previsao (PREVISÃO/PREVISAO)
+  - Exclusao NAO depende de estado de filtros (sem race condition)
+  - Dependencies do useMemo: `[cubData, companySettings, consistentItems, selectedYears, selectedCompanies]`
+- Formula do paidTotal em `src/components/contas-table.tsx`:
+  - Mesmo calculo: `netAmount - taxAmount` para valor liquido
+  - Deve sempre bater com coluna "Liquido" do Sienge "Contas Pagas Sintetico"
+- Formula do Orcado: `areaM2 * factor * cubValue`
+- Formula do A Realizar: `budget - realized`
+- Formula do % Realizado: `(realized / budget) * 100`
+- Ordenacao: empresas Finalizadas sempre no final
+
+Qualquer alteracao nessas areas deve ser confirmada com o usuario antes de ser feita.
+Os valores do Orcamento foram validados contra Contas Pagas e batem 100%.
+
 ## Stack
 - Next.js 14 (App Router) + TypeScript
 - PostgreSQL (Railway production)
