@@ -230,7 +230,7 @@ export async function invalidatePurchaseOrdersCache(startDate: string, endDate: 
 
 export async function getCachedOutcome(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
   const result = await pool.query(
-    `SELECT data, cached_at FROM cached_outcome WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '24 hours'`,
+    `SELECT data, cached_at FROM cached_outcome WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '7 days'`,
     [startDate, endDate]
   );
   return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
@@ -248,7 +248,7 @@ export async function cacheOutcome(startDate: string, endDate: string, data: unk
 
 export async function getCachedIncome(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
   const result = await pool.query(
-    `SELECT data, cached_at FROM cached_income WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '24 hours'`,
+    `SELECT data, cached_at FROM cached_income WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '7 days'`,
     [startDate, endDate]
   );
   return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
@@ -264,12 +264,12 @@ export async function cacheIncome(startDate: string, endDate: string, data: unkn
 
 // ─── Bank Movements (Movimentações Bancárias) ────────────────────────────────
 
-export async function getCachedBankMovements(startDate: string, endDate: string): Promise<unknown | null> {
+export async function getCachedBankMovements(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
   const result = await pool.query(
-    `SELECT data FROM cached_bank_movements WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '24 hours'`,
+    `SELECT data, cached_at FROM cached_bank_movements WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '7 days'`,
     [startDate, endDate]
   );
-  return result.rows.length > 0 ? result.rows[0].data : null;
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
 }
 
 export async function cacheBankMovements(startDate: string, endDate: string, data: unknown) {
@@ -322,7 +322,7 @@ export async function deleteCompanySetting(companyId: number) {
 
 export async function getCachedCub(): Promise<{ data: unknown; cachedAt: string } | null> {
   const result = await pool.query(
-    `SELECT data, cached_at FROM cached_cub WHERE id = 1 AND cached_at > NOW() - INTERVAL '24 hours'`
+    `SELECT data, cached_at FROM cached_cub WHERE id = 1 AND cached_at > NOW() - INTERVAL '7 days'`
   );
   return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
 }

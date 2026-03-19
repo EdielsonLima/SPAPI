@@ -21,7 +21,10 @@ export async function GET(request: NextRequest) {
 
   if (!forceRefresh) {
     const cached = await getCachedBankMovements(startDate, endDate);
-    if (cached) return NextResponse.json(cached);
+    if (cached) {
+        const d = cached.data as Record<string, unknown>;
+        return NextResponse.json({ ...d, cachedAt: cached.cachedAt });
+      }
   }
 
   const url = new URL(`${SIENGE_BASE}/bank-movement`);
