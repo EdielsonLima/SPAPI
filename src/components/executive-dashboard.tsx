@@ -618,9 +618,10 @@ export function ExecutiveDashboard() {
 
   // === Budget vs Actual (Orçado vs Realizado) ===
   // ▼▼▼ VALIDATED 2026-03-18 — Budget vs Realizado — DO NOT MODIFY without explicit user request ▼▼▼
-  // Realizado = sum of (netAmount - taxAmount) for non-previsão payments
-  // Must match "Contas Pagas" page values exactly
+  // Realizado = sum of (netAmount - taxAmount) for ALL non-previsão payments (all years)
+  // Must match "Contas Pagas" page with Ano=Todos for each company
   // Orçado = areaM2 * factor * cubValue
+  // NOTE: No year filter — budget sums ALL payments regardless of selectedYears
   const budgetData = useMemo(() => {
     if (!cubData || companySettings.length === 0) return [];
     const cubValue = cubData.currentValue;
@@ -628,19 +629,17 @@ export function ExecutiveDashboard() {
     return companySettings.filter(cs => selectedCompanies.size === 0 || selectedCompanies.has(cs.companyName)).map(cs => {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
-      // Sum payments for this company using valor líquido (netAmount - taxAmount)
+      // Sum ALL payments for this company using valor líquido (netAmount - taxAmount)
       // Same logic as contas-table paidTotal: filter netAmount > 0, sum (netAmount - taxAmount)
       // Always excludes previsão documents (hardcoded, not dependent on filter state)
+      // No year filter: budget represents total cost to date (matches Contas Pagas with Ano=Todos)
       let realized = 0;
       consistentItems.forEach(item => {
         if (item.companyName !== cs.companyName) return;
         const docName = (item.documentIdentificationName || "").toUpperCase();
         if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
         (item.payments || []).forEach(p => {
-          if (
-            p.netAmount > 0 &&
-            p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
-          ) {
+          if (p.netAmount > 0 && p.paymentDate) {
             realized += p.netAmount - (p.taxAmount || 0);
           }
         });
@@ -666,7 +665,7 @@ export function ExecutiveDashboard() {
       if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
       return b.budget - a.budget;
     });
-  }, [cubData, companySettings, consistentItems, selectedYears, selectedCompanies]);
+  }, [cubData, companySettings, consistentItems, selectedCompanies]);
   // ▲▲▲ END VALIDATED — Budget vs Realizado ▲▲▲
 
   const budgetTotals = useMemo(() => {
