@@ -755,10 +755,10 @@ export function DreTab({
             })()
           ) : (
             /* ══════ DRE SIMPLES: Original view ══════ */
-            <>
-          {/* Table */}
-          <div className="mx-6 my-4 border border-slate-200 rounded-xl overflow-hidden max-w-4xl">
-          {/* Table Header */}
+            <div className="mx-6 my-4 flex flex-col xl:flex-row items-start gap-6">
+              {/* Table */}
+              <div className="border border-slate-200/80 rounded-2xl overflow-hidden flex-grow shadow-[0_4px_20px_rgb(0,0,0,0.03)] bg-white w-full max-w-4xl">
+              {/* Table Header */}
           <div className="grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 bg-slate-800 text-[11px] font-bold text-white uppercase tracking-widest">
             <span className="w-8" />
             <span>Conta</span>
@@ -907,121 +907,119 @@ export function DreTab({
               );
             })}
           </div>
-          </div>
-            </>
+              </div>
+
+              {/* ══════ INSIGHTS CONTABEIS (Side Panel in DRE Simples) ══════ */}
+              {receitaOperacional !== 0 && (
+                <div className="w-full xl:w-[420px] flex-shrink-0 self-start border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden bg-white sticky top-24">
+                  <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-amber-50 to-white border-b border-amber-100/50">
+                    <div className="p-2 bg-amber-100 text-amber-600 rounded-lg shadow-sm">
+                      <Lightbulb className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-base font-bold text-slate-800 tracking-tight">Insights da DRE <span className="text-slate-400 font-medium ml-1 block text-xs mt-0.5">Análise Automática</span></h3>
+                  </div>
+                  <div className="px-5 py-5 space-y-3 bg-white/50 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
+                    {(() => {
+                      const rec = receitaOperacional;
+                      const lb = calculated.lucro_bruto || 0;
+                      const lo = calculated.lucro_operacional || 0;
+                      const ll = calculated.lucro_liquido || 0;
+                      const saldo = calculated.saldo || 0;
+                      const vc = calculated.variacao_caixa || 0;
+                      const cv = accum.custo_variavel?.total || 0;
+                      const cf = accum.custo_fixo?.total || 0;
+                      const df = accum.despesas_financeiras?.total || 0;
+                      const dt = accum.despesas_tributarias?.total || 0;
+                      const imob = accum.imobilizacoes?.total || 0;
+                      const ret = accum.retiradas?.total || 0;
+
+                      const margBruta = (lb / rec) * 100;
+                      const margOp = (lo / rec) * 100;
+                      const margLiq = (ll / rec) * 100;
+                      const pesoCv = (Math.abs(cv) / rec) * 100;
+                      const pesoCf = (Math.abs(cf) / rec) * 100;
+                      const pesoDf = (Math.abs(df) / rec) * 100;
+                      const pesoDt = (Math.abs(dt) / rec) * 100;
+
+                      const insights: { icon: "check" | "alert" | "info"; text: string }[] = [];
+
+                      // Margem bruta
+                      if (margBruta >= 30) {
+                        insights.push({ icon: "check", text: `Margem bruta de ${margBruta.toFixed(1)}% indica boa eficiencia na operacao. Os custos variaveis representam ${pesoCv.toFixed(1)}% da receita.` });
+                      } else if (margBruta >= 15) {
+                        insights.push({ icon: "info", text: `Margem bruta de ${margBruta.toFixed(1)}% esta dentro da media. Os custos variaveis (${pesoCv.toFixed(1)}% da receita) merecem atencao para otimizacao.` });
+                      } else {
+                        insights.push({ icon: "alert", text: `Margem bruta de apenas ${margBruta.toFixed(1)}% e preocupante. Custos variaveis consomem ${pesoCv.toFixed(1)}% da receita — avalie renegociacao com fornecedores e revisao de precificacao.` });
+                      }
+
+                      // Margem operacional
+                      if (margOp >= 15) {
+                        insights.push({ icon: "check", text: `Margem operacional de ${margOp.toFixed(1)}% demonstra eficiencia na gestao de custos fixos (${pesoCf.toFixed(1)}% da receita).` });
+                      } else if (margOp >= 5) {
+                        insights.push({ icon: "info", text: `Margem operacional de ${margOp.toFixed(1)}%. Os custos fixos representam ${pesoCf.toFixed(1)}% da receita — busque oportunidades de reducao de overhead.` });
+                      } else {
+                        insights.push({ icon: "alert", text: `Margem operacional de ${margOp.toFixed(1)}% deixa pouca margem de seguranca. Custos fixos de ${pesoCf.toFixed(1)}% da receita precisam ser revisados.` });
+                      }
+
+                      // Diferenca entre lucro bruto e operacional (peso do custo fixo)
+                      if (pesoCf > pesoCv) {
+                        insights.push({ icon: "alert", text: `Custos fixos (${formatCurrency(Math.abs(cf))}) superam custos variaveis (${formatCurrency(Math.abs(cv))}) — estrutura de custo pesada que aumenta o ponto de equilibrio.` });
+                      }
+
+                      // Despesas financeiras
+                      if (pesoDf > 5) {
+                        insights.push({ icon: "alert", text: `Despesas financeiras representam ${pesoDf.toFixed(1)}% da receita (${formatCurrency(Math.abs(df))}). Avalie renegociacao de dividas e reducao de endividamento.` });
+                      } else if (pesoDf > 2) {
+                        insights.push({ icon: "info", text: `Despesas financeiras em ${pesoDf.toFixed(1)}% da receita — nivel moderado. Monitore a evolucao do custo da divida.` });
+                      }
+
+                      // Carga tributaria
+                      if (pesoDt > 15) {
+                        insights.push({ icon: "alert", text: `Carga tributaria de ${pesoDt.toFixed(1)}% da receita e elevada. Considere revisao do planejamento tributario e aproveitamento de beneficios fiscais.` });
+                      } else if (pesoDt > 8) {
+                        insights.push({ icon: "info", text: `Despesas tributarias representam ${pesoDt.toFixed(1)}% da receita. Revise periodicamente o enquadramento tributario.` });
+                      }
+
+                      // Margem liquida
+                      if (margLiq < 0) {
+                        insights.push({ icon: "alert", text: `Resultado liquido negativo (${formatCurrency(Math.abs(ll))}). A operacao nao esta gerando lucro suficiente para cobrir despesas financeiras e tributarias.` });
+                      } else if (margLiq >= 10) {
+                        insights.push({ icon: "check", text: `Margem liquida de ${margLiq.toFixed(1)}% e saudavel, mostrando boa rentabilidade apos todas as deducoes.` });
+                      }
+
+                      // Saldo vs Lucro liquido (imobilizacoes e retiradas)
+                      if (ll > 0 && saldo < ll * 0.5) {
+                        const consumo = Math.abs(imob) + Math.abs(ret);
+                        insights.push({ icon: "info", text: `Imobilizacoes (${formatCurrency(Math.abs(imob))}) e retiradas (${formatCurrency(Math.abs(ret))}) consomem ${((consumo / ll) * 100).toFixed(0)}% do lucro liquido — acompanhe o impacto no caixa.` });
+                      }
+
+                      // Variacao de caixa
+                      if (vc < 0) {
+                        insights.push({ icon: "alert", text: `Variacao de caixa negativa de ${formatCurrency(Math.abs(vc))}. O caixa da empresa esta diminuindo — revise entradas/saidas nao operacionais e controle o fluxo de caixa.` });
+                      } else if (vc > 0) {
+                        insights.push({ icon: "check", text: `Variacao de caixa positiva de ${formatCurrency(vc)}. A empresa esta acumulando caixa no periodo.` });
+                      }
+
+                      return insights.map((insight, i) => (
+                        <div key={i} className={`flex items-start gap-3.5 p-4 rounded-xl text-[13px] border shadow-sm transition-all hover:shadow-md ${
+                          insight.icon === "check" ? "bg-emerald-50/70 border-emerald-100/80 text-emerald-900" :
+                          insight.icon === "alert" ? "bg-amber-50/70 border-amber-200/50 text-amber-900" :
+                          "bg-blue-50/70 border-blue-100/80 text-blue-900"
+                        }`}>
+                          {insight.icon === "check" && <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-500" />}
+                          {insight.icon === "alert" && <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-500" />}
+                          {insight.icon === "info" && <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-500" />}
+                          <span className="leading-relaxed font-medium">{insight.text}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
-
-      {/* ══════ INSIGHTS CONTABEIS ══════ */}
-      {receitaOperacional !== 0 && (
-        <Card className="border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden mt-6">
-          <CardContent className="p-0">
-            <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-amber-50 to-white border-b border-amber-100/50">
-              <div className="p-2 bg-amber-100 text-amber-600 rounded-lg">
-                <Lightbulb className="h-5 w-5" />
-              </div>
-              <h3 className="text-base font-bold text-slate-800 tracking-tight">Insights da DRE <span className="text-slate-400 font-medium ml-1">Análise Automática</span></h3>
-            </div>
-            <div className="px-6 py-5 space-y-3 bg-white/50">
-              {(() => {
-                const rec = receitaOperacional;
-                const lb = calculated.lucro_bruto || 0;
-                const lo = calculated.lucro_operacional || 0;
-                const ll = calculated.lucro_liquido || 0;
-                const saldo = calculated.saldo || 0;
-                const vc = calculated.variacao_caixa || 0;
-                const cv = accum.custo_variavel?.total || 0;
-                const cf = accum.custo_fixo?.total || 0;
-                const df = accum.despesas_financeiras?.total || 0;
-                const dt = accum.despesas_tributarias?.total || 0;
-                const imob = accum.imobilizacoes?.total || 0;
-                const ret = accum.retiradas?.total || 0;
-
-                const margBruta = (lb / rec) * 100;
-                const margOp = (lo / rec) * 100;
-                const margLiq = (ll / rec) * 100;
-                const pesoCv = (Math.abs(cv) / rec) * 100;
-                const pesoCf = (Math.abs(cf) / rec) * 100;
-                const pesoDf = (Math.abs(df) / rec) * 100;
-                const pesoDt = (Math.abs(dt) / rec) * 100;
-
-                const insights: { icon: "check" | "alert" | "info"; text: string }[] = [];
-
-                // Margem bruta
-                if (margBruta >= 30) {
-                  insights.push({ icon: "check", text: `Margem bruta de ${margBruta.toFixed(1)}% indica boa eficiencia na operacao. Os custos variaveis representam ${pesoCv.toFixed(1)}% da receita.` });
-                } else if (margBruta >= 15) {
-                  insights.push({ icon: "info", text: `Margem bruta de ${margBruta.toFixed(1)}% esta dentro da media. Os custos variaveis (${pesoCv.toFixed(1)}% da receita) merecem atencao para otimizacao.` });
-                } else {
-                  insights.push({ icon: "alert", text: `Margem bruta de apenas ${margBruta.toFixed(1)}% e preocupante. Custos variaveis consomem ${pesoCv.toFixed(1)}% da receita — avalie renegociacao com fornecedores e revisao de precificacao.` });
-                }
-
-                // Margem operacional
-                if (margOp >= 15) {
-                  insights.push({ icon: "check", text: `Margem operacional de ${margOp.toFixed(1)}% demonstra eficiencia na gestao de custos fixos (${pesoCf.toFixed(1)}% da receita).` });
-                } else if (margOp >= 5) {
-                  insights.push({ icon: "info", text: `Margem operacional de ${margOp.toFixed(1)}%. Os custos fixos representam ${pesoCf.toFixed(1)}% da receita — busque oportunidades de reducao de overhead.` });
-                } else {
-                  insights.push({ icon: "alert", text: `Margem operacional de ${margOp.toFixed(1)}% deixa pouca margem de seguranca. Custos fixos de ${pesoCf.toFixed(1)}% da receita precisam ser revisados.` });
-                }
-
-                // Diferenca entre lucro bruto e operacional (peso do custo fixo)
-                if (pesoCf > pesoCv) {
-                  insights.push({ icon: "alert", text: `Custos fixos (${formatCurrency(Math.abs(cf))}) superam custos variaveis (${formatCurrency(Math.abs(cv))}) — estrutura de custo pesada que aumenta o ponto de equilibrio.` });
-                }
-
-                // Despesas financeiras
-                if (pesoDf > 5) {
-                  insights.push({ icon: "alert", text: `Despesas financeiras representam ${pesoDf.toFixed(1)}% da receita (${formatCurrency(Math.abs(df))}). Avalie renegociacao de dividas e reducao de endividamento.` });
-                } else if (pesoDf > 2) {
-                  insights.push({ icon: "info", text: `Despesas financeiras em ${pesoDf.toFixed(1)}% da receita — nivel moderado. Monitore a evolucao do custo da divida.` });
-                }
-
-                // Carga tributaria
-                if (pesoDt > 15) {
-                  insights.push({ icon: "alert", text: `Carga tributaria de ${pesoDt.toFixed(1)}% da receita e elevada. Considere revisao do planejamento tributario e aproveitamento de beneficios fiscais.` });
-                } else if (pesoDt > 8) {
-                  insights.push({ icon: "info", text: `Despesas tributarias representam ${pesoDt.toFixed(1)}% da receita. Revise periodicamente o enquadramento tributario.` });
-                }
-
-                // Margem liquida
-                if (margLiq < 0) {
-                  insights.push({ icon: "alert", text: `Resultado liquido negativo (${formatCurrency(Math.abs(ll))}). A operacao nao esta gerando lucro suficiente para cobrir despesas financeiras e tributarias.` });
-                } else if (margLiq >= 10) {
-                  insights.push({ icon: "check", text: `Margem liquida de ${margLiq.toFixed(1)}% e saudavel, mostrando boa rentabilidade apos todas as deducoes.` });
-                }
-
-                // Saldo vs Lucro liquido (imobilizacoes e retiradas)
-                if (ll > 0 && saldo < ll * 0.5) {
-                  const consumo = Math.abs(imob) + Math.abs(ret);
-                  insights.push({ icon: "info", text: `Imobilizacoes (${formatCurrency(Math.abs(imob))}) e retiradas (${formatCurrency(Math.abs(ret))}) consomem ${((consumo / ll) * 100).toFixed(0)}% do lucro liquido — acompanhe o impacto no caixa.` });
-                }
-
-                // Variacao de caixa
-                if (vc < 0) {
-                  insights.push({ icon: "alert", text: `Variacao de caixa negativa de ${formatCurrency(Math.abs(vc))}. O caixa da empresa esta diminuindo — revise entradas/saidas nao operacionais e controle o fluxo de caixa.` });
-                } else if (vc > 0) {
-                  insights.push({ icon: "check", text: `Variacao de caixa positiva de ${formatCurrency(vc)}. A empresa esta acumulando caixa no periodo.` });
-                }
-
-                return insights.map((insight, i) => (
-                  <div key={i} className={`flex items-start gap-3.5 p-4 rounded-xl text-[13px] border shadow-sm transition-all hover:shadow-md ${
-                    insight.icon === "check" ? "bg-emerald-50/50 border-emerald-100 text-emerald-900" :
-                    insight.icon === "alert" ? "bg-amber-50/50 border-amber-200/60 text-amber-900" :
-                    "bg-blue-50/50 border-blue-100 text-blue-900"
-                  }`}>
-                    {insight.icon === "check" && <CheckCircle className="h-5 w-5 mt-0.5 flex-shrink-0 text-emerald-500" />}
-                    {insight.icon === "alert" && <AlertTriangle className="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-500" />}
-                    {insight.icon === "info" && <Lightbulb className="h-5 w-5 mt-0.5 flex-shrink-0 text-blue-500" />}
-                    <span className="leading-relaxed font-medium">{insight.text}</span>
-                  </div>
-                ));
-              })()}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }
