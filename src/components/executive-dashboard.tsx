@@ -263,6 +263,7 @@ export function ExecutiveDashboard() {
   const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades">("vendas");
   const [unitStatusFilter, setUnitStatusFilter] = useState<string>("Todas");
   const [unitEnterpriseFilter, setUnitEnterpriseFilter] = useState<string>("Todos");
+  const [unitTypeFilter, setUnitTypeFilter] = useState<string>("Todos");
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
@@ -2205,8 +2206,26 @@ export function ExecutiveDashboard() {
           return { ...item, pct };
         });
 
+        // ─── Unit type inference from name ───
+        const inferUnitType = (name: string): string => {
+          const n = name.toUpperCase().trim();
+          if (/\bVG\b|VAGA|GARAGEM|^G[\s-]?\d/i.test(n)) {
+            if (/DUPLA|DBL|2V/i.test(n)) return "Vaga Dupla";
+            if (/TRIPLA|TPL|3V/i.test(n)) return "Vaga Tripla";
+            if (/PNE|DEFICIENTE|ACESS/i.test(n)) return "Vaga PNE";
+            return "Vaga Simples";
+          }
+          if (/\bSL\b|\bSALA\b|COMERCIAL/i.test(n)) return "Sala Comercial";
+          if (/\bLJ\b|\bLOJA\b/i.test(n)) return "Loja";
+          if (/\bCASA\b/i.test(n)) return "Casa";
+          if (/\bCOB\b|COBERTURA/i.test(n)) return "Cobertura";
+          if (/\bGARDEN\b|\bJARDIM\b/i.test(n)) return "Garden";
+          if (/\bDEP\b|DEPOSITO|\bBOX\b/i.test(n)) return "Depósito";
+          return "Apartamento";
+        };
+
         // ─── Unit analysis from contracts ───
-        const unitMap = new Map<string, { enterprise: string; unit: string; status: string; value: number; customer: string; contractDate: string }>();
+        const unitMap = new Map<string, { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string }>();
         // Use ALL contracts (not just filtered) for unit inventory overview
         const allContractsForUnits = salesContracts.filter(c => {
           if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
@@ -2227,6 +2246,7 @@ export function ExecutiveDashboard() {
                 enterprise: c.enterpriseName,
                 unit: u.name,
                 status,
+                tipo: inferUnitType(u.name),
                 value: c.value || 0,
                 customer: c.salesContractCustomers?.[0]?.name || "—",
                 contractDate: c.contractDate || "",
@@ -2523,17 +2543,25 @@ export function ExecutiveDashboard() {
               };
               const defaultColor = { bg: "bg-white", text: "text-violet-600", border: "border-violet-200", activeBg: "bg-violet-500 text-white border-violet-500" };
 
-              // Filter units by status and enterprise
+              // Collect all unique unit types
+              const allUnitTypes = Array.from(new Set(allUnits.map(u => u.tipo))).sort();
+
+              // Filter units by status, enterprise and type
               const filteredUnits = allUnits.filter(u => {
                 if (unitStatusFilter !== "Todas" && u.status !== unitStatusFilter) return false;
                 if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
+                if (unitTypeFilter !== "Todos" && u.tipo !== unitTypeFilter) return false;
                 return true;
               });
 
-              // Count per status (for badges)
+              // Count per status (for badges) - respecting enterprise + type filters
               const statusCounts = new Map<string, number>();
-              const enterpriseFilteredUnits = allUnits.filter(u => unitEnterpriseFilter === "Todos" || u.enterprise === unitEnterpriseFilter);
-              enterpriseFilteredUnits.forEach(u => {
+              const preFilteredUnits = allUnits.filter(u => {
+                if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
+                if (unitTypeFilter !== "Todos" && u.tipo !== unitTypeFilter) return false;
+                return true;
+              });
+              preFilteredUnits.forEach(u => {
                 statusCounts.set(u.status, (statusCounts.get(u.status) || 0) + 1);
               });
 
@@ -2608,25 +2636,40 @@ export function ExecutiveDashboard() {
               <Card className="border-0 shadow-sm mt-6">
                 <CardContent className="p-4">
                   <div className="flex flex-col gap-3">
-                    {/* Enterprise filter */}
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Empreendimento:</span>
-                      <select
-                        className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        value={unitEnterpriseFilter}
-                        onChange={e => setUnitEnterpriseFilter(e.target.value)}
-                      >
-                        <option value="Todos">Todos ({allUnits.length})</option>
-                        {allEnterprises.map(e => (
-                          <option key={e} value={e}>{e} ({allUnits.filter(u => u.enterprise === e).length})</option>
-                        ))}
-                      </select>
+                    {/* Enterprise + Type filters */}
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Empreendimento:</span>
+                        <select
+                          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          value={unitEnterpriseFilter}
+                          onChange={e => setUnitEnterpriseFilter(e.target.value)}
+                        >
+                          <option value="Todos">Todos ({allUnits.length})</option>
+                          {allEnterprises.map(e => (
+                            <option key={e} value={e}>{e} ({allUnits.filter(u => u.enterprise === e).length})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tipo de Imóvel:</span>
+                        <select
+                          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                          value={unitTypeFilter}
+                          onChange={e => setUnitTypeFilter(e.target.value)}
+                        >
+                          <option value="Todos">Todos</option>
+                          {allUnitTypes.map(t => (
+                            <option key={t} value={t}>{t} ({allUnits.filter(u => u.tipo === t).length})</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                     {/* Status filter tabs */}
                     <div className="flex items-center gap-2 flex-wrap">
                       {["Todas", ...allStatuses].map(status => {
                         const isActive = unitStatusFilter === status;
-                        const count = status === "Todas" ? enterpriseFilteredUnits.length : (statusCounts.get(status) || 0);
+                        const count = status === "Todas" ? preFilteredUnits.length : (statusCounts.get(status) || 0);
                         const colors = statusColors[status] || defaultColor;
                         return (
                           <button
@@ -2665,6 +2708,7 @@ export function ExecutiveDashboard() {
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pl-5">Status</TableHead>
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Empreendimento</TableHead>
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Unidade</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Tipo</TableHead>
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Cliente</TableHead>
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right">Data Contrato</TableHead>
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right pr-5">Valor</TableHead>
@@ -2689,7 +2733,7 @@ export function ExecutiveDashboard() {
                                 });
                               }}
                             >
-                              <TableCell className="pl-5 py-3" colSpan={2}>
+                              <TableCell className="pl-5 py-3" colSpan={3}>
                                 <div className="flex items-center gap-2">
                                   <div className={`p-0.5 rounded transition-colors ${isExpanded ? "bg-indigo-100" : ""}`}>
                                     {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-indigo-500" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
@@ -2729,6 +2773,9 @@ export function ExecutiveDashboard() {
                                   <TableCell>
                                     <span className="font-mono text-[12px] font-bold text-slate-700 bg-white py-0.5 px-2 rounded border border-slate-200 shadow-sm">{u.unit}</span>
                                   </TableCell>
+                                  <TableCell>
+                                    <span className="text-[11px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100">{u.tipo}</span>
+                                  </TableCell>
                                   <TableCell className="text-[12px] text-slate-600">{u.customer}</TableCell>
                                   <TableCell className="text-right text-[12px] text-slate-500 tabular-nums">{formatDate(u.contractDate)}</TableCell>
                                   <TableCell className="text-right pr-5 text-[12px] font-medium tabular-nums text-slate-700">
@@ -2742,7 +2789,7 @@ export function ExecutiveDashboard() {
                       })}
                       {/* Total row */}
                       <TableRow className="bg-indigo-50/50 border-t-2 border-indigo-200">
-                        <TableCell className="pl-5 py-3 font-bold text-[13px] text-indigo-800" colSpan={4}>
+                        <TableCell className="pl-5 py-3 font-bold text-[13px] text-indigo-800" colSpan={5}>
                           TOTAL — {filteredUnits.length} unidades
                         </TableCell>
                         <TableCell />
