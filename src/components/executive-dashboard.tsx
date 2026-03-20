@@ -1757,6 +1757,10 @@ export function ExecutiveDashboard() {
             onSelectAll={() => setSelectedCompanies(new Set(allCompanyNames))}
             onClear={() => setSelectedCompanies(defaultCompanies())}
             activeColor="indigo"
+            onSaveDefault={() => {
+              localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
+              toast.success("Padrão de empresas salvo!");
+            }}
           />
           <MultiSelectFilter
             label="Anos"
@@ -1767,6 +1771,10 @@ export function ExecutiveDashboard() {
             onSelectAll={() => setSelectedYears(new Set(availableYears))}
             onClear={() => setSelectedYears(new Set())}
             activeColor="violet"
+            onSaveDefault={() => {
+              localStorage.setItem("dashboard_default_years", JSON.stringify([...selectedYears]));
+              toast.success("Padrão de anos salvo!");
+            }}
           />
           <MultiSelectFilter
             label="Meses"
