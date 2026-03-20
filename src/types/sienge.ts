@@ -418,3 +418,22 @@ export interface SiengeSalesContract {
   salesContractUnits: SiengeSalesContractUnit[];
   paymentConditions: SiengeSalesContractPaymentCondition[];
 }
+
+// ─── Enterprise Units ─────────────────────────────────────────────────────────
+
+export interface SiengeEnterprise {
+  id: number;
+  name: string;
+  companyId: number;
+  companyName: string;
+}
+
+export interface SiengeEnterpriseUnit {
+  id: number;
+  name: string;
+  enterpriseId: number;
+  enterpriseName: string;
+  commercialStock: string; // "Disponivel", "Vendido", "Reserva Tecnica", etc.
+  areaTotal: number;
+  price: number;
+}

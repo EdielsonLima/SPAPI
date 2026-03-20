@@ -260,6 +260,7 @@ export function ExecutiveDashboard() {
   const [expandedCreditors, setExpandedCreditors] = useState<Set<string>>(new Set());
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
   const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
+  const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades">("vendas");
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
@@ -2202,8 +2203,84 @@ export function ExecutiveDashboard() {
           return { ...item, pct };
         });
 
+        // ─── Unit analysis from contracts ───
+        const unitMap = new Map<string, { enterprise: string; unit: string; status: string; value: number; customer: string; contractDate: string }>();
+        // Use ALL contracts (not just filtered) for unit inventory overview
+        const allContractsForUnits = salesContracts.filter(c => {
+          if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
+          return true;
+        });
+        allContractsForUnits.forEach(c => {
+          (c.salesContractUnits || []).forEach(u => {
+            const key = `${c.enterpriseName}||${u.name}`;
+            const existing = unitMap.get(key);
+            // Keep the most recent contract for each unit
+            if (!existing || (c.contractDate > existing.contractDate)) {
+              let status = "Vendida";
+              if (c.cancellationDate || c.situation === "Cancelado") status = "Disponível";
+              else if (c.situation === "Emitido") status = "Vendida";
+              else if (c.situation === "Distratado") status = "Disponível";
+              else status = c.situation || "Outro";
+              unitMap.set(key, {
+                enterprise: c.enterpriseName,
+                unit: u.name,
+                status,
+                value: c.value || 0,
+                customer: c.salesContractCustomers?.[0]?.name || "—",
+                contractDate: c.contractDate || "",
+              });
+            }
+          });
+        });
+
+        const allUnits = Array.from(unitMap.values());
+        const enterpriseUnitSummary = new Map<string, { total: number; vendida: number; disponivel: number; outro: number; valorTotal: number; units: typeof allUnits }>();
+        allUnits.forEach(u => {
+          if (!enterpriseUnitSummary.has(u.enterprise)) {
+            enterpriseUnitSummary.set(u.enterprise, { total: 0, vendida: 0, disponivel: 0, outro: 0, valorTotal: 0, units: [] });
+          }
+          const s = enterpriseUnitSummary.get(u.enterprise)!;
+          s.total++;
+          s.units.push(u);
+          if (u.status === "Vendida") { s.vendida++; s.valorTotal += u.value; }
+          else if (u.status === "Disponível") s.disponivel++;
+          else s.outro++;
+        });
+        const enterpriseRows = Array.from(enterpriseUnitSummary.entries())
+          .map(([name, data]) => ({ name, ...data }))
+          .sort((a, b) => b.total - a.total);
+
+        const totalUnitsCount = allUnits.length;
+        const totalVendidas = allUnits.filter(u => u.status === "Vendida").length;
+        const totalDisponiveis = allUnits.filter(u => u.status === "Disponível").length;
+        const totalOutros = allUnits.filter(u => u.status !== "Vendida" && u.status !== "Disponível").length;
+
         return (
           <>
+            {/* Sub-tabs */}
+            <div className="flex items-center gap-1 mb-4">
+              <Button
+                variant={comercialSubTab === "vendas" ? "default" : "ghost"}
+                size="sm"
+                className={`h-8 text-xs font-semibold ${comercialSubTab === "vendas" ? "bg-indigo-600 text-white hover:bg-indigo-700" : "text-slate-500 hover:text-slate-700"}`}
+                onClick={() => setComercialSubTab("vendas")}
+              >
+                <Handshake className="h-3.5 w-3.5 mr-1.5" />
+                Vendas
+              </Button>
+              <Button
+                variant={comercialSubTab === "unidades" ? "default" : "ghost"}
+                size="sm"
+                className={`h-8 text-xs font-semibold ${comercialSubTab === "unidades" ? "bg-indigo-600 text-white hover:bg-indigo-700" : "text-slate-500 hover:text-slate-700"}`}
+                onClick={() => setComercialSubTab("unidades")}
+              >
+                <Building2 className="h-3.5 w-3.5 mr-1.5" />
+                Unidades
+              </Button>
+            </div>
+
+            {/* ─── VENDAS SUB-TAB ─── */}
+            {comercialSubTab === "vendas" && <>
             {/* KPI Cards */}
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
               <Card className="border-0 shadow-sm overflow-hidden">
@@ -2425,6 +2502,205 @@ export function ExecutiveDashboard() {
                 </Table>
               </CardContent>
             </Card>
+            </>}
+
+            {/* ─── UNIDADES SUB-TAB ─── */}
+            {comercialSubTab === "unidades" && <>
+              {/* Unit KPI Cards */}
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                <Card className="border-0 shadow-sm overflow-hidden">
+                  <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-indigo-400" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-indigo-600/80 uppercase tracking-widest">Total Unidades</p>
+                        <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalUnitsCount}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">{enterpriseRows.length} empreendimentos</p>
+                      </div>
+                      <div className="p-3 bg-indigo-50 rounded-xl"><Building2 className="h-5 w-5 text-indigo-500" /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm overflow-hidden">
+                  <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Vendidas</p>
+                        <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalVendidas}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">{totalUnitsCount > 0 ? ((totalVendidas / totalUnitsCount) * 100).toFixed(1) : 0}% do total</p>
+                      </div>
+                      <div className="p-3 bg-emerald-50 rounded-xl"><CheckCircle className="h-5 w-5 text-emerald-500" /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm overflow-hidden">
+                  <div className="h-1.5 bg-gradient-to-r from-amber-500 to-amber-400" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-amber-600/80 uppercase tracking-widest">Disponíveis</p>
+                        <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalDisponiveis}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">{totalUnitsCount > 0 ? ((totalDisponiveis / totalUnitsCount) * 100).toFixed(1) : 0}% do total</p>
+                      </div>
+                      <div className="p-3 bg-amber-50 rounded-xl"><AlertTriangle className="h-5 w-5 text-amber-500" /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-sm overflow-hidden">
+                  <div className="h-1.5 bg-gradient-to-r from-slate-500 to-slate-400" />
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-xs font-bold text-slate-600/80 uppercase tracking-widest">Outros Status</p>
+                        <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalOutros}</p>
+                        <p className="text-[11px] text-slate-400 mt-1">Reserva técnica, etc.</p>
+                      </div>
+                      <div className="p-3 bg-slate-100 rounded-xl"><Clock className="h-5 w-5 text-slate-500" /></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Stacked bar chart - units by enterprise */}
+              {enterpriseRows.length > 0 && (
+                <Card className="border-0 shadow-sm mt-6">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-bold text-slate-700">Unidades por Empreendimento</CardTitle>
+                    <CardDescription className="text-xs text-slate-400">{totalUnitsCount} unidades em {enterpriseRows.length} empreendimentos</CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <ResponsiveContainer width="100%" height={Math.max(250, enterpriseRows.length * 50)}>
+                      <BarChart data={enterpriseRows} layout="vertical" margin={{ top: 5, right: 80, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} width={180} />
+                        <RechartsTooltip
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          formatter={(value: any, name: any) => [Number(value ?? 0), name === "vendida" ? "Vendidas" : name === "disponivel" ? "Disponíveis" : "Outros"]}
+                          contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "13px" }}
+                        />
+                        <Bar dataKey="vendida" stackId="a" fill="#22c55e" name="Vendidas" radius={[0, 0, 0, 0]}>
+                          <LabelList dataKey="vendida" position="center" fontSize={10} fontWeight={700} fill="#fff" formatter={(v: unknown) => Number(v) > 0 ? Number(v) : ""} />
+                        </Bar>
+                        <Bar dataKey="disponivel" stackId="a" fill="#f59e0b" name="Disponíveis" radius={[0, 0, 0, 0]}>
+                          <LabelList dataKey="disponivel" position="center" fontSize={10} fontWeight={700} fill="#fff" formatter={(v: unknown) => Number(v) > 0 ? Number(v) : ""} />
+                        </Bar>
+                        <Bar dataKey="outro" stackId="a" fill="#94a3b8" name="Outros" radius={[0, 4, 4, 0]}>
+                          <LabelList dataKey="outro" position="center" fontSize={10} fontWeight={700} fill="#fff" formatter={(v: unknown) => Number(v) > 0 ? Number(v) : ""} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                    <div className="flex items-center justify-center gap-6 mt-3">
+                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-emerald-500" /><span className="text-xs text-slate-500">Vendidas</span></div>
+                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-amber-500" /><span className="text-xs text-slate-500">Disponíveis</span></div>
+                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-slate-400" /><span className="text-xs text-slate-500">Outros</span></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Detailed table by enterprise */}
+              <Card className="border-0 shadow-sm mt-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold text-slate-700">Detalhamento por Empreendimento</CardTitle>
+                  <CardDescription className="text-xs text-slate-400">Clique para expandir e ver as unidades individuais</CardDescription>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50/80 border-b border-slate-200">
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pl-5">Empreendimento</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-center">Total</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-center">Vendidas</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-center">Disponíveis</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-center">Outros</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right">Valor Vendido</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right pr-5">% Vendido</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {enterpriseRows.map(row => {
+                        const pctVendido = row.total > 0 ? (row.vendida / row.total) * 100 : 0;
+                        const isExpanded = expandedComercial.has(`unit-${row.name}`);
+                        return (
+                          <React.Fragment key={row.name}>
+                            <TableRow
+                              className="hover:bg-slate-50/80 cursor-pointer transition-colors border-b border-slate-100"
+                              onClick={() => {
+                                setExpandedComercial(prev => {
+                                  const next = new Set(prev);
+                                  const key = `unit-${row.name}`;
+                                  if (next.has(key)) next.delete(key); else next.add(key);
+                                  return next;
+                                });
+                              }}
+                            >
+                              <TableCell className="pl-5 py-3">
+                                <div className="flex items-center gap-2">
+                                  <div className={`p-0.5 rounded transition-colors ${isExpanded ? "bg-indigo-100" : ""}`}>
+                                    {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-indigo-500" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
+                                  </div>
+                                  <span className="font-semibold text-[13px] text-slate-700">{row.name}</span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center font-bold text-[13px] text-slate-700 tabular-nums">{row.total}</TableCell>
+                              <TableCell className="text-center font-bold text-[13px] text-emerald-600 tabular-nums">{row.vendida}</TableCell>
+                              <TableCell className="text-center font-bold text-[13px] text-amber-600 tabular-nums">{row.disponivel}</TableCell>
+                              <TableCell className="text-center font-bold text-[13px] text-slate-500 tabular-nums">{row.outro}</TableCell>
+                              <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{formatCurrency(row.valorTotal)}</TableCell>
+                              <TableCell className="text-right pr-5">
+                                <div className="flex items-center justify-end gap-2">
+                                  <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(pctVendido, 100)}%` }} />
+                                  </div>
+                                  <span className={`text-[11px] font-bold tabular-nums ${pctVendido >= 80 ? "text-emerald-600" : pctVendido >= 50 ? "text-amber-600" : "text-red-600"}`}>
+                                    {pctVendido.toFixed(0)}%
+                                  </span>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                            {isExpanded && row.units
+                              .sort((a, b) => a.unit.localeCompare(b.unit))
+                              .map((u, idx) => (
+                                <TableRow key={`${u.unit}-${idx}`} className="bg-slate-50/50 border-b border-slate-100/50">
+                                  <TableCell className="pl-12 py-2" colSpan={2}>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-slate-400 font-mono text-[10px] bg-white py-0.5 px-1.5 rounded border border-slate-200 shadow-sm">{u.unit}</span>
+                                      <span className="text-[12px] text-slate-600">{u.customer}</span>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-center" colSpan={2}>
+                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                                      u.status === "Vendida" ? "border-emerald-200 text-emerald-600 bg-emerald-50" :
+                                      u.status === "Disponível" ? "border-amber-200 text-amber-600 bg-amber-50" :
+                                      "border-slate-200 text-slate-500"
+                                    }`}>{u.status}</Badge>
+                                  </TableCell>
+                                  <TableCell className="text-center text-[12px] text-slate-500 tabular-nums">{formatDate(u.contractDate)}</TableCell>
+                                  <TableCell className="text-right text-[12px] text-slate-600 font-medium tabular-nums" colSpan={2}>
+                                    {u.status === "Vendida" ? formatCurrency(u.value) : "—"}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                          </React.Fragment>
+                        );
+                      })}
+                      {/* Total row */}
+                      <TableRow className="bg-indigo-50/50 border-t-2 border-indigo-200">
+                        <TableCell className="pl-5 py-3 font-bold text-[13px] text-indigo-800">TOTAL</TableCell>
+                        <TableCell className="text-center font-bold text-[13px] text-indigo-800 tabular-nums">{totalUnitsCount}</TableCell>
+                        <TableCell className="text-center font-bold text-[13px] text-emerald-700 tabular-nums">{totalVendidas}</TableCell>
+                        <TableCell className="text-center font-bold text-[13px] text-amber-700 tabular-nums">{totalDisponiveis}</TableCell>
+                        <TableCell className="text-center font-bold text-[13px] text-slate-600 tabular-nums">{totalOutros}</TableCell>
+                        <TableCell className="text-right font-bold text-[14px] text-indigo-800 tabular-nums">{formatCurrency(allUnits.filter(u => u.status === "Vendida").reduce((s, u) => s + u.value, 0))}</TableCell>
+                        <TableCell className="text-right pr-5 font-bold text-[13px] text-indigo-700">{totalUnitsCount > 0 ? ((totalVendidas / totalUnitsCount) * 100).toFixed(0) : 0}%</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </>}
           </>
         );
       })()}
