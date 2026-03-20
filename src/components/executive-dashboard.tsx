@@ -262,9 +262,9 @@ export function ExecutiveDashboard() {
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
   const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
   const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades" | "quadro">("vendas");
-  const [unitStatusFilter, setUnitStatusFilter] = useState<string>("Todas");
-  const [unitEnterpriseFilter, setUnitEnterpriseFilter] = useState<string>("Todos");
-  const [unitTypeFilter, setUnitTypeFilter] = useState<string>("Todos");
+  const [selectedUnitStatuses, setSelectedUnitStatuses] = useState<Set<string>>(new Set());
+  const [selectedUnitEnterprises, setSelectedUnitEnterprises] = useState<Set<string>>(new Set());
+  const [selectedUnitTypes, setSelectedUnitTypes] = useState<Set<string>>(new Set());
   const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
@@ -2539,10 +2539,6 @@ export function ExecutiveDashboard() {
 
             {/* ─── UNIDADES SUB-TAB ─── */}
             {comercialSubTab === "unidades" && (() => {
-              // Collect all unique statuses and enterprises
-              const allStatuses = Array.from(new Set(allUnits.map(u => u.status))).sort();
-              const allEnterprises = Array.from(new Set(allUnits.map(u => u.enterprise))).sort();
-
               // Status color mapping
               const statusColors: Record<string, { bg: string; text: string; border: string; activeBg: string }> = {
                 "Todas": { bg: "bg-white", text: "text-slate-700", border: "border-slate-300", activeBg: "bg-slate-800 text-white border-slate-800" },
@@ -2555,30 +2551,20 @@ export function ExecutiveDashboard() {
               const defaultColor = { bg: "bg-white", text: "text-violet-600", border: "border-violet-200", activeBg: "bg-violet-500 text-white border-violet-500" };
 
               // Cascading filters: Enterprise → Type → Unit names
-              const unitsForEnterprise = unitEnterpriseFilter === "Todos" ? allUnits : allUnits.filter(u => u.enterprise === unitEnterpriseFilter);
+              const allEnterpriseOptions = Array.from(new Set(allUnits.map(u => u.enterprise))).sort();
+              const unitsForEnterprise = selectedUnitEnterprises.size === 0 ? allUnits : allUnits.filter(u => selectedUnitEnterprises.has(u.enterprise));
               const allUnitTypes = Array.from(new Set(unitsForEnterprise.map(u => u.tipo))).sort();
-              const unitsForType = unitTypeFilter === "Todos" ? unitsForEnterprise : unitsForEnterprise.filter(u => u.tipo === unitTypeFilter);
+              const unitsForType = selectedUnitTypes.size === 0 ? unitsForEnterprise : unitsForEnterprise.filter(u => selectedUnitTypes.has(u.tipo));
               const allUnitNames = Array.from(new Set(unitsForType.map(u => u.unit))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+              const allStatusOptions = Array.from(new Set(allUnits.map(u => u.status))).sort();
 
-              // Filter units by status, enterprise, type and selected units
+              // Filter units by all filters
               const filteredUnits = allUnits.filter(u => {
-                if (unitStatusFilter !== "Todas" && u.status !== unitStatusFilter) return false;
-                if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
-                if (unitTypeFilter !== "Todos" && u.tipo !== unitTypeFilter) return false;
+                if (selectedUnitEnterprises.size > 0 && !selectedUnitEnterprises.has(u.enterprise)) return false;
+                if (selectedUnitTypes.size > 0 && !selectedUnitTypes.has(u.tipo)) return false;
                 if (selectedUnits.size > 0 && !selectedUnits.has(u.unit)) return false;
+                if (selectedUnitStatuses.size > 0 && !selectedUnitStatuses.has(u.status)) return false;
                 return true;
-              });
-
-              // Count per status (for badges) - respecting enterprise + type + unit filters
-              const statusCounts = new Map<string, number>();
-              const preFilteredUnits = allUnits.filter(u => {
-                if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
-                if (unitTypeFilter !== "Todos" && u.tipo !== unitTypeFilter) return false;
-                if (selectedUnits.size > 0 && !selectedUnits.has(u.unit)) return false;
-                return true;
-              });
-              preFilteredUnits.forEach(u => {
-                statusCounts.set(u.status, (statusCounts.get(u.status) || 0) + 1);
               });
 
               // Group filtered units by enterprise for the table
@@ -2648,89 +2634,58 @@ export function ExecutiveDashboard() {
                 </Card>
               </div>
 
-              {/* Filters row: Enterprise select + Status tabs */}
-              <Card className="border-0 shadow-sm mt-6">
-                <CardContent className="p-4">
-                  <div className="flex flex-col gap-3">
-                    {/* Enterprise + Type filters */}
-                    <div className="flex items-center gap-4 flex-wrap">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Empreendimento:</span>
-                        <select
-                          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          value={unitEnterpriseFilter}
-                          onChange={e => { setUnitEnterpriseFilter(e.target.value); setUnitTypeFilter("Todos"); setSelectedUnits(new Set()); setUnitStatusFilter("Todas"); }}
-                        >
-                          <option value="Todos">Todos ({allUnits.length})</option>
-                          {allEnterprises.map(e => (
-                            <option key={e} value={e}>{e} ({allUnits.filter(u => u.enterprise === e).length})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tipo de Imóvel:</span>
-                        <select
-                          className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                          value={unitTypeFilter}
-                          onChange={e => { setUnitTypeFilter(e.target.value); setSelectedUnits(new Set()); setUnitStatusFilter("Todas"); }}
-                        >
-                          <option value="Todos">Todos</option>
-                          {allUnitTypes.map(t => (
-                            <option key={t} value={t}>{t} ({unitsForEnterprise.filter(u => u.tipo === t).length})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <MultiSelectFilter
-                        label="Unidades"
-                        icon={<Search className="h-4 w-4" />}
-                        allOptions={allUnitNames}
-                        selected={selectedUnits}
-                        onToggle={(name) => {
-                          setSelectedUnits(prev => {
-                            const next = new Set(prev);
-                            if (next.has(name)) next.delete(name); else next.add(name);
-                            return next;
-                          });
-                        }}
-                        onSelectAll={() => setSelectedUnits(new Set(allUnitNames))}
-                        onClear={() => setSelectedUnits(new Set())}
-                        activeColor="cyan"
-                      />
-                    </div>
-                    {/* Status filter tabs */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {["Todas", ...allStatuses].map(status => {
-                        const isActive = unitStatusFilter === status;
-                        const count = status === "Todas" ? preFilteredUnits.length : (statusCounts.get(status) || 0);
-                        const colors = statusColors[status] || defaultColor;
-                        return (
-                          <button
-                            key={status}
-                            onClick={() => setUnitStatusFilter(status)}
-                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                              isActive ? colors.activeBg : `${colors.bg} ${colors.text} ${colors.border} hover:bg-slate-50`
-                            }`}
-                          >
-                            {status}
-                            <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold ${
-                              isActive ? "bg-white/20 text-inherit" : "bg-slate-100 text-slate-500"
-                            }`}>{count}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Filters row: all MultiSelectFilter */}
+              <div className="flex items-center gap-2 flex-wrap mt-6">
+                <MultiSelectFilter
+                  label="Empreendimento"
+                  icon={<Building2 className="h-4 w-4" />}
+                  allOptions={allEnterpriseOptions}
+                  selected={selectedUnitEnterprises}
+                  onToggle={(name) => { setSelectedUnitEnterprises(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                  onSelectAll={() => { setSelectedUnitEnterprises(new Set(allEnterpriseOptions)); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                  onClear={() => { setSelectedUnitEnterprises(new Set()); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                  activeColor="indigo"
+                />
+                <MultiSelectFilter
+                  label="Tipo Imóvel"
+                  icon={<Ruler className="h-4 w-4" />}
+                  allOptions={allUnitTypes}
+                  selected={selectedUnitTypes}
+                  onToggle={(name) => { setSelectedUnitTypes(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); setSelectedUnits(new Set()); }}
+                  onSelectAll={() => { setSelectedUnitTypes(new Set(allUnitTypes)); setSelectedUnits(new Set()); }}
+                  onClear={() => { setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                  activeColor="violet"
+                />
+                <MultiSelectFilter
+                  label="Unidades"
+                  icon={<Search className="h-4 w-4" />}
+                  allOptions={allUnitNames}
+                  selected={selectedUnits}
+                  onToggle={(name) => { setSelectedUnits(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
+                  onSelectAll={() => setSelectedUnits(new Set(allUnitNames))}
+                  onClear={() => setSelectedUnits(new Set())}
+                  activeColor="cyan"
+                />
+                <MultiSelectFilter
+                  label="Status"
+                  icon={<CheckCircle className="h-4 w-4" />}
+                  allOptions={allStatusOptions}
+                  selected={selectedUnitStatuses}
+                  onToggle={(name) => { setSelectedUnitStatuses(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
+                  onSelectAll={() => setSelectedUnitStatuses(new Set(allStatusOptions))}
+                  onClear={() => setSelectedUnitStatuses(new Set())}
+                  activeColor="emerald"
+                />
+              </div>
 
               {/* Units table */}
               <Card className="border-0 shadow-sm mt-4">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-bold text-slate-700">
-                    {unitStatusFilter === "Todas" ? "Todas as Unidades" : `Unidades — ${unitStatusFilter}`}
+                    {selectedUnitStatuses.size === 0 ? "Todas as Unidades" : `Unidades — ${Array.from(selectedUnitStatuses).join(", ")}`}
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-400">
-                    {filteredUnits.length} unidades {unitEnterpriseFilter !== "Todos" ? `em ${unitEnterpriseFilter}` : `em ${enterpriseGroupRows.length} empreendimentos`}
+                    {filteredUnits.length} unidades {selectedUnitEnterprises.size > 0 ? `em ${Array.from(selectedUnitEnterprises).join(", ")}` : `em ${enterpriseGroupRows.length} empreendimentos`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -2838,29 +2793,28 @@ export function ExecutiveDashboard() {
 
             {/* ─── QUADRO ESPELHO SUB-TAB ─── */}
             {comercialSubTab === "quadro" && (() => {
-              const qEnterprises = Array.from(new Set(allUnits.map(u => u.enterprise))).sort();
-              // Cascading: types depend on selected enterprise
-              const qUnitsForEnterprise = unitEnterpriseFilter === "Todos" ? allUnits : allUnits.filter(u => u.enterprise === unitEnterpriseFilter);
-              const qTypes = Array.from(new Set(qUnitsForEnterprise.map(u => u.tipo))).sort();
+              // Cascading filters using shared Set-based states
+              const qEnterpriseOptions = Array.from(new Set(allUnits.map(u => u.enterprise))).sort();
+              const qUnitsForEnterprise = selectedUnitEnterprises.size === 0 ? allUnits : allUnits.filter(u => selectedUnitEnterprises.has(u.enterprise));
+              const qTypeOptions = Array.from(new Set(qUnitsForEnterprise.map(u => u.tipo))).sort();
+              const qUnitsForType = selectedUnitTypes.size === 0 ? qUnitsForEnterprise : qUnitsForEnterprise.filter(u => selectedUnitTypes.has(u.tipo));
+              const qUnitNames = Array.from(new Set(qUnitsForType.map(u => u.unit))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+              const qStatusOptions = Array.from(new Set(allUnits.map(u => u.status))).sort();
 
-              // Filter units for selected enterprise
+              // Filter units
               const qUnits = allUnits.filter(u => {
-                if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
-                if (unitTypeFilter !== "Todos" && u.tipo !== unitTypeFilter) return false;
+                if (selectedUnitEnterprises.size > 0 && !selectedUnitEnterprises.has(u.enterprise)) return false;
+                if (selectedUnitTypes.size > 0 && !selectedUnitTypes.has(u.tipo)) return false;
+                if (selectedUnits.size > 0 && !selectedUnits.has(u.unit)) return false;
                 return true;
               }).sort((a, b) => a.unit.localeCompare(b.unit, undefined, { numeric: true }));
-
-              // Status counts
-              const qStatusCounts = new Map<string, number>();
-              qUnits.forEach(u => qStatusCounts.set(u.status, (qStatusCounts.get(u.status) || 0) + 1));
-              const qStatuses = Array.from(new Set(qUnits.map(u => u.status))).sort();
 
               const qVendidas = qUnits.filter(u => u.status === "Vendida").length;
               const qDisponiveis = qUnits.filter(u => u.status === "Disponível").length;
               const qOutros = qUnits.length - qVendidas - qDisponiveis;
 
               // Filter by status if active
-              const qVisible = unitStatusFilter === "Todas" ? qUnits : qUnits.filter(u => u.status === unitStatusFilter);
+              const qVisible = selectedUnitStatuses.size === 0 ? qUnits : qUnits.filter(u => selectedUnitStatuses.has(u.status));
 
               // Card colors by status
               const cardStyle = (status: string) => {
@@ -2882,65 +2836,55 @@ export function ExecutiveDashboard() {
 
               return <>
                 {/* Filters */}
-                <Card className="border-0 shadow-sm">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center gap-4 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Empreendimento:</span>
-                          <select
-                            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            value={unitEnterpriseFilter}
-                            onChange={e => { setUnitEnterpriseFilter(e.target.value); setUnitTypeFilter("Todos"); setUnitStatusFilter("Todas"); }}
-                          >
-                            <option value="Todos">Todos ({allUnits.length})</option>
-                            {qEnterprises.map(e => (
-                              <option key={e} value={e}>{e} ({allUnits.filter(u => u.enterprise === e).length})</option>
-                            ))}
-                          </select>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tipo:</span>
-                          <select
-                            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            value={unitTypeFilter}
-                            onChange={e => { setUnitTypeFilter(e.target.value); setUnitStatusFilter("Todas"); }}
-                          >
-                            <option value="Todos">Todos</option>
-                            {qTypes.map(t => (
-                              <option key={t} value={t}>{t} ({qUnitsForEnterprise.filter(u => u.tipo === t).length})</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      {/* Status filter tabs */}
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {["Todas", ...qStatuses].map(status => {
-                          const isActive = unitStatusFilter === status;
-                          const count = status === "Todas" ? qUnits.length : (qStatusCounts.get(status) || 0);
-                          return (
-                            <button
-                              key={status}
-                              onClick={() => setUnitStatusFilter(status)}
-                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                                isActive
-                                  ? status === "Vendida" ? "bg-red-500 text-white border-red-500"
-                                  : status === "Disponível" ? "bg-emerald-500 text-white border-emerald-500"
-                                  : "bg-slate-800 text-white border-slate-800"
-                                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                              }`}
-                            >
-                              {status}
-                              <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold ${
-                                isActive ? "bg-white/20" : "bg-slate-100 text-slate-500"
-                              }`}>{count}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <MultiSelectFilter
+                    label="Empreendimento"
+                    icon={<Building2 className="h-3.5 w-3.5" />}
+                    allOptions={qEnterpriseOptions}
+                    selected={selectedUnitEnterprises}
+                    onToggle={v => {
+                      setSelectedUnitEnterprises(prev => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; });
+                      setSelectedUnitTypes(new Set());
+                      setSelectedUnits(new Set());
+                    }}
+                    onSelectAll={() => { setSelectedUnitEnterprises(new Set(qEnterpriseOptions)); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                    onClear={() => { setSelectedUnitEnterprises(new Set()); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                    activeColor="indigo"
+                  />
+                  <MultiSelectFilter
+                    label="Tipo Imóvel"
+                    icon={<Ruler className="h-3.5 w-3.5" />}
+                    allOptions={qTypeOptions}
+                    selected={selectedUnitTypes}
+                    onToggle={v => {
+                      setSelectedUnitTypes(prev => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; });
+                      setSelectedUnits(new Set());
+                    }}
+                    onSelectAll={() => { setSelectedUnitTypes(new Set(qTypeOptions)); setSelectedUnits(new Set()); }}
+                    onClear={() => { setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                    activeColor="violet"
+                  />
+                  <MultiSelectFilter
+                    label="Unidades"
+                    icon={<Search className="h-3.5 w-3.5" />}
+                    allOptions={qUnitNames}
+                    selected={selectedUnits}
+                    onToggle={v => setSelectedUnits(prev => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; })}
+                    onSelectAll={() => setSelectedUnits(new Set(qUnitNames))}
+                    onClear={() => setSelectedUnits(new Set())}
+                    activeColor="cyan"
+                  />
+                  <MultiSelectFilter
+                    label="Status"
+                    icon={<CheckCircle className="h-3.5 w-3.5" />}
+                    allOptions={qStatusOptions}
+                    selected={selectedUnitStatuses}
+                    onToggle={v => setSelectedUnitStatuses(prev => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; })}
+                    onSelectAll={() => setSelectedUnitStatuses(new Set(qStatusOptions))}
+                    onClear={() => setSelectedUnitStatuses(new Set())}
+                    activeColor="emerald"
+                  />
+                </div>
 
                 {/* Summary bar */}
                 {qUnits.length > 0 && (
@@ -2969,7 +2913,7 @@ export function ExecutiveDashboard() {
                 )}
 
                 {/* Grid of unit cards */}
-                {unitEnterpriseFilter === "Todos" ? (
+                {selectedUnitEnterprises.size === 0 ? (
                   <Card className="border-0 shadow-sm mt-4">
                     <CardContent className="p-8 text-center">
                       <LayoutGrid className="h-12 w-12 text-slate-300 mx-auto mb-3" />
