@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { siengeGet } from "@/lib/sienge";
-import { getCachedSalesContracts, cacheSalesContracts } from "@/lib/db";
+import { getCachedSalesContracts, cacheSalesContracts, ensureSalesContractsTable } from "@/lib/db";
 import { SiengeSalesContract } from "@/types/sienge";
 
 interface SiengeListResponse {
@@ -18,6 +18,9 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const forceRefresh = searchParams.get("forceRefresh") === "true";
+
+  // Ensure table exists (auto-migration for production)
+  await ensureSalesContractsTable();
 
   // Check cache first
   if (!forceRefresh) {

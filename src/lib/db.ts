@@ -282,6 +282,15 @@ export async function cacheBankMovements(startDate: string, endDate: string, dat
 
 // ─── Sales Contracts (Contratos de Vendas) ──────────────────────────────────
 
+let salesTableReady = false;
+export async function ensureSalesContractsTable() {
+  if (salesTableReady) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS cached_sales_contracts (
+    id SERIAL PRIMARY KEY, data JSONB NOT NULL, cached_at TIMESTAMP NOT NULL DEFAULT NOW()
+  )`);
+  salesTableReady = true;
+}
+
 export async function getCachedSalesContracts(): Promise<{ data: unknown; cachedAt: string } | null> {
   const result = await pool.query(
     `SELECT data, cached_at FROM cached_sales_contracts WHERE cached_at > NOW() - INTERVAL '7 days' ORDER BY id DESC LIMIT 1`

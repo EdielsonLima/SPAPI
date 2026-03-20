@@ -326,11 +326,16 @@ export function ExecutiveDashboard() {
     else if (!dataLoadedRef.current) setLoading(true);
 
     try {
-      const [outcomeRes, bmRes, incomeRes, salesRes] = await Promise.all([
+      // Sales contracts fetch runs independently — never blocks main data
+      fetch(`/api/sienge/sales-contracts${refreshParam ? "?forceRefresh=true" : ""}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => { if (data) setSalesContracts(data.data || []); })
+        .catch(() => {});
+
+      const [outcomeRes, bmRes, incomeRes] = await Promise.all([
         fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
         fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
         fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
-        fetch(`/api/sienge/sales-contracts${refreshParam ? "?forceRefresh=true" : ""}`),
       ]);
 
       if (!outcomeRes.ok) throw new Error("Outcome API error");
@@ -355,11 +360,6 @@ export function ExecutiveDashboard() {
       const incomeData = await incomeRes.json();
       setIncomeItems(incomeData.data || []);
       if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
-
-      if (salesRes.ok) {
-        const salesData = await salesRes.json();
-        setSalesContracts(salesData.data || []);
-      }
 
       dataLoadedRef.current = true;
     } catch {
