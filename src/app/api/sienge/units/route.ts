@@ -14,8 +14,8 @@ const STOCK_LABELS: Record<string, string> = {
   V: "Vendida",
   D: "Disponível",
   R: "Reserva Técnica",
-  P: "Permuta",
-  G: "Gravame",
+  P: "Proposta",
+  G: "Vendido/Terceiros",
 };
 
 export async function GET(request: NextRequest) {

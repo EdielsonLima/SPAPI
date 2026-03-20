@@ -2293,26 +2293,7 @@ export function ExecutiveDashboard() {
         });
 
         const allUnits = Array.from(unitMap.values());
-        const enterpriseUnitSummary = new Map<string, { total: number; vendida: number; disponivel: number; outro: number; valorTotal: number; units: typeof allUnits }>();
-        allUnits.forEach(u => {
-          if (!enterpriseUnitSummary.has(u.enterprise)) {
-            enterpriseUnitSummary.set(u.enterprise, { total: 0, vendida: 0, disponivel: 0, outro: 0, valorTotal: 0, units: [] });
-          }
-          const s = enterpriseUnitSummary.get(u.enterprise)!;
-          s.total++;
-          s.units.push(u);
-          if (u.status === "Vendida") { s.vendida++; s.valorTotal += u.value; }
-          else if (u.status === "Disponível") s.disponivel++;
-          else s.outro++;
-        });
-        const enterpriseRows = Array.from(enterpriseUnitSummary.entries())
-          .map(([name, data]) => ({ name, ...data }))
-          .sort((a, b) => b.total - a.total);
 
-        const totalUnitsCount = allUnits.length;
-        const totalVendidas = allUnits.filter(u => u.status === "Vendida").length;
-        const totalDisponiveis = allUnits.filter(u => u.status === "Disponível").length;
-        const totalOutros = allUnits.filter(u => u.status !== "Vendida" && u.status !== "Disponível").length;
 
         return (
           <>
@@ -2582,8 +2563,8 @@ export function ExecutiveDashboard() {
                 "Vendida": { bg: "bg-white", text: "text-red-600", border: "border-red-200", activeBg: "bg-red-500 text-white border-red-500" },
                 "Disponível": { bg: "bg-white", text: "text-emerald-600", border: "border-emerald-200", activeBg: "bg-emerald-500 text-white border-emerald-500" },
                 "Reserva Técnica": { bg: "bg-white", text: "text-blue-600", border: "border-blue-200", activeBg: "bg-blue-500 text-white border-blue-500" },
-                "Permuta": { bg: "bg-white", text: "text-purple-600", border: "border-purple-200", activeBg: "bg-purple-500 text-white border-purple-500" },
-                "Gravame": { bg: "bg-white", text: "text-yellow-600", border: "border-yellow-200", activeBg: "bg-yellow-500 text-white border-yellow-500" },
+                "Proposta": { bg: "bg-white", text: "text-orange-600", border: "border-orange-200", activeBg: "bg-orange-500 text-white border-orange-500" },
+                "Vendido/Terceiros": { bg: "bg-white", text: "text-pink-600", border: "border-pink-200", activeBg: "bg-pink-500 text-white border-pink-500" },
                 "Emitido": { bg: "bg-white", text: "text-red-600", border: "border-red-200", activeBg: "bg-red-500 text-white border-red-500" },
                 "Cancelado": { bg: "bg-white", text: "text-slate-500", border: "border-slate-200", activeBg: "bg-slate-500 text-white border-slate-500" },
                 "Distratado": { bg: "bg-white", text: "text-orange-600", border: "border-orange-200", activeBg: "bg-orange-500 text-white border-orange-500" },
@@ -2617,6 +2598,13 @@ export function ExecutiveDashboard() {
                 .map(([name, units]) => ({ name, units, totalValue: units.reduce((s, u) => s + (u.status === "Vendida" ? u.value : 0), 0) }))
                 .sort((a, b) => b.units.length - a.units.length);
 
+              // KPI counts based on filtered units
+              const fTotal = filteredUnits.length;
+              const fVendidas = filteredUnits.filter(u => u.status === "Vendida").length;
+              const fDisponiveis = filteredUnits.filter(u => u.status === "Disponível").length;
+              const fOutros = fTotal - fVendidas - fDisponiveis;
+              const fEnterprises = new Set(filteredUnits.map(u => u.enterprise)).size;
+
               return <>
               {/* KPI summary cards */}
               <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
@@ -2626,8 +2614,8 @@ export function ExecutiveDashboard() {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs font-bold text-indigo-600/80 uppercase tracking-widest">Total Unidades</p>
-                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalUnitsCount}</p>
-                        <p className="text-[11px] font-medium text-slate-400 mt-1">{enterpriseRows.length} empreendimentos</p>
+                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{fTotal}</p>
+                        <p className="text-[11px] font-medium text-slate-400 mt-1">{fEnterprises} empreendimentos</p>
                       </div>
                       <div className="p-3 bg-indigo-50/80 rounded-2xl ring-1 ring-indigo-100/50 shadow-sm"><Building2 className="h-5 w-5 text-indigo-500" /></div>
                     </div>
@@ -2639,8 +2627,8 @@ export function ExecutiveDashboard() {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Vendidas</p>
-                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalVendidas}</p>
-                        <p className="text-[11px] font-medium text-slate-400 mt-1">{totalUnitsCount > 0 ? ((totalVendidas / totalUnitsCount) * 100).toFixed(1) : 0}% do total</p>
+                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{fVendidas}</p>
+                        <p className="text-[11px] font-medium text-slate-400 mt-1">{fTotal > 0 ? ((fVendidas / fTotal) * 100).toFixed(1) : 0}% do total</p>
                       </div>
                       <div className="p-3 bg-emerald-50/80 rounded-2xl ring-1 ring-emerald-100/50 shadow-sm"><CheckCircle className="h-5 w-5 text-emerald-500" /></div>
                     </div>
@@ -2652,8 +2640,8 @@ export function ExecutiveDashboard() {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs font-bold text-amber-600/80 uppercase tracking-widest">Disponíveis</p>
-                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalDisponiveis}</p>
-                        <p className="text-[11px] font-medium text-slate-400 mt-1">{totalUnitsCount > 0 ? ((totalDisponiveis / totalUnitsCount) * 100).toFixed(1) : 0}% do total</p>
+                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{fDisponiveis}</p>
+                        <p className="text-[11px] font-medium text-slate-400 mt-1">{fTotal > 0 ? ((fDisponiveis / fTotal) * 100).toFixed(1) : 0}% do total</p>
                       </div>
                       <div className="p-3 bg-amber-50/80 rounded-2xl ring-1 ring-amber-100/50 shadow-sm"><AlertTriangle className="h-5 w-5 text-amber-500" /></div>
                     </div>
@@ -2665,7 +2653,7 @@ export function ExecutiveDashboard() {
                     <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs font-bold text-slate-600/80 uppercase tracking-widest">Outros Status</p>
-                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalOutros}</p>
+                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{fOutros}</p>
                         <p className="text-[11px] font-medium text-slate-400 mt-1">Reserva técnica, etc.</p>
                       </div>
                       <div className="p-3 bg-slate-100/80 rounded-2xl ring-1 ring-slate-200/50 shadow-sm"><Clock className="h-5 w-5 text-slate-500" /></div>
@@ -2854,8 +2842,9 @@ export function ExecutiveDashboard() {
               const qVendidas = qUnits.filter(u => u.status === "Vendida").length;
               const qDisponiveis = qUnits.filter(u => u.status === "Disponível").length;
               const qReserva = qUnits.filter(u => u.status === "Reserva Técnica").length;
-              const qPermuta = qUnits.filter(u => u.status === "Permuta").length;
-              const qOutros = qUnits.length - qVendidas - qDisponiveis - qReserva - qPermuta;
+              const qProposta = qUnits.filter(u => u.status === "Proposta").length;
+              const qVendTerceiros = qUnits.filter(u => u.status === "Vendido/Terceiros").length;
+              const qOutros = qUnits.length - qVendidas - qDisponiveis - qReserva - qProposta - qVendTerceiros;
 
               // Filter by status if active
               const qVisible = selectedUnitStatuses.size === 0 ? qUnits : qUnits.filter(u => selectedUnitStatuses.has(u.status));
@@ -2866,8 +2855,8 @@ export function ExecutiveDashboard() {
                   case "Vendida": return "bg-white border-slate-200 border-l-[4px] border-l-red-500 hover:border-red-300 hover:shadow-md";
                   case "Disponível": return "bg-white border-slate-200 border-l-[4px] border-l-emerald-500 hover:border-emerald-300 hover:shadow-md";
                   case "Reserva Técnica": return "bg-white border-slate-200 border-l-[4px] border-l-blue-500 hover:border-blue-300 hover:shadow-md";
-                  case "Permuta": return "bg-white border-slate-200 border-l-[4px] border-l-purple-500 hover:border-purple-300 hover:shadow-md";
-                  case "Gravame": return "bg-white border-slate-200 border-l-[4px] border-l-yellow-500 hover:border-yellow-300 hover:shadow-md";
+                  case "Proposta": return "bg-white border-slate-200 border-l-[4px] border-l-orange-500 hover:border-orange-300 hover:shadow-md";
+                  case "Vendido/Terceiros": return "bg-white border-slate-200 border-l-[4px] border-l-pink-500 hover:border-pink-300 hover:shadow-md";
                   default: return "bg-white border-slate-200 border-l-[4px] border-l-amber-500 hover:border-amber-300 hover:shadow-md";
                 }
               };
@@ -2876,8 +2865,8 @@ export function ExecutiveDashboard() {
                   case "Vendida": return "text-red-700";
                   case "Disponível": return "text-emerald-700";
                   case "Reserva Técnica": return "text-blue-700";
-                  case "Permuta": return "text-purple-700";
-                  case "Gravame": return "text-yellow-700";
+                  case "Proposta": return "text-orange-700";
+                  case "Vendido/Terceiros": return "text-pink-700";
                   default: return "text-amber-700";
                 }
               };
@@ -2945,7 +2934,8 @@ export function ExecutiveDashboard() {
                             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400" /><span className="text-slate-500">Vendidas: <strong className="text-red-600">{qVendidas}</strong></span></span>
                             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400" /><span className="text-slate-500">Disponíveis: <strong className="text-emerald-600">{qDisponiveis}</strong></span></span>
                             {qReserva > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-400" /><span className="text-slate-500">Reserva: <strong className="text-blue-600">{qReserva}</strong></span></span>}
-                            {qPermuta > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-purple-400" /><span className="text-slate-500">Permuta: <strong className="text-purple-600">{qPermuta}</strong></span></span>}
+                            {qProposta > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-400" /><span className="text-slate-500">Proposta: <strong className="text-orange-600">{qProposta}</strong></span></span>}
+                            {qVendTerceiros > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-pink-400" /><span className="text-slate-500">Vend/Terceiros: <strong className="text-pink-600">{qVendTerceiros}</strong></span></span>}
                             {qOutros > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400" /><span className="text-slate-500">Outros: <strong className="text-amber-600">{qOutros}</strong></span></span>}
                           </div>
                         </div>
@@ -2957,7 +2947,8 @@ export function ExecutiveDashboard() {
                         {qVendidas > 0 && <div className="h-full bg-red-400 transition-all rounded-full shadow-inner" style={{ width: `${(qVendidas / qUnits.length) * 100}%` }} title={`Vendidas: ${qVendidas}`} />}
                         {qDisponiveis > 0 && <div className="h-full bg-emerald-400 transition-all rounded-full shadow-inner" style={{ width: `${(qDisponiveis / qUnits.length) * 100}%` }} title={`Disponível: ${qDisponiveis}`} />}
                         {qReserva > 0 && <div className="h-full bg-blue-400 transition-all rounded-full shadow-inner" style={{ width: `${(qReserva / qUnits.length) * 100}%` }} title={`Reserva Tećnica: ${qReserva}`} />}
-                        {qPermuta > 0 && <div className="h-full bg-purple-400 transition-all rounded-full shadow-inner" style={{ width: `${(qPermuta / qUnits.length) * 100}%` }} title={`Permuta: ${qPermuta}`} />}
+                        {qProposta > 0 && <div className="h-full bg-orange-400 transition-all rounded-full shadow-inner" style={{ width: `${(qProposta / qUnits.length) * 100}%` }} title={`Proposta: ${qProposta}`} />}
+                        {qVendTerceiros > 0 && <div className="h-full bg-pink-400 transition-all rounded-full shadow-inner" style={{ width: `${(qVendTerceiros / qUnits.length) * 100}%` }} title={`Vendido/Terceiros: ${qVendTerceiros}`} />}
                         {qOutros > 0 && <div className="h-full bg-amber-400 transition-all rounded-full shadow-inner" style={{ width: `${(qOutros / qUnits.length) * 100}%` }} title={`Outros: ${qOutros}`} />}
                       </div>
                     </CardContent>
@@ -2983,7 +2974,7 @@ export function ExecutiveDashboard() {
                       >
                         <div className="flex justify-between items-start">
                           <p className="text-lg font-extrabold text-slate-800 leading-none">{u.unit}</p>
-                          <div className={`w-2 h-2 rounded-full ${u.status === "Vendida" ? "bg-red-500" : u.status === "Disponível" ? "bg-emerald-500" : u.status === "Reserva Técnica" ? "bg-blue-500" : u.status === "Permuta" ? "bg-purple-500" : "bg-slate-300"}`} />
+                          <div className={`w-2 h-2 rounded-full ${u.status === "Vendida" ? "bg-red-500" : u.status === "Disponível" ? "bg-emerald-500" : u.status === "Reserva Técnica" ? "bg-blue-500" : u.status === "Proposta" ? "bg-orange-500" : u.status === "Vendido/Terceiros" ? "bg-pink-500" : "bg-slate-300"}`} />
                         </div>
                         <p className={`text-[10px] font-bold mt-2 uppercase tracking-wide ${statusTextColor(u.status)}`}>{u.status}</p>
                         {u.tipo !== "Apartamento" && (

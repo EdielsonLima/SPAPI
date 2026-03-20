@@ -435,7 +435,7 @@ export interface SiengeUnit {
   contractId: number | null;
   name: string;
   propertyType: string;
-  commercialStock: string; // V=Vendida, D=Disponível, R=Reserva Técnica, P=Permuta, G=Gravame
+  commercialStock: string; // V=Vendida, D=Disponível, R=Reserva Técnica, P=Proposta, G=Vendido/Terceiros
   floor: string;
   contractNumber: string;
   deliveryDate: string | null;
@@ -456,7 +456,7 @@ export interface SiengeEnrichedUnit {
   companyName: string;
   name: string;
   propertyType: string;
-  commercialStock: string; // Label: "Vendida", "Disponível", "Reserva Técnica", "Permuta", "Gravame"
+  commercialStock: string; // Label: "Vendida", "Disponível", "Reserva Técnica", "Proposta", "Vendido/Terceiros"
   floor: string;
   contractNumber: string;
   privateArea: number;
