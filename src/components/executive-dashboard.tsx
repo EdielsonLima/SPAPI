@@ -2255,7 +2255,7 @@ export function ExecutiveDashboard() {
                       <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
                       <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={80} />
                       <RechartsTooltip formatter={(v: number | undefined) => [formatCurrency(v ?? 0), "Valor"]} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#6366f1"
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}
                         label={((props: Record<string, unknown>) => {
                           const x = Number(props.x ?? 0), y = Number(props.y ?? 0), w = Number(props.width ?? 0), value = Number(props.value ?? 0), index = Number(props.index ?? 0);
                           const entry = comercialChart[index];
@@ -2273,7 +2273,16 @@ export function ExecutiveDashboard() {
                             </g>
                           );
                         }) as unknown as undefined}
-                      />
+                      >
+                        {(() => {
+                          const values = comercialChart.map(d => d.value);
+                          const maxVal = Math.max(...values);
+                          const minVal = Math.min(...values);
+                          return comercialChart.map((entry, idx) => (
+                            <Cell key={idx} fill={entry.value === maxVal ? "#22c55e" : entry.value === minVal ? "#ef4444" : "#6366f1"} />
+                          ));
+                        })()}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
