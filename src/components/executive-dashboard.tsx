@@ -275,7 +275,7 @@ export function ExecutiveDashboard() {
 
   const availableYears = useMemo(() => {
     const arr: string[] = [];
-    if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia" || activeTab === "dre") {
+    if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia" || activeTab === "dre" || activeTab === "comercial") {
       for (let y = currentYear - 10; y <= currentYear; y++) arr.push(String(y));
     } else {
       // Contas a Pagar / a Receber: mostra ano atual em diante
