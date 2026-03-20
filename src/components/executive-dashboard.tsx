@@ -36,6 +36,7 @@ import {
   FileDown,
   BarChart3,
   Handshake,
+  LayoutGrid,
 } from "lucide-react";
 import {
   BarChart,
@@ -260,7 +261,7 @@ export function ExecutiveDashboard() {
   const [expandedCreditors, setExpandedCreditors] = useState<Set<string>>(new Set());
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
   const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
-  const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades">("vendas");
+  const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades" | "quadro">("vendas");
   const [unitStatusFilter, setUnitStatusFilter] = useState<string>("Todas");
   const [unitEnterpriseFilter, setUnitEnterpriseFilter] = useState<string>("Todos");
   const [unitTypeFilter, setUnitTypeFilter] = useState<string>("Todos");
@@ -2299,6 +2300,15 @@ export function ExecutiveDashboard() {
                 <Building2 className="h-3.5 w-3.5 mr-1.5" />
                 Unidades
               </Button>
+              <Button
+                variant={comercialSubTab === "quadro" ? "default" : "ghost"}
+                size="sm"
+                className={`h-8 text-xs font-semibold ${comercialSubTab === "quadro" ? "bg-indigo-600 text-white hover:bg-indigo-700" : "text-slate-500 hover:text-slate-700"}`}
+                onClick={() => setComercialSubTab("quadro")}
+              >
+                <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
+                Quadro Espelho
+              </Button>
             </div>
 
             {/* ─── VENDAS SUB-TAB ─── */}
@@ -2801,6 +2811,175 @@ export function ExecutiveDashboard() {
                   </Table>
                 </CardContent>
               </Card>
+              </>;
+            })()}
+
+            {/* ─── QUADRO ESPELHO SUB-TAB ─── */}
+            {comercialSubTab === "quadro" && (() => {
+              const qEnterprises = Array.from(new Set(allUnits.map(u => u.enterprise))).sort();
+              const qTypes = Array.from(new Set(allUnits.map(u => u.tipo))).sort();
+
+              // Filter units for selected enterprise
+              const qUnits = allUnits.filter(u => {
+                if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
+                if (unitTypeFilter !== "Todos" && u.tipo !== unitTypeFilter) return false;
+                return true;
+              }).sort((a, b) => a.unit.localeCompare(b.unit, undefined, { numeric: true }));
+
+              // Status counts
+              const qStatusCounts = new Map<string, number>();
+              qUnits.forEach(u => qStatusCounts.set(u.status, (qStatusCounts.get(u.status) || 0) + 1));
+              const qStatuses = Array.from(new Set(qUnits.map(u => u.status))).sort();
+
+              const qVendidas = qUnits.filter(u => u.status === "Vendida").length;
+              const qDisponiveis = qUnits.filter(u => u.status === "Disponível").length;
+              const qOutros = qUnits.length - qVendidas - qDisponiveis;
+
+              // Filter by status if active
+              const qVisible = unitStatusFilter === "Todas" ? qUnits : qUnits.filter(u => u.status === unitStatusFilter);
+
+              // Card colors by status
+              const cardStyle = (status: string) => {
+                switch (status) {
+                  case "Vendida": return "bg-red-100 border-red-300 hover:bg-red-200";
+                  case "Disponível": return "bg-emerald-100 border-emerald-300 hover:bg-emerald-200";
+                  case "Autorizado": return "bg-blue-100 border-blue-300 hover:bg-blue-200";
+                  default: return "bg-amber-100 border-amber-300 hover:bg-amber-200";
+                }
+              };
+              const statusTextColor = (status: string) => {
+                switch (status) {
+                  case "Vendida": return "text-red-700";
+                  case "Disponível": return "text-emerald-700";
+                  case "Autorizado": return "text-blue-700";
+                  default: return "text-amber-700";
+                }
+              };
+
+              return <>
+                {/* Filters */}
+                <Card className="border-0 shadow-sm">
+                  <CardContent className="p-4">
+                    <div className="flex flex-col gap-3">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Empreendimento:</span>
+                          <select
+                            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            value={unitEnterpriseFilter}
+                            onChange={e => { setUnitEnterpriseFilter(e.target.value); setUnitStatusFilter("Todas"); }}
+                          >
+                            <option value="Todos">Todos ({allUnits.length})</option>
+                            {qEnterprises.map(e => (
+                              <option key={e} value={e}>{e} ({allUnits.filter(u => u.enterprise === e).length})</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Tipo:</span>
+                          <select
+                            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            value={unitTypeFilter}
+                            onChange={e => setUnitTypeFilter(e.target.value)}
+                          >
+                            <option value="Todos">Todos</option>
+                            {qTypes.map(t => (
+                              <option key={t} value={t}>{t}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      {/* Status filter tabs */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {["Todas", ...qStatuses].map(status => {
+                          const isActive = unitStatusFilter === status;
+                          const count = status === "Todas" ? qUnits.length : (qStatusCounts.get(status) || 0);
+                          return (
+                            <button
+                              key={status}
+                              onClick={() => setUnitStatusFilter(status)}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                                isActive
+                                  ? status === "Vendida" ? "bg-red-500 text-white border-red-500"
+                                  : status === "Disponível" ? "bg-emerald-500 text-white border-emerald-500"
+                                  : "bg-slate-800 text-white border-slate-800"
+                                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                              }`}
+                            >
+                              {status}
+                              <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold ${
+                                isActive ? "bg-white/20" : "bg-slate-100 text-slate-500"
+                              }`}>{count}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Summary bar */}
+                {qUnits.length > 0 && (
+                  <Card className="border-0 shadow-sm mt-4">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm font-bold text-slate-700">{qUnits.length} unidades</span>
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400" /><span className="text-slate-500">Vendidas: <strong className="text-red-600">{qVendidas}</strong></span></span>
+                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400" /><span className="text-slate-500">Disponíveis: <strong className="text-emerald-600">{qDisponiveis}</strong></span></span>
+                            {qOutros > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400" /><span className="text-slate-500">Outros: <strong className="text-amber-600">{qOutros}</strong></span></span>}
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold text-slate-500">
+                          {qUnits.length > 0 ? ((qVendidas / qUnits.length) * 100).toFixed(0) : 0}% vendido
+                        </span>
+                      </div>
+                      <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
+                        {qVendidas > 0 && <div className="h-full bg-red-400 transition-all" style={{ width: `${(qVendidas / qUnits.length) * 100}%` }} />}
+                        {qDisponiveis > 0 && <div className="h-full bg-emerald-400 transition-all" style={{ width: `${(qDisponiveis / qUnits.length) * 100}%` }} />}
+                        {qOutros > 0 && <div className="h-full bg-amber-400 transition-all" style={{ width: `${(qOutros / qUnits.length) * 100}%` }} />}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Grid of unit cards */}
+                {unitEnterpriseFilter === "Todos" ? (
+                  <Card className="border-0 shadow-sm mt-4">
+                    <CardContent className="p-8 text-center">
+                      <LayoutGrid className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                      <p className="text-sm font-semibold text-slate-500">Selecione um empreendimento</p>
+                      <p className="text-xs text-slate-400 mt-1">Escolha um empreendimento no filtro acima para visualizar o quadro de unidades</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 mt-4">
+                    {qVisible.map((u, idx) => (
+                      <div
+                        key={`${u.unit}-${idx}`}
+                        className={`relative rounded-xl border-2 p-3 cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group ${cardStyle(u.status)}`}
+                        title={`${u.unit} — ${u.status}${u.status === "Vendida" ? `\n${u.customer}\n${formatCurrency(u.value)}` : ""}`}
+                      >
+                        <p className="text-lg font-extrabold text-slate-800 leading-tight">{u.unit}</p>
+                        <p className={`text-[11px] font-semibold mt-0.5 ${statusTextColor(u.status)}`}>{u.status}</p>
+                        {u.tipo !== "Apartamento" && (
+                          <p className="text-[9px] text-slate-400 mt-0.5">{u.tipo}</p>
+                        )}
+                        {/* Hover overlay with details */}
+                        {u.status === "Vendida" && (
+                          <div className="absolute inset-0 bg-white/95 rounded-xl p-3 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center">
+                            <p className="text-sm font-bold text-slate-800">{u.unit}</p>
+                            <p className="text-[10px] text-red-600 font-semibold mt-0.5">Vendida</p>
+                            <p className="text-[10px] text-slate-600 mt-1 truncate" title={u.customer}>{u.customer}</p>
+                            <p className="text-[11px] font-bold text-slate-800 mt-0.5">{formatCurrency(u.value)}</p>
+                            <p className="text-[9px] text-slate-400 mt-0.5">{formatDate(u.contractDate)}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>;
             })()}
           </>
