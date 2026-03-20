@@ -2979,6 +2979,7 @@ export function ExecutiveDashboard() {
                       <div
                         key={`${u.unit}-${idx}`}
                         className={`relative rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-1 group ${cardStyle(u.status)}`}
+                        title={u.status === "Vendida" ? `Unidade ${u.unit}\nStatus: ${u.status}\nCliente: ${u.customer}\nValor: ${formatCurrency(u.value)}` : `Unidade ${u.unit} — ${u.status}`}
                       >
                         <div className="flex justify-between items-start">
                           <p className="text-lg font-extrabold text-slate-800 leading-none">{u.unit}</p>
@@ -2995,7 +2996,10 @@ export function ExecutiveDashboard() {
                               <p className="text-base font-black text-slate-800">{u.unit}</p>
                               <Badge variant="outline" className="text-[9px] bg-red-50 text-red-600 border-red-200 px-1.5 py-0 uppercase font-bold tracking-wider rounded-md">Vendida</Badge>
                             </div>
-                            <p className="text-[11px] text-slate-600 font-semibold leading-tight truncate mb-2" title={u.customer}>{u.customer}</p>
+                            <div className="mb-2">
+                              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Cliente</span>
+                              <p className="text-[11px] text-slate-700 font-semibold leading-tight line-clamp-2" title={u.customer}>{u.customer || "Não informado"}</p>
+                            </div>
                             <p className="text-[13px] font-black text-slate-800 tabular-nums bg-slate-50 px-2 py-1 rounded inline-block w-max">{formatCurrency(u.value)}</p>
                             <p className="text-[10px] text-slate-400 mt-1 font-medium">{formatDate(u.contractDate)}</p>
                           </div>
