@@ -280,6 +280,23 @@ export async function cacheBankMovements(startDate: string, endDate: string, dat
   );
 }
 
+// ─── Sales Contracts (Contratos de Vendas) ──────────────────────────────────
+
+export async function getCachedSalesContracts(): Promise<{ data: unknown; cachedAt: string } | null> {
+  const result = await pool.query(
+    `SELECT data, cached_at FROM cached_sales_contracts WHERE cached_at > NOW() - INTERVAL '7 days' ORDER BY id DESC LIMIT 1`
+  );
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
+}
+
+export async function cacheSalesContracts(data: unknown) {
+  await pool.query(`DELETE FROM cached_sales_contracts`);
+  await pool.query(
+    `INSERT INTO cached_sales_contracts (data, cached_at) VALUES ($1, NOW())`,
+    [JSON.stringify(data)]
+  );
+}
+
 // ─── Company Settings (M² e Fator) ──────────────────────────────────────────
 
 export interface CompanySetting {

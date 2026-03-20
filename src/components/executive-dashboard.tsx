@@ -35,6 +35,7 @@ import {
   Ruler,
   FileDown,
   BarChart3,
+  Handshake,
 } from "lucide-react";
 import {
   BarChart,
@@ -47,7 +48,7 @@ import {
   Cell,
   LabelList,
 } from "recharts";
-import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge";
+import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } from "@/types/sienge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS } from "@/lib/dashboard-utils";
@@ -55,7 +56,7 @@ import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
 type Section = "cp" | "cr";
-type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "dre";
+type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre";
 type ChartView = "mensal" | "anual";
 
 // === Reusable Multi-Select Filter ===
@@ -244,6 +245,7 @@ export function ExecutiveDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
   const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
+  const [salesContracts, setSalesContracts] = useState<SiengeSalesContract[]>([]);
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
   const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string }[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -256,6 +258,7 @@ export function ExecutiveDashboard() {
   const [delinquentSort, setDelinquentSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [showOverdueTable, setShowOverdueTable] = useState(false);
   const [expandedCreditors, setExpandedCreditors] = useState<Set<string>>(new Set());
+  const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
@@ -323,10 +326,11 @@ export function ExecutiveDashboard() {
     else if (!dataLoadedRef.current) setLoading(true);
 
     try {
-      const [outcomeRes, bmRes, incomeRes] = await Promise.all([
+      const [outcomeRes, bmRes, incomeRes, salesRes] = await Promise.all([
         fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
         fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
         fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+        fetch(`/api/sienge/sales-contracts${refreshParam ? "?forceRefresh=true" : ""}`),
       ]);
 
       if (!outcomeRes.ok) throw new Error("Outcome API error");
@@ -351,6 +355,11 @@ export function ExecutiveDashboard() {
       const incomeData = await incomeRes.json();
       setIncomeItems(incomeData.data || []);
       if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
+
+      if (salesRes.ok) {
+        const salesData = await salesRes.json();
+        setSalesContracts(salesData.data || []);
+      }
 
       dataLoadedRef.current = true;
     } catch {
@@ -1462,6 +1471,7 @@ export function ExecutiveDashboard() {
       },
     ],
     orcamento: [],
+    comercial: [],
     dre: [],
   };
 
@@ -1580,6 +1590,20 @@ export function ExecutiveDashboard() {
             <button
               onClick={() => {
                 setSection("cp");
+                setActiveTab("comercial");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "comercial"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <Handshake className="h-3.5 w-3.5" />
+              Comercial
+            </button>
+            <button
+              onClick={() => {
+                setSection("cp");
                 setActiveTab("dre");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
@@ -1594,7 +1618,7 @@ export function ExecutiveDashboard() {
           </div>
 
           {/* Tabs */}
-          {activeTab !== "orcamento" && activeTab !== "dre" && <Tabs value={activeTab} onValueChange={v => {
+          {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             setActiveTab(tab);
             // Only reset time-based filters, keep company, docType and year selections stable
@@ -1722,7 +1746,40 @@ export function ExecutiveDashboard() {
             labelFn={(m) => MONTH_NAMES[m] || m}
           />
         </div>}
-        {activeTab !== "orcamento" && activeTab !== "dre" && <div className="flex items-center gap-2 flex-wrap">
+        {activeTab === "comercial" && <div className="flex items-center gap-2 flex-wrap">
+          <MultiSelectFilter
+            label="Empresas"
+            icon={<Building2 className="h-4 w-4" />}
+            allOptions={allCompanyNames}
+            selected={selectedCompanies}
+            onToggle={(name) => toggleInSet(setSelectedCompanies, name)}
+            onSelectAll={() => setSelectedCompanies(new Set(allCompanyNames))}
+            onClear={() => setSelectedCompanies(defaultCompanies())}
+            activeColor="indigo"
+          />
+          <MultiSelectFilter
+            label="Anos"
+            icon={<CalendarClock className="h-4 w-4" />}
+            allOptions={availableYears}
+            selected={selectedYears}
+            onToggle={(y) => toggleInSet(setSelectedYears, y)}
+            onSelectAll={() => setSelectedYears(new Set(availableYears))}
+            onClear={() => setSelectedYears(new Set())}
+            activeColor="violet"
+          />
+          <MultiSelectFilter
+            label="Meses"
+            icon={<CalendarClock className="h-4 w-4" />}
+            allOptions={MONTH_OPTIONS}
+            selected={selectedMonths}
+            onToggle={(m) => toggleInSet(setSelectedMonths, m)}
+            onSelectAll={() => setSelectedMonths(new Set(MONTH_OPTIONS))}
+            onClear={() => setSelectedMonths(new Set())}
+            activeColor="amber"
+            labelFn={(m) => MONTH_NAMES[m] || m}
+          />
+        </div>}
+        {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
             label="Empresas"
             icon={<Building2 className="h-4 w-4" />}
@@ -2056,8 +2113,227 @@ export function ExecutiveDashboard() {
         </div>
       )}
 
+      {/* ══════ COMERCIAL TAB ══════ */}
+      {activeTab === "comercial" && (() => {
+        // Filter contracts by company, year, month
+        const filtered = salesContracts.filter(c => {
+          if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
+          if (selectedYears.size > 0 && c.contractDate) {
+            if (!selectedYears.has(c.contractDate.substring(0, 4))) return false;
+          }
+          if (selectedMonths.size > 0 && c.contractDate) {
+            if (!selectedMonths.has(c.contractDate.substring(5, 7))) return false;
+          }
+          return true;
+        });
+
+        const totalValue = filtered.reduce((s, c) => s + (c.value || 0), 0);
+        const totalContracts = filtered.length;
+        const ticketMedio = totalContracts > 0 ? totalValue / totalContracts : 0;
+        const emitidos = filtered.filter(c => c.situation === "Emitido").length;
+        const cancelados = filtered.filter(c => c.situation === "Cancelado" || c.cancellationDate).length;
+
+        // Group by company
+        const byCompany = new Map<string, { contracts: typeof filtered; totalValue: number }>();
+        filtered.forEach(c => {
+          const key = c.companyName;
+          if (!byCompany.has(key)) byCompany.set(key, { contracts: [], totalValue: 0 });
+          const entry = byCompany.get(key)!;
+          entry.contracts.push(c);
+          entry.totalValue += c.value || 0;
+        });
+        const companyRows = Array.from(byCompany.entries())
+          .map(([name, data]) => ({ name, ...data }))
+          .sort((a, b) => b.totalValue - a.totalValue);
+
+        // Monthly chart data
+        const monthlyMap = new Map<string, number>();
+        filtered.forEach(c => {
+          if (!c.contractDate) return;
+          const key = c.contractDate.substring(0, 7); // YYYY-MM
+          monthlyMap.set(key, (monthlyMap.get(key) || 0) + (c.value || 0));
+        });
+        const monthlyChart = Array.from(monthlyMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([month, value]) => {
+            const [y, m] = month.split("-");
+            return { month: `${MONTH_LABELS[parseInt(m, 10) - 1] || m}/${y.slice(2)}`, value };
+          });
+
+        return (
+          <>
+            {/* KPI Cards */}
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+              <Card className="border-0 shadow-sm overflow-hidden">
+                <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-indigo-400" />
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-indigo-600/80 uppercase tracking-widest">Total Contratos</p>
+                      <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalContracts}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">{emitidos} emitidos · {cancelados} cancelados</p>
+                    </div>
+                    <div className="p-3 bg-indigo-50 rounded-xl"><FileText className="h-5 w-5 text-indigo-500" /></div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm overflow-hidden">
+                <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Valor Total Vendido</p>
+                      <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{formatCurrency(totalValue)}</p>
+                    </div>
+                    <div className="p-3 bg-emerald-50 rounded-xl"><Banknote className="h-5 w-5 text-emerald-500" /></div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm overflow-hidden">
+                <div className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-400" />
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-blue-600/80 uppercase tracking-widest">Ticket Médio</p>
+                      <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{formatCurrency(ticketMedio)}</p>
+                    </div>
+                    <div className="p-3 bg-blue-50 rounded-xl"><TrendingUp className="h-5 w-5 text-blue-500" /></div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="border-0 shadow-sm overflow-hidden">
+                <div className="h-1.5 bg-gradient-to-r from-violet-500 to-violet-400" />
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-bold text-violet-600/80 uppercase tracking-widest">Empresas</p>
+                      <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{companyRows.length}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">{new Set(filtered.map(c => c.salesContractCustomers?.[0]?.name).filter(Boolean)).size} clientes</p>
+                    </div>
+                    <div className="p-3 bg-violet-50 rounded-xl"><Building2 className="h-5 w-5 text-violet-500" /></div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Monthly Chart */}
+            {monthlyChart.length > 0 && (
+              <Card className="border-0 shadow-sm mt-6">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold text-slate-700">Vendas por Mês</CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <ResponsiveContainer width="100%" height={280}>
+                    <BarChart data={monthlyChart} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                      <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={80} />
+                      <RechartsTooltip formatter={(v: number | undefined) => [formatCurrency(v ?? 0), "Valor"]} />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#6366f1" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Table by Company */}
+            <Card className="border-0 shadow-sm mt-6">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold text-slate-700">Contratos por Empreendimento</CardTitle>
+                <CardDescription className="text-xs text-slate-400">{totalContracts} contratos · {formatCurrency(totalValue)}</CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50/80 border-b border-slate-200">
+                      <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pl-5">Empreendimento</TableHead>
+                      <TableHead className="text-right font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Contratos</TableHead>
+                      <TableHead className="text-right font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Valor Total</TableHead>
+                      <TableHead className="text-right font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Ticket Médio</TableHead>
+                      <TableHead className="text-right font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pr-5">% do Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {companyRows.map(row => {
+                      const pct = totalValue > 0 ? (row.totalValue / totalValue) * 100 : 0;
+                      const avgTicket = row.contracts.length > 0 ? row.totalValue / row.contracts.length : 0;
+                      const isExpanded = expandedComercial.has(`comercial-${row.name}`);
+                      return (
+                        <React.Fragment key={row.name}>
+                          <TableRow
+                            className="hover:bg-slate-50/80 cursor-pointer transition-colors border-b border-slate-100"
+                            onClick={() => {
+                              setExpandedComercial(prev => {
+                                const next = new Set(prev);
+                                const key = `comercial-${row.name}`;
+                                if (next.has(key)) next.delete(key); else next.add(key);
+                                return next;
+                              });
+                            }}
+                          >
+                            <TableCell className="pl-5 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className={`p-0.5 rounded transition-colors ${isExpanded ? "bg-indigo-100" : ""}`}>
+                                  {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-indigo-500" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
+                                </div>
+                                <span className="font-semibold text-[13px] text-slate-700">{row.name}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{row.contracts.length}</TableCell>
+                            <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{formatCurrency(row.totalValue)}</TableCell>
+                            <TableCell className="text-right text-[13px] text-slate-600 tabular-nums">{formatCurrency(avgTicket)}</TableCell>
+                            <TableCell className="text-right pr-5">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold tabular-nums bg-indigo-50 text-indigo-700">
+                                {pct.toFixed(1)}%
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                          {isExpanded && row.contracts
+                            .sort((a, b) => (b.value || 0) - (a.value || 0))
+                            .map(c => (
+                              <TableRow key={c.id} className="bg-slate-50/50 border-b border-slate-100/50">
+                                <TableCell className="pl-12 py-2.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-slate-400 font-mono text-[10px] bg-white py-0.5 px-1.5 rounded border border-slate-200 shadow-sm">{c.number}</span>
+                                    <span className="text-[12px] text-slate-600">{c.salesContractCustomers?.[0]?.name || "—"}</span>
+                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                                      c.situation === "Emitido" ? "border-emerald-200 text-emerald-600 bg-emerald-50" :
+                                      c.situation === "Cancelado" || c.cancellationDate ? "border-red-200 text-red-600 bg-red-50" :
+                                      "border-slate-200 text-slate-500"
+                                    }`}>{c.cancellationDate ? "Cancelado" : c.situation}</Badge>
+                                  </div>
+                                </TableCell>
+                                <TableCell className="text-right text-[12px] text-slate-500 tabular-nums">{formatDate(c.contractDate)}</TableCell>
+                                <TableCell className="text-right text-[12px] text-slate-600 font-medium tabular-nums">{formatCurrency(c.value)}</TableCell>
+                                <TableCell className="text-right text-[12px] text-slate-500 tabular-nums">
+                                  {c.salesContractUnits?.filter(u => u.main)?.map(u => u.name).join(", ") || "—"}
+                                </TableCell>
+                                <TableCell className="text-right pr-5 text-[12px] text-slate-400 tabular-nums">
+                                  {c.paymentConditions?.length || 0} cond.
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                        </React.Fragment>
+                      );
+                    })}
+                    {/* Total row */}
+                    <TableRow className="bg-indigo-50/50 border-t-2 border-indigo-200">
+                      <TableCell className="pl-5 py-3 font-bold text-[13px] text-indigo-800">TOTAL</TableCell>
+                      <TableCell className="text-right font-bold text-[13px] text-indigo-800 tabular-nums">{totalContracts}</TableCell>
+                      <TableCell className="text-right font-bold text-[14px] text-indigo-800 tabular-nums">{formatCurrency(totalValue)}</TableCell>
+                      <TableCell className="text-right font-bold text-[13px] text-indigo-700 tabular-nums">{formatCurrency(ticketMedio)}</TableCell>
+                      <TableCell className="text-right pr-5 font-bold text-[13px] text-indigo-700">100%</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </>
+        );
+      })()}
+
       {/* KPI Cards */}
-      {activeTab !== "orcamento" && activeTab !== "dre" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}

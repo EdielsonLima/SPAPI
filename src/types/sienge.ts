@@ -361,3 +361,60 @@ export interface SiengeDeliveryAttended {
   deliveryDate: string;
   quantityDelivery: number;
 }
+
+// ─── Sales Contracts (Contratos de Vendas) ──────────────────────────────────
+
+export interface SiengeSalesContractCustomer {
+  id: number;
+  name: string;
+  main: boolean;
+  spouse: boolean;
+  participationPercentage: number;
+}
+
+export interface SiengeSalesContractUnit {
+  id: number;
+  main: boolean;
+  name: string;
+  participationPercentage: number;
+}
+
+export interface SiengeSalesContractPaymentCondition {
+  conditionTypeId: string;
+  conditionTypeName: string;
+  installmentsNumber: number;
+  openInstallmentsNumber: number;
+  totalValue: number;
+  outstandingBalance: number;
+  amountPaid: number;
+  bearerName: string;
+  indexerName: string;
+  firstPayment: string;
+  baseDate: string;
+  sequenceId: number;
+  orderNumber: number;
+  status: string;
+}
+
+export interface SiengeSalesContract {
+  id: number;
+  companyId: number;
+  companyName: string;
+  enterpriseId: number;
+  enterpriseName: string;
+  number: string;
+  situation: string;
+  value: number;
+  totalSellingValue: number;
+  contractDate: string;
+  issueDate: string;
+  expectedDeliveryDate: string;
+  cancellationDate: string | null;
+  cancellationReason: string | null;
+  totalCancellationAmount: number;
+  creationDate: string;
+  lastUpdateDate: string;
+  salesContractCustomers: SiengeSalesContractCustomer[];
+  salesContractUnits: SiengeSalesContractUnit[];
+  paymentConditions: SiengeSalesContractPaymentCondition[];
+}

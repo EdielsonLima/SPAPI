@@ -121,6 +121,13 @@ CREATE TABLE IF NOT EXISTS cached_income (
   PRIMARY KEY (start_date, end_date)
 );
 
+-- ── Contratos de Vendas (Sales Contracts) ────────────────────────────────
+CREATE TABLE IF NOT EXISTS cached_sales_contracts (
+  id         SERIAL PRIMARY KEY,
+  data       JSONB     NOT NULL,
+  cached_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- ── Configurações de Empresas (M² e Fator) ─────────────────────────────────
 CREATE TABLE IF NOT EXISTS company_settings (
   company_id   INTEGER PRIMARY KEY REFERENCES cached_companies(id),
