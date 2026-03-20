@@ -261,6 +261,8 @@ export function ExecutiveDashboard() {
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
   const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
   const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades">("vendas");
+  const [unitStatusFilter, setUnitStatusFilter] = useState<string>("Todas");
+  const [unitEnterpriseFilter, setUnitEnterpriseFilter] = useState<string>("Todos");
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
@@ -2505,8 +2507,48 @@ export function ExecutiveDashboard() {
             </>}
 
             {/* ─── UNIDADES SUB-TAB ─── */}
-            {comercialSubTab === "unidades" && <>
-              {/* Unit KPI Cards */}
+            {comercialSubTab === "unidades" && (() => {
+              // Collect all unique statuses and enterprises
+              const allStatuses = Array.from(new Set(allUnits.map(u => u.status))).sort();
+              const allEnterprises = Array.from(new Set(allUnits.map(u => u.enterprise))).sort();
+
+              // Status color mapping
+              const statusColors: Record<string, { bg: string; text: string; border: string; activeBg: string }> = {
+                "Todas": { bg: "bg-white", text: "text-slate-700", border: "border-slate-300", activeBg: "bg-slate-800 text-white border-slate-800" },
+                "Vendida": { bg: "bg-white", text: "text-red-600", border: "border-red-200", activeBg: "bg-red-500 text-white border-red-500" },
+                "Disponível": { bg: "bg-white", text: "text-emerald-600", border: "border-emerald-200", activeBg: "bg-emerald-500 text-white border-emerald-500" },
+                "Emitido": { bg: "bg-white", text: "text-red-600", border: "border-red-200", activeBg: "bg-red-500 text-white border-red-500" },
+                "Cancelado": { bg: "bg-white", text: "text-slate-500", border: "border-slate-200", activeBg: "bg-slate-500 text-white border-slate-500" },
+                "Distratado": { bg: "bg-white", text: "text-orange-600", border: "border-orange-200", activeBg: "bg-orange-500 text-white border-orange-500" },
+              };
+              const defaultColor = { bg: "bg-white", text: "text-violet-600", border: "border-violet-200", activeBg: "bg-violet-500 text-white border-violet-500" };
+
+              // Filter units by status and enterprise
+              const filteredUnits = allUnits.filter(u => {
+                if (unitStatusFilter !== "Todas" && u.status !== unitStatusFilter) return false;
+                if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
+                return true;
+              });
+
+              // Count per status (for badges)
+              const statusCounts = new Map<string, number>();
+              const enterpriseFilteredUnits = allUnits.filter(u => unitEnterpriseFilter === "Todos" || u.enterprise === unitEnterpriseFilter);
+              enterpriseFilteredUnits.forEach(u => {
+                statusCounts.set(u.status, (statusCounts.get(u.status) || 0) + 1);
+              });
+
+              // Group filtered units by enterprise for the table
+              const groupedByEnterprise = new Map<string, typeof filteredUnits>();
+              filteredUnits.forEach(u => {
+                if (!groupedByEnterprise.has(u.enterprise)) groupedByEnterprise.set(u.enterprise, []);
+                groupedByEnterprise.get(u.enterprise)!.push(u);
+              });
+              const enterpriseGroupRows = Array.from(groupedByEnterprise.entries())
+                .map(([name, units]) => ({ name, units, totalValue: units.reduce((s, u) => s + (u.status === "Vendida" ? u.value : 0), 0) }))
+                .sort((a, b) => b.units.length - a.units.length);
+
+              return <>
+              {/* KPI summary cards */}
               <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
                 <Card className="border-0 shadow-sm overflow-hidden">
                   <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-indigo-400" />
@@ -2562,145 +2604,158 @@ export function ExecutiveDashboard() {
                 </Card>
               </div>
 
-              {/* Stacked bar chart - units by enterprise */}
-              {enterpriseRows.length > 0 && (
-                <Card className="border-0 shadow-sm mt-6">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-bold text-slate-700">Unidades por Empreendimento</CardTitle>
-                    <CardDescription className="text-xs text-slate-400">{totalUnitsCount} unidades em {enterpriseRows.length} empreendimentos</CardDescription>
-                  </CardHeader>
-                  <CardContent className="p-4 pt-0">
-                    <ResponsiveContainer width="100%" height={Math.max(250, enterpriseRows.length * 50)}>
-                      <BarChart data={enterpriseRows} layout="vertical" margin={{ top: 5, right: 80, left: 10, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 11, fill: "#94a3b8" }} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} width={180} />
-                        <RechartsTooltip
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          formatter={(value: any, name: any) => [Number(value ?? 0), name === "vendida" ? "Vendidas" : name === "disponivel" ? "Disponíveis" : "Outros"]}
-                          contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "13px" }}
-                        />
-                        <Bar dataKey="vendida" stackId="a" fill="#22c55e" name="Vendidas" radius={[0, 0, 0, 0]}>
-                          <LabelList dataKey="vendida" position="center" fontSize={10} fontWeight={700} fill="#fff" formatter={(v: unknown) => Number(v) > 0 ? Number(v) : ""} />
-                        </Bar>
-                        <Bar dataKey="disponivel" stackId="a" fill="#f59e0b" name="Disponíveis" radius={[0, 0, 0, 0]}>
-                          <LabelList dataKey="disponivel" position="center" fontSize={10} fontWeight={700} fill="#fff" formatter={(v: unknown) => Number(v) > 0 ? Number(v) : ""} />
-                        </Bar>
-                        <Bar dataKey="outro" stackId="a" fill="#94a3b8" name="Outros" radius={[0, 4, 4, 0]}>
-                          <LabelList dataKey="outro" position="center" fontSize={10} fontWeight={700} fill="#fff" formatter={(v: unknown) => Number(v) > 0 ? Number(v) : ""} />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <div className="flex items-center justify-center gap-6 mt-3">
-                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-emerald-500" /><span className="text-xs text-slate-500">Vendidas</span></div>
-                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-amber-500" /><span className="text-xs text-slate-500">Disponíveis</span></div>
-                      <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-slate-400" /><span className="text-xs text-slate-500">Outros</span></div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Detailed table by enterprise */}
+              {/* Filters row: Enterprise select + Status tabs */}
               <Card className="border-0 shadow-sm mt-6">
+                <CardContent className="p-4">
+                  <div className="flex flex-col gap-3">
+                    {/* Enterprise filter */}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Empreendimento:</span>
+                      <select
+                        className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        value={unitEnterpriseFilter}
+                        onChange={e => setUnitEnterpriseFilter(e.target.value)}
+                      >
+                        <option value="Todos">Todos ({allUnits.length})</option>
+                        {allEnterprises.map(e => (
+                          <option key={e} value={e}>{e} ({allUnits.filter(u => u.enterprise === e).length})</option>
+                        ))}
+                      </select>
+                    </div>
+                    {/* Status filter tabs */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {["Todas", ...allStatuses].map(status => {
+                        const isActive = unitStatusFilter === status;
+                        const count = status === "Todas" ? enterpriseFilteredUnits.length : (statusCounts.get(status) || 0);
+                        const colors = statusColors[status] || defaultColor;
+                        return (
+                          <button
+                            key={status}
+                            onClick={() => setUnitStatusFilter(status)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                              isActive ? colors.activeBg : `${colors.bg} ${colors.text} ${colors.border} hover:bg-slate-50`
+                            }`}
+                          >
+                            {status}
+                            <span className={`inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold ${
+                              isActive ? "bg-white/20 text-inherit" : "bg-slate-100 text-slate-500"
+                            }`}>{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Units table */}
+              <Card className="border-0 shadow-sm mt-4">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold text-slate-700">Detalhamento por Empreendimento</CardTitle>
-                  <CardDescription className="text-xs text-slate-400">Clique para expandir e ver as unidades individuais</CardDescription>
+                  <CardTitle className="text-sm font-bold text-slate-700">
+                    {unitStatusFilter === "Todas" ? "Todas as Unidades" : `Unidades — ${unitStatusFilter}`}
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-400">
+                    {filteredUnits.length} unidades {unitEnterpriseFilter !== "Todos" ? `em ${unitEnterpriseFilter}` : `em ${enterpriseGroupRows.length} empreendimentos`}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-slate-50/80 border-b border-slate-200">
-                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pl-5">Empreendimento</TableHead>
-                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-center">Total</TableHead>
-                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-center">Vendidas</TableHead>
-                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-center">Disponíveis</TableHead>
-                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-center">Outros</TableHead>
-                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right">Valor Vendido</TableHead>
-                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right pr-5">% Vendido</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pl-5">Status</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Empreendimento</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Unidade</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Cliente</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right">Data Contrato</TableHead>
+                        <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right pr-5">Valor</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {enterpriseRows.map(row => {
-                        const pctVendido = row.total > 0 ? (row.vendida / row.total) * 100 : 0;
-                        const isExpanded = expandedComercial.has(`unit-${row.name}`);
+                      {enterpriseGroupRows.map(group => {
+                        const isExpanded = expandedComercial.has(`unitgroup-${group.name}`);
+                        const groupUnits = group.units.sort((a, b) => a.unit.localeCompare(b.unit, undefined, { numeric: true }));
+                        const vendidas = group.units.filter(u => u.status === "Vendida").length;
+                        const disponiveis = group.units.filter(u => u.status === "Disponível").length;
                         return (
-                          <React.Fragment key={row.name}>
+                          <React.Fragment key={group.name}>
                             <TableRow
-                              className="hover:bg-slate-50/80 cursor-pointer transition-colors border-b border-slate-100"
+                              className="hover:bg-slate-50/80 cursor-pointer transition-colors border-b border-slate-100 bg-slate-50/40"
                               onClick={() => {
                                 setExpandedComercial(prev => {
                                   const next = new Set(prev);
-                                  const key = `unit-${row.name}`;
+                                  const key = `unitgroup-${group.name}`;
                                   if (next.has(key)) next.delete(key); else next.add(key);
                                   return next;
                                 });
                               }}
                             >
-                              <TableCell className="pl-5 py-3">
+                              <TableCell className="pl-5 py-3" colSpan={2}>
                                 <div className="flex items-center gap-2">
                                   <div className={`p-0.5 rounded transition-colors ${isExpanded ? "bg-indigo-100" : ""}`}>
                                     {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-indigo-500" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
                                   </div>
-                                  <span className="font-semibold text-[13px] text-slate-700">{row.name}</span>
+                                  <span className="font-bold text-[13px] text-slate-700">{group.name}</span>
+                                  <span className="text-[11px] text-slate-400 ml-2">{group.units.length} un.</span>
+                                  {vendidas > 0 && <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{vendidas} vendidas</span>}
+                                  {disponiveis > 0 && <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded">{disponiveis} disp.</span>}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-center font-bold text-[13px] text-slate-700 tabular-nums">{row.total}</TableCell>
-                              <TableCell className="text-center font-bold text-[13px] text-emerald-600 tabular-nums">{row.vendida}</TableCell>
-                              <TableCell className="text-center font-bold text-[13px] text-amber-600 tabular-nums">{row.disponivel}</TableCell>
-                              <TableCell className="text-center font-bold text-[13px] text-slate-500 tabular-nums">{row.outro}</TableCell>
-                              <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{formatCurrency(row.valorTotal)}</TableCell>
-                              <TableCell className="text-right pr-5">
+                              <TableCell />
+                              <TableCell />
+                              <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-2">
                                   <div className="w-16 h-2 bg-slate-100 rounded-full overflow-hidden">
-                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(pctVendido, 100)}%` }} />
+                                    <div className="h-full bg-red-400 rounded-full" style={{ width: `${group.units.length > 0 ? (vendidas / group.units.length) * 100 : 0}%` }} />
                                   </div>
-                                  <span className={`text-[11px] font-bold tabular-nums ${pctVendido >= 80 ? "text-emerald-600" : pctVendido >= 50 ? "text-amber-600" : "text-red-600"}`}>
-                                    {pctVendido.toFixed(0)}%
-                                  </span>
+                                  <span className="text-[10px] font-bold text-slate-400 tabular-nums">{group.units.length > 0 ? ((vendidas / group.units.length) * 100).toFixed(0) : 0}%</span>
                                 </div>
                               </TableCell>
+                              <TableCell className="text-right pr-5 font-bold text-[13px] text-slate-700 tabular-nums">{formatCurrency(group.totalValue)}</TableCell>
                             </TableRow>
-                            {isExpanded && row.units
-                              .sort((a, b) => a.unit.localeCompare(b.unit))
-                              .map((u, idx) => (
-                                <TableRow key={`${u.unit}-${idx}`} className="bg-slate-50/50 border-b border-slate-100/50">
-                                  <TableCell className="pl-12 py-2" colSpan={2}>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-slate-400 font-mono text-[10px] bg-white py-0.5 px-1.5 rounded border border-slate-200 shadow-sm">{u.unit}</span>
-                                      <span className="text-[12px] text-slate-600">{u.customer}</span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="text-center" colSpan={2}>
-                                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
-                                      u.status === "Vendida" ? "border-emerald-200 text-emerald-600 bg-emerald-50" :
-                                      u.status === "Disponível" ? "border-amber-200 text-amber-600 bg-amber-50" :
-                                      "border-slate-200 text-slate-500"
+                            {isExpanded && groupUnits.map((u, idx) => {
+                              const sc = statusColors[u.status] || defaultColor;
+                              return (
+                                <TableRow key={`${u.unit}-${idx}`} className={`border-b border-slate-100/50 ${
+                                  u.status === "Vendida" ? "bg-red-50/30" : u.status === "Disponível" ? "bg-emerald-50/30" : "bg-white"
+                                }`}>
+                                  <TableCell className="pl-8 py-2.5">
+                                    <Badge variant="outline" className={`text-[10px] px-2 py-0.5 font-semibold ${
+                                      u.status === "Vendida" ? "border-red-200 text-red-600 bg-red-50" :
+                                      u.status === "Disponível" ? "border-emerald-200 text-emerald-600 bg-emerald-50" :
+                                      `${sc.border} ${sc.text} ${sc.bg}`
                                     }`}>{u.status}</Badge>
                                   </TableCell>
-                                  <TableCell className="text-center text-[12px] text-slate-500 tabular-nums">{formatDate(u.contractDate)}</TableCell>
-                                  <TableCell className="text-right text-[12px] text-slate-600 font-medium tabular-nums" colSpan={2}>
+                                  <TableCell className="text-[12px] text-slate-500">{u.enterprise}</TableCell>
+                                  <TableCell>
+                                    <span className="font-mono text-[12px] font-bold text-slate-700 bg-white py-0.5 px-2 rounded border border-slate-200 shadow-sm">{u.unit}</span>
+                                  </TableCell>
+                                  <TableCell className="text-[12px] text-slate-600">{u.customer}</TableCell>
+                                  <TableCell className="text-right text-[12px] text-slate-500 tabular-nums">{formatDate(u.contractDate)}</TableCell>
+                                  <TableCell className="text-right pr-5 text-[12px] font-medium tabular-nums text-slate-700">
                                     {u.status === "Vendida" ? formatCurrency(u.value) : "—"}
                                   </TableCell>
                                 </TableRow>
-                              ))}
+                              );
+                            })}
                           </React.Fragment>
                         );
                       })}
                       {/* Total row */}
                       <TableRow className="bg-indigo-50/50 border-t-2 border-indigo-200">
-                        <TableCell className="pl-5 py-3 font-bold text-[13px] text-indigo-800">TOTAL</TableCell>
-                        <TableCell className="text-center font-bold text-[13px] text-indigo-800 tabular-nums">{totalUnitsCount}</TableCell>
-                        <TableCell className="text-center font-bold text-[13px] text-emerald-700 tabular-nums">{totalVendidas}</TableCell>
-                        <TableCell className="text-center font-bold text-[13px] text-amber-700 tabular-nums">{totalDisponiveis}</TableCell>
-                        <TableCell className="text-center font-bold text-[13px] text-slate-600 tabular-nums">{totalOutros}</TableCell>
-                        <TableCell className="text-right font-bold text-[14px] text-indigo-800 tabular-nums">{formatCurrency(allUnits.filter(u => u.status === "Vendida").reduce((s, u) => s + u.value, 0))}</TableCell>
-                        <TableCell className="text-right pr-5 font-bold text-[13px] text-indigo-700">{totalUnitsCount > 0 ? ((totalVendidas / totalUnitsCount) * 100).toFixed(0) : 0}%</TableCell>
+                        <TableCell className="pl-5 py-3 font-bold text-[13px] text-indigo-800" colSpan={4}>
+                          TOTAL — {filteredUnits.length} unidades
+                        </TableCell>
+                        <TableCell />
+                        <TableCell className="text-right pr-5 font-bold text-[14px] text-indigo-800 tabular-nums">
+                          {formatCurrency(filteredUnits.filter(u => u.status === "Vendida").reduce((s, u) => s + u.value, 0))}
+                        </TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
                 </CardContent>
               </Card>
-            </>}
+              </>;
+            })()}
           </>
         );
       })()}
