@@ -343,12 +343,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   // For "pagas/recebidas" mode, fetch extra years back to capture items with old due dates
   // that were paid/received in the selected year.
   // For "a-receber/vencidas" mode, extend endDate to include future parcels.
+  // Fixed date range — same as Painel Executivo so they share the same DB cache
   const { startDate, endDate } = useMemo(() => {
-    const yr = filterAno === "all" ? currentYear : parseInt(filterAno, 10);
-    const start = isPagas ? yr - 10 : isOverdue ? yr - 10 : yr;
-    const end = isPagas ? yr : yr + 5;
-    return { startDate: `${start}-01-01`, endDate: `${end}-12-31` };
-  }, [filterAno, currentYear, isPagas]);
+    return { startDate: `${currentYear - 10}-01-01`, endDate: `${currentYear + 5}-12-31` };
+  }, [currentYear]);
   const [sortField, setSortField] = useState<SortField>(isPagas ? "paymentDate" : "dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(0);
