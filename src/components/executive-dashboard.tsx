@@ -247,6 +247,7 @@ export function ExecutiveDashboard() {
   const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
   const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
   const [salesContracts, setSalesContracts] = useState<SiengeSalesContract[]>([]);
+  const [apiUnits, setApiUnits] = useState<{ enterpriseName: string; companyName: string; name: string; propertyType: string; commercialStock: string; floor: string; contractNumber: string; privateArea: number }[]>([]);
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
   const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string }[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -337,6 +338,12 @@ export function ExecutiveDashboard() {
       fetch(`/api/sienge/sales-contracts${refreshParam ? "?forceRefresh=true" : ""}`)
         .then(res => res.ok ? res.json() : null)
         .then(data => { if (data) setSalesContracts(data.data || []); })
+        .catch(() => {});
+
+      // Units fetch runs independently — real unit data from Sienge
+      fetch(`/api/sienge/units${refreshParam ? "?forceRefresh=true" : ""}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => { if (data) setApiUnits(data.data || []); })
         .catch(() => {});
 
       const [outcomeRes, bmRes, incomeRes] = await Promise.all([
@@ -2226,23 +2233,50 @@ export function ExecutiveDashboard() {
           return "Apartamento";
         };
 
-        // ─── Unit analysis from contracts ───
-        const unitMap = new Map<string, { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string }>();
-        // Use ALL contracts (not just filtered) for unit inventory overview
+        // ─── Unit analysis: API units + sales contract enrichment ───
+        type UnitRecord = { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string; area: number };
+        const unitMap = new Map<string, UnitRecord>();
+
+        // 1. Seed from real Sienge /units API (source of truth for status)
+        if (apiUnits.length > 0) {
+          apiUnits.forEach(u => {
+            // Filter by company if selected
+            if (selectedCompanies.size > 0 && u.companyName && !selectedCompanies.has(u.companyName)) return;
+            const key = `${u.enterpriseName}||${u.name}`;
+            unitMap.set(key, {
+              enterprise: u.enterpriseName,
+              unit: u.name,
+              status: u.commercialStock, // Already mapped: "Vendida", "Disponível", etc.
+              tipo: u.propertyType || inferUnitType(u.name),
+              value: 0,
+              customer: "—",
+              contractDate: "",
+              area: u.privateArea || 0,
+            });
+          });
+        }
+
+        // 2. Overlay sales contract data (customer, value, contract date)
         const allContractsForUnits = salesContracts.filter(c => {
           if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
           return true;
         });
         allContractsForUnits.forEach(c => {
+          if (c.cancellationDate || c.situation === "Cancelado" || c.situation === "Distratado") return;
           (c.salesContractUnits || []).forEach(u => {
             const key = `${c.enterpriseName}||${u.name}`;
             const existing = unitMap.get(key);
-            // Keep the most recent contract for each unit
-            if (!existing || (c.contractDate > existing.contractDate)) {
+            if (existing) {
+              // Enrich existing API unit with contract data
+              if (!existing.contractDate || c.contractDate > existing.contractDate) {
+                existing.value = c.value || existing.value;
+                existing.customer = c.salesContractCustomers?.[0]?.name || existing.customer;
+                existing.contractDate = c.contractDate || existing.contractDate;
+              }
+            } else if (apiUnits.length === 0) {
+              // Fallback: no API units loaded, use contract-based inference
               let status = "Vendida";
-              if (c.cancellationDate || c.situation === "Cancelado") status = "Disponível";
-              else if (c.situation === "Emitido") status = "Vendida";
-              else if (c.situation === "Distratado") status = "Disponível";
+              if (c.situation === "Emitido") status = "Vendida";
               else status = c.situation || "Outro";
               unitMap.set(key, {
                 enterprise: c.enterpriseName,
@@ -2252,6 +2286,7 @@ export function ExecutiveDashboard() {
                 value: c.value || 0,
                 customer: c.salesContractCustomers?.[0]?.name || "—",
                 contractDate: c.contractDate || "",
+                area: 0,
               });
             }
           });
@@ -2544,6 +2579,9 @@ export function ExecutiveDashboard() {
                 "Todas": { bg: "bg-white", text: "text-slate-700", border: "border-slate-300", activeBg: "bg-slate-800 text-white border-slate-800" },
                 "Vendida": { bg: "bg-white", text: "text-red-600", border: "border-red-200", activeBg: "bg-red-500 text-white border-red-500" },
                 "Disponível": { bg: "bg-white", text: "text-emerald-600", border: "border-emerald-200", activeBg: "bg-emerald-500 text-white border-emerald-500" },
+                "Reserva Técnica": { bg: "bg-white", text: "text-blue-600", border: "border-blue-200", activeBg: "bg-blue-500 text-white border-blue-500" },
+                "Permuta": { bg: "bg-white", text: "text-purple-600", border: "border-purple-200", activeBg: "bg-purple-500 text-white border-purple-500" },
+                "Gravame": { bg: "bg-white", text: "text-yellow-600", border: "border-yellow-200", activeBg: "bg-yellow-500 text-white border-yellow-500" },
                 "Emitido": { bg: "bg-white", text: "text-red-600", border: "border-red-200", activeBg: "bg-red-500 text-white border-red-500" },
                 "Cancelado": { bg: "bg-white", text: "text-slate-500", border: "border-slate-200", activeBg: "bg-slate-500 text-white border-slate-500" },
                 "Distratado": { bg: "bg-white", text: "text-orange-600", border: "border-orange-200", activeBg: "bg-orange-500 text-white border-orange-500" },
@@ -2811,7 +2849,9 @@ export function ExecutiveDashboard() {
 
               const qVendidas = qUnits.filter(u => u.status === "Vendida").length;
               const qDisponiveis = qUnits.filter(u => u.status === "Disponível").length;
-              const qOutros = qUnits.length - qVendidas - qDisponiveis;
+              const qReserva = qUnits.filter(u => u.status === "Reserva Técnica").length;
+              const qPermuta = qUnits.filter(u => u.status === "Permuta").length;
+              const qOutros = qUnits.length - qVendidas - qDisponiveis - qReserva - qPermuta;
 
               // Filter by status if active
               const qVisible = selectedUnitStatuses.size === 0 ? qUnits : qUnits.filter(u => selectedUnitStatuses.has(u.status));
@@ -2821,7 +2861,9 @@ export function ExecutiveDashboard() {
                 switch (status) {
                   case "Vendida": return "bg-red-100 border-red-300 hover:bg-red-200";
                   case "Disponível": return "bg-emerald-100 border-emerald-300 hover:bg-emerald-200";
-                  case "Autorizado": return "bg-blue-100 border-blue-300 hover:bg-blue-200";
+                  case "Reserva Técnica": return "bg-blue-100 border-blue-300 hover:bg-blue-200";
+                  case "Permuta": return "bg-purple-100 border-purple-300 hover:bg-purple-200";
+                  case "Gravame": return "bg-yellow-100 border-yellow-300 hover:bg-yellow-200";
                   default: return "bg-amber-100 border-amber-300 hover:bg-amber-200";
                 }
               };
@@ -2829,7 +2871,9 @@ export function ExecutiveDashboard() {
                 switch (status) {
                   case "Vendida": return "text-red-700";
                   case "Disponível": return "text-emerald-700";
-                  case "Autorizado": return "text-blue-700";
+                  case "Reserva Técnica": return "text-blue-700";
+                  case "Permuta": return "text-purple-700";
+                  case "Gravame": return "text-yellow-700";
                   default: return "text-amber-700";
                 }
               };
@@ -2896,6 +2940,8 @@ export function ExecutiveDashboard() {
                           <div className="flex items-center gap-3 text-xs">
                             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400" /><span className="text-slate-500">Vendidas: <strong className="text-red-600">{qVendidas}</strong></span></span>
                             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400" /><span className="text-slate-500">Disponíveis: <strong className="text-emerald-600">{qDisponiveis}</strong></span></span>
+                            {qReserva > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-400" /><span className="text-slate-500">Reserva: <strong className="text-blue-600">{qReserva}</strong></span></span>}
+                            {qPermuta > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-purple-400" /><span className="text-slate-500">Permuta: <strong className="text-purple-600">{qPermuta}</strong></span></span>}
                             {qOutros > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400" /><span className="text-slate-500">Outros: <strong className="text-amber-600">{qOutros}</strong></span></span>}
                           </div>
                         </div>
@@ -2906,6 +2952,8 @@ export function ExecutiveDashboard() {
                       <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
                         {qVendidas > 0 && <div className="h-full bg-red-400 transition-all" style={{ width: `${(qVendidas / qUnits.length) * 100}%` }} />}
                         {qDisponiveis > 0 && <div className="h-full bg-emerald-400 transition-all" style={{ width: `${(qDisponiveis / qUnits.length) * 100}%` }} />}
+                        {qReserva > 0 && <div className="h-full bg-blue-400 transition-all" style={{ width: `${(qReserva / qUnits.length) * 100}%` }} />}
+                        {qPermuta > 0 && <div className="h-full bg-purple-400 transition-all" style={{ width: `${(qPermuta / qUnits.length) * 100}%` }} />}
                         {qOutros > 0 && <div className="h-full bg-amber-400 transition-all" style={{ width: `${(qOutros / qUnits.length) * 100}%` }} />}
                       </div>
                     </CardContent>

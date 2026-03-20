@@ -424,16 +424,41 @@ export interface SiengeSalesContract {
 export interface SiengeEnterprise {
   id: number;
   name: string;
+  commercialName: string | null;
   companyId: number;
   companyName: string;
 }
 
-export interface SiengeEnterpriseUnit {
+export interface SiengeUnit {
   id: number;
+  enterpriseId: number;
+  contractId: number | null;
   name: string;
+  propertyType: string;
+  commercialStock: string; // V=Vendida, D=Disponível, R=Reserva Técnica, P=Permuta, G=Gravame
+  floor: string;
+  contractNumber: string;
+  deliveryDate: string | null;
+  scheduledDeliveryDate: string | null;
+  privateArea: number;
+  commonArea: number;
+  terrainArea: number | null;
+  usableArea: number | null;
+  note: string;
+  childUnits: unknown[];
+}
+
+// Enriched unit with enterprise name (returned by our API)
+export interface SiengeEnrichedUnit {
+  id: number;
   enterpriseId: number;
   enterpriseName: string;
-  commercialStock: string; // "Disponivel", "Vendido", "Reserva Tecnica", etc.
-  areaTotal: number;
-  price: number;
+  companyName: string;
+  name: string;
+  propertyType: string;
+  commercialStock: string; // Label: "Vendida", "Disponível", "Reserva Técnica", "Permuta", "Gravame"
+  floor: string;
+  contractNumber: string;
+  privateArea: number;
+  deliveryDate: string | null;
 }

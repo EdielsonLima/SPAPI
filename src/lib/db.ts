@@ -306,6 +306,32 @@ export async function cacheSalesContracts(data: unknown) {
   );
 }
 
+// ─── Units (Unidades de Empreendimentos) ─────────────────────────────────────
+
+let unitsTableReady = false;
+export async function ensureUnitsTable() {
+  if (unitsTableReady) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS cached_units (
+    id SERIAL PRIMARY KEY, data JSONB NOT NULL, cached_at TIMESTAMP NOT NULL DEFAULT NOW()
+  )`);
+  unitsTableReady = true;
+}
+
+export async function getCachedUnits(): Promise<{ data: unknown; cachedAt: string } | null> {
+  const result = await pool.query(
+    `SELECT data, cached_at FROM cached_units WHERE cached_at > NOW() - INTERVAL '7 days' ORDER BY id DESC LIMIT 1`
+  );
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
+}
+
+export async function cacheUnits(data: unknown) {
+  await pool.query(`DELETE FROM cached_units`);
+  await pool.query(
+    `INSERT INTO cached_units (data, cached_at) VALUES ($1, NOW())`,
+    [JSON.stringify(data)]
+  );
+}
+
 // ─── Company Settings (M² e Fator) ──────────────────────────────────────────
 
 export interface CompanySetting {
