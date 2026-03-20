@@ -2852,12 +2852,12 @@ export function ExecutiveDashboard() {
               // Card colors by status
               const cardStyle = (status: string) => {
                 switch (status) {
-                  case "Vendida": return "bg-white border-slate-200 border-l-[4px] border-l-red-500 hover:border-red-300 hover:shadow-md";
-                  case "Disponível": return "bg-white border-slate-200 border-l-[4px] border-l-emerald-500 hover:border-emerald-300 hover:shadow-md";
-                  case "Reserva Técnica": return "bg-white border-slate-200 border-l-[4px] border-l-blue-500 hover:border-blue-300 hover:shadow-md";
-                  case "Proposta": return "bg-white border-slate-200 border-l-[4px] border-l-orange-500 hover:border-orange-300 hover:shadow-md";
-                  case "Vendido/Terceiros": return "bg-white border-slate-200 border-l-[4px] border-l-pink-500 hover:border-pink-300 hover:shadow-md";
-                  default: return "bg-white border-slate-200 border-l-[4px] border-l-amber-500 hover:border-amber-300 hover:shadow-md";
+                  case "Vendida": return "bg-red-50/70 border-red-200 border-l-[4px] border-l-red-500 hover:bg-red-100/80 hover:border-red-300 hover:shadow-md";
+                  case "Disponível": return "bg-emerald-50/70 border-emerald-200 border-l-[4px] border-l-emerald-500 hover:bg-emerald-100/80 hover:border-emerald-300 hover:shadow-md";
+                  case "Reserva Técnica": return "bg-blue-50/70 border-blue-200 border-l-[4px] border-l-blue-500 hover:bg-blue-100/80 hover:border-blue-300 hover:shadow-md";
+                  case "Proposta": return "bg-orange-50/70 border-orange-200 border-l-[4px] border-l-orange-500 hover:bg-orange-100/80 hover:border-orange-300 hover:shadow-md";
+                  case "Vendido/Terceiros": return "bg-pink-50/70 border-pink-200 border-l-[4px] border-l-pink-500 hover:bg-pink-100/80 hover:border-pink-300 hover:shadow-md";
+                  default: return "bg-amber-50/70 border-amber-200 border-l-[4px] border-l-amber-500 hover:bg-amber-100/80 hover:border-amber-300 hover:shadow-md";
                 }
               };
               const statusTextColor = (status: string) => {
