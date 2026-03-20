@@ -265,6 +265,7 @@ export function ExecutiveDashboard() {
   const [unitStatusFilter, setUnitStatusFilter] = useState<string>("Todas");
   const [unitEnterpriseFilter, setUnitEnterpriseFilter] = useState<string>("Todos");
   const [unitTypeFilter, setUnitTypeFilter] = useState<string>("Todos");
+  const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
@@ -2553,22 +2554,25 @@ export function ExecutiveDashboard() {
               };
               const defaultColor = { bg: "bg-white", text: "text-violet-600", border: "border-violet-200", activeBg: "bg-violet-500 text-white border-violet-500" };
 
-              // Collect all unique unit types
+              // Collect all unique unit types and unit names
               const allUnitTypes = Array.from(new Set(allUnits.map(u => u.tipo))).sort();
+              const allUnitNames = Array.from(new Set(allUnits.map(u => u.unit))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
-              // Filter units by status, enterprise and type
+              // Filter units by status, enterprise, type and selected units
               const filteredUnits = allUnits.filter(u => {
                 if (unitStatusFilter !== "Todas" && u.status !== unitStatusFilter) return false;
                 if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
                 if (unitTypeFilter !== "Todos" && u.tipo !== unitTypeFilter) return false;
+                if (selectedUnits.size > 0 && !selectedUnits.has(u.unit)) return false;
                 return true;
               });
 
-              // Count per status (for badges) - respecting enterprise + type filters
+              // Count per status (for badges) - respecting enterprise + type + unit filters
               const statusCounts = new Map<string, number>();
               const preFilteredUnits = allUnits.filter(u => {
                 if (unitEnterpriseFilter !== "Todos" && u.enterprise !== unitEnterpriseFilter) return false;
                 if (unitTypeFilter !== "Todos" && u.tipo !== unitTypeFilter) return false;
+                if (selectedUnits.size > 0 && !selectedUnits.has(u.unit)) return false;
                 return true;
               });
               preFilteredUnits.forEach(u => {
@@ -2674,6 +2678,22 @@ export function ExecutiveDashboard() {
                           ))}
                         </select>
                       </div>
+                      <MultiSelectFilter
+                        label="Unidades"
+                        icon={<Search className="h-4 w-4" />}
+                        allOptions={allUnitNames}
+                        selected={selectedUnits}
+                        onToggle={(name) => {
+                          setSelectedUnits(prev => {
+                            const next = new Set(prev);
+                            if (next.has(name)) next.delete(name); else next.add(name);
+                            return next;
+                          });
+                        }}
+                        onSelectAll={() => setSelectedUnits(new Set(allUnitNames))}
+                        onClear={() => setSelectedUnits(new Set())}
+                        activeColor="cyan"
+                      />
                     </div>
                     {/* Status filter tabs */}
                     <div className="flex items-center gap-2 flex-wrap">
