@@ -91,6 +91,45 @@ export async function siengeGet<T>(endpoint: string, params?: Record<string, str
   }
 }
 
+// ─── Bulk API fetcher (com concurrency limit + retry 429) ───────────────────
+// Usa SIENGE_BULK_API_URL. Mesma proteção de rate limit que siengeGet.
+export async function siengeBulkGet(url: string, authHeader: string): Promise<Response> {
+  await acquireSlot();
+  try {
+    const maxRetries = 3;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 120_000); // 2 min timeout
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          headers: { Authorization: authHeader, "Content-Type": "application/json" },
+          cache: "no-store",
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      if (response.status === 429) {
+        if (attempt < maxRetries) {
+          const retryAfter = response.headers.get("Retry-After");
+          const waitMs = retryAfter ? parseInt(retryAfter, 10) * 1000 : (attempt + 1) * 5000;
+          console.warn(`Sienge Bulk 429 — retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+          await delay(waitMs);
+          continue;
+        }
+        throw new Error(`Sienge Bulk API 429 Too Many Requests (after ${maxRetries} retries)`);
+      }
+
+      return response;
+    }
+    throw new Error("Sienge Bulk API: max retries exceeded");
+  } finally {
+    releaseSlot();
+  }
+}
+
 export async function siengePostFormData(endpoint: string, formData: FormData): Promise<{ ok: boolean; status: number; body?: unknown }> {
   const apiUrl = process.env.SIENGE_API_URL!;
   const username = process.env.SIENGE_USERNAME!;

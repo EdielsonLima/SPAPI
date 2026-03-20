@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCachedOutcome, cacheOutcome } from "@/lib/db";
+import { siengeBulkGet } from "@/lib/sienge";
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -39,13 +40,7 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("withBankMovements", "true");
 
   try {
-    const response = await fetch(url.toString(), {
-      headers: {
-        Authorization: authHeader,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-    });
+    const response = await siengeBulkGet(url.toString(), authHeader);
 
     if (!response.ok) {
       throw new Error(`Sienge API error: ${response.status} ${response.statusText}`);

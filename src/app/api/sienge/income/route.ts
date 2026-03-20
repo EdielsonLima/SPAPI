@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCachedIncome, cacheIncome } from "@/lib/db";
+import { siengeBulkGet } from "@/lib/sienge";
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -42,17 +43,10 @@ export async function GET(request: NextRequest) {
     return url.toString();
   };
 
-  const fetchHeaders = {
-    Authorization: authHeader,
-    "Content-Type": "application/json",
-  };
-
   try {
-    // Fetch income by due date (D) and by payment date (P) in parallel
-    const [responseD, responseP] = await Promise.all([
-      fetch(buildUrl("D"), { headers: fetchHeaders, cache: "no-store" }),
-      fetch(buildUrl("P"), { headers: fetchHeaders, cache: "no-store" }),
-    ]);
+    // Fetch income by due date (D) then by payment date (P) — sequential to respect rate limit
+    const responseD = await siengeBulkGet(buildUrl("D"), authHeader);
+    const responseP = await siengeBulkGet(buildUrl("P"), authHeader);
 
     if (!responseD.ok) {
       throw new Error(`Sienge API error (D): ${responseD.status} ${responseD.statusText}`);
