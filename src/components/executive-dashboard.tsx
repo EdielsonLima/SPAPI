@@ -259,6 +259,7 @@ export function ExecutiveDashboard() {
   const [showOverdueTable, setShowOverdueTable] = useState(false);
   const [expandedCreditors, setExpandedCreditors] = useState<Set<string>>(new Set());
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
+  const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
@@ -2144,7 +2145,22 @@ export function ExecutiveDashboard() {
         });
         const companyRows = Array.from(byCompany.entries())
           .map(([name, data]) => ({ name, ...data }))
-          .sort((a, b) => b.totalValue - a.totalValue);
+          .sort((a, b) => {
+            const { field, dir } = comercialSort;
+            let cmp = 0;
+            switch (field) {
+              case "name": cmp = a.name.localeCompare(b.name); break;
+              case "contracts": cmp = a.contracts.length - b.contracts.length; break;
+              case "totalValue": cmp = a.totalValue - b.totalValue; break;
+              case "ticket": {
+                const ta = a.contracts.length > 0 ? a.totalValue / a.contracts.length : 0;
+                const tb = b.contracts.length > 0 ? b.totalValue / b.contracts.length : 0;
+                cmp = ta - tb; break;
+              }
+              case "pct": cmp = a.totalValue - b.totalValue; break;
+            }
+            return dir === "asc" ? cmp : -cmp;
+          });
 
         // Monthly chart data
         const monthlyMap = new Map<string, number>();
@@ -2299,11 +2315,31 @@ export function ExecutiveDashboard() {
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-slate-50/80 border-b border-slate-200">
-                      <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pl-5">Empreendimento</TableHead>
-                      <TableHead className="text-right font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Contratos</TableHead>
-                      <TableHead className="text-right font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Valor Total</TableHead>
-                      <TableHead className="text-right font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Ticket Médio</TableHead>
-                      <TableHead className="text-right font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pr-5">% do Total</TableHead>
+                      {([
+                        { key: "name" as const, label: "Empreendimento", align: "left" },
+                        { key: "contracts" as const, label: "Contratos", align: "right" },
+                        { key: "totalValue" as const, label: "Valor Total", align: "right" },
+                        { key: "ticket" as const, label: "Ticket Médio", align: "right" },
+                        { key: "pct" as const, label: "% do Total", align: "right" },
+                      ] as const).map((col, i) => {
+                        const isSorted = comercialSort.field === col.key;
+                        const SortIcon = isSorted ? (comercialSort.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                        return (
+                          <TableHead
+                            key={col.key}
+                            className={`font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 cursor-pointer hover:text-slate-700 select-none ${col.align === "right" ? "text-right" : ""} ${i === 0 ? "pl-5" : ""} ${i === 4 ? "pr-5" : ""}`}
+                            onClick={() => setComercialSort(prev => ({
+                              field: col.key,
+                              dir: prev.field === col.key && prev.dir === "desc" ? "asc" : "desc",
+                            }))}
+                          >
+                            <span className="inline-flex items-center gap-1">
+                              {col.label}
+                              <SortIcon className={`h-3 w-3 ${isSorted ? "text-indigo-500" : "text-slate-300"}`} />
+                            </span>
+                          </TableHead>
+                        );
+                      })}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
