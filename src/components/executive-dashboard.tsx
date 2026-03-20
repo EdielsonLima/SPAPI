@@ -2171,7 +2171,12 @@ export function ExecutiveDashboard() {
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([year, value]) => ({ month: year, value }));
 
-        const comercialChart = chartView === "anual" ? yearlyChart : monthlyChart;
+        const rawChart = chartView === "anual" ? yearlyChart : monthlyChart;
+        const comercialChart = rawChart.map((item, idx) => {
+          const prev = idx > 0 ? rawChart[idx - 1].value : 0;
+          const pct = prev > 0 ? ((item.value - prev) / prev) * 100 : null;
+          return { ...item, pct };
+        });
 
         return (
           <>
@@ -2244,13 +2249,31 @@ export function ExecutiveDashboard() {
                   </Tabs>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={comercialChart} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={comercialChart} margin={{ top: 40, right: 10, left: 10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
                       <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={80} />
                       <RechartsTooltip formatter={(v: number | undefined) => [formatCurrency(v ?? 0), "Valor"]} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#6366f1" />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]} fill="#6366f1"
+                        label={((props: Record<string, unknown>) => {
+                          const x = Number(props.x ?? 0), y = Number(props.y ?? 0), w = Number(props.width ?? 0), value = Number(props.value ?? 0), index = Number(props.index ?? 0);
+                          const entry = comercialChart[index];
+                          const pct = entry?.pct;
+                          return (
+                            <g>
+                              <text x={x + w / 2} y={y - 16} textAnchor="middle" fontSize={10} fontWeight={700} fill="#334155">
+                                {formatCompactCurrency(value)}
+                              </text>
+                              {pct !== null && pct !== undefined && (
+                                <text x={x + w / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill={pct >= 0 ? "#16a34a" : "#dc2626"}>
+                                  {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                                </text>
+                              )}
+                            </g>
+                          );
+                        }) as unknown as undefined}
+                      />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>
