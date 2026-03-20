@@ -2160,6 +2160,19 @@ export function ExecutiveDashboard() {
             return { month: `${MONTH_LABELS[parseInt(m, 10) - 1] || m}/${y.slice(2)}`, value };
           });
 
+        // Yearly chart data
+        const yearlyMap = new Map<string, number>();
+        filtered.forEach(c => {
+          if (!c.contractDate) return;
+          const year = c.contractDate.substring(0, 4);
+          yearlyMap.set(year, (yearlyMap.get(year) || 0) + (c.value || 0));
+        });
+        const yearlyChart = Array.from(yearlyMap.entries())
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([year, value]) => ({ month: year, value }));
+
+        const comercialChart = chartView === "anual" ? yearlyChart : monthlyChart;
+
         return (
           <>
             {/* KPI Cards */}
@@ -2216,15 +2229,23 @@ export function ExecutiveDashboard() {
               </Card>
             </div>
 
-            {/* Monthly Chart */}
-            {monthlyChart.length > 0 && (
+            {/* Sales Chart */}
+            {comercialChart.length > 0 && (
               <Card className="border-0 shadow-sm mt-6">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold text-slate-700">Vendas por Mês</CardTitle>
+                <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                  <CardTitle className="text-sm font-bold text-slate-700">
+                    {chartView === "anual" ? "Vendas por Ano" : "Vendas por Mês"}
+                  </CardTitle>
+                  <Tabs value={chartView} onValueChange={v => setChartView(v as ChartView)}>
+                    <TabsList className="h-8">
+                      <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
+                      <TabsTrigger value="anual" className="text-xs px-3 h-7">Anual</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
                   <ResponsiveContainer width="100%" height={280}>
-                    <BarChart data={monthlyChart} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
+                    <BarChart data={comercialChart} margin={{ top: 10, right: 10, left: 10, bottom: 5 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                       <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
                       <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={80} />
