@@ -2554,9 +2554,11 @@ export function ExecutiveDashboard() {
               };
               const defaultColor = { bg: "bg-white", text: "text-violet-600", border: "border-violet-200", activeBg: "bg-violet-500 text-white border-violet-500" };
 
-              // Collect all unique unit types and unit names
-              const allUnitTypes = Array.from(new Set(allUnits.map(u => u.tipo))).sort();
-              const allUnitNames = Array.from(new Set(allUnits.map(u => u.unit))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+              // Cascading filters: Enterprise → Type → Unit names
+              const unitsForEnterprise = unitEnterpriseFilter === "Todos" ? allUnits : allUnits.filter(u => u.enterprise === unitEnterpriseFilter);
+              const allUnitTypes = Array.from(new Set(unitsForEnterprise.map(u => u.tipo))).sort();
+              const unitsForType = unitTypeFilter === "Todos" ? unitsForEnterprise : unitsForEnterprise.filter(u => u.tipo === unitTypeFilter);
+              const allUnitNames = Array.from(new Set(unitsForType.map(u => u.unit))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
 
               // Filter units by status, enterprise, type and selected units
               const filteredUnits = allUnits.filter(u => {
@@ -2657,7 +2659,7 @@ export function ExecutiveDashboard() {
                         <select
                           className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           value={unitEnterpriseFilter}
-                          onChange={e => setUnitEnterpriseFilter(e.target.value)}
+                          onChange={e => { setUnitEnterpriseFilter(e.target.value); setUnitTypeFilter("Todos"); setSelectedUnits(new Set()); setUnitStatusFilter("Todas"); }}
                         >
                           <option value="Todos">Todos ({allUnits.length})</option>
                           {allEnterprises.map(e => (
@@ -2670,11 +2672,11 @@ export function ExecutiveDashboard() {
                         <select
                           className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                           value={unitTypeFilter}
-                          onChange={e => setUnitTypeFilter(e.target.value)}
+                          onChange={e => { setUnitTypeFilter(e.target.value); setSelectedUnits(new Set()); setUnitStatusFilter("Todas"); }}
                         >
                           <option value="Todos">Todos</option>
                           {allUnitTypes.map(t => (
-                            <option key={t} value={t}>{t} ({allUnits.filter(u => u.tipo === t).length})</option>
+                            <option key={t} value={t}>{t} ({unitsForEnterprise.filter(u => u.tipo === t).length})</option>
                           ))}
                         </select>
                       </div>
@@ -2837,7 +2839,9 @@ export function ExecutiveDashboard() {
             {/* ─── QUADRO ESPELHO SUB-TAB ─── */}
             {comercialSubTab === "quadro" && (() => {
               const qEnterprises = Array.from(new Set(allUnits.map(u => u.enterprise))).sort();
-              const qTypes = Array.from(new Set(allUnits.map(u => u.tipo))).sort();
+              // Cascading: types depend on selected enterprise
+              const qUnitsForEnterprise = unitEnterpriseFilter === "Todos" ? allUnits : allUnits.filter(u => u.enterprise === unitEnterpriseFilter);
+              const qTypes = Array.from(new Set(qUnitsForEnterprise.map(u => u.tipo))).sort();
 
               // Filter units for selected enterprise
               const qUnits = allUnits.filter(u => {
@@ -2887,7 +2891,7 @@ export function ExecutiveDashboard() {
                           <select
                             className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             value={unitEnterpriseFilter}
-                            onChange={e => { setUnitEnterpriseFilter(e.target.value); setUnitStatusFilter("Todas"); }}
+                            onChange={e => { setUnitEnterpriseFilter(e.target.value); setUnitTypeFilter("Todos"); setUnitStatusFilter("Todas"); }}
                           >
                             <option value="Todos">Todos ({allUnits.length})</option>
                             {qEnterprises.map(e => (
@@ -2900,11 +2904,11 @@ export function ExecutiveDashboard() {
                           <select
                             className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
                             value={unitTypeFilter}
-                            onChange={e => setUnitTypeFilter(e.target.value)}
+                            onChange={e => { setUnitTypeFilter(e.target.value); setUnitStatusFilter("Todas"); }}
                           >
                             <option value="Todos">Todos</option>
                             {qTypes.map(t => (
-                              <option key={t} value={t}>{t}</option>
+                              <option key={t} value={t}>{t} ({qUnitsForEnterprise.filter(u => u.tipo === t).length})</option>
                             ))}
                           </select>
                         </div>
