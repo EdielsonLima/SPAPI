@@ -2316,33 +2316,33 @@ export function ExecutiveDashboard() {
 
         return (
           <>
-            {/* Sub-tabs */}
-            <div className="flex items-center gap-1 mb-4">
+            {/* Modern Segmented Sub-tabs */}
+            <div className="inline-flex items-center p-1 mb-6 bg-slate-100/80 rounded-xl border border-slate-200/50 w-full md:w-auto overflow-x-auto shadow-inner">
               <Button
-                variant={comercialSubTab === "vendas" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
-                className={`h-8 text-xs font-semibold ${comercialSubTab === "vendas" ? "bg-indigo-600 text-white hover:bg-indigo-700" : "text-slate-500 hover:text-slate-700"}`}
+                className={`h-9 px-5 text-[13px] font-bold rounded-lg transition-all duration-200 ${comercialSubTab === "vendas" ? "bg-white text-indigo-700 shadow-[0_2px_8px_rgb(0,0,0,0.06)] border border-slate-200/50" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"}`}
                 onClick={() => setComercialSubTab("vendas")}
               >
-                <Handshake className="h-3.5 w-3.5 mr-1.5" />
+                <Handshake className={`h-4 w-4 mr-2 ${comercialSubTab === "vendas" ? "text-indigo-500" : "text-slate-400"}`} />
                 Vendas
               </Button>
               <Button
-                variant={comercialSubTab === "unidades" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
-                className={`h-8 text-xs font-semibold ${comercialSubTab === "unidades" ? "bg-indigo-600 text-white hover:bg-indigo-700" : "text-slate-500 hover:text-slate-700"}`}
+                className={`h-9 px-5 text-[13px] font-bold rounded-lg transition-all duration-200 ml-1 ${comercialSubTab === "unidades" ? "bg-white text-emerald-700 shadow-[0_2px_8px_rgb(0,0,0,0.06)] border border-slate-200/50" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"}`}
                 onClick={() => setComercialSubTab("unidades")}
               >
-                <Building2 className="h-3.5 w-3.5 mr-1.5" />
+                <Building2 className={`h-4 w-4 mr-2 ${comercialSubTab === "unidades" ? "text-emerald-500" : "text-slate-400"}`} />
                 Unidades
               </Button>
               <Button
-                variant={comercialSubTab === "quadro" ? "default" : "ghost"}
+                variant="ghost"
                 size="sm"
-                className={`h-8 text-xs font-semibold ${comercialSubTab === "quadro" ? "bg-indigo-600 text-white hover:bg-indigo-700" : "text-slate-500 hover:text-slate-700"}`}
+                className={`h-9 px-5 text-[13px] font-bold rounded-lg transition-all duration-200 ml-1 ${comercialSubTab === "quadro" ? "bg-white text-blue-700 shadow-[0_2px_8px_rgb(0,0,0,0.06)] border border-slate-200/50" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"}`}
                 onClick={() => setComercialSubTab("quadro")}
               >
-                <LayoutGrid className="h-3.5 w-3.5 mr-1.5" />
+                <LayoutGrid className={`h-4 w-4 mr-2 ${comercialSubTab === "quadro" ? "text-blue-500" : "text-slate-400"}`} />
                 Quadro Espelho
               </Button>
             </div>
@@ -2351,53 +2351,53 @@ export function ExecutiveDashboard() {
             {comercialSubTab === "vendas" && <>
             {/* KPI Cards */}
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-              <Card className="border-0 shadow-sm overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-indigo-400" />
+              <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-indigo-400 group-hover:h-2 transition-all duration-300" />
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs font-bold text-indigo-600/80 uppercase tracking-widest">Total Contratos</p>
-                      <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalContracts}</p>
-                      <p className="text-[11px] text-slate-400 mt-1">{emitidos} emitidos · {cancelados} cancelados</p>
+                      <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalContracts}</p>
+                      <p className="text-[11px] font-medium text-slate-400 mt-1">{emitidos} emitidos · {cancelados} cancelados</p>
                     </div>
-                    <div className="p-3 bg-indigo-50 rounded-xl"><FileText className="h-5 w-5 text-indigo-500" /></div>
+                    <div className="p-3 bg-indigo-50/80 rounded-2xl ring-1 ring-indigo-100/50 shadow-sm"><FileText className="h-5 w-5 text-indigo-500" /></div>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-sm overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+              <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-400 group-hover:h-2 transition-all duration-300" />
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Valor Total Vendido</p>
-                      <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{formatCurrency(totalValue)}</p>
+                      <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Valor Vendido</p>
+                      <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{formatCurrency(totalValue)}</p>
                     </div>
-                    <div className="p-3 bg-emerald-50 rounded-xl"><Banknote className="h-5 w-5 text-emerald-500" /></div>
+                    <div className="p-3 bg-emerald-50/80 rounded-2xl ring-1 ring-emerald-100/50 shadow-sm"><Banknote className="h-5 w-5 text-emerald-500" /></div>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-sm overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-400" />
+              <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                <div className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-400 group-hover:h-2 transition-all duration-300" />
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs font-bold text-blue-600/80 uppercase tracking-widest">Ticket Médio</p>
-                      <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{formatCurrency(ticketMedio)}</p>
+                      <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{formatCurrency(ticketMedio)}</p>
                     </div>
-                    <div className="p-3 bg-blue-50 rounded-xl"><TrendingUp className="h-5 w-5 text-blue-500" /></div>
+                    <div className="p-3 bg-blue-50/80 rounded-2xl ring-1 ring-blue-100/50 shadow-sm"><TrendingUp className="h-5 w-5 text-blue-500" /></div>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-0 shadow-sm overflow-hidden">
-                <div className="h-1.5 bg-gradient-to-r from-violet-500 to-violet-400" />
+              <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                <div className="h-1.5 bg-gradient-to-r from-violet-500 to-violet-400 group-hover:h-2 transition-all duration-300" />
                 <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs font-bold text-violet-600/80 uppercase tracking-widest">Empresas</p>
-                      <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{companyRows.length}</p>
-                      <p className="text-[11px] text-slate-400 mt-1">{new Set(filtered.map(c => c.salesContractCustomers?.[0]?.name).filter(Boolean)).size} clientes</p>
+                      <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{companyRows.length}</p>
+                      <p className="text-[11px] font-medium text-slate-400 mt-1">{new Set(filtered.map(c => c.salesContractCustomers?.[0]?.name).filter(Boolean)).size} clientes</p>
                     </div>
-                    <div className="p-3 bg-violet-50 rounded-xl"><Building2 className="h-5 w-5 text-violet-500" /></div>
+                    <div className="p-3 bg-violet-50/80 rounded-2xl ring-1 ring-violet-100/50 shadow-sm"><Building2 className="h-5 w-5 text-violet-500" /></div>
                   </div>
                 </CardContent>
               </Card>
@@ -2465,9 +2465,10 @@ export function ExecutiveDashboard() {
                 <CardDescription className="text-xs text-slate-400">{totalContracts} contratos · {formatCurrency(totalValue)}</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-slate-50/80 border-b border-slate-200">
+                <div className="overflow-auto max-h-[500px] border-t border-slate-100">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50/95 backdrop-blur-sm sticky top-0 z-10 shadow-sm border-b border-slate-200">
                       {([
                         { key: "name" as const, label: "Empreendimento", align: "left" },
                         { key: "contracts" as const, label: "Contratos", align: "right" },
@@ -2568,7 +2569,8 @@ export function ExecutiveDashboard() {
                     </TableRow>
                   </TableBody>
                 </Table>
-              </CardContent>
+              </div>
+            </CardContent>
             </Card>
             </>}
 
@@ -2618,55 +2620,55 @@ export function ExecutiveDashboard() {
               return <>
               {/* KPI summary cards */}
               <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="border-0 shadow-sm overflow-hidden">
-                  <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-indigo-400" />
+                <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                  <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-indigo-400 group-hover:h-2 transition-all duration-300" />
                   <CardContent className="p-5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs font-bold text-indigo-600/80 uppercase tracking-widest">Total Unidades</p>
-                        <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalUnitsCount}</p>
-                        <p className="text-[11px] text-slate-400 mt-1">{enterpriseRows.length} empreendimentos</p>
+                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalUnitsCount}</p>
+                        <p className="text-[11px] font-medium text-slate-400 mt-1">{enterpriseRows.length} empreendimentos</p>
                       </div>
-                      <div className="p-3 bg-indigo-50 rounded-xl"><Building2 className="h-5 w-5 text-indigo-500" /></div>
+                      <div className="p-3 bg-indigo-50/80 rounded-2xl ring-1 ring-indigo-100/50 shadow-sm"><Building2 className="h-5 w-5 text-indigo-500" /></div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="border-0 shadow-sm overflow-hidden">
-                  <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-400" />
+                <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                  <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-400 group-hover:h-2 transition-all duration-300" />
                   <CardContent className="p-5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Vendidas</p>
-                        <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalVendidas}</p>
-                        <p className="text-[11px] text-slate-400 mt-1">{totalUnitsCount > 0 ? ((totalVendidas / totalUnitsCount) * 100).toFixed(1) : 0}% do total</p>
+                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalVendidas}</p>
+                        <p className="text-[11px] font-medium text-slate-400 mt-1">{totalUnitsCount > 0 ? ((totalVendidas / totalUnitsCount) * 100).toFixed(1) : 0}% do total</p>
                       </div>
-                      <div className="p-3 bg-emerald-50 rounded-xl"><CheckCircle className="h-5 w-5 text-emerald-500" /></div>
+                      <div className="p-3 bg-emerald-50/80 rounded-2xl ring-1 ring-emerald-100/50 shadow-sm"><CheckCircle className="h-5 w-5 text-emerald-500" /></div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="border-0 shadow-sm overflow-hidden">
-                  <div className="h-1.5 bg-gradient-to-r from-amber-500 to-amber-400" />
+                <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                  <div className="h-1.5 bg-gradient-to-r from-amber-500 to-amber-400 group-hover:h-2 transition-all duration-300" />
                   <CardContent className="p-5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs font-bold text-amber-600/80 uppercase tracking-widest">Disponíveis</p>
-                        <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalDisponiveis}</p>
-                        <p className="text-[11px] text-slate-400 mt-1">{totalUnitsCount > 0 ? ((totalDisponiveis / totalUnitsCount) * 100).toFixed(1) : 0}% do total</p>
+                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalDisponiveis}</p>
+                        <p className="text-[11px] font-medium text-slate-400 mt-1">{totalUnitsCount > 0 ? ((totalDisponiveis / totalUnitsCount) * 100).toFixed(1) : 0}% do total</p>
                       </div>
-                      <div className="p-3 bg-amber-50 rounded-xl"><AlertTriangle className="h-5 w-5 text-amber-500" /></div>
+                      <div className="p-3 bg-amber-50/80 rounded-2xl ring-1 ring-amber-100/50 shadow-sm"><AlertTriangle className="h-5 w-5 text-amber-500" /></div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="border-0 shadow-sm overflow-hidden">
-                  <div className="h-1.5 bg-gradient-to-r from-slate-500 to-slate-400" />
+                <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                  <div className="h-1.5 bg-gradient-to-r from-slate-500 to-slate-400 group-hover:h-2 transition-all duration-300" />
                   <CardContent className="p-5">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between">
                       <div>
                         <p className="text-xs font-bold text-slate-600/80 uppercase tracking-widest">Outros Status</p>
-                        <p className="text-2xl font-extrabold text-slate-800 mt-1 tabular-nums">{totalOutros}</p>
-                        <p className="text-[11px] text-slate-400 mt-1">Reserva técnica, etc.</p>
+                        <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalOutros}</p>
+                        <p className="text-[11px] font-medium text-slate-400 mt-1">Reserva técnica, etc.</p>
                       </div>
-                      <div className="p-3 bg-slate-100 rounded-xl"><Clock className="h-5 w-5 text-slate-500" /></div>
+                      <div className="p-3 bg-slate-100/80 rounded-2xl ring-1 ring-slate-200/50 shadow-sm"><Clock className="h-5 w-5 text-slate-500" /></div>
                     </div>
                   </CardContent>
                 </Card>
@@ -2727,9 +2729,10 @@ export function ExecutiveDashboard() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-slate-50/80 border-b border-slate-200">
+                  <div className="overflow-auto max-h-[500px] border-t border-slate-100">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50/95 backdrop-blur-sm sticky top-0 z-10 shadow-sm border-b border-slate-200">
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 pl-5">Status</TableHead>
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Empreendimento</TableHead>
                         <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11">Unidade</TableHead>
@@ -2824,7 +2827,8 @@ export function ExecutiveDashboard() {
                       </TableRow>
                     </TableBody>
                   </Table>
-                </CardContent>
+                </div>
+              </CardContent>
               </Card>
               </>;
             })()}
@@ -2859,12 +2863,12 @@ export function ExecutiveDashboard() {
               // Card colors by status
               const cardStyle = (status: string) => {
                 switch (status) {
-                  case "Vendida": return "bg-red-100 border-red-300 hover:bg-red-200";
-                  case "Disponível": return "bg-emerald-100 border-emerald-300 hover:bg-emerald-200";
-                  case "Reserva Técnica": return "bg-blue-100 border-blue-300 hover:bg-blue-200";
-                  case "Permuta": return "bg-purple-100 border-purple-300 hover:bg-purple-200";
-                  case "Gravame": return "bg-yellow-100 border-yellow-300 hover:bg-yellow-200";
-                  default: return "bg-amber-100 border-amber-300 hover:bg-amber-200";
+                  case "Vendida": return "bg-white border-slate-200 border-l-[4px] border-l-red-500 hover:border-red-300 hover:shadow-md";
+                  case "Disponível": return "bg-white border-slate-200 border-l-[4px] border-l-emerald-500 hover:border-emerald-300 hover:shadow-md";
+                  case "Reserva Técnica": return "bg-white border-slate-200 border-l-[4px] border-l-blue-500 hover:border-blue-300 hover:shadow-md";
+                  case "Permuta": return "bg-white border-slate-200 border-l-[4px] border-l-purple-500 hover:border-purple-300 hover:shadow-md";
+                  case "Gravame": return "bg-white border-slate-200 border-l-[4px] border-l-yellow-500 hover:border-yellow-300 hover:shadow-md";
+                  default: return "bg-white border-slate-200 border-l-[4px] border-l-amber-500 hover:border-amber-300 hover:shadow-md";
                 }
               };
               const statusTextColor = (status: string) => {
@@ -2949,12 +2953,12 @@ export function ExecutiveDashboard() {
                           {qUnits.length > 0 ? ((qVendidas / qUnits.length) * 100).toFixed(0) : 0}% vendido
                         </span>
                       </div>
-                      <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden flex">
-                        {qVendidas > 0 && <div className="h-full bg-red-400 transition-all" style={{ width: `${(qVendidas / qUnits.length) * 100}%` }} />}
-                        {qDisponiveis > 0 && <div className="h-full bg-emerald-400 transition-all" style={{ width: `${(qDisponiveis / qUnits.length) * 100}%` }} />}
-                        {qReserva > 0 && <div className="h-full bg-blue-400 transition-all" style={{ width: `${(qReserva / qUnits.length) * 100}%` }} />}
-                        {qPermuta > 0 && <div className="h-full bg-purple-400 transition-all" style={{ width: `${(qPermuta / qUnits.length) * 100}%` }} />}
-                        {qOutros > 0 && <div className="h-full bg-amber-400 transition-all" style={{ width: `${(qOutros / qUnits.length) * 100}%` }} />}
+                      <div className="w-full h-4 flex gap-[2px]">
+                        {qVendidas > 0 && <div className="h-full bg-red-400 transition-all rounded-full shadow-inner" style={{ width: `${(qVendidas / qUnits.length) * 100}%` }} title={`Vendidas: ${qVendidas}`} />}
+                        {qDisponiveis > 0 && <div className="h-full bg-emerald-400 transition-all rounded-full shadow-inner" style={{ width: `${(qDisponiveis / qUnits.length) * 100}%` }} title={`Disponível: ${qDisponiveis}`} />}
+                        {qReserva > 0 && <div className="h-full bg-blue-400 transition-all rounded-full shadow-inner" style={{ width: `${(qReserva / qUnits.length) * 100}%` }} title={`Reserva Tećnica: ${qReserva}`} />}
+                        {qPermuta > 0 && <div className="h-full bg-purple-400 transition-all rounded-full shadow-inner" style={{ width: `${(qPermuta / qUnits.length) * 100}%` }} title={`Permuta: ${qPermuta}`} />}
+                        {qOutros > 0 && <div className="h-full bg-amber-400 transition-all rounded-full shadow-inner" style={{ width: `${(qOutros / qUnits.length) * 100}%` }} title={`Outros: ${qOutros}`} />}
                       </div>
                     </CardContent>
                   </Card>
@@ -2974,22 +2978,26 @@ export function ExecutiveDashboard() {
                     {qVisible.map((u, idx) => (
                       <div
                         key={`${u.unit}-${idx}`}
-                        className={`relative rounded-xl border-2 p-3 cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group ${cardStyle(u.status)}`}
-                        title={`${u.unit} — ${u.status}${u.status === "Vendida" ? `\n${u.customer}\n${formatCurrency(u.value)}` : ""}`}
+                        className={`relative rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-1 group ${cardStyle(u.status)}`}
                       >
-                        <p className="text-lg font-extrabold text-slate-800 leading-tight">{u.unit}</p>
-                        <p className={`text-[11px] font-semibold mt-0.5 ${statusTextColor(u.status)}`}>{u.status}</p>
+                        <div className="flex justify-between items-start">
+                          <p className="text-lg font-extrabold text-slate-800 leading-none">{u.unit}</p>
+                          <div className={`w-2 h-2 rounded-full ${u.status === "Vendida" ? "bg-red-500" : u.status === "Disponível" ? "bg-emerald-500" : u.status === "Reserva Técnica" ? "bg-blue-500" : u.status === "Permuta" ? "bg-purple-500" : "bg-slate-300"}`} />
+                        </div>
+                        <p className={`text-[10px] font-bold mt-2 uppercase tracking-wide ${statusTextColor(u.status)}`}>{u.status}</p>
                         {u.tipo !== "Apartamento" && (
-                          <p className="text-[9px] text-slate-400 mt-0.5">{u.tipo}</p>
+                          <p className="text-[9px] text-slate-400 font-medium mt-0.5">{u.tipo}</p>
                         )}
                         {/* Hover overlay with details */}
                         {u.status === "Vendida" && (
-                          <div className="absolute inset-0 bg-white/95 rounded-xl p-3 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-center">
-                            <p className="text-sm font-bold text-slate-800">{u.unit}</p>
-                            <p className="text-[10px] text-red-600 font-semibold mt-0.5">Vendida</p>
-                            <p className="text-[10px] text-slate-600 mt-1 truncate" title={u.customer}>{u.customer}</p>
-                            <p className="text-[11px] font-bold text-slate-800 mt-0.5">{formatCurrency(u.value)}</p>
-                            <p className="text-[9px] text-slate-400 mt-0.5">{formatDate(u.contractDate)}</p>
+                          <div className="absolute z-10 -inset-x-2 -inset-y-3 bg-white/95 backdrop-blur-md rounded-xl p-4 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col justify-center scale-95 group-hover:scale-100 origin-center">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-base font-black text-slate-800">{u.unit}</p>
+                              <Badge variant="outline" className="text-[9px] bg-red-50 text-red-600 border-red-200 px-1.5 py-0 uppercase font-bold tracking-wider rounded-md">Vendida</Badge>
+                            </div>
+                            <p className="text-[11px] text-slate-600 font-semibold leading-tight truncate mb-2" title={u.customer}>{u.customer}</p>
+                            <p className="text-[13px] font-black text-slate-800 tabular-nums bg-slate-50 px-2 py-1 rounded inline-block w-max">{formatCurrency(u.value)}</p>
+                            <p className="text-[10px] text-slate-400 mt-1 font-medium">{formatDate(u.contractDate)}</p>
                           </div>
                         )}
                       </div>
