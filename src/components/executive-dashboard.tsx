@@ -267,6 +267,7 @@ export function ExecutiveDashboard() {
   const [selectedUnitEnterprises, setSelectedUnitEnterprises] = useState<Set<string>>(new Set());
   const [selectedUnitTypes, setSelectedUnitTypes] = useState<Set<string>>(new Set());
   const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
+  const [selectedUnitCustomers, setSelectedUnitCustomers] = useState<Set<string>>(new Set());
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
@@ -2146,8 +2147,16 @@ export function ExecutiveDashboard() {
           if (selectedMonths.size > 0 && c.contractDate) {
             if (!selectedMonths.has(c.contractDate.substring(5, 7))) return false;
           }
+          if (selectedUnitCustomers.size > 0) {
+            const customerName = c.salesContractCustomers?.[0]?.name || "";
+            if (!selectedUnitCustomers.has(customerName)) return false;
+          }
           return true;
         });
+        const allVendasCustomers = Array.from(new Set(salesContracts.filter(c => {
+          if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
+          return true;
+        }).map(c => c.salesContractCustomers?.[0]?.name).filter(Boolean) as string[])).sort();
 
         const totalValue = filtered.reduce((s, c) => s + (c.value || 0), 0);
         const totalContracts = filtered.length;
@@ -2330,6 +2339,19 @@ export function ExecutiveDashboard() {
 
             {/* ─── VENDAS SUB-TAB ─── */}
             {comercialSubTab === "vendas" && <>
+            {/* Cliente filter */}
+            <div className="flex items-center gap-2 flex-wrap mb-6">
+              <MultiSelectFilter
+                label="Cliente"
+                icon={<Users className="h-4 w-4" />}
+                allOptions={allVendasCustomers}
+                selected={selectedUnitCustomers}
+                onToggle={(name) => { setSelectedUnitCustomers(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
+                onSelectAll={() => setSelectedUnitCustomers(new Set(allVendasCustomers))}
+                onClear={() => setSelectedUnitCustomers(new Set())}
+                activeColor="rose"
+              />
+            </div>
             {/* KPI Cards */}
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
               <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
@@ -2578,6 +2600,7 @@ export function ExecutiveDashboard() {
               const unitsForType = selectedUnitTypes.size === 0 ? unitsForEnterprise : unitsForEnterprise.filter(u => selectedUnitTypes.has(u.tipo));
               const allUnitNames = Array.from(new Set(unitsForType.map(u => u.unit))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
               const allStatusOptions = Array.from(new Set(allUnits.map(u => u.status))).sort();
+              const allCustomerOptions = Array.from(new Set(allUnits.map(u => u.customer).filter(c => c && c !== "—"))).sort();
 
               // Filter units by all filters
               const filteredUnits = allUnits.filter(u => {
@@ -2585,6 +2608,7 @@ export function ExecutiveDashboard() {
                 if (selectedUnitTypes.size > 0 && !selectedUnitTypes.has(u.tipo)) return false;
                 if (selectedUnits.size > 0 && !selectedUnits.has(u.unit)) return false;
                 if (selectedUnitStatuses.size > 0 && !selectedUnitStatuses.has(u.status)) return false;
+                if (selectedUnitCustomers.size > 0 && !selectedUnitCustomers.has(u.customer)) return false;
                 return true;
               });
 
@@ -2703,6 +2727,16 @@ export function ExecutiveDashboard() {
                   onSelectAll={() => setSelectedUnitStatuses(new Set(allStatusOptions))}
                   onClear={() => setSelectedUnitStatuses(new Set())}
                   activeColor="emerald"
+                />
+                <MultiSelectFilter
+                  label="Cliente"
+                  icon={<Users className="h-4 w-4" />}
+                  allOptions={allCustomerOptions}
+                  selected={selectedUnitCustomers}
+                  onToggle={(name) => { setSelectedUnitCustomers(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
+                  onSelectAll={() => setSelectedUnitCustomers(new Set(allCustomerOptions))}
+                  onClear={() => setSelectedUnitCustomers(new Set())}
+                  activeColor="rose"
                 />
               </div>
 
@@ -2830,12 +2864,14 @@ export function ExecutiveDashboard() {
               const qUnitsForType = selectedUnitTypes.size === 0 ? qUnitsForEnterprise : qUnitsForEnterprise.filter(u => selectedUnitTypes.has(u.tipo));
               const qUnitNames = Array.from(new Set(qUnitsForType.map(u => u.unit))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
               const qStatusOptions = Array.from(new Set(allUnits.map(u => u.status))).sort();
+              const qCustomerOptions = Array.from(new Set(allUnits.map(u => u.customer).filter(c => c && c !== "—"))).sort();
 
               // Filter units
               const qUnits = allUnits.filter(u => {
                 if (selectedUnitEnterprises.size > 0 && !selectedUnitEnterprises.has(u.enterprise)) return false;
                 if (selectedUnitTypes.size > 0 && !selectedUnitTypes.has(u.tipo)) return false;
                 if (selectedUnits.size > 0 && !selectedUnits.has(u.unit)) return false;
+                if (selectedUnitCustomers.size > 0 && !selectedUnitCustomers.has(u.customer)) return false;
                 return true;
               }).sort((a, b) => a.unit.localeCompare(b.unit, undefined, { numeric: true }));
 
@@ -2920,6 +2956,16 @@ export function ExecutiveDashboard() {
                     onSelectAll={() => setSelectedUnitStatuses(new Set(qStatusOptions))}
                     onClear={() => setSelectedUnitStatuses(new Set())}
                     activeColor="emerald"
+                  />
+                  <MultiSelectFilter
+                    label="Cliente"
+                    icon={<Users className="h-3.5 w-3.5" />}
+                    allOptions={qCustomerOptions}
+                    selected={selectedUnitCustomers}
+                    onToggle={v => setSelectedUnitCustomers(prev => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; })}
+                    onSelectAll={() => setSelectedUnitCustomers(new Set(qCustomerOptions))}
+                    onClear={() => setSelectedUnitCustomers(new Set())}
+                    activeColor="rose"
                   />
                 </div>
 
