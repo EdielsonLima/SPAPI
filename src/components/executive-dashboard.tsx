@@ -2391,58 +2391,84 @@ export function ExecutiveDashboard() {
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
-                <div className="h-1.5 bg-gradient-to-r from-violet-500 to-violet-400 group-hover:h-2 transition-all duration-300" />
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-xs font-bold text-violet-600/80 uppercase tracking-widest">Empresas</p>
-                      <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{companyRows.length}</p>
-                      <p className="text-[11px] font-medium text-slate-400 mt-1">{new Set(filtered.map(c => c.salesContractCustomers?.[0]?.name).filter(Boolean)).size} clientes</p>
-                    </div>
-                    <div className="p-3 bg-violet-50/80 rounded-2xl ring-1 ring-violet-100/50 shadow-sm"><Building2 className="h-5 w-5 text-violet-500" /></div>
-                  </div>
-                </CardContent>
-              </Card>
+              {(() => {
+                const totalUn = allUnits.filter(u => filtered.some(c => c.companyName === u.enterprise) || (selectedCompanies.size === 0 || selectedCompanies.has(u.enterprise))).length > 0
+                  ? allUnits.filter(u => companyRows.some(r => r.name === u.enterprise)).length
+                  : allUnits.length;
+                const vendUn = (totalUn === allUnits.length ? allUnits : allUnits.filter(u => companyRows.some(r => r.name === u.enterprise)))
+                  .filter(u => u.status === "Vendida" || u.status === "Vendido/Terceiros").length;
+                const dispUn = (totalUn === allUnits.length ? allUnits : allUnits.filter(u => companyRows.some(r => r.name === u.enterprise)))
+                  .filter(u => u.status === "Disponível").length;
+                const pctVend = totalUn > 0 ? (vendUn / totalUn) * 100 : 0;
+                return (
+                  <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
+                    <div className={`h-1.5 bg-gradient-to-r ${pctVend >= 80 ? "from-emerald-500 to-emerald-400" : pctVend >= 50 ? "from-blue-500 to-blue-400" : "from-amber-500 to-amber-400"} group-hover:h-2 transition-all duration-300`} />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-violet-600/80 uppercase tracking-widest">Estoque</p>
+                          <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{pctVend.toFixed(0)}% <span className="text-lg font-bold text-slate-400">vendido</span></p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">{vendUn} vendidas · {dispUn} disponíveis · {totalUn} total</p>
+                        </div>
+                        <div className="p-3 bg-violet-50/80 rounded-2xl ring-1 ring-violet-100/50 shadow-sm"><Building2 className="h-5 w-5 text-violet-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })()}
             </div>
 
-            {/* Charts: Bar by Company + Column by Period */}
+            {/* Charts: Enterprise Cards + Column by Period */}
             <div className="grid gap-6 lg:grid-cols-5 mt-6">
-              {/* Horizontal bar chart - Vendas por Empreendimento */}
+              {/* Enterprise cards with unit breakdown */}
               <Card className="border-0 shadow-sm lg:col-span-2">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-lg text-slate-800">Por Empreendimento</CardTitle>
-                  <CardDescription className="text-slate-400">Valor vendido por empreendimento</CardDescription>
+                  <CardDescription className="text-slate-400">Vendas e estoque por empreendimento</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {companyRows.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={Math.max(320, companyRows.length * 44)}>
-                      <BarChart
-                        data={companyRows.map(r => ({ name: r.name.length > 20 ? r.name.substring(0, 20) + "..." : r.name, fullName: r.name, value: r.totalValue, contracts: r.contracts.length }))}
-                        layout="vertical"
-                        margin={{ top: 0, right: 80, left: 0, bottom: 0 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
-                        <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={formatCompactCurrency} axisLine={false} tickLine={false} />
-                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} width={140} axisLine={false} tickLine={false} />
-                        <RechartsTooltip
-                          formatter={(value: unknown) => [formatCurrency(Number(value)), "Valor Vendido"]}
-                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                          labelFormatter={(_label: any, payload: any) => {
-                            const item = payload?.[0]?.payload;
-                            return item ? `${item.fullName} (${item.contracts} contratos)` : String(_label);
-                          }}
-                          contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "13px" }}
-                        />
-                        <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={24}>
-                          {companyRows.map((_, idx) => (
-                            <Cell key={idx} fill={`hsl(239, 84%, ${55 + idx * 4}%)`} />
-                          ))}
-                          <LabelList dataKey="value" position="right" formatter={(v: unknown) => formatCompactCurrency(Number(v))} style={{ fontSize: 11, fill: "#475569", fontWeight: 600 }} />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  ) : (
+                <CardContent className="space-y-3">
+                  {companyRows.length > 0 ? companyRows.map(row => {
+                    const enterpriseUnits = allUnits.filter(u => u.enterprise === row.name);
+                    const totalUn = enterpriseUnits.length;
+                    const vendidas = enterpriseUnits.filter(u => u.status === "Vendida" || u.status === "Vendido/Terceiros").length;
+                    const disponiveis = enterpriseUnits.filter(u => u.status === "Disponível").length;
+                    const reserva = enterpriseUnits.filter(u => u.status === "Reserva Técnica").length;
+                    const outros = totalUn - vendidas - disponiveis - reserva;
+                    const pctVendido = totalUn > 0 ? (vendidas / totalUn) * 100 : 0;
+                    const pctDisponivel = totalUn > 0 ? (disponiveis / totalUn) * 100 : 0;
+                    return (
+                      <div key={row.name} className="p-3 rounded-xl border border-slate-200/80 hover:border-slate-300 hover:shadow-sm transition-all bg-white">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-bold text-slate-800 truncate" title={row.name}>{row.name}</p>
+                            <p className="text-[11px] text-slate-400 mt-0.5">{row.contracts.length} contratos · {formatCurrency(row.totalValue)}</p>
+                          </div>
+                          <span className={`text-[13px] font-black tabular-nums ml-2 ${pctVendido >= 80 ? "text-emerald-600" : pctVendido >= 50 ? "text-blue-600" : "text-amber-600"}`}>
+                            {pctVendido.toFixed(0)}%
+                          </span>
+                        </div>
+                        {totalUn > 0 && (
+                          <>
+                            {/* Progress bar */}
+                            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden flex gap-[1px] mb-2">
+                              {vendidas > 0 && <div className="h-full bg-red-400 rounded-full transition-all" style={{ width: `${pctVendido}%` }} title={`Vendidas: ${vendidas}`} />}
+                              {reserva > 0 && <div className="h-full bg-blue-400 rounded-full transition-all" style={{ width: `${(reserva / totalUn) * 100}%` }} title={`Reserva: ${reserva}`} />}
+                              {outros > 0 && <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${(outros / totalUn) * 100}%` }} title={`Outros: ${outros}`} />}
+                              {disponiveis > 0 && <div className="h-full bg-emerald-400 rounded-full transition-all" style={{ width: `${pctDisponivel}%` }} title={`Disponíveis: ${disponiveis}`} />}
+                            </div>
+                            {/* Unit counts */}
+                            <div className="flex items-center gap-3 text-[10px] flex-wrap">
+                              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-red-400" /><span className="text-slate-500">Vend. <strong className="text-slate-700">{vendidas}</strong></span></span>
+                              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-400" /><span className="text-slate-500">Disp. <strong className="text-slate-700">{disponiveis}</strong></span></span>
+                              {reserva > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-blue-400" /><span className="text-slate-500">Res. <strong className="text-slate-700">{reserva}</strong></span></span>}
+                              {outros > 0 && <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-400" /><span className="text-slate-500">Outros <strong className="text-slate-700">{outros}</strong></span></span>}
+                              <span className="ml-auto text-slate-400 font-medium">{totalUn} un.</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    );
+                  }) : (
                     <div className="flex items-center justify-center h-[320px] text-slate-400 text-sm">Sem dados</div>
                   )}
                 </CardContent>
