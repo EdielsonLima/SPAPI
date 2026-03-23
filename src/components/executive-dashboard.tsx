@@ -2164,10 +2164,10 @@ export function ExecutiveDashboard() {
         const emitidos = filtered.filter(c => c.situation === "Emitido").length;
         const cancelados = filtered.filter(c => c.situation === "Cancelado" || c.cancellationDate).length;
 
-        // Group by company
+        // Group by enterprise (use enterpriseName to match with units data)
         const byCompany = new Map<string, { contracts: typeof filtered; totalValue: number }>();
         filtered.forEach(c => {
-          const key = c.companyName;
+          const key = c.enterpriseName || c.companyName;
           if (!byCompany.has(key)) byCompany.set(key, { contracts: [], totalValue: 0 });
           const entry = byCompany.get(key)!;
           entry.contracts.push(c);
