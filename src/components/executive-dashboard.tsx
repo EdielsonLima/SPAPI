@@ -2438,13 +2438,15 @@ export function ExecutiveDashboard() {
                 </CardContent>
               </Card>
               {(() => {
-                const totalUn = allUnits.filter(u => filtered.some(c => c.companyName === u.enterprise) || (selectedCompanies.size === 0 || selectedCompanies.has(u.enterprise))).length > 0
-                  ? allUnits.filter(u => companyRows.some(r => r.name === u.enterprise)).length
-                  : allUnits.length;
-                const vendUn = (totalUn === allUnits.length ? allUnits : allUnits.filter(u => companyRows.some(r => r.name === u.enterprise)))
-                  .filter(u => u.status === "Vendida" || u.status === "Vendido/Terceiros").length;
-                const dispUn = (totalUn === allUnits.length ? allUnits : allUnits.filter(u => companyRows.some(r => r.name === u.enterprise)))
-                  .filter(u => u.status === "Disponível").length;
+                // Filter units same way as enterprise cards (respect type filter)
+                const kpiUnitsBase = allUnits.filter(u => {
+                  if (companyRows.length > 0 && companyRows.length < allUnits.length && !companyRows.some(r => r.name === u.enterprise)) return false;
+                  if (selectedUnitTypes.size > 0 && !selectedUnitTypes.has(u.tipo)) return false;
+                  return true;
+                });
+                const totalUn = kpiUnitsBase.length;
+                const vendUn = kpiUnitsBase.filter(u => u.status === "Vendida" || u.status === "Vendido/Terceiros").length;
+                const dispUn = kpiUnitsBase.filter(u => u.status === "Disponível").length;
                 const pctVend = totalUn > 0 ? (vendUn / totalUn) * 100 : 0;
                 return (
                   <Card className="border border-slate-200/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group">
@@ -2474,7 +2476,7 @@ export function ExecutiveDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {companyRows.length > 0 ? companyRows.map(row => {
-                    const enterpriseUnits = allUnits.filter(u => u.enterprise === row.name);
+                    const enterpriseUnits = allUnits.filter(u => u.enterprise === row.name && (selectedUnitTypes.size === 0 || selectedUnitTypes.has(u.tipo)));
                     const totalUn = enterpriseUnits.length;
                     const vendidas = enterpriseUnits.filter(u => u.status === "Vendida" || u.status === "Vendido/Terceiros").length;
                     const disponiveis = enterpriseUnits.filter(u => u.status === "Disponível").length;
