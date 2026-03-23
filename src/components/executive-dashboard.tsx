@@ -1696,7 +1696,7 @@ export function ExecutiveDashboard() {
             selected={selectedCompanies}
             onToggle={(name) => toggleInSet(setSelectedCompanies, name)}
             onSelectAll={() => setSelectedCompanies(new Set(allCompanyNames))}
-            onClear={() => setSelectedCompanies(defaultCompanies())}
+            onClear={() => setSelectedCompanies(new Set())}
             activeColor="blue"
             onSaveDefault={() => {
               localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
@@ -1728,7 +1728,7 @@ export function ExecutiveDashboard() {
             selected={selectedCompanies}
             onToggle={(name) => toggleInSet(setSelectedCompanies, name)}
             onSelectAll={() => setSelectedCompanies(new Set(allCompanyNames))}
-            onClear={() => setSelectedCompanies(defaultCompanies())}
+            onClear={() => setSelectedCompanies(new Set())}
             activeColor="blue"
             onSaveDefault={() => {
               localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
@@ -1769,7 +1769,7 @@ export function ExecutiveDashboard() {
             selected={selectedCompanies}
             onToggle={(name) => toggleInSet(setSelectedCompanies, name)}
             onSelectAll={() => setSelectedCompanies(new Set(allCompanyNames))}
-            onClear={() => setSelectedCompanies(defaultCompanies())}
+            onClear={() => setSelectedCompanies(new Set())}
             activeColor="indigo"
             onSaveDefault={() => {
               localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
@@ -1810,7 +1810,7 @@ export function ExecutiveDashboard() {
             selected={selectedCompanies}
             onToggle={(name) => toggleInSet(setSelectedCompanies, name)}
             onSelectAll={() => setSelectedCompanies(new Set(allCompanyNames))}
-            onClear={() => setSelectedCompanies(defaultCompanies())}
+            onClear={() => setSelectedCompanies(new Set())}
             activeColor="blue"
             onSaveDefault={() => {
               localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
