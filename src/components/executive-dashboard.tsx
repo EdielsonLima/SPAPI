@@ -254,7 +254,7 @@ export function ExecutiveDashboard() {
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
-  const [chartView, setChartView] = useState<ChartView>("mensal");
+  const [chartView, setChartView] = useState<ChartView>("anual");
   const [showDelinquentTable, setShowDelinquentTable] = useState(false);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [delinquentSort, setDelinquentSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
@@ -2438,10 +2438,13 @@ export function ExecutiveDashboard() {
                 </CardContent>
               </Card>
               {(() => {
+                // Exclude permuta/vehicle units from sales view (not real inventory)
+                const isRealUnit = (tipo: string) => !(/permuta|veículo|veiculos/i.test(tipo));
                 // Filter units same way as enterprise cards (respect type filter)
                 const kpiUnitsBase = allUnits.filter(u => {
                   if (companyRows.length > 0 && companyRows.length < allUnits.length && !companyRows.some(r => r.name === u.enterprise)) return false;
-                  if (selectedUnitTypes.size > 0 && !selectedUnitTypes.has(u.tipo)) return false;
+                  if (selectedUnitTypes.size > 0) { if (!selectedUnitTypes.has(u.tipo)) return false; }
+                  else { if (!isRealUnit(u.tipo)) return false; }
                   return true;
                 });
                 const totalUn = kpiUnitsBase.length;
@@ -2476,7 +2479,8 @@ export function ExecutiveDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {companyRows.length > 0 ? companyRows.map(row => {
-                    const enterpriseUnits = allUnits.filter(u => u.enterprise === row.name && (selectedUnitTypes.size === 0 || selectedUnitTypes.has(u.tipo)));
+                    const isRealUnit = (tipo: string) => !(/permuta|veículo|veiculos/i.test(tipo));
+                    const enterpriseUnits = allUnits.filter(u => u.enterprise === row.name && (selectedUnitTypes.size > 0 ? selectedUnitTypes.has(u.tipo) : isRealUnit(u.tipo)));
                     const totalUn = enterpriseUnits.length;
                     const vendidas = enterpriseUnits.filter(u => u.status === "Vendida" || u.status === "Vendido/Terceiros").length;
                     const disponiveis = enterpriseUnits.filter(u => u.status === "Disponível").length;
