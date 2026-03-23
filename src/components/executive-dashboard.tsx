@@ -2406,60 +2406,110 @@ export function ExecutiveDashboard() {
               </Card>
             </div>
 
-            {/* Sales Chart */}
-            {comercialChart.length > 0 && (
-              <Card className="border-0 shadow-sm mt-6">
-                <CardHeader className="pb-2 flex flex-row items-center justify-between">
-                  <CardTitle className="text-sm font-bold text-slate-700">
-                    {chartView === "anual" ? "Vendas por Ano" : "Vendas por Mês"}
-                  </CardTitle>
-                  <Tabs value={chartView} onValueChange={v => setChartView(v as ChartView)}>
-                    <TabsList className="h-8">
-                      <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
-                      <TabsTrigger value="anual" className="text-xs px-3 h-7">Anual</TabsTrigger>
-                    </TabsList>
-                  </Tabs>
+            {/* Charts: Bar by Company + Column by Period */}
+            <div className="grid gap-6 lg:grid-cols-5 mt-6">
+              {/* Horizontal bar chart - Vendas por Empreendimento */}
+              <Card className="border-0 shadow-sm lg:col-span-2">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg text-slate-800">Por Empreendimento</CardTitle>
+                  <CardDescription className="text-slate-400">Valor vendido por empreendimento</CardDescription>
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <ResponsiveContainer width="100%" height={320}>
-                    <BarChart data={comercialChart} margin={{ top: 40, right: 10, left: 10, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                      <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
-                      <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={80} />
-                      <RechartsTooltip formatter={(v: number | undefined) => [formatCurrency(v ?? 0), "Valor"]} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]}
-                        label={((props: Record<string, unknown>) => {
-                          const x = Number(props.x ?? 0), y = Number(props.y ?? 0), w = Number(props.width ?? 0), value = Number(props.value ?? 0), index = Number(props.index ?? 0);
-                          const entry = comercialChart[index];
-                          const pct = entry?.pct;
-                          return (
-                            <g>
-                              <text x={x + w / 2} y={y - 16} textAnchor="middle" fontSize={10} fontWeight={700} fill="#334155">
-                                {formatCompactCurrency(value)}
-                              </text>
-                              {pct !== null && pct !== undefined && (
-                                <text x={x + w / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill={pct >= 0 ? "#16a34a" : "#dc2626"}>
-                                  {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
-                                </text>
-                              )}
-                            </g>
-                          );
-                        }) as unknown as undefined}
+                <CardContent>
+                  {companyRows.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={Math.max(320, companyRows.length * 44)}>
+                      <BarChart
+                        data={companyRows.map(r => ({ name: r.name.length > 20 ? r.name.substring(0, 20) + "..." : r.name, fullName: r.name, value: r.totalValue, contracts: r.contracts.length }))}
+                        layout="vertical"
+                        margin={{ top: 0, right: 80, left: 0, bottom: 0 }}
                       >
-                        {(() => {
-                          const values = comercialChart.map(d => d.value);
-                          const maxVal = Math.max(...values);
-                          const minVal = Math.min(...values);
-                          return comercialChart.map((entry, idx) => (
-                            <Cell key={idx} fill={entry.value === maxVal ? "#22c55e" : entry.value === minVal ? "#ef4444" : "#6366f1"} />
-                          ));
-                        })()}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                        <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={formatCompactCurrency} axisLine={false} tickLine={false} />
+                        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} width={140} axisLine={false} tickLine={false} />
+                        <RechartsTooltip
+                          formatter={(value: unknown) => [formatCurrency(Number(value)), "Valor Vendido"]}
+                          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                          labelFormatter={(_label: any, payload: any) => {
+                            const item = payload?.[0]?.payload;
+                            return item ? `${item.fullName} (${item.contracts} contratos)` : String(_label);
+                          }}
+                          contentStyle={{ borderRadius: "8px", border: "1px solid #e2e8f0", fontSize: "13px" }}
+                        />
+                        <Bar dataKey="value" radius={[0, 4, 4, 0]} maxBarSize={24}>
+                          {companyRows.map((_, idx) => (
+                            <Cell key={idx} fill={`hsl(239, 84%, ${55 + idx * 4}%)`} />
+                          ))}
+                          <LabelList dataKey="value" position="right" formatter={(v: unknown) => formatCompactCurrency(Number(v))} style={{ fontSize: 11, fill: "#475569", fontWeight: 600 }} />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[320px] text-slate-400 text-sm">Sem dados</div>
+                  )}
                 </CardContent>
               </Card>
-            )}
+
+              {/* Column chart - Evolução Mensal/Anual */}
+              <Card className="border-0 shadow-sm lg:col-span-3">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg text-slate-800">
+                        {chartView === "anual" ? "Vendas por Ano" : "Vendas por Mês"}
+                      </CardTitle>
+                      <CardDescription className="text-slate-400">Evolução das vendas no período</CardDescription>
+                    </div>
+                    <Tabs value={chartView} onValueChange={v => setChartView(v as ChartView)}>
+                      <TabsList className="h-8">
+                        <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
+                        <TabsTrigger value="anual" className="text-xs px-3 h-7">Anual</TabsTrigger>
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  {comercialChart.length > 0 ? (
+                    <ResponsiveContainer width="100%" height={Math.max(320, companyRows.length * 44)}>
+                      <BarChart data={comercialChart} margin={{ top: 40, right: 10, left: 10, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                        <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={80} />
+                        <RechartsTooltip formatter={(v: number | undefined) => [formatCurrency(v ?? 0), "Valor"]} />
+                        <Bar dataKey="value" radius={[4, 4, 0, 0]}
+                          label={((props: Record<string, unknown>) => {
+                            const x = Number(props.x ?? 0), y = Number(props.y ?? 0), w = Number(props.width ?? 0), value = Number(props.value ?? 0), index = Number(props.index ?? 0);
+                            const entry = comercialChart[index];
+                            const pct = entry?.pct;
+                            return (
+                              <g>
+                                <text x={x + w / 2} y={y - 16} textAnchor="middle" fontSize={10} fontWeight={700} fill="#334155">
+                                  {formatCompactCurrency(value)}
+                                </text>
+                                {pct !== null && pct !== undefined && (
+                                  <text x={x + w / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill={pct >= 0 ? "#16a34a" : "#dc2626"}>
+                                    {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                                  </text>
+                                )}
+                              </g>
+                            );
+                          }) as unknown as undefined}
+                        >
+                          {(() => {
+                            const values = comercialChart.map(d => d.value);
+                            const maxVal = Math.max(...values);
+                            const minVal = Math.min(...values);
+                            return comercialChart.map((entry, idx) => (
+                              <Cell key={idx} fill={entry.value === maxVal ? "#22c55e" : entry.value === minVal ? "#ef4444" : "#6366f1"} />
+                            ));
+                          })()}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-[320px] text-slate-400 text-sm">Sem dados para o período</div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
 
             {/* Table by Company */}
             <Card className="border-0 shadow-sm mt-6">
