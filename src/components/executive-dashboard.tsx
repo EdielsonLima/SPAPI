@@ -2138,7 +2138,7 @@ export function ExecutiveDashboard() {
 
       {/* ══════ COMERCIAL TAB ══════ */}
       {activeTab === "comercial" && (() => {
-        // Filter contracts by company, year, month
+        // Filter contracts by company, year, month, enterprise, customer
         const filtered = salesContracts.filter(c => {
           if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
           if (selectedYears.size > 0 && c.contractDate) {
@@ -2147,16 +2147,24 @@ export function ExecutiveDashboard() {
           if (selectedMonths.size > 0 && c.contractDate) {
             if (!selectedMonths.has(c.contractDate.substring(5, 7))) return false;
           }
+          if (selectedUnitEnterprises.size > 0) {
+            if (!selectedUnitEnterprises.has(c.enterpriseName || c.companyName)) return false;
+          }
           if (selectedUnitCustomers.size > 0) {
             const customerName = c.salesContractCustomers?.[0]?.name || "";
             if (!selectedUnitCustomers.has(customerName)) return false;
           }
+          if (selectedUnitStatuses.size > 0) {
+            const situation = c.cancellationDate ? "Cancelado" : c.situation || "Outro";
+            if (!selectedUnitStatuses.has(situation)) return false;
+          }
           return true;
         });
-        const allVendasCustomers = Array.from(new Set(salesContracts.filter(c => {
-          if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
-          return true;
-        }).map(c => c.salesContractCustomers?.[0]?.name).filter(Boolean) as string[])).sort();
+        // Options for Vendas filters (from all contracts respecting company filter)
+        const baseContracts = salesContracts.filter(c => selectedCompanies.size === 0 || selectedCompanies.has(c.companyName));
+        const allVendasEnterprises = Array.from(new Set(baseContracts.map(c => c.enterpriseName || c.companyName))).sort();
+        const allVendasCustomers = Array.from(new Set(baseContracts.map(c => c.salesContractCustomers?.[0]?.name).filter(Boolean) as string[])).sort();
+        const allVendasStatuses = Array.from(new Set(baseContracts.map(c => c.cancellationDate ? "Cancelado" : c.situation || "Outro"))).sort();
 
         const totalValue = filtered.reduce((s, c) => s + (c.value || 0), 0);
         const totalContracts = filtered.length;
@@ -2339,8 +2347,28 @@ export function ExecutiveDashboard() {
 
             {/* ─── VENDAS SUB-TAB ─── */}
             {comercialSubTab === "vendas" && <>
-            {/* Cliente filter */}
+            {/* Filters */}
             <div className="flex items-center gap-2 flex-wrap mb-6">
+              <MultiSelectFilter
+                label="Empreendimento"
+                icon={<Building2 className="h-4 w-4" />}
+                allOptions={allVendasEnterprises}
+                selected={selectedUnitEnterprises}
+                onToggle={(name) => { setSelectedUnitEnterprises(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                onSelectAll={() => { setSelectedUnitEnterprises(new Set(allVendasEnterprises)); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                onClear={() => { setSelectedUnitEnterprises(new Set()); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                activeColor="indigo"
+              />
+              <MultiSelectFilter
+                label="Status"
+                icon={<CheckCircle className="h-4 w-4" />}
+                allOptions={allVendasStatuses}
+                selected={selectedUnitStatuses}
+                onToggle={(name) => { setSelectedUnitStatuses(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
+                onSelectAll={() => setSelectedUnitStatuses(new Set(allVendasStatuses))}
+                onClear={() => setSelectedUnitStatuses(new Set())}
+                activeColor="emerald"
+              />
               <MultiSelectFilter
                 label="Cliente"
                 icon={<Users className="h-4 w-4" />}
