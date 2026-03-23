@@ -2150,6 +2150,11 @@ export function ExecutiveDashboard() {
           if (selectedUnitEnterprises.size > 0) {
             if (!selectedUnitEnterprises.has(c.enterpriseName || c.companyName)) return false;
           }
+          if (selectedUnitTypes.size > 0) {
+            const unitNames = (c.salesContractUnits || []).map(u => u.name);
+            const hasMatchingType = unitNames.some(name => selectedUnitTypes.has(inferUnitType(name)));
+            if (!hasMatchingType) return false;
+          }
           if (selectedUnitCustomers.size > 0) {
             const customerName = c.salesContractCustomers?.[0]?.name || "";
             if (!selectedUnitCustomers.has(customerName)) return false;
@@ -2311,6 +2316,9 @@ export function ExecutiveDashboard() {
 
         const allUnits = Array.from(unitMap.values());
 
+        // Tipo Imóvel options for Vendas (cascaded by enterprise selection)
+        const vendasUnitsForEnterprise = selectedUnitEnterprises.size === 0 ? allUnits : allUnits.filter(u => selectedUnitEnterprises.has(u.enterprise));
+        const allVendasTypes = Array.from(new Set(vendasUnitsForEnterprise.map(u => u.tipo))).sort();
 
         return (
           <>
@@ -2358,6 +2366,16 @@ export function ExecutiveDashboard() {
                 onSelectAll={() => { setSelectedUnitEnterprises(new Set(allVendasEnterprises)); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
                 onClear={() => { setSelectedUnitEnterprises(new Set()); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
                 activeColor="indigo"
+              />
+              <MultiSelectFilter
+                label="Tipo Imóvel"
+                icon={<Ruler className="h-4 w-4" />}
+                allOptions={allVendasTypes}
+                selected={selectedUnitTypes}
+                onToggle={(name) => { setSelectedUnitTypes(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); setSelectedUnits(new Set()); }}
+                onSelectAll={() => { setSelectedUnitTypes(new Set(allVendasTypes)); setSelectedUnits(new Set()); }}
+                onClear={() => { setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                activeColor="violet"
               />
               <MultiSelectFilter
                 label="Status"
