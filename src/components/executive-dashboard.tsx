@@ -2138,6 +2138,24 @@ export function ExecutiveDashboard() {
 
       {/* ══════ COMERCIAL TAB ══════ */}
       {activeTab === "comercial" && (() => {
+        // ─── Unit type inference from name (must be before filtered) ───
+        const inferUnitType = (name: string): string => {
+          const n = name.toUpperCase().trim();
+          if (/\bVG\b|VAGA|GARAGEM|^G[\s-]?\d/i.test(n)) {
+            if (/DUPLA|DBL|2V/i.test(n)) return "Vaga Dupla";
+            if (/TRIPLA|TPL|3V/i.test(n)) return "Vaga Tripla";
+            if (/PNE|DEFICIENTE|ACESS/i.test(n)) return "Vaga PNE";
+            return "Vaga Simples";
+          }
+          if (/\bSL\b|\bSALA\b|COMERCIAL/i.test(n)) return "Sala Comercial";
+          if (/\bLJ\b|\bLOJA\b/i.test(n)) return "Loja";
+          if (/\bCASA\b/i.test(n)) return "Casa";
+          if (/\bCOB\b|COBERTURA/i.test(n)) return "Cobertura";
+          if (/\bGARDEN\b|\bJARDIM\b/i.test(n)) return "Garden";
+          if (/\bDEP\b|DEPOSITO|\bBOX\b/i.test(n)) return "Depósito";
+          return "Apartamento";
+        };
+
         // Filter contracts by company, year, month, enterprise, customer
         const filtered = salesContracts.filter(c => {
           if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
@@ -2236,24 +2254,6 @@ export function ExecutiveDashboard() {
           const pct = prev > 0 ? ((item.value - prev) / prev) * 100 : null;
           return { ...item, pct };
         });
-
-        // ─── Unit type inference from name ───
-        const inferUnitType = (name: string): string => {
-          const n = name.toUpperCase().trim();
-          if (/\bVG\b|VAGA|GARAGEM|^G[\s-]?\d/i.test(n)) {
-            if (/DUPLA|DBL|2V/i.test(n)) return "Vaga Dupla";
-            if (/TRIPLA|TPL|3V/i.test(n)) return "Vaga Tripla";
-            if (/PNE|DEFICIENTE|ACESS/i.test(n)) return "Vaga PNE";
-            return "Vaga Simples";
-          }
-          if (/\bSL\b|\bSALA\b|COMERCIAL/i.test(n)) return "Sala Comercial";
-          if (/\bLJ\b|\bLOJA\b/i.test(n)) return "Loja";
-          if (/\bCASA\b/i.test(n)) return "Casa";
-          if (/\bCOB\b|COBERTURA/i.test(n)) return "Cobertura";
-          if (/\bGARDEN\b|\bJARDIM\b/i.test(n)) return "Garden";
-          if (/\bDEP\b|DEPOSITO|\bBOX\b/i.test(n)) return "Depósito";
-          return "Apartamento";
-        };
 
         // ─── Unit analysis: API units + sales contract enrichment ───
         type UnitRecord = { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string; area: number };
