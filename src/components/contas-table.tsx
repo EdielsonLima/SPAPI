@@ -922,40 +922,43 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       {/* Summary Cards */}
       <div className={`grid gap-4 md:grid-cols-3 ${isOverdue ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
-        <Card className={`border-0 shadow-sm border-l-4 ${isPagas ? "border-l-emerald-500" : isOverdue ? "border-l-red-500" : "border-l-amber-500"}`}>
+        <Card className={`border-0 shadow-md overflow-hidden ${isPagas ? "bg-emerald-50/60" : isOverdue ? "bg-red-50/60" : "bg-amber-50/60"}`}>
+          <div className={`h-1.5 ${isPagas ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : isOverdue ? "bg-gradient-to-r from-red-500 to-red-400" : "bg-gradient-to-r from-amber-500 to-amber-400"}`} />
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isPagas ? (isIncome ? "Recebido Hoje" : "Pago Hoje") : isOverdue ? (isIncome ? "Inadimplentes Hoje" : "Vencidas Hoje") : (isIncome ? "A Receber Hoje" : "A Pagar Hoje")}</div>
-            <div className={`text-xl font-bold mt-1 ${isPagas ? "text-emerald-600" : isOverdue ? "text-red-600" : "text-amber-600"}`}>
+            <div className={`text-xs font-bold uppercase tracking-widest ${isPagas ? "text-emerald-600/80" : isOverdue ? "text-red-600/80" : "text-amber-600/80"}`}>{isPagas ? (isIncome ? "Recebido Hoje" : "Pago Hoje") : isOverdue ? (isIncome ? "Inadimplentes Hoje" : "Vencidas Hoje") : (isIncome ? "A Receber Hoje" : "A Pagar Hoje")}</div>
+            <div className={`text-2xl font-black mt-1 ${isPagas ? "text-emerald-700" : isOverdue ? "text-red-700" : "text-amber-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(todayStats.valor)}
             </div>
             {!loading && (
               <div className="text-xs text-slate-400 mt-1.5 space-x-2">
                 <span>{todayStats.titulos} {todayStats.titulos === 1 ? "titulo" : "titulos"}</span>
-                <span>•</span>
+                <span>·</span>
                 <span>{todayStats.credores} {todayStats.credores === 1 ? counterpartLabel.toLowerCase() : counterpartLabelPlural}</span>
               </div>
             )}
           </CardContent>
         </Card>
-        <Card className={`border-0 shadow-sm border-l-4 ${isPagas ? "border-l-teal-400" : isOverdue ? "border-l-orange-400" : "border-l-blue-400"}`}>
+        <Card className={`border-0 shadow-md overflow-hidden ${isPagas ? "bg-teal-50/60" : isOverdue ? "bg-orange-50/60" : "bg-blue-50/60"}`}>
+          <div className={`h-1.5 ${isPagas ? "bg-gradient-to-r from-teal-500 to-teal-400" : isOverdue ? "bg-gradient-to-r from-orange-500 to-orange-400" : "bg-gradient-to-r from-blue-500 to-blue-400"}`} />
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isPagas ? (isIncome ? "Recebido ultimos 7 dias" : "Pago ultimos 7 dias") : isOverdue ? (isIncome ? "Inadimplentes ultimos 7 dias" : "Vencidas ultimos 7 dias") : (isIncome ? "A Receber em 7 dias" : "A Pagar em 7 dias")}</div>
-            <div className={`text-xl font-bold mt-1 ${isPagas ? "text-teal-600" : isOverdue ? "text-orange-600" : "text-blue-600"}`}>
+            <div className={`text-xs font-bold uppercase tracking-widest ${isPagas ? "text-teal-600/80" : isOverdue ? "text-orange-600/80" : "text-blue-600/80"}`}>{isPagas ? (isIncome ? "Recebido ultimos 7 dias" : "Pago ultimos 7 dias") : isOverdue ? (isIncome ? "Inadimplentes ultimos 7 dias" : "Vencidas ultimos 7 dias") : (isIncome ? "A Receber em 7 dias" : "A Pagar em 7 dias")}</div>
+            <div className={`text-2xl font-black mt-1 ${isPagas ? "text-teal-700" : isOverdue ? "text-orange-700" : "text-blue-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(weekStats.valor)}
             </div>
             {!loading && (
               <div className="text-xs text-slate-400 mt-1.5 space-x-2">
                 <span>{weekStats.titulos} {weekStats.titulos === 1 ? "titulo" : "titulos"}</span>
-                <span>•</span>
+                <span>·</span>
                 <span>{weekStats.credores} {weekStats.credores === 1 ? counterpartLabel.toLowerCase() : counterpartLabelPlural}</span>
               </div>
             )}
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="border-0 shadow-md overflow-hidden bg-slate-50/60">
+          <div className="h-1.5 bg-gradient-to-r from-slate-400 to-slate-300" />
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">Total Parcelas</div>
-            <div className="text-xl font-bold text-slate-800 mt-1">
+            <div className="text-xs font-bold uppercase tracking-widest text-slate-500/80">Total Parcelas</div>
+            <div className="text-2xl font-black text-slate-800 mt-1">
               {loading ? <Skeleton className="h-7 w-16" /> : sorted.length}
             </div>
             {!loading && (
@@ -965,18 +968,20 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
             )}
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className={`border-0 shadow-md overflow-hidden ${isPagas ? "bg-green-50/60" : "bg-indigo-50/60"}`}>
+          <div className={`h-1.5 ${isPagas ? "bg-gradient-to-r from-green-500 to-green-400" : "bg-gradient-to-r from-indigo-500 to-indigo-400"}`} />
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isPagas ? (isIncome ? "Total Recebido" : "Total Pago") : "Valor Original"}</div>
-            <div className={`text-xl font-bold mt-1 ${isPagas ? "text-emerald-600" : "text-blue-600"}`}>
+            <div className={`text-xs font-bold uppercase tracking-widest ${isPagas ? "text-green-600/80" : "text-indigo-600/80"}`}>{isPagas ? (isIncome ? "Total Recebido" : "Total Pago") : "Valor Original"}</div>
+            <div className={`text-2xl font-black mt-1 ${isPagas ? "text-green-700" : "text-indigo-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(isPagas ? totalPaid : totalAmount)}
             </div>
           </CardContent>
         </Card>
-        <Card className={`border-0 shadow-sm ${isOverdue ? "border-l-4 border-l-red-500" : ""}`}>
+        <Card className={`border-0 shadow-md overflow-hidden ${isOverdue ? "bg-red-50/60" : "bg-violet-50/60"}`}>
+          <div className={`h-1.5 ${isOverdue ? "bg-gradient-to-r from-red-500 to-red-400" : "bg-gradient-to-r from-violet-500 to-violet-400"}`} />
           <CardContent className="p-4">
-            <div className="text-sm text-slate-500">{isPagas ? counterpartLabelPlural.charAt(0).toUpperCase() + counterpartLabelPlural.slice(1) : "Saldo Pendente"}</div>
-            <div className={`text-xl font-bold mt-1 ${isOverdue ? "text-red-600" : "text-slate-800"}`}>
+            <div className={`text-xs font-bold uppercase tracking-widest ${isOverdue ? "text-red-600/80" : "text-violet-600/80"}`}>{isPagas ? counterpartLabelPlural.charAt(0).toUpperCase() + counterpartLabelPlural.slice(1) : "Saldo Pendente"}</div>
+            <div className={`text-2xl font-black mt-1 ${isOverdue ? "text-red-700" : "text-violet-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : isPagas
                 ? `${new Set(sorted.map((i) => getCounterpartId(i))).size}`
                 : formatCurrency(totalBalance)}
@@ -1199,7 +1204,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         <CardContent className="px-0 pb-0">
           <div className="overflow-x-auto">
             <Table>
-              <TableHeader className="bg-slate-100/80">
+              <TableHeader className="bg-slate-100/95 backdrop-blur-sm sticky top-0 z-20">
                 <TableRow>
                   <TableHead className="w-[40px]" />
                   <TableHead className="min-w-[50px] text-xs">Parc.</TableHead>
