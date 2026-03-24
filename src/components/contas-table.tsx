@@ -365,22 +365,6 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [billNotes, setBillNotes] = useState<Record<number, string | null>>({});
   const [loadingNotes, setLoadingNotes] = useState<Set<number>>(new Set());
   const fetchedNotesRef = React.useRef<Set<number>>(new Set());
-  const filterHeaderRef = useRef<HTMLDivElement>(null);
-  const [filterHeaderH, setFilterHeaderH] = useState(0);
-
-  useEffect(() => {
-    const el = filterHeaderRef.current;
-    if (!el) return;
-    const measure = () => {
-      const h = Math.round(el.getBoundingClientRect().height);
-      setFilterHeaderH(prev => (prev === h ? prev : h));
-    };
-    // Measure once after mount settles
-    const raf = requestAnimationFrame(measure);
-    const ro = new ResizeObserver(() => requestAnimationFrame(measure));
-    ro.observe(el);
-    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
-  }, []);
 
   const fetchBillNotes = useCallback(async (billId: number) => {
     if (fetchedNotesRef.current.has(billId)) return;
@@ -1030,8 +1014,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       </div>
 
       {/* Filters + Table */}
-      <Card className="border-0 shadow-sm overflow-visible">
-        <CardHeader ref={filterHeaderRef} className="pb-4 sticky top-16 z-30 bg-white/95 backdrop-blur-sm rounded-t-xl border-b border-slate-100">
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-4">
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[100px]">
@@ -1217,10 +1201,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           </div>
         </CardHeader>
 
-        <CardContent className="px-0 pb-0 overflow-visible">
-          <div>
+        <CardContent className="px-0 pb-0">
+          <div className="overflow-x-clip">
             <Table>
-              <TableHeader className="bg-slate-100/95 backdrop-blur-sm sticky z-20 shadow-sm" style={{ top: `calc(4rem + ${filterHeaderH}px)` }}>
+              <TableHeader className="bg-white/95 backdrop-blur-sm sticky top-16 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
                 <TableRow>
                   <TableHead className="w-[40px]" />
                   <TableHead className="min-w-[50px] text-xs">Parc.</TableHead>
