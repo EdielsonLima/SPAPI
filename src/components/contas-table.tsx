@@ -29,8 +29,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Search,
-  ChevronLeft,
-  ChevronRight,
   ChevronDown,
   Filter,
   Loader2,
@@ -1202,8 +1200,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         </CardHeader>
 
         <CardContent className="px-0 pb-0">
-          <div className="overflow-x-clip">
-            <Table>
+          <div>
+            <Table containerClassName="overflow-visible">
               <TableHeader className="bg-white/95 backdrop-blur-sm sticky top-16 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
                 <TableRow>
                   <TableHead className="w-[40px]" />
