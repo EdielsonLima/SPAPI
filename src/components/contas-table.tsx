@@ -1202,7 +1202,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         <CardContent className="px-0 pb-0">
           <div>
             <Table containerClassName="overflow-visible">
-              <TableHeader className="bg-white sticky top-0 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+              <TableHeader className="bg-white sticky -top-4 md:-top-6 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
                 <TableRow>
                   <TableHead className="w-[40px]" />
                   <TableHead className="min-w-[50px] text-xs">Parc.</TableHead>
