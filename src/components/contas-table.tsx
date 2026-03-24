@@ -371,11 +371,15 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   useEffect(() => {
     const el = filterHeaderRef.current;
     if (!el) return;
-    const measure = () => setFilterHeaderH(el.getBoundingClientRect().height);
-    measure();
-    const ro = new ResizeObserver(measure);
+    const measure = () => {
+      const h = Math.round(el.getBoundingClientRect().height);
+      setFilterHeaderH(prev => (prev === h ? prev : h));
+    };
+    // Measure once after mount settles
+    const raf = requestAnimationFrame(measure);
+    const ro = new ResizeObserver(() => requestAnimationFrame(measure));
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => { cancelAnimationFrame(raf); ro.disconnect(); };
   }, []);
 
   const fetchBillNotes = useCallback(async (billId: number) => {
