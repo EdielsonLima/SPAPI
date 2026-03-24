@@ -77,6 +77,7 @@ type SortField =
   | "documentNumber"
   | "documentType"
   | "costEstimationSheet"
+  | "financialCategory"
   | "originalAmount"
   | "balanceAmount"
   | "paymentDate"
@@ -334,6 +335,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     }
     return new Set<string>();
   });
+  const [filterPlanoFinanceiro, setFilterPlanoFinanceiro] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_planoFinanceiro`);
+      if (saved) return new Set(JSON.parse(saved));
+    }
+    return new Set<string>();
+  });
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
   const [filterAno, setFilterAno] = useState(isOverdue ? "all" : String(currentYear));
   const [filterMes, setFilterMes] = useState("all");
@@ -473,6 +481,16 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     items.forEach((item) => {
       const tipo = item.documentIdentificationId?.trim();
       if (tipo) set.add(tipo);
+    });
+    return Array.from(set).sort();
+  }, [items]);
+
+  const planoFinanceiroNames = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((item) => {
+      item.paymentsCategories?.forEach((cat) => {
+        if (cat.financialCategoryName) set.add(cat.financialCategoryName);
+      });
     });
     return Array.from(set).sort();
   }, [items]);
@@ -619,6 +637,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         if (!filterTipoDoc.has(tipo)) return false;
       }
 
+      if (filterPlanoFinanceiro.size > 0) {
+        const has = item.paymentsCategories?.some(
+          (cat) => filterPlanoFinanceiro.has(cat.financialCategoryName)
+        );
+        if (!has) return false;
+      }
+
       if (filterTipoBaixa.size > 0 && isIncome) {
         const hasType = (item.payments || []).some(p =>
           p.operationTypeName && filterTipoBaixa.has(p.operationTypeName)
@@ -640,7 +665,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
+  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -666,6 +691,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         case "documentNumber": cmp = (a.documentNumber || "").localeCompare(b.documentNumber || ""); break;
         case "documentType": cmp = (a.documentIdentificationId || "").localeCompare(b.documentIdentificationId || ""); break;
         case "costEstimationSheet": cmp = (getBuildingsCosts(a)[0]?.costEstimationSheetName || "").localeCompare(getBuildingsCosts(b)[0]?.costEstimationSheetName || ""); break;
+        case "financialCategory": cmp = (a.paymentsCategories?.[0]?.financialCategoryName || "").localeCompare(b.paymentsCategories?.[0]?.financialCategoryName || ""); break;
         case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
         case "balanceAmount": cmp = a.correctedBalanceAmount - b.correctedBalanceAmount; break;
         case "paymentDate": cmp = (latestPaymentDate(a, filterAno, filterMes) || "").localeCompare(latestPaymentDate(b, filterAno, filterMes) || ""); break;
@@ -1130,6 +1156,22 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 />
               </div>
 
+              {!isIncome && planoFinanceiroNames.length > 0 && (
+                <div className="min-w-[220px]">
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Plano Financeiro</label>
+                  <MultiSelectFilter
+                    label="Plano Financeiro"
+                    icon={<FolderOpen className="h-4 w-4 text-slate-400" />}
+                    allOptions={planoFinanceiroNames}
+                    selected={filterPlanoFinanceiro}
+                    onToggle={(name) => { setFilterPlanoFinanceiro(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
+                    onSelectAll={() => { setFilterPlanoFinanceiro(new Set(planoFinanceiroNames)); setPage(0); }}
+                    onClear={() => { setFilterPlanoFinanceiro(new Set()); setPage(0); }}
+                    onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_planoFinanceiro`, JSON.stringify([...filterPlanoFinanceiro])); toast.success("Padrao de plano financeiro salvo!"); }}
+                  />
+                </div>
+              )}
+
               {isIncome && tiposBaixa.length > 0 && (
                 <div className="min-w-[180px]">
                   <label className="text-xs font-medium text-slate-500 mb-1 block">Tipo de Baixa</label>
@@ -1172,6 +1214,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   <SortableHead field="companyName" className="min-w-[150px]">Empresa</SortableHead>
                   {!isIncome && (
                     <SortableHead field="costEstimationSheet" className="min-w-[180px]">Item Orcamento</SortableHead>
+                  )}
+                  {!isIncome && (
+                    <SortableHead field="financialCategory" className="min-w-[180px]">Plano Financeiro</SortableHead>
                   )}
                   <SortableHead field="billId" className="min-w-[80px]">Titulo</SortableHead>
                   <SortableHead field="documentType" className="min-w-[80px]">Tipo Doc.</SortableHead>
@@ -1255,6 +1300,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                 {getBuildingsCosts(item)[0]?.costEstimationSheetName || "-"}
                                 {getBuildingsCosts(item).length > 1 && (
                                   <Badge variant="secondary" className="text-[10px] ml-1">+{getBuildingsCosts(item).length - 1}</Badge>
+                                )}
+                              </TableCell>
+                            )}
+                            {!isIncome && (
+                              <TableCell className="text-sm max-w-[200px] truncate" title={item.paymentsCategories?.map(c => c.financialCategoryName).filter(Boolean).join(", ") || "-"}>
+                                {item.paymentsCategories?.[0]?.financialCategoryName || "-"}
+                                {(item.paymentsCategories?.length || 0) > 1 && (
+                                  <Badge variant="secondary" className="text-[10px] ml-1">+{(item.paymentsCategories?.length || 0) - 1}</Badge>
                                 )}
                               </TableCell>
                             )}
