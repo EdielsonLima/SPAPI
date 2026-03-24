@@ -1571,21 +1571,55 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
             </Table>
           </div>
 
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t">
-              <p className="text-sm text-slate-500">
-                Pagina {page + 1} de {totalPages} ({sorted.length} parcelas)
-              </p>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(Math.max(0, page - 1))}>
-                  <ChevronLeft className="h-4 w-4" /> Anterior
-                </Button>
-                <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)}>
-                  Proximo <ChevronRight className="h-4 w-4" />
-                </Button>
+          {totalPages > 1 && (() => {
+            const start = page * perPage + 1;
+            const end = Math.min((page + 1) * perPage, sorted.length);
+            // Build page numbers: show first, last, current ±2, with ellipsis
+            const pages: (number | "...")[] = [];
+            for (let i = 0; i < totalPages; i++) {
+              if (i === 0 || i === totalPages - 1 || (i >= page - 2 && i <= page + 2)) {
+                pages.push(i);
+              } else if (pages[pages.length - 1] !== "...") {
+                pages.push("...");
+              }
+            }
+            return (
+              <div className="flex items-center justify-between px-6 py-4 border-t">
+                <p className="text-sm text-slate-500">
+                  Mostrando {start} - {end} de {sorted.length.toLocaleString("pt-BR")} registros
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(0)} className="text-xs">
+                    Primeira
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)} className="text-xs">
+                    Anterior
+                  </Button>
+                  {pages.map((p, i) =>
+                    p === "..." ? (
+                      <span key={`e${i}`} className="px-1 text-slate-400 text-sm">...</span>
+                    ) : (
+                      <Button
+                        key={p}
+                        variant={p === page ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPage(p)}
+                        className={`text-xs min-w-[32px] ${p === page ? "bg-emerald-600 hover:bg-emerald-700 text-white" : ""}`}
+                      >
+                        {p + 1}
+                      </Button>
+                    )
+                  )}
+                  <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage(page + 1)} className="text-xs">
+                    Proxima
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={page + 1 >= totalPages} onClick={() => setPage(totalPages - 1)} className="text-xs">
+                    Ultima
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </CardContent>
       </Card>
     </div>
