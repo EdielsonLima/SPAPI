@@ -365,6 +365,18 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [billNotes, setBillNotes] = useState<Record<number, string | null>>({});
   const [loadingNotes, setLoadingNotes] = useState<Set<number>>(new Set());
   const fetchedNotesRef = React.useRef<Set<number>>(new Set());
+  const filterHeaderRef = useRef<HTMLDivElement>(null);
+  const [filterHeaderH, setFilterHeaderH] = useState(0);
+
+  useEffect(() => {
+    const el = filterHeaderRef.current;
+    if (!el) return;
+    const measure = () => setFilterHeaderH(el.getBoundingClientRect().height);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const fetchBillNotes = useCallback(async (billId: number) => {
     if (fetchedNotesRef.current.has(billId)) return;
@@ -1014,8 +1026,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       </div>
 
       {/* Filters + Table */}
-      <Card className="border-0 shadow-sm">
-        <CardHeader className="pb-4">
+      <Card className="border-0 shadow-sm overflow-visible">
+        <CardHeader ref={filterHeaderRef} className="pb-4 sticky top-16 z-30 bg-white/95 backdrop-blur-sm rounded-t-xl border-b border-slate-100">
           <div className="space-y-4">
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[100px]">
@@ -1201,10 +1213,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           </div>
         </CardHeader>
 
-        <CardContent className="px-0 pb-0">
-          <div className="overflow-auto max-h-[calc(100vh-22rem)]">
+        <CardContent className="px-0 pb-0 overflow-visible">
+          <div>
             <Table>
-              <TableHeader className="bg-slate-100/95 backdrop-blur-sm sticky top-0 z-20 shadow-sm">
+              <TableHeader className="bg-slate-100/95 backdrop-blur-sm sticky z-20 shadow-sm" style={{ top: `calc(4rem + ${filterHeaderH}px)` }}>
                 <TableRow>
                   <TableHead className="w-[40px]" />
                   <TableHead className="min-w-[50px] text-xs">Parc.</TableHead>
