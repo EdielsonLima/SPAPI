@@ -870,11 +870,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
   const SortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field)
-      return <ArrowUpDown className="h-3 w-3 ml-1 opacity-40" />;
+      return <ArrowUpDown className="h-3 w-3 ml-1 text-slate-400" />;
     return sortDir === "asc" ? (
-      <ArrowUp className="h-3 w-3 ml-1 text-blue-600" />
+      <ArrowUp className="h-3 w-3 ml-1 text-white" />
     ) : (
-      <ArrowDown className="h-3 w-3 ml-1 text-blue-600" />
+      <ArrowDown className="h-3 w-3 ml-1 text-white" />
     );
   };
 
@@ -890,7 +890,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     <TableHead className={className}>
       <button
         onClick={() => handleSort(field)}
-        className="flex items-center gap-0.5 hover:text-blue-600 transition-colors w-full"
+        className="flex items-center gap-0.5 hover:text-white transition-colors w-full"
       >
         {children}
         <SortIcon field={field} />
@@ -1202,7 +1202,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         <CardContent className="px-0 pb-0">
           <div>
             <Table containerClassName="overflow-visible">
-              <TableHeader className="bg-white sticky -top-4 md:-top-6 z-20 shadow-[0_1px_3px_rgba(0,0,0,0.08)]">
+              <TableHeader className="bg-slate-800 text-slate-100 sticky -top-4 md:-top-6 z-20 shadow-md [&_th]:text-slate-200">
                 <TableRow>
                   <TableHead className="w-[40px]" />
                   <TableHead className="min-w-[50px] text-xs">Parc.</TableHead>

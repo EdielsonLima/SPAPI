@@ -132,9 +132,9 @@ export default function PlanoFinanceiroPage() {
               <Button variant="outline" onClick={fetchData}>Tentar novamente</Button>
             </div>
           ) : (
-            <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
-              <Table>
-                <TableHeader className="bg-slate-100/80">
+            <div>
+              <Table containerClassName="overflow-visible">
+                <TableHeader className="bg-slate-800 text-slate-100 sticky -top-4 md:-top-6 z-20 shadow-md [&_th]:text-slate-200">
                   <TableRow>
                     <TableHead className="w-32">Codigo</TableHead>
                     <TableHead>Nome</TableHead>

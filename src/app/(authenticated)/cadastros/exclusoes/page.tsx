@@ -335,9 +335,9 @@ export default function ExclusoesPage() {
               <p>{exclusions.length === 0 ? "Nenhum titulo excluido" : "Nenhum resultado encontrado"}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-slate-50">
+            <div>
+              <Table containerClassName="overflow-visible">
+                <TableHeader className="bg-slate-800 text-slate-100 sticky -top-4 md:-top-6 z-20 shadow-md [&_th]:text-slate-200">
                   <TableRow>
                     <TableHead className="text-xs">Empresa</TableHead>
                     <TableHead className="text-xs w-[80px]">Titulo</TableHead>

@@ -1253,14 +1253,14 @@ export default function PedidosPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader className="bg-slate-100/80">
+              <div>
+                <Table containerClassName="overflow-visible">
+                  <TableHeader className="bg-slate-800 text-slate-100 sticky -top-4 md:-top-6 z-20 shadow-md [&_th]:text-slate-200">
                     <TableRow>
                       {(() => {
                         const SI = ({ col }: { col: string }) => mainSort.key === col
-                          ? (mainSort.dir === "asc" ? <ArrowUp className="h-3 w-3 inline ml-0.5 text-slate-600" /> : <ArrowDown className="h-3 w-3 inline ml-0.5 text-slate-600" />)
-                          : <ArrowUpDown className="h-3 w-3 inline ml-0.5 text-slate-300 group-hover:text-slate-500" />;
+                          ? (mainSort.dir === "asc" ? <ArrowUp className="h-3 w-3 inline ml-0.5 text-white" /> : <ArrowDown className="h-3 w-3 inline ml-0.5 text-white" />)
+                          : <ArrowUpDown className="h-3 w-3 inline ml-0.5 text-slate-400 group-hover:text-slate-200" />;
                         const Th = ({ col, label, className }: { col: string; label: string; className?: string }) => (
                           <TableHead className={`cursor-pointer select-none ${className ?? ""}`} onClick={() => toggleMainSort(col)}>
                             <span className="group flex items-center gap-0 whitespace-nowrap">{label}<SI col={col} /></span>
@@ -1810,14 +1810,14 @@ export default function PedidosPage() {
                 )}
               </div>
               {/* Table */}
-              <div className="overflow-x-auto">
-                <Table className="text-sm">
-                  <TableHeader className="bg-slate-100/80">
+              <div>
+                <Table className="text-sm" containerClassName="overflow-visible">
+                  <TableHeader className="bg-slate-800 text-slate-100 sticky -top-4 md:-top-6 z-20 shadow-md [&_th]:text-slate-200">
                     <TableRow>
                       {(() => {
                         const SI = ({ col }: { col: string }) => itemTabSort.key === col
-                          ? (itemTabSort.dir === "asc" ? <ArrowUp className="h-3 w-3 inline ml-0.5 text-slate-600" /> : <ArrowDown className="h-3 w-3 inline ml-0.5 text-slate-600" />)
-                          : <ArrowUpDown className="h-3 w-3 inline ml-0.5 text-slate-300 group-hover:text-slate-500" />;
+                          ? (itemTabSort.dir === "asc" ? <ArrowUp className="h-3 w-3 inline ml-0.5 text-white" /> : <ArrowDown className="h-3 w-3 inline ml-0.5 text-white" />)
+                          : <ArrowUpDown className="h-3 w-3 inline ml-0.5 text-slate-400 group-hover:text-slate-200" />;
                         const Th = ({ col, label, className }: { col: string; label: string; className?: string }) => (
                           <TableHead
                             className={`cursor-pointer select-none ${className ?? ""}`}

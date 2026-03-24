@@ -458,8 +458,8 @@ export default function EmpreendimentosPage() {
               <Button variant="outline" onClick={fetchData}>Tentar novamente</Button>
             </div>
           ) : (
-            <Table>
-              <TableHeader className="bg-slate-100/80">
+            <Table containerClassName="overflow-visible">
+              <TableHeader className="bg-slate-800 text-slate-100 sticky -top-4 md:-top-6 z-20 shadow-md [&_th]:text-slate-200">
                 <TableRow>
                   <TableHead className="w-20">Cod</TableHead>
                   <TableHead>Empresa</TableHead>
