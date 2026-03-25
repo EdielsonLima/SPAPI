@@ -497,14 +497,22 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return Array.from(set).sort();
   }, [items]);
 
+  const NO_ITEM_ORCAMENTO = "(Sem item)";
   const itemOrcamentoNames = useMemo(() => {
     const set = new Set<string>();
+    let hasEmpty = false;
     items.forEach((item) => {
-      getBuildingsCosts(item).forEach((bc) => {
+      const costs = getBuildingsCosts(item);
+      if (costs.length === 0 || costs.every(bc => !bc.costEstimationSheetName)) {
+        hasEmpty = true;
+      }
+      costs.forEach((bc) => {
         if (bc.costEstimationSheetName) set.add(bc.costEstimationSheetName);
       });
     });
-    return Array.from(set).sort();
+    const sorted = Array.from(set).sort();
+    if (hasEmpty) sorted.unshift(NO_ITEM_ORCAMENTO);
+    return sorted;
   }, [items]);
 
   const tituloIds = useMemo(() => {
@@ -681,9 +689,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       }
 
       if (filterItemOrcamento.size > 0) {
-        const has = getBuildingsCosts(item).some(
-          (bc) => filterItemOrcamento.has(bc.costEstimationSheetName)
-        );
+        const costs = getBuildingsCosts(item);
+        const isEmpty = costs.length === 0 || costs.every(bc => !bc.costEstimationSheetName);
+        const has = (isEmpty && filterItemOrcamento.has(NO_ITEM_ORCAMENTO)) ||
+          costs.some(bc => filterItemOrcamento.has(bc.costEstimationSheetName));
         if (!has) return false;
       }
 
