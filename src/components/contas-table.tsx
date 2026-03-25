@@ -340,6 +340,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     }
     return new Set<string>();
   });
+  const [filterItemOrcamento, setFilterItemOrcamento] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_itemOrcamento`);
+      if (saved) return new Set(JSON.parse(saved));
+    }
+    return new Set<string>();
+  });
   const [filterTitulo, setFilterTitulo] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_titulo`);
@@ -486,6 +493,16 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     items.forEach((item) => {
       const tipo = item.documentIdentificationId?.trim();
       if (tipo) set.add(tipo);
+    });
+    return Array.from(set).sort();
+  }, [items]);
+
+  const itemOrcamentoNames = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((item) => {
+      getBuildingsCosts(item).forEach((bc) => {
+        if (bc.costEstimationSheetName) set.add(bc.costEstimationSheetName);
+      });
     });
     return Array.from(set).sort();
   }, [items]);
@@ -663,6 +680,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         if (!has) return false;
       }
 
+      if (filterItemOrcamento.size > 0) {
+        const has = getBuildingsCosts(item).some(
+          (bc) => filterItemOrcamento.has(bc.costEstimationSheetName)
+        );
+        if (!has) return false;
+      }
+
       if (filterTitulo.size > 0 && !filterTitulo.has(String(item.billId)))
         return false;
 
@@ -687,7 +711,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterTitulo, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
+  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -877,6 +901,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     filterCentrosCusto.size > 0 ||
     filterCredores.size > 0 ||
     filterTipoDoc.size > 0 ||
+    filterItemOrcamento.size > 0 ||
     filterTitulo.size > 0 ||
     filterTipoBaixa.size > 0 ||
     filterDia.length > 0 ||
@@ -887,6 +912,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     setFilterCentrosCusto(new Set());
     setFilterCredores(new Set());
     setFilterTipoDoc(new Set());
+    setFilterItemOrcamento(new Set());
     setFilterTitulo(new Set());
     setFilterTipoBaixa(new Set());
     setFilterDia([]);
@@ -1197,6 +1223,22 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                     onSelectAll={() => { setFilterPlanoFinanceiro(new Set(planoFinanceiroNames)); setPage(0); }}
                     onClear={() => { setFilterPlanoFinanceiro(new Set()); setPage(0); }}
                     onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_planoFinanceiro`, JSON.stringify([...filterPlanoFinanceiro])); toast.success("Padrao de plano financeiro salvo!"); }}
+                  />
+                </div>
+              )}
+
+              {!isIncome && itemOrcamentoNames.length > 0 && (
+                <div className="min-w-[220px]">
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Item Orçamento</label>
+                  <MultiSelectFilter
+                    label="Item Orçamento"
+                    icon={<FolderOpen className="h-4 w-4 text-slate-400" />}
+                    allOptions={itemOrcamentoNames}
+                    selected={filterItemOrcamento}
+                    onToggle={(name) => { setFilterItemOrcamento(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
+                    onSelectAll={() => { setFilterItemOrcamento(new Set(itemOrcamentoNames)); setPage(0); }}
+                    onClear={() => { setFilterItemOrcamento(new Set()); setPage(0); }}
+                    onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_itemOrcamento`, JSON.stringify([...filterItemOrcamento])); toast.success("Padrao de item orcamento salvo!"); }}
                   />
                 </div>
               )}
