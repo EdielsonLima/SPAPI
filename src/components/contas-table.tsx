@@ -1368,7 +1368,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
                           <TableRow
-                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-blue-100 border-l-4 border-blue-500 hover:bg-blue-100" : "hover:bg-slate-50 border-l-4 border-transparent"}`}
+                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-blue-100 border-l-4 border-blue-500 hover:bg-blue-100" : (!isIncome && (getBuildingsCosts(item).length === 0 || getBuildingsCosts(item).every(bc => !bc.costEstimationSheetName))) ? "bg-red-50 hover:bg-red-100 border-l-4 border-red-300" : "hover:bg-slate-50 border-l-4 border-transparent"}`}
                             onClick={() => toggleBillExpand(item.billId)}
                           >
                             <TableCell className="w-[40px] px-2">
