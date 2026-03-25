@@ -340,6 +340,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     }
     return new Set<string>();
   });
+  const [filterTitulo, setFilterTitulo] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_titulo`);
+      if (saved) return new Set(JSON.parse(saved));
+    }
+    return new Set<string>();
+  });
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
   const [filterAno, setFilterAno] = useState(isOverdue ? "all" : String(currentYear));
   const [filterMes, setFilterMes] = useState("all");
@@ -483,6 +490,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return Array.from(set).sort();
   }, [items]);
 
+  const tituloIds = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((item) => {
+      if (item.billId) set.add(String(item.billId));
+    });
+    return Array.from(set).sort((a, b) => Number(a) - Number(b));
+  }, [items]);
+
   const planoFinanceiroNames = useMemo(() => {
     const set = new Set<string>();
     items.forEach((item) => {
@@ -613,7 +628,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           getCounterpartName(item).toLowerCase().includes(s) ||
           item.companyName?.toLowerCase().includes(s) ||
           item.projectName?.toLowerCase().includes(s) ||
-          item.documentNumber?.includes(search);
+          item.documentNumber?.includes(search) ||
+          String(item.billId).includes(search) ||
+          (item.documentIdentificationId?.toLowerCase().includes(s)) ||
+          (item.paymentsCategories?.some(c => c.financialCategoryName?.toLowerCase().includes(s))) ||
+          (item.paymentsCategories?.some(c => c.costCenterName?.toLowerCase().includes(s))) ||
+          (getBuildingsCosts(item).some(bc => bc.costEstimationSheetName?.toLowerCase().includes(s))) ||
+          String(item.originalAmount).includes(search);
         if (!match) return false;
       }
 
@@ -642,6 +663,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         if (!has) return false;
       }
 
+      if (filterTitulo.size > 0 && !filterTitulo.has(String(item.billId)))
+        return false;
+
       if (filterTipoBaixa.size > 0 && isIncome) {
         const hasType = (item.payments || []).some(p =>
           p.operationTypeName && filterTipoBaixa.has(p.operationTypeName)
@@ -663,7 +687,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
+  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterTitulo, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -853,6 +877,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     filterCentrosCusto.size > 0 ||
     filterCredores.size > 0 ||
     filterTipoDoc.size > 0 ||
+    filterTitulo.size > 0 ||
     filterTipoBaixa.size > 0 ||
     filterDia.length > 0 ||
     search !== "";
@@ -862,6 +887,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     setFilterCentrosCusto(new Set());
     setFilterCredores(new Set());
     setFilterTipoDoc(new Set());
+    setFilterTitulo(new Set());
     setFilterTipoBaixa(new Set());
     setFilterDia([]);
     setSearch("");
@@ -1174,6 +1200,20 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   />
                 </div>
               )}
+
+              <div className="min-w-[160px]">
+                <label className="text-xs font-medium text-slate-500 mb-1 block">Título</label>
+                <MultiSelectFilter
+                  label="Título"
+                  icon={<FileText className="h-4 w-4 text-slate-400" />}
+                  allOptions={tituloIds}
+                  selected={filterTitulo}
+                  onToggle={(name) => { setFilterTitulo(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
+                  onSelectAll={() => { setFilterTitulo(new Set(tituloIds)); setPage(0); }}
+                  onClear={() => { setFilterTitulo(new Set()); setPage(0); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_titulo`, JSON.stringify([...filterTitulo])); toast.success("Padrao de titulo salvo!"); }}
+                />
+              </div>
 
               {isIncome && tiposBaixa.length > 0 && (
                 <div className="min-w-[180px]">
