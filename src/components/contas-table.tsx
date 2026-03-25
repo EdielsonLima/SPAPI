@@ -71,6 +71,7 @@ type SortField =
   | "daysOverdue"
   | "creditorName"
   | "companyName"
+  | "costCenter"
   | "projectName"
   | "documentNumber"
   | "documentType"
@@ -742,6 +743,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         case "daysOverdue": cmp = daysDiff(a.dueDate) - daysDiff(b.dueDate); break;
         case "creditorName": cmp = getCounterpartName(a).localeCompare(getCounterpartName(b)); break;
         case "companyName": cmp = (a.companyName || "").localeCompare(b.companyName || ""); break;
+        case "costCenter": cmp = (a.paymentsCategories?.[0]?.costCenterName || "").localeCompare(b.paymentsCategories?.[0]?.costCenterName || ""); break;
         case "projectName": cmp = (a.projectName || "").localeCompare(b.projectName || ""); break;
         case "documentNumber": cmp = (a.documentNumber || "").localeCompare(b.documentNumber || ""); break;
         case "documentType": cmp = (a.documentIdentificationId || "").localeCompare(b.documentIdentificationId || ""); break;
@@ -1306,6 +1308,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   )}
                   <SortableHead field="creditorName" className="min-w-[200px]">{counterpartLabel}</SortableHead>
                   <SortableHead field="companyName" className="min-w-[150px]">Empresa</SortableHead>
+                  <SortableHead field="costCenter" className="min-w-[150px]">Centro de Custo</SortableHead>
                   {!isIncome && (
                     <SortableHead field="costEstimationSheet" className="min-w-[180px]">Item Orcamento</SortableHead>
                   )}
@@ -1389,6 +1392,12 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             )}
                             <TableCell className={`max-w-[250px] truncate ${isExpanded ? "font-bold text-blue-900" : "font-medium"}`} title={getCounterpartName(item)}>{getCounterpartName(item)}</TableCell>
                             <TableCell className="text-sm max-w-[180px] truncate" title={item.companyName}>{item.companyName}</TableCell>
+                            <TableCell className="text-sm max-w-[180px] truncate" title={item.paymentsCategories?.map(c => c.costCenterName).filter(Boolean).join(", ") || "-"}>
+                              {item.paymentsCategories?.[0]?.costCenterName || "-"}
+                              {(item.paymentsCategories?.length || 0) > 1 && item.paymentsCategories!.some(c => c.costCenterName) && (
+                                <Badge variant="secondary" className="text-[10px] ml-1">+{item.paymentsCategories!.filter(c => c.costCenterName).length - 1}</Badge>
+                              )}
+                            </TableCell>
                             {!isIncome && (
                               <TableCell className="text-sm max-w-[200px] truncate" title={getBuildingsCosts(item).map((bc) => bc.costEstimationSheetName).filter(Boolean).join(", ") || "-"}>
                                 {getBuildingsCosts(item)[0]?.costEstimationSheetName || "-"}
