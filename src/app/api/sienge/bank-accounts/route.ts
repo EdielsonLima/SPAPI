@@ -14,15 +14,34 @@ export async function GET() {
 
   try {
     // Sienge endpoint: GET /accounts-balances (Saldo de Contas Correntes)
-    const today = new Date().toISOString().split("T")[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-    const firstPage = await siengeGet<SiengeRawResponse>(
-      "/accounts-balances",
-      { date: today, offset: "0", limit: "100" }
-    );
+    // Try multiple param combinations since Sienge docs may vary
+    let firstPage: SiengeRawResponse = null;
+    const paramAttempts: Record<string, string>[] = [
+      { balanceDate: today, offset: "0", limit: "100" },
+      { date: today, offset: "0", limit: "100" },
+      { dataBase: today, offset: "0", limit: "100" },
+    ];
+
+    for (const params of paramAttempts) {
+      try {
+        firstPage = await siengeGet<SiengeRawResponse>("/accounts-balances", params);
+        console.log(`[accounts-balances] Success with params:`, JSON.stringify(params));
+        break;
+      } catch (err) {
+        console.log(`[accounts-balances] Failed with params ${JSON.stringify(params)}: ${err}`);
+        continue;
+      }
+    }
+
+    if (!firstPage) {
+      return NextResponse.json({ error: "All parameter combinations failed for /accounts-balances", data: [] });
+    }
 
     console.log("[accounts-balances] Raw response keys:", Object.keys(firstPage || {}));
-    console.log("[accounts-balances] Sample:", JSON.stringify(firstPage).substring(0, 1000));
+    console.log("[accounts-balances] Sample:", JSON.stringify(firstPage).substring(0, 1500));
 
     const results = firstPage?.results || firstPage?.data || (Array.isArray(firstPage) ? firstPage : []);
     const total = firstPage?.resultSetMetadata?.count || results.length;
@@ -31,10 +50,13 @@ export async function GET() {
     const allAccounts: any[] = [...results];
     let offset = results.length;
 
+    // Find which params worked
+    const workingParams = paramAttempts.find(() => firstPage !== null) || paramAttempts[0];
+
     while (offset < total) {
       const page = await siengeGet<SiengeRawResponse>(
         "/accounts-balances",
-        { date: today, offset: String(offset), limit: "100" }
+        { ...workingParams, offset: String(offset), limit: "100" }
       );
       const pageResults = page?.results || page?.data || [];
       if (pageResults.length === 0) break;
