@@ -279,6 +279,7 @@ export function ExecutiveDashboard() {
   });
   const [bankFees, setBankFees] = useState<SiengeBankMovement[]>([]);
   const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>([]);
+  const [allBankMovementsFull, setAllBankMovementsFull] = useState<SiengeBankMovement[]>([]);
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
@@ -370,6 +371,12 @@ export function ExecutiveDashboard() {
         );
         setBankFees(fees);
       }
+
+      // Fetch ALL bank movements (including linked to outcomes/incomes) for DRE Level 3 enrichment
+      fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N${refreshParam}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => { if (data) setAllBankMovementsFull(data.data || []); })
+        .catch(() => {});
 
       if (!incomeRes.ok) throw new Error("Income API error");
       const incomeData = await incomeRes.json();
@@ -3741,6 +3748,7 @@ export function ExecutiveDashboard() {
           outcomeItems={consistentItems}
           incomeItems={consistentIncome}
           bankFees={allBankMovements}
+          allBankMovements={allBankMovementsFull}
           selectedYears={selectedYears}
           selectedMonths={selectedMonths}
           selectedCompanies={selectedCompanies}

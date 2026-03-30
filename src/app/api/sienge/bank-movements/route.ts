@@ -18,9 +18,13 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get("startDate") || "2024-01-01";
   const endDate = searchParams.get("endDate") || new Date().toISOString().split("T")[0];
   const forceRefresh = searchParams.get("forceRefresh") === "true";
+  const detachedOnly = searchParams.get("detachedOnly") !== "N";
+  // Use different cache keys for detached-only vs all bank movements
+  const cacheStartDate = detachedOnly ? startDate : `all:${startDate}`;
+  const cacheEndDate = detachedOnly ? endDate : `all:${endDate}`;
 
   if (!forceRefresh) {
-    const cached = await getCachedBankMovements(startDate, endDate);
+    const cached = await getCachedBankMovements(cacheStartDate, cacheEndDate);
     if (cached) {
         const d = cached.data as Record<string, unknown>;
         return NextResponse.json({ ...d, cachedAt: cached.cachedAt });
@@ -32,14 +36,16 @@ export async function GET(request: NextRequest) {
   url.searchParams.set("startDate", startDate);
   url.searchParams.set("endDate", endDate);
   url.searchParams.set("selectionType", "M");
-  url.searchParams.set("onlyDetachedMovement", "S");
+  if (detachedOnly) {
+    url.searchParams.set("onlyDetachedMovement", "S");
+  }
 
   try {
     const response = await siengeBulkGet(url.toString(), authHeader);
 
     if (response.status === 404) {
       const empty = { data: [] };
-      await cacheBankMovements(startDate, endDate, empty);
+      await cacheBankMovements(cacheStartDate, cacheEndDate, empty);
       return NextResponse.json(empty);
     }
 
@@ -48,7 +54,7 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json();
-    await cacheBankMovements(startDate, endDate, data);
+    await cacheBankMovements(cacheStartDate, cacheEndDate, data);
     return NextResponse.json(data);
   } catch (error) {
     console.error("Error fetching bank movements:", error);

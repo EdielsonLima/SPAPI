@@ -29,6 +29,7 @@ interface DreTabProps {
   outcomeItems: SiengeOutcome[];
   incomeItems: SiengeIncome[];
   bankFees: SiengeBankMovement[];
+  allBankMovements?: SiengeBankMovement[];
   selectedYears: Set<string>;
   selectedMonths: Set<string>;
   selectedCompanies: Set<string>;
@@ -119,6 +120,7 @@ export function DreTab({
   outcomeItems,
   incomeItems,
   bankFees,
+  allBankMovements = [],
   selectedYears,
   selectedMonths,
   selectedCompanies,
@@ -288,6 +290,17 @@ export function DreTab({
       return true;
     };
 
+    // DRE ignores company filter (shows ALL companies to match Power BI)
+    // This filter is used for Level 3 enrichment from Sienge API data
+    const matchesDreFilters = (date: string) => {
+      if (!date) return false;
+      const year = date.substring(0, 4);
+      const month = date.substring(5, 7);
+      if (selectedYears.size > 0 && !selectedYears.has(year)) return false;
+      if (selectedMonths.size > 0 && !selectedMonths.has(month)) return false;
+      return true;
+    };
+
     // Helper: add Level 3 detail only (does NOT change Level 1+2 totals)
     const addDetailOnly = (dreCat: string, fcId: string, detailName: string, detailAmount: number) => {
       if (!accum[dreCat]?.accounts[fcId]) return;
@@ -315,11 +328,13 @@ export function DreTab({
       }
 
       // Step 2: Enrich Level 3 with Sienge details (creditor/client names)
+      // DRE ignores company filter — uses matchesDreFilters (year+month only)
       const excelFcIds = new Set(Object.keys(excelSupplementary));
+      const enrichedFcIds = new Set<string>(); // Track which fcIds got L3 details
 
       for (const item of outcomeItems) {
         for (const payment of (item.payments || [])) {
-          if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
+          if (!matchesDreFilters(payment.paymentDate)) continue;
           for (const pc of (item.paymentsCategories || [])) {
             const fcId = String(pc.financialCategoryId);
             if (!excelFcIds.has(fcId)) continue;
@@ -328,6 +343,7 @@ export function DreTab({
             const rate = (pc.financialCategoryRate || 100) / 100;
             const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
             addDetailOnly(dreCat, fcId, item.creditorName || "", payment.netAmount * rate * sign);
+            enrichedFcIds.add(fcId);
           }
         }
       }
@@ -338,7 +354,7 @@ export function DreTab({
         for (const payment of (item.payments || [])) {
           const amount = payment.netAmount || 0;
           if (amount <= 0) continue;
-          if (!matchesFilters(payment.paymentDate, item.companyName)) continue;
+          if (!matchesDreFilters(payment.paymentDate)) continue;
           for (const pc of pcs) {
             const fcId = String(pc.financialCategoryId);
             if (!excelFcIds.has(fcId)) continue;
@@ -346,13 +362,15 @@ export function DreTab({
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
             addDetailOnly(dreCat, fcId, item.clientName || "", amount * rate);
+            enrichedFcIds.add(fcId);
           }
         }
       }
 
+      // Use detached bank movements for all fcIds
       for (const bm of bankFees) {
         if (!bm.bankMovementDate) continue;
-        if (!matchesFilters(bm.bankMovementDate, bm.companyName)) continue;
+        if (!matchesDreFilters(bm.bankMovementDate)) continue;
         for (const fc of (bm.financialCategories || [])) {
           const fcId = String(fc.financialCategoryId);
           if (!excelFcIds.has(fcId)) continue;
@@ -360,6 +378,23 @@ export function DreTab({
           if (!dreCat) continue;
           const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
           addDetailOnly(dreCat, fcId, "Movimento Bancario", Math.abs(bm.bankMovementAmount) * sign);
+          enrichedFcIds.add(fcId);
+        }
+      }
+
+      // Use ALL bank movements (including linked) as fallback for fcIds not yet enriched
+      for (const bm of allBankMovements) {
+        if (!bm.bankMovementDate) continue;
+        if (!matchesDreFilters(bm.bankMovementDate)) continue;
+        for (const fc of (bm.financialCategories || [])) {
+          const fcId = String(fc.financialCategoryId);
+          if (enrichedFcIds.has(fcId)) continue; // Already enriched from outcome/income/detached
+          if (!excelFcIds.has(fcId)) continue;
+          const dreCat = excelFcToDre[fcId] || fcToDre[fcId];
+          if (!dreCat) continue;
+          const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
+          const detailName = fc.financialCategoryName || "Movimento Bancario";
+          addDetailOnly(dreCat, fcId, detailName, Math.abs(bm.bankMovementAmount) * (fc.financialCategoryRate / 100) * sign);
         }
       }
     } else {
@@ -427,7 +462,7 @@ export function DreTab({
     };
 
     return { accum, calculated, receitaOperacional: accum.receita_operacional.total };
-  }, [dreMappings, outcomeItems, incomeItems, bankFees, selectedYears, selectedMonths, selectedCompanies, excelSupplementary]);
+  }, [dreMappings, outcomeItems, incomeItems, bankFees, allBankMovements, selectedYears, selectedMonths, selectedCompanies, excelSupplementary]);
 
   if (loadingMappings) {
     return (
