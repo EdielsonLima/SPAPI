@@ -37,6 +37,7 @@ import {
   BarChart3,
   Handshake,
   LayoutGrid,
+  Landmark,
 } from "lucide-react";
 import {
   BarChart,
@@ -57,7 +58,7 @@ import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
 type Section = "cp" | "cr";
-type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre";
+type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "saldos";
 type ChartView = "mensal" | "anual";
 
 // === Reusable Multi-Select Filter ===
@@ -280,6 +281,9 @@ export function ExecutiveDashboard() {
   const [bankFees, setBankFees] = useState<SiengeBankMovement[]>([]);
   const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>([]);
   const [allBankMovementsFull, setAllBankMovementsFull] = useState<SiengeBankMovement[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<{ bankAccountId: number; bankAccountDescription: string; bankCode: string; bankName: string; agencyNumber: string; accountNumber: string; companyId: number; companyName: string; currentBalance: number }[]>([]);
+  const [loadingBankAccounts, setLoadingBankAccounts] = useState(false);
+  const [expandedBankCompanies, setExpandedBankCompanies] = useState<Set<string>>(new Set());
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
@@ -394,6 +398,20 @@ export function ExecutiveDashboard() {
   }, [currentYear]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Fetch bank accounts when saldos tab is active
+  useEffect(() => {
+    if (activeTab !== "saldos" || bankAccounts.length > 0) return;
+    setLoadingBankAccounts(true);
+    fetch("/api/sienge/bank-accounts")
+      .then(res => res.json())
+      .then(json => {
+        if (json.data) setBankAccounts(json.data);
+      })
+      .catch(() => toast.error("Erro ao carregar saldos bancarios"))
+      .finally(() => setLoadingBankAccounts(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   useEffect(() => {
     fetch("/api/bill-exclusions")
@@ -1495,6 +1513,7 @@ export function ExecutiveDashboard() {
     orcamento: [],
     comercial: [],
     dre: [],
+    saldos: [],
   };
 
   const kpis = kpiConfigs[activeTab];
@@ -1637,10 +1656,24 @@ export function ExecutiveDashboard() {
               <BarChart3 className="h-3.5 w-3.5" />
               DRE
             </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                setActiveTab("saldos");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "saldos"
+                  ? "bg-white text-indigo-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <Landmark className="h-3.5 w-3.5" />
+              Saldos
+            </button>
           </div>
 
           {/* Tabs */}
-          {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && <Tabs value={activeTab} onValueChange={v => {
+          {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             setActiveTab(tab);
             // Only reset time-based filters, keep company, docType and year selections stable
@@ -3753,6 +3786,173 @@ export function ExecutiveDashboard() {
           selectedMonths={selectedMonths}
           selectedCompanies={selectedCompanies}
         />
+      )}
+
+      {/* ══════ SALDOS BANCÁRIOS TAB ══════ */}
+      {activeTab === "saldos" && (
+        <div className="space-y-6">
+          {loadingBankAccounts ? (
+            <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span className="text-sm">Carregando saldos bancarios...</span>
+            </div>
+          ) : (() => {
+            // Group by company
+            const byCompany: Record<string, { companyName: string; accounts: typeof bankAccounts }> = {};
+            for (const acc of bankAccounts) {
+              const key = acc.companyName || `Empresa ${acc.companyId}`;
+              if (!byCompany[key]) byCompany[key] = { companyName: key, accounts: [] };
+              byCompany[key].accounts.push(acc);
+            }
+            const companies = Object.values(byCompany).sort((a, b) => {
+              const totalA = a.accounts.reduce((s, ac) => s + ac.currentBalance, 0);
+              const totalB = b.accounts.reduce((s, ac) => s + ac.currentBalance, 0);
+              return totalB - totalA;
+            });
+            const grandTotal = bankAccounts.reduce((s, a) => s + a.currentBalance, 0);
+
+            // Chart data
+            const chartData = companies.map(c => ({
+              name: c.companyName.length > 20 ? c.companyName.substring(0, 20) + "..." : c.companyName,
+              fullName: c.companyName,
+              value: c.accounts.reduce((s, a) => s + a.currentBalance, 0),
+            }));
+
+            const COLORS = ["#6366f1", "#8b5cf6", "#a78bfa", "#818cf8", "#7c3aed", "#6d28d9", "#5b21b6", "#4c1d95", "#c4b5fd", "#ddd6fe"];
+
+            return (
+              <>
+                {/* KPI Card */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <Card className="border-indigo-200/60 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                    <CardContent className="p-5">
+                      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-600 rounded-t-xl" />
+                      <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">Saldo Total</p>
+                      <p className="text-3xl font-black tabular-nums text-slate-800 dark:text-slate-100">
+                        {formatCurrency(grandTotal)}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{bankAccounts.length} contas em {companies.length} empresas</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  {/* Bar Chart */}
+                  <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Saldo por Empresa</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 80, top: 5, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                            <XAxis type="number" tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11 }} />
+                            <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 11 }} />
+                            <RechartsTooltip
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              formatter={(value: any) => formatCurrency(Number(value))}
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              labelFormatter={(label: any) => {
+                                const s = String(label);
+                                const item = chartData.find(d => d.name === s);
+                                return item?.fullName || s;
+                              }}
+                            />
+                            <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                              {chartData.map((_entry, index) => (
+                                <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                              {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                              <LabelList dataKey="value" position="right" formatter={(v: any) => formatCompactCurrency(Number(v))} style={{ fontSize: 11, fontWeight: 600 }} />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Table */}
+                  <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Contas por Empresa</CardTitle>
+                      <CardDescription className="text-xs text-slate-500">Clique na empresa para ver as contas</CardDescription>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader className="bg-slate-800 text-slate-100">
+                          <TableRow>
+                            <TableHead className="text-slate-200 text-xs w-[40px]" />
+                            <TableHead className="text-slate-200 text-xs">Empresa</TableHead>
+                            <TableHead className="text-slate-200 text-xs text-right">Saldo Atual</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {companies.map((company) => {
+                            const companyTotal = company.accounts.reduce((s, a) => s + a.currentBalance, 0);
+                            const isExpanded = expandedBankCompanies.has(company.companyName);
+                            return (
+                              <React.Fragment key={company.companyName}>
+                                <TableRow
+                                  className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+                                  onClick={() => {
+                                    setExpandedBankCompanies(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(company.companyName)) next.delete(company.companyName);
+                                      else next.add(company.companyName);
+                                      return next;
+                                    });
+                                  }}
+                                >
+                                  <TableCell className="w-[40px] px-2">
+                                    {isExpanded
+                                      ? <ChevronDown className="h-4 w-4 text-slate-400" />
+                                      : <ChevronRight className="h-4 w-4 text-slate-400" />
+                                    }
+                                  </TableCell>
+                                  <TableCell className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    {company.companyName}
+                                  </TableCell>
+                                  <TableCell className={`text-sm font-bold text-right tabular-nums ${companyTotal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-300/60"}`}>
+                                    {formatCurrency(companyTotal)}
+                                  </TableCell>
+                                </TableRow>
+                                {isExpanded && company.accounts
+                                  .sort((a, b) => b.currentBalance - a.currentBalance)
+                                  .map(acc => (
+                                    <TableRow key={acc.bankAccountId} className="bg-slate-50/50 dark:bg-slate-800/50">
+                                      <TableCell />
+                                      <TableCell className="text-xs text-slate-500 dark:text-slate-400 pl-8">
+                                        <span className="font-medium text-slate-600 dark:text-slate-300">{acc.bankName || acc.bankAccountDescription}</span>
+                                        {acc.agencyNumber && <span className="ml-2 text-slate-400">Ag: {acc.agencyNumber}</span>}
+                                        {acc.accountNumber && <span className="ml-2 text-slate-400">Cc: {acc.accountNumber}</span>}
+                                      </TableCell>
+                                      <TableCell className={`text-xs font-semibold text-right tabular-nums ${acc.currentBalance >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500 dark:text-red-300/60"}`}>
+                                        {formatCurrency(acc.currentBalance)}
+                                      </TableCell>
+                                    </TableRow>
+                                  ))
+                                }
+                              </React.Fragment>
+                            );
+                          })}
+                          {/* Total row */}
+                          <TableRow className="bg-indigo-50 dark:bg-indigo-950/40 border-t-2 border-indigo-200 dark:border-indigo-800">
+                            <TableCell />
+                            <TableCell className="text-sm font-bold text-indigo-700 dark:text-indigo-300">Total</TableCell>
+                            <TableCell className="text-sm font-black text-right tabular-nums text-indigo-700 dark:text-indigo-300">
+                              {formatCurrency(grandTotal)}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
+            );
+          })()}
+        </div>
       )}
 
     </div>
