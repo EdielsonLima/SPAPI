@@ -284,6 +284,16 @@ export function ExecutiveDashboard() {
   const [bankAccounts, setBankAccounts] = useState<{ bankAccountId: number; bankAccountDescription: string; bankCode: string; bankName: string; agencyNumber: string; accountNumber: string; companyId: number; companyName: string; currentBalance: number }[]>([]);
   const [loadingBankAccounts, setLoadingBankAccounts] = useState(false);
   const [expandedBankCompanies, setExpandedBankCompanies] = useState<Set<string>>(new Set());
+  const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("dashboard_saldos_accounts");
+      if (saved) return new Set(JSON.parse(saved));
+    }
+    return new Set<string>(); // empty = all selected (will be initialized after fetch)
+  });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [bankAccountsInitialized, setBankAccountsInitialized] = useState(false);
+  const [bankAccountSearch, setBankAccountSearch] = useState("");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
@@ -410,6 +420,14 @@ export function ExecutiveDashboard() {
       .then(json => {
         if (json.data && json.data.length > 0) {
           setBankAccounts(json.data);
+          // Initialize selected accounts if not saved before
+          const saved = localStorage.getItem("dashboard_saldos_accounts");
+          if (!saved) {
+            // Default: select all accounts
+            const allNums = new Set<string>(json.data.map((a: { accountNumber: string }) => a.accountNumber));
+            setSelectedBankAccounts(allNums);
+          }
+          setBankAccountsInitialized(true);
         } else if (json.error) {
           console.error("Bank accounts API error:", json.error, json.details);
           toast.error("Erro na API de saldos: " + (json.details || json.error));
@@ -3801,6 +3819,7 @@ export function ExecutiveDashboard() {
       )}
 
       {/* ══════ SALDOS BANCÁRIOS TAB ══════ */}
+      {/* ══════ SALDOS BANCÁRIOS TAB ══════ */}
       {activeTab === "saldos" && (
         <div className="space-y-6">
           {loadingBankAccounts ? (
@@ -3809,9 +3828,14 @@ export function ExecutiveDashboard() {
               <span className="text-sm">Carregando saldos bancarios...</span>
             </div>
           ) : (() => {
+            // All unique account numbers for filter
+            const allAccountNums = Array.from(new Set(bankAccounts.map(a => a.accountNumber))).sort();
+            const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
+            const filteredAccounts = bankAccounts.filter(a => effectiveSelected.has(a.accountNumber));
+
             // Group by company
             const byCompany: Record<string, { companyName: string; accounts: typeof bankAccounts }> = {};
-            for (const acc of bankAccounts) {
+            for (const acc of filteredAccounts) {
               const key = acc.companyName || `Empresa ${acc.companyId}`;
               if (!byCompany[key]) byCompany[key] = { companyName: key, accounts: [] };
               byCompany[key].accounts.push(acc);
@@ -3821,7 +3845,8 @@ export function ExecutiveDashboard() {
               const totalB = b.accounts.reduce((s, ac) => s + ac.currentBalance, 0);
               return totalB - totalA;
             });
-            const grandTotal = bankAccounts.reduce((s, a) => s + a.currentBalance, 0);
+            const grandTotal = filteredAccounts.reduce((s, a) => s + a.currentBalance, 0);
+            const filteredSearch = bankAccountSearch.toLowerCase();
 
             // Chart data
             const chartData = companies.map(c => ({
@@ -3834,16 +3859,118 @@ export function ExecutiveDashboard() {
 
             return (
               <>
+                {/* Filter bar */}
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Account filter */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2 h-9 text-xs">
+                        <Landmark className="h-3.5 w-3.5" />
+                        Contas
+                        {selectedBankAccounts.size > 0 && selectedBankAccounts.size < allAccountNums.length && (
+                          <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">{selectedBankAccounts.size}</Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-80 p-0" align="start">
+                      <div className="p-3 border-b">
+                        <div className="relative">
+                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="Buscar conta..."
+                            className="w-full pl-8 pr-3 py-2 text-xs border rounded-md bg-background"
+                            value={bankAccountSearch}
+                            onChange={e => setBankAccountSearch(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      <div className="max-h-[300px] overflow-y-auto p-2">
+                        <div className="flex items-center gap-2 px-2 py-1.5 border-b mb-1">
+                          <Checkbox
+                            checked={selectedBankAccounts.size === allAccountNums.length || selectedBankAccounts.size === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelectedBankAccounts(new Set(allAccountNums));
+                              else setSelectedBankAccounts(new Set());
+                            }}
+                          />
+                          <span className="text-xs font-semibold">Selecionar tudo</span>
+                          <Badge variant="secondary" className="ml-auto text-[10px]">{allAccountNums.length}</Badge>
+                        </div>
+                        {allAccountNums
+                          .filter(num => {
+                            if (!filteredSearch) return true;
+                            const acc = bankAccounts.find(a => a.accountNumber === num);
+                            const label = acc ? `${acc.bankAccountDescription} ${acc.accountNumber} ${acc.companyName}` : num;
+                            return label.toLowerCase().includes(filteredSearch);
+                          })
+                          .map(num => {
+                            const acc = bankAccounts.find(a => a.accountNumber === num);
+                            const label = acc?.bankAccountDescription || `Conta ${num}`;
+                            const company = acc?.companyName || "";
+                            return (
+                              <div key={num} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
+                                <Checkbox
+                                  checked={effectiveSelected.has(num)}
+                                  onCheckedChange={(checked) => {
+                                    setSelectedBankAccounts(prev => {
+                                      const next = new Set(prev.size === 0 ? allAccountNums : prev);
+                                      if (checked) next.add(num);
+                                      else next.delete(num);
+                                      return next;
+                                    });
+                                  }}
+                                />
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-xs font-medium truncate">{label}</span>
+                                  <span className="text-[10px] text-slate-400 truncate">{company} - {num}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                      <div className="p-2 border-t flex justify-end">
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => {
+                            localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(selectedBankAccounts)));
+                            toast.success("Padrao de contas salvo!");
+                          }}
+                        >
+                          <Save className="h-3 w-3" />
+                          Salvar padrao
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    Saldo do dia: <span className="font-semibold text-slate-700 dark:text-slate-200">{new Date().toLocaleDateString("pt-BR")}</span>
+                  </span>
+
+                  {selectedBankAccounts.size > 0 && selectedBankAccounts.size < allAccountNums.length && (
+                    <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500" onClick={() => setSelectedBankAccounts(new Set(allAccountNums))}>
+                      <X className="h-3 w-3 mr-1" /> Limpar filtro
+                    </Button>
+                  )}
+                </div>
+
                 {/* KPI Card */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <Card className="border-indigo-200/60 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                    <CardContent className="p-5">
-                      <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-600 rounded-t-xl" />
+                  <Card className="relative border-indigo-200/60 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-600" />
+                    <CardContent className="p-5 pt-6">
                       <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">Saldo Total</p>
-                      <p className="text-3xl font-black tabular-nums text-slate-800 dark:text-slate-100">
+                      <p className={`text-3xl font-black tabular-nums ${grandTotal >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-300/70"}`}>
                         {formatCurrency(grandTotal)}
                       </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{bankAccounts.length} contas em {companies.length} empresas</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        {filteredAccounts.length} contas em {companies.length} empresas
+                        {selectedBankAccounts.size > 0 && selectedBankAccounts.size < allAccountNums.length && (
+                          <span className="ml-1 text-indigo-500">({allAccountNums.length - selectedBankAccounts.size} excluídas)</span>
+                        )}
+                      </p>
                     </CardContent>
                   </Card>
                 </div>
