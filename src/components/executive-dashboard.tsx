@@ -281,7 +281,7 @@ export function ExecutiveDashboard() {
   const [bankFees, setBankFees] = useState<SiengeBankMovement[]>([]);
   const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>([]);
   const [allBankMovementsFull, setAllBankMovementsFull] = useState<SiengeBankMovement[]>([]);
-  const [bankAccounts, setBankAccounts] = useState<{ bankAccountId: number; bankAccountDescription: string; bankCode: string; bankName: string; agencyNumber: string; accountNumber: string; companyId: number; companyName: string; currentBalance: number }[]>([]);
+  const [bankAccounts, setBankAccounts] = useState<{ bankAccountId: number; bankAccountDescription: string; bankCode: string; bankName: string; agencyNumber: string; accountNumber: string; companyId: number; companyName: string; currentBalance: number; isInDimBanco?: boolean }[]>([]);
   const [loadingBankAccounts, setLoadingBankAccounts] = useState(false);
   const [expandedBankCompanies, setExpandedBankCompanies] = useState<Set<string>>(new Set());
   const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(() => {
@@ -423,9 +423,15 @@ export function ExecutiveDashboard() {
           // Initialize selected accounts if not saved before
           const saved = localStorage.getItem("dashboard_saldos_accounts");
           if (!saved) {
-            // Default: select all accounts
-            const allNums = new Set<string>(json.data.map((a: { accountNumber: string }) => a.accountNumber));
-            setSelectedBankAccounts(allNums);
+            // Default: select only accounts that are in DimBanco (valid accounts)
+            const validNums = new Set<string>(
+              json.data
+                .filter((a: { isInDimBanco?: boolean }) => a.isInDimBanco)
+                .map((a: { accountNumber: string }) => a.accountNumber)
+            );
+            setSelectedBankAccounts(validNums);
+            // Auto-save so it persists
+            localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(validNums)));
           }
           setBankAccountsInitialized(true);
         } else if (json.error) {
@@ -3913,7 +3919,6 @@ export function ExecutiveDashboard() {
                           .map(num => {
                             const acc = bankAccounts.find(a => a.accountNumber === num);
                             const company = acc?.companyName || "";
-                            const bankDesc = acc?.bankName || acc?.bankAccountDescription || "";
                             return (
                               <div key={num} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
                                 <Checkbox
@@ -3928,8 +3933,10 @@ export function ExecutiveDashboard() {
                                   }}
                                 />
                                 <div className="flex flex-col min-w-0 flex-1">
-                                  <span className="text-xs font-bold font-mono truncate">{num}</span>
-                                  <span className="text-[10px] text-slate-400 truncate">{company}{bankDesc ? ` - ${bankDesc}` : ""}</span>
+                                  <span className="text-xs font-medium truncate">
+                                    {acc?.bankName ? <span className="font-semibold">{acc.bankName}</span> : <span className="font-mono">{num}</span>}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 truncate">{company} - {num}</span>
                                 </div>
                                 <span className={`text-[10px] font-semibold tabular-nums flex-shrink-0 ${(acc?.currentBalance ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
                                   {formatCompactCurrency(acc?.currentBalance ?? 0)}

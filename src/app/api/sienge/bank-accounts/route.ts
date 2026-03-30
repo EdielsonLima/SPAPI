@@ -6,6 +6,31 @@ import { siengeGet } from "@/lib/sienge";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type R = any;
 
+// Mapping: accountNumber → bankName (from Power BI DimBanco)
+const BANK_NAMES: Record<string, string> = {
+  "570920-2": "Banco XP",
+  "A0257918-9": "Aplicação Bradesco",
+  "275226-3": "Banco do Brasil",
+  "0257918-9": "Banco Bradesco",
+  "2261-8": "Caixa Econômica",
+  "CAIXA": "Cash",
+  "479-0": "Banco do Brasil",
+  "490-1": "Banco do Brasil",
+  "487-1": "Banco do Brasil",
+  "274-7": "Banco do Brasil",
+  "276-3": "Banco do Brasil",
+  "277-1": "Banco do Brasil",
+  "572226-0": "Banco XP",
+  "5370-8": "Banco do Brasil",
+  "5026-3": "Caixa Econômica",
+  "0241711-1": "Banco Bradesco",
+  "00483730-8": "BTG Pactual - CH",
+  "00910779-3": "BTG Pactual - JP",
+};
+
+// Set of valid accounts from DimBanco
+const VALID_ACCOUNTS = new Set(Object.keys(BANK_NAMES));
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -37,55 +62,22 @@ export async function GET() {
       (cd?.results || []).forEach((c: R) => { companiesMap[c.id] = c.name; });
     } catch { /* ignore */ }
 
-    // 3. Fetch bank account details for EVERY unique account via their link
-    const bankAccountDetails: Record<string, { bankName: string; agencyNumber: string; description: string }> = {};
-
-    // Collect unique links
-    const linkMap = new Map<string, string>(); // accountNumber -> link href
-    for (const acc of allAccounts) {
-      const bankLink = (acc.links || []).find((l: R) => l.rel === "bank-account");
-      if (bankLink?.href && acc.accountNumber) {
-        linkMap.set(acc.accountNumber, bankLink.href);
-      }
-    }
-
-    // Fetch details in batches of 5 to avoid rate limits
-    const entries = Array.from(linkMap.entries());
-    for (let i = 0; i < entries.length; i += 5) {
-      const batch = entries.slice(i, i + 5);
-      const promises = batch.map(async ([accNum, link]) => {
-        try {
-          const urlPath = new URL(link).pathname.replace(/.*\/public\/api\/v1/, "");
-          const detail = await siengeGet<R>(urlPath);
-          if (i === 0) console.log(`[bank-account-detail] ${accNum}:`, JSON.stringify(detail).substring(0, 500));
-          bankAccountDetails[accNum] = {
-            bankName: detail?.bankName || detail?.bank?.name || detail?.bankDescription || detail?.name || "",
-            agencyNumber: detail?.agencyNumber || detail?.agency || "",
-            description: detail?.description || detail?.bankAccountDescription || detail?.name || "",
-          };
-        } catch { /* skip */ }
-      });
-      await Promise.all(promises);
-    }
-
-    console.log(`[accounts-balances] ${allAccounts.length} accounts, ${Object.keys(bankAccountDetails).length} with details`);
-
-    // 4. Map to normalized structure
+    // 3. Map to normalized structure with bank names from DimBanco
     const enriched = allAccounts.map((acc: R) => {
       const accNum = acc.accountNumber || "";
-      const detail = bankAccountDetails[accNum];
       return {
         bankAccountId: accNum,
-        bankAccountDescription: detail?.description || `Conta ${accNum}`,
+        bankAccountDescription: accNum,
         bankCode: "",
-        bankName: detail?.bankName || "",
-        agencyNumber: detail?.agencyNumber || "",
+        bankName: BANK_NAMES[accNum] || "",
+        agencyNumber: "",
         accountNumber: accNum,
         companyId: acc.companyId || 0,
         companyName: companiesMap[acc.companyId] || `Empresa ${acc.companyId}`,
         currentBalance: acc.amount ?? 0,
         reconciledAmount: acc.reconciledAmount ?? 0,
         accountStatus: acc.accountStatus || "",
+        isInDimBanco: VALID_ACCOUNTS.has(accNum),
       };
     });
 
