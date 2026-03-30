@@ -293,7 +293,6 @@ export function ExecutiveDashboard() {
   });
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [bankAccountsInitialized, setBankAccountsInitialized] = useState(false);
-  const [bankAccountSearch, setBankAccountSearch] = useState("");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
@@ -3834,17 +3833,15 @@ export function ExecutiveDashboard() {
               <span className="text-sm">Carregando saldos bancarios...</span>
             </div>
           ) : (() => {
-            // All unique account numbers for the filter (always from ALL accounts)
-            const allAccountNums = Array.from(new Set(bankAccounts.map(a => a.accountNumber))).sort();
-            const allSelected = allAccountNums.length > 0 && allAccountNums.every(n => selectedBankAccounts.has(n));
+            // Account list filtered by selected companies (if any)
+            const companyFilteredAccounts = selectedCompanies.size > 0
+              ? bankAccounts.filter(a => selectedCompanies.has(a.companyName))
+              : bankAccounts;
+            const allAccountNums = Array.from(new Set(companyFilteredAccounts.map(a => a.accountNumber))).sort();
             const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
 
-            // Apply both company filter AND account filter
-            const filteredAccounts = bankAccounts.filter(a => {
-              if (!effectiveSelected.has(a.accountNumber)) return false;
-              if (selectedCompanies.size > 0 && !selectedCompanies.has(a.companyName)) return false;
-              return true;
-            });
+            // Apply account filter on company-filtered set
+            const filteredAccounts = companyFilteredAccounts.filter(a => effectiveSelected.has(a.accountNumber));
 
             // Group by company
             const byCompany: Record<string, { companyName: string; accounts: typeof bankAccounts }> = {};
@@ -3859,7 +3856,6 @@ export function ExecutiveDashboard() {
               return totalB - totalA;
             });
             const grandTotal = filteredAccounts.reduce((s, a) => s + a.currentBalance, 0);
-            const filteredSearch = bankAccountSearch.toLowerCase();
 
             // Chart data
             const chartData = companies.map(c => ({
@@ -3874,108 +3870,37 @@ export function ExecutiveDashboard() {
               <>
                 {/* Filter bar */}
                 <div className="flex flex-wrap items-center gap-3">
-                  {/* Account filter */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="outline" size="sm" className="gap-2 h-9 text-xs">
-                        <Landmark className="h-3.5 w-3.5" />
-                        Contas
-                        {selectedBankAccounts.size > 0 && selectedBankAccounts.size < allAccountNums.length && (
-                          <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">{selectedBankAccounts.size}</Badge>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-80 p-0" align="start">
-                      <div className="p-3 border-b">
-                        <div className="relative">
-                          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
-                          <input
-                            type="text"
-                            placeholder="Buscar conta..."
-                            className="w-full pl-8 pr-3 py-2 text-xs border rounded-md bg-background"
-                            value={bankAccountSearch}
-                            onChange={e => setBankAccountSearch(e.target.value)}
-                          />
-                        </div>
-                      </div>
-                      <div className="max-h-[300px] overflow-y-auto p-2">
-                        <div
-                          className="flex items-center gap-2 px-2 py-1.5 border-b mb-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded"
-                          onClick={() => {
-                            if (allSelected) {
-                              setSelectedBankAccounts(new Set<string>());
-                            } else {
-                              setSelectedBankAccounts(new Set(allAccountNums));
-                            }
-                          }}
-                        >
-                          <div className={`h-4 w-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${allSelected ? "bg-primary border-primary" : "border-slate-300 dark:border-slate-600"}`}>
-                            {allSelected && <span className="text-white text-[10px] font-bold">✓</span>}
-                          </div>
-                          <span className="text-xs font-semibold">{allSelected ? "Desmarcar tudo" : "Selecionar tudo"}</span>
-                          <Badge variant="secondary" className="ml-auto text-[10px]">{allAccountNums.length}</Badge>
-                        </div>
-                        {allAccountNums
-                          .filter(num => {
-                            if (!filteredSearch) return true;
-                            const acc = bankAccounts.find(a => a.accountNumber === num);
-                            const searchStr = acc ? `${acc.accountNumber} ${acc.bankAccountDescription} ${acc.bankName} ${acc.companyName}` : num;
-                            return searchStr.toLowerCase().includes(filteredSearch);
-                          })
-                          .map(num => {
-                            const acc = bankAccounts.find(a => a.accountNumber === num);
-                            const company = acc?.companyName || "";
-                            return (
-                              <div key={num} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
-                                <Checkbox
-                                  checked={effectiveSelected.has(num)}
-                                  onCheckedChange={(checked) => {
-                                    setSelectedBankAccounts(prev => {
-                                      const next = new Set(prev.size === 0 ? allAccountNums : prev);
-                                      if (checked) next.add(num);
-                                      else next.delete(num);
-                                      return next;
-                                    });
-                                  }}
-                                />
-                                <div className="flex flex-col min-w-0 flex-1">
-                                  <span className="text-xs font-medium truncate">
-                                    {acc?.bankName ? <span className="font-semibold">{acc.bankName}</span> : <span className="font-mono">{num}</span>}
-                                  </span>
-                                  <span className="text-[10px] text-slate-400 truncate">{company} - {num}</span>
-                                </div>
-                                <span className={`text-[10px] font-semibold tabular-nums flex-shrink-0 ${(acc?.currentBalance ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                                  {formatCompactCurrency(acc?.currentBalance ?? 0)}
-                                </span>
-                              </div>
-                            );
-                          })}
-                      </div>
-                      <div className="p-2 border-t flex justify-end">
-                        <Button
-                          size="sm"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => {
-                            localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(selectedBankAccounts)));
-                            toast.success("Padrao de contas salvo!");
-                          }}
-                        >
-                          <Save className="h-3 w-3" />
-                          Salvar padrao
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  {/* Account filter - uses same MultiSelectFilter as Empresas */}
+                  <MultiSelectFilter
+                    label="Contas"
+                    icon={<Landmark className="h-3.5 w-3.5" />}
+                    allOptions={allAccountNums}
+                    selected={selectedBankAccounts}
+                    onToggle={(num) => {
+                      setSelectedBankAccounts(prev => {
+                        const next = new Set(prev);
+                        if (next.has(num)) next.delete(num);
+                        else next.add(num);
+                        return next;
+                      });
+                    }}
+                    onSelectAll={() => setSelectedBankAccounts(new Set(allAccountNums))}
+                    onClear={() => setSelectedBankAccounts(new Set())}
+                    activeColor="indigo"
+                    labelFn={(num) => {
+                      const acc = bankAccounts.find(a => a.accountNumber === num);
+                      if (acc?.bankName) return `${acc.bankName} (${num})`;
+                      return num;
+                    }}
+                    onSaveDefault={() => {
+                      localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(selectedBankAccounts)));
+                      toast.success("Padrao de contas salvo!");
+                    }}
+                  />
 
                   <span className="text-xs text-slate-500 dark:text-slate-400">
                     Saldo do dia: <span className="font-semibold text-slate-700 dark:text-slate-200">{new Date().toLocaleDateString("pt-BR")}</span>
                   </span>
-
-                  {selectedBankAccounts.size > 0 && selectedBankAccounts.size < allAccountNums.length && (
-                    <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500" onClick={() => setSelectedBankAccounts(new Set(allAccountNums))}>
-                      <X className="h-3 w-3 mr-1" /> Limpar filtro
-                    </Button>
-                  )}
                 </div>
 
                 {/* KPI Card */}
