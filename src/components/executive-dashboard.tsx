@@ -3828,10 +3828,15 @@ export function ExecutiveDashboard() {
               <span className="text-sm">Carregando saldos bancarios...</span>
             </div>
           ) : (() => {
-            // All unique account numbers for filter
-            const allAccountNums = Array.from(new Set(bankAccounts.map(a => a.accountNumber))).sort();
+            // Apply company filter first
+            const companyFiltered = selectedCompanies.size > 0
+              ? bankAccounts.filter(a => selectedCompanies.has(a.companyName))
+              : bankAccounts;
+
+            // All unique account numbers for filter (from company-filtered set)
+            const allAccountNums = Array.from(new Set(companyFiltered.map(a => a.accountNumber))).sort();
             const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
-            const filteredAccounts = bankAccounts.filter(a => effectiveSelected.has(a.accountNumber));
+            const filteredAccounts = companyFiltered.filter(a => effectiveSelected.has(a.accountNumber));
 
             // Group by company
             const byCompany: Record<string, { companyName: string; accounts: typeof bankAccounts }> = {};
