@@ -400,15 +400,27 @@ export function ExecutiveDashboard() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   // Fetch bank accounts when saldos tab is active
+  const bankAccountsLoaded = useRef(false);
   useEffect(() => {
-    if (activeTab !== "saldos" || bankAccounts.length > 0) return;
+    if (activeTab !== "saldos" || bankAccountsLoaded.current) return;
+    bankAccountsLoaded.current = true;
     setLoadingBankAccounts(true);
     fetch("/api/sienge/bank-accounts")
       .then(res => res.json())
       .then(json => {
-        if (json.data) setBankAccounts(json.data);
+        if (json.data && json.data.length > 0) {
+          setBankAccounts(json.data);
+        } else if (json.error) {
+          console.error("Bank accounts API error:", json.error, json.details);
+          toast.error("Erro na API de saldos: " + (json.details || json.error));
+          bankAccountsLoaded.current = false; // allow retry
+        }
       })
-      .catch(() => toast.error("Erro ao carregar saldos bancarios"))
+      .catch((err) => {
+        toast.error("Erro ao carregar saldos bancarios");
+        console.error(err);
+        bankAccountsLoaded.current = false;
+      })
       .finally(() => setLoadingBankAccounts(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
