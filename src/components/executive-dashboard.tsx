@@ -72,6 +72,7 @@ function MultiSelectFilter({
   onClear,
   activeColor = "blue",
   labelFn,
+  subtitleFn,
   onSaveDefault,
 }: {
   label: string;
@@ -83,6 +84,7 @@ function MultiSelectFilter({
   onClear: () => void;
   activeColor?: string;
   labelFn?: (value: string) => string;
+  subtitleFn?: (value: string) => string;
   onSaveDefault?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -94,7 +96,12 @@ function MultiSelectFilter({
   const filtered = useMemo(() => {
     if (!search) return allOptions;
     const q = search.toLowerCase();
-    return allOptions.filter(n => getLabel(n).toLowerCase().includes(q) || n.toLowerCase().includes(q));
+    return allOptions.filter(n => {
+      if (getLabel(n).toLowerCase().includes(q) || n.toLowerCase().includes(q)) return true;
+      if (subtitleFn && subtitleFn(n).toLowerCase().includes(q)) return true;
+      return false;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allOptions, search]);
 
   const allSelected = selected.size === allOptions.length && allOptions.length > 0;
@@ -163,7 +170,10 @@ function MultiSelectFilter({
                   checked={selected.has(name)}
                   onCheckedChange={() => onToggle(name)}
                 />
-                <span className="truncate">{getLabel(name)}</span>
+                <div className="min-w-0 flex-1">
+                  <span className="truncate block">{getLabel(name)}</span>
+                  {subtitleFn && <span className="text-[10px] text-slate-400 truncate block">{subtitleFn(name)}</span>}
+                </div>
               </label>
             ))
           )}
@@ -3891,6 +3901,10 @@ export function ExecutiveDashboard() {
                       const acc = bankAccounts.find(a => a.accountNumber === num);
                       if (acc?.bankName) return `${acc.bankName} (${num})`;
                       return num;
+                    }}
+                    subtitleFn={(num) => {
+                      const acc = bankAccounts.find(a => a.accountNumber === num);
+                      return acc?.companyName || "";
                     }}
                     onSaveDefault={() => {
                       localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(selectedBankAccounts)));

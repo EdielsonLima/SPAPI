@@ -28,8 +28,18 @@ const BANK_NAMES: Record<string, string> = {
   "00910779-3": "BTG Pactual - JP",
 };
 
-// Set of valid accounts from DimBanco
-const VALID_ACCOUNTS = new Set(Object.keys(BANK_NAMES));
+// Accounts that are only valid for specific companies (companyId)
+// CAIXA exists in all companies but only Silva Packer (companyId=1) should be in DimBanco
+const COMPANY_RESTRICTED_ACCOUNTS: Record<string, number> = {
+  "CAIXA": 1, // Only Silva Packer
+};
+
+function isInDimBanco(accountNumber: string, companyId: number): boolean {
+  if (!BANK_NAMES[accountNumber]) return false;
+  const restriction = COMPANY_RESTRICTED_ACCOUNTS[accountNumber];
+  if (restriction !== undefined && restriction !== companyId) return false;
+  return true;
+}
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -77,7 +87,7 @@ export async function GET() {
         currentBalance: acc.amount ?? 0,
         reconciledAmount: acc.reconciledAmount ?? 0,
         accountStatus: acc.accountStatus || "",
-        isInDimBanco: VALID_ACCOUNTS.has(accNum),
+        isInDimBanco: isInDimBanco(accNum, acc.companyId || 0),
       };
     });
 
