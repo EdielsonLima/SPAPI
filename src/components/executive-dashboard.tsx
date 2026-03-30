@@ -3899,15 +3899,20 @@ export function ExecutiveDashboard() {
                         </div>
                       </div>
                       <div className="max-h-[300px] overflow-y-auto p-2">
-                        <div className="flex items-center gap-2 px-2 py-1.5 border-b mb-1">
-                          <Checkbox
-                            checked={allSelected}
-                            onCheckedChange={() => {
-                              if (allSelected) setSelectedBankAccounts(new Set());
-                              else setSelectedBankAccounts(new Set(allAccountNums));
-                            }}
-                          />
-                          <span className="text-xs font-semibold">Selecionar tudo</span>
+                        <div
+                          className="flex items-center gap-2 px-2 py-1.5 border-b mb-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 rounded"
+                          onClick={() => {
+                            if (allSelected) {
+                              setSelectedBankAccounts(new Set<string>());
+                            } else {
+                              setSelectedBankAccounts(new Set(allAccountNums));
+                            }
+                          }}
+                        >
+                          <div className={`h-4 w-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${allSelected ? "bg-primary border-primary" : "border-slate-300 dark:border-slate-600"}`}>
+                            {allSelected && <span className="text-white text-[10px] font-bold">✓</span>}
+                          </div>
+                          <span className="text-xs font-semibold">{allSelected ? "Desmarcar tudo" : "Selecionar tudo"}</span>
                           <Badge variant="secondary" className="ml-auto text-[10px]">{allAccountNums.length}</Badge>
                         </div>
                         {allAccountNums
