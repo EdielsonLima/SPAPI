@@ -586,7 +586,7 @@ export function DreTab({
                 <Badge variant="outline" className={`text-xs px-2 py-0.5 font-medium rounded-full shadow-sm ${
                   isPositive
                     ? `${kpi.iconBg} border-current/20 ${kpi.textColor}`
-                    : "bg-red-50/80 dark:bg-red-950/50 border-red-200/50 dark:border-red-800/50 text-red-700 dark:text-red-400"
+                    : "bg-red-50/80 dark:bg-red-950/50 border-red-200/50 dark:border-red-800/50 text-red-700 dark:text-red-300/60"
                 }`}>
                   {isPositive ? <TrendingUp className="h-3.5 w-3.5 mr-1" /> : <TrendingDown className="h-3.5 w-3.5 mr-1" />}
                   {margin}
@@ -594,7 +594,7 @@ export function DreTab({
               </div>
               <div className="text-2xl font-black tabular-nums tracking-tight text-slate-800 dark:text-slate-100">
                 {formatCurrency(Math.abs(value))}
-                {!isPositive && <span className="text-sm font-bold text-red-500 dark:text-red-400 ml-1">-</span>}
+                {!isPositive && <span className="text-sm font-bold text-red-500 dark:text-red-300/60 ml-1">-</span>}
               </div>
             </div>
           );
@@ -785,7 +785,7 @@ export function DreTab({
                                   <td key={m} className={`text-right px-4 py-3.5 text-[13px] tabular-nums ${
                                     isCalc
                                       ? v < 0 ? "text-red-700 font-semibold" : "text-emerald-700 font-semibold"
-                                      : v < 0 ? "text-red-600 dark:text-red-400/70 font-medium" : "text-slate-700 dark:text-slate-300 font-medium"
+                                      : v < 0 ? "text-red-600 dark:text-red-300/60 font-medium" : "text-slate-700 dark:text-slate-300 font-medium"
                                   }`}>
                                     {v !== 0 ? fmtVal(v) : ""}
                                   </td>
@@ -794,7 +794,7 @@ export function DreTab({
                               <td className={`text-right px-5 py-3.5 font-bold text-[14px] tabular-nums ${
                                 isCalc
                                   ? total < 0 ? "text-red-700" : "text-emerald-700"
-                                  : total < 0 ? "text-red-600 dark:text-red-400/70" : "text-slate-800 dark:text-slate-200"
+                                  : total < 0 ? "text-red-600 dark:text-red-300/60" : "text-slate-800 dark:text-slate-200"
                               }`}>
                                 {fmtVal(total)}
                               </td>
@@ -814,14 +814,14 @@ export function DreTab({
                                     const v = acctData.months[m] || 0;
                                     return (
                                       <td key={m} className={`text-right px-4 py-2.5 text-[12px] tabular-nums ${
-                                        v < 0 ? "text-red-500 dark:text-red-400/70 font-medium" : "text-slate-600 dark:text-slate-400"
+                                        v < 0 ? "text-red-500 dark:text-red-300/60 font-medium" : "text-slate-600 dark:text-slate-400"
                                       }`}>
                                         {v !== 0 ? fmtVal(v) : ""}
                                       </td>
                                     );
                                   })}
                                   <td className={`text-right px-5 py-2.5 font-semibold text-[13px] tabular-nums ${
-                                    acctTotal < 0 ? "text-red-600 dark:text-red-400/70" : "text-slate-700 dark:text-slate-300"
+                                    acctTotal < 0 ? "text-red-600 dark:text-red-300/60" : "text-slate-700 dark:text-slate-300"
                                   }`}>
                                     {fmtVal(acctTotal)}
                                   </td>
@@ -894,14 +894,14 @@ export function DreTab({
                     <span className={`text-[14px] text-right tabular-nums ${
                       isCalculated
                         ? value < 0
-                          ? "font-bold text-red-700 dark:text-red-400/80"
+                          ? "font-bold text-red-700 dark:text-red-300/70"
                           : "font-bold text-emerald-700 dark:text-emerald-400"
                         : value < 0
-                          ? "font-semibold text-red-600 dark:text-red-400/70"
+                          ? "font-semibold text-red-600 dark:text-red-300/60"
                           : "font-semibold text-slate-800 dark:text-slate-200"
                     }`}>
                       {formatCurrency(Math.abs(value))}
-                      {value < 0 && <span className="text-xs ml-0.5 font-bold text-red-500 dark:text-red-400/70">-</span>}
+                      {value < 0 && <span className="text-xs ml-0.5 font-bold text-red-500 dark:text-red-300/60">-</span>}
                     </span>
                   </div>
 
@@ -946,7 +946,7 @@ export function DreTab({
                                   {pct >= 0.1 ? `${pct.toFixed(1)}%` : "<0.1%"}
                                 </span>
                                 <span className={`text-[12px] text-right tabular-nums ${
-                                  acct.amount < 0 ? "text-red-600 dark:text-red-400/70 font-semibold" : "text-slate-700 dark:text-slate-200 font-semibold"
+                                  acct.amount < 0 ? "text-red-600 dark:text-red-300/60 font-semibold" : "text-slate-700 dark:text-slate-200 font-semibold"
                                 }`}>
                                   {formatCurrency(Math.abs(acct.amount))}
                                   {acct.amount < 0 && <span className="ml-0.5">-</span>}
@@ -984,7 +984,7 @@ export function DreTab({
                                           <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                                         </div>
                                         <span className={`text-[11px] text-right tabular-nums font-medium ${
-                                          detail.amount < 0 ? "text-red-500 dark:text-red-400/70" : "text-slate-600 dark:text-slate-400"
+                                          detail.amount < 0 ? "text-red-500 dark:text-red-300/60" : "text-slate-600 dark:text-slate-400"
                                         }`}>
                                           {formatCurrency(Math.abs(detail.amount))}
                                           {detail.amount < 0 && <span className="ml-0.5">-</span>}
