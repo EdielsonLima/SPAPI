@@ -2,6 +2,7 @@
 
 import { signOut, useSession } from "next-auth/react";
 import { usePathname } from "next/navigation";
+import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, Menu } from "lucide-react";
+import { LogOut, Menu, Sun, Moon } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./sidebar";
 
@@ -31,6 +32,7 @@ const pathLabels: Record<string, string[]> = {
 export function Header() {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const { theme, setTheme } = useTheme();
   const userName = session?.user?.name || "Usuario";
   const initials = userName
     .split(" ")
@@ -42,7 +44,7 @@ export function Header() {
   const breadcrumbSegments = pathLabels[pathname] || [];
 
   return (
-    <header className="h-16 border-b bg-white flex items-center justify-between px-4 md:px-6">
+    <header className="h-16 border-b border-border bg-background flex items-center justify-between px-4 md:px-6">
       {/* Mobile menu */}
       <Sheet>
         <SheetTrigger asChild>
@@ -58,7 +60,7 @@ export function Header() {
       <div className="flex-1 flex items-center min-w-0">
         {breadcrumbSegments.length > 0 && (
           <>
-            <span className="text-sm font-medium text-slate-700 truncate md:hidden">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate md:hidden">
               {breadcrumbSegments[breadcrumbSegments.length - 1]}
             </span>
             <nav className="text-sm hidden md:flex items-center gap-1">
@@ -66,8 +68,8 @@ export function Header() {
                 const isLast = index === breadcrumbSegments.length - 1;
                 return (
                   <span key={index} className="flex items-center gap-1">
-                    {index > 0 && <span className="text-slate-300">{">"}</span>}
-                    <span className={isLast ? "font-medium text-slate-700" : "text-slate-500"}>
+                    {index > 0 && <span className="text-slate-300 dark:text-slate-600">{">"}</span>}
+                    <span className={isLast ? "font-medium text-slate-700 dark:text-slate-200" : "text-slate-500 dark:text-slate-400"}>
                       {segment}
                     </span>
                   </span>
@@ -77,6 +79,18 @@ export function Header() {
           </>
         )}
       </div>
+
+      {/* Theme toggle */}
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        className="h-9 w-9 mr-2"
+      >
+        <Sun className="h-4 w-4 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
+        <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
+        <span className="sr-only">Alternar tema</span>
+      </Button>
 
       {/* User menu */}
       <DropdownMenu>
@@ -88,7 +102,7 @@ export function Header() {
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium text-slate-700 hidden sm:inline">
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200 hidden sm:inline">
               {userName}
             </span>
           </Button>

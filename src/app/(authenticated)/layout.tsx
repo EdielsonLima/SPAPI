@@ -9,7 +9,7 @@ export default function AuthenticatedLayout({
 }) {
   return (
     <SessionProvider>
-      <div className="flex h-screen overflow-hidden bg-slate-50">
+      <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
         {/* Sidebar - hidden on mobile */}
         <div className="hidden md:flex">
           <Sidebar />
