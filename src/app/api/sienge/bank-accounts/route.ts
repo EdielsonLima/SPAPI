@@ -13,81 +13,104 @@ export async function GET() {
   }
 
   try {
-    // Sienge endpoint: GET /accounts-balances (Saldo de Contas Correntes)
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-    // Try multiple param combinations since Sienge docs may vary
-    let firstPage: SiengeRawResponse = null;
-    const paramAttempts: Record<string, string>[] = [
-      { balanceDate: today, offset: "0", limit: "100" },
-      { date: today, offset: "0", limit: "100" },
-      { dataBase: today, offset: "0", limit: "100" },
-    ];
+    // 1. Fetch account balances
+    const firstPage = await siengeGet<SiengeRawResponse>(
+      "/accounts-balances",
+      { balanceDate: today, offset: "0", limit: "100" }
+    );
 
-    for (const params of paramAttempts) {
-      try {
-        firstPage = await siengeGet<SiengeRawResponse>("/accounts-balances", params);
-        console.log(`[accounts-balances] Success with params:`, JSON.stringify(params));
-        break;
-      } catch (err) {
-        console.log(`[accounts-balances] Failed with params ${JSON.stringify(params)}: ${err}`);
-        continue;
-      }
-    }
-
-    if (!firstPage) {
-      return NextResponse.json({ error: "All parameter combinations failed for /accounts-balances", data: [] });
-    }
-
-    console.log("[accounts-balances] Raw response keys:", Object.keys(firstPage || {}));
-    console.log("[accounts-balances] Sample:", JSON.stringify(firstPage).substring(0, 1500));
-
-    const results = firstPage?.results || firstPage?.data || (Array.isArray(firstPage) ? firstPage : []);
+    const results = firstPage?.results || [];
     const total = firstPage?.resultSetMetadata?.count || results.length;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allAccounts: any[] = [...results];
     let offset = results.length;
 
-    // Find which params worked
-    const workingParams = paramAttempts.find(() => firstPage !== null) || paramAttempts[0];
-
     while (offset < total) {
       const page = await siengeGet<SiengeRawResponse>(
         "/accounts-balances",
-        { ...workingParams, offset: String(offset), limit: "100" }
+        { balanceDate: today, offset: String(offset), limit: "100" }
       );
-      const pageResults = page?.results || page?.data || [];
+      const pageResults = page?.results || [];
       if (pageResults.length === 0) break;
       allAccounts.push(...pageResults);
       offset += pageResults.length;
     }
 
-    console.log(`[accounts-balances] Total fetched: ${allAccounts.length}`);
-    if (allAccounts.length > 0) {
-      console.log("[accounts-balances] Sample fields:", Object.keys(allAccounts[0]));
-      console.log("[accounts-balances] Sample:", JSON.stringify(allAccounts[0]).substring(0, 500));
+    // 2. Fetch companies for name lookup
+    const companiesMap: Record<number, string> = {};
+    try {
+      const companiesData = await siengeGet<SiengeRawResponse>(
+        "/companies",
+        { offset: "0", limit: "100" }
+      );
+      const companyResults = companiesData?.results || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      companyResults.forEach((c: any) => {
+        companiesMap[c.id] = c.name;
+      });
+    } catch {
+      console.log("[accounts-balances] Could not fetch companies for name lookup");
     }
 
-    // Return raw + mapped so we can debug field names
-    const sampleRaw = allAccounts.length > 0 ? allAccounts.slice(0, 3) : [];
+    // 3. Try to get bank account details for each unique account
+    // Extract bank account IDs from links
+    const bankAccountDetails: Record<string, { bankName: string; agencyNumber: string; description: string }> = {};
+    const uniqueAccountLinks = new Set<string>();
 
-    // Map to normalized structure
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const enriched = allAccounts.map((acc: any) => ({
-      bankAccountId: acc.bankAccountId || acc.accountId || acc.id || 0,
-      bankAccountDescription: acc.bankAccountDescription || acc.description || acc.accountDescription || "",
-      bankCode: acc.bankCode || acc.bank?.code || "",
-      bankName: acc.bankName || acc.bank?.name || acc.bankDescription || "",
-      agencyNumber: acc.agencyNumber || acc.agency || "",
-      accountNumber: acc.accountNumber || acc.account || "",
-      companyId: acc.companyId || acc.company?.id || 0,
-      companyName: acc.companyName || acc.company?.name || acc.enterpriseName || "",
-      currentBalance: acc.currentBalance ?? acc.balance ?? acc.value ?? acc.saldo ?? 0,
-    }));
+    for (const acc of allAccounts) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bankLink = (acc.links || []).find((l: any) => l.rel === "bank-account");
+      if (bankLink?.href) {
+        uniqueAccountLinks.add(bankLink.href);
+      }
+    }
 
-    return NextResponse.json({ data: enriched, _debug_raw_sample: sampleRaw, _debug_fields: allAccounts.length > 0 ? Object.keys(allAccounts[0]) : [] });
+    // Fetch bank account details (limited to avoid rate limits)
+    const linkArray = Array.from(uniqueAccountLinks);
+    for (const link of linkArray.slice(0, 30)) {
+      try {
+        // Extract the path from the full URL
+        const urlPath = new URL(link).pathname.replace(/.*\/public\/api\/v1/, "");
+        const detail = await siengeGet<SiengeRawResponse>(urlPath);
+        const accNum = detail?.accountNumber || detail?.account || "";
+        if (accNum) {
+          bankAccountDetails[accNum] = {
+            bankName: detail?.bankName || detail?.bank?.name || detail?.bankDescription || "",
+            agencyNumber: detail?.agencyNumber || detail?.agency || "",
+            description: detail?.description || detail?.name || "",
+          };
+        }
+      } catch {
+        // Skip if we can't fetch details
+      }
+    }
+
+    // 4. Map to normalized structure
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const enriched = allAccounts.map((acc: any) => {
+      const accNum = acc.accountNumber || "";
+      const detail = bankAccountDetails[accNum];
+      return {
+        bankAccountId: acc.accountNumber || 0,
+        bankAccountDescription: detail?.description || `Conta ${accNum}`,
+        bankCode: "",
+        bankName: detail?.bankName || "",
+        agencyNumber: detail?.agencyNumber || "",
+        accountNumber: accNum,
+        companyId: acc.companyId || 0,
+        companyName: companiesMap[acc.companyId] || `Empresa ${acc.companyId}`,
+        currentBalance: acc.amount ?? 0,
+        reconciledAmount: acc.reconciledAmount ?? 0,
+        accountStatus: acc.accountStatus || "",
+      };
+    });
+
+    return NextResponse.json({ data: enriched });
   } catch (error) {
     console.error("Error fetching accounts-balances:", error);
     return NextResponse.json(
