@@ -70,6 +70,9 @@ export async function GET() {
       console.log("[accounts-balances] Sample:", JSON.stringify(allAccounts[0]).substring(0, 500));
     }
 
+    // Return raw + mapped so we can debug field names
+    const sampleRaw = allAccounts.length > 0 ? allAccounts.slice(0, 3) : [];
+
     // Map to normalized structure
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const enriched = allAccounts.map((acc: any) => ({
@@ -84,7 +87,7 @@ export async function GET() {
       currentBalance: acc.currentBalance ?? acc.balance ?? acc.value ?? acc.saldo ?? 0,
     }));
 
-    return NextResponse.json({ data: enriched });
+    return NextResponse.json({ data: enriched, _debug_raw_sample: sampleRaw, _debug_fields: allAccounts.length > 0 ? Object.keys(allAccounts[0]) : [] });
   } catch (error) {
     console.error("Error fetching accounts-balances:", error);
     return NextResponse.json(

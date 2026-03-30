@@ -408,6 +408,7 @@ export function ExecutiveDashboard() {
     fetch("/api/sienge/bank-accounts")
       .then(res => res.json())
       .then(json => {
+        console.log("[Saldos] API response:", JSON.stringify(json._debug_fields), JSON.stringify(json._debug_raw_sample));
         if (json.data && json.data.length > 0) {
           setBankAccounts(json.data);
         } else if (json.error) {
