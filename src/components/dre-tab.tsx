@@ -97,11 +97,21 @@ const MONTH_NAMES: Record<string, string> = {
   "09": "set", "10": "out", "11": "nov", "12": "dez",
 };
 
+// Level 4: individual transaction within a creditor/client
+interface TransactionDetail {
+  billId: number;
+  paymentDate: string;
+  amount: number;
+  documentType: string;
+  observation: string;
+}
+
 // Detail record for level 3 (creditor/client within a financial account)
 interface AccountDetail {
   name: string;
   amount: number;
   observations: string[];
+  transactions: TransactionDetail[];
 }
 
 // Level 2: financial account accumulator
@@ -130,6 +140,7 @@ export function DreTab({
   const [loadingMappings, setLoadingMappings] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
   const [dreMode, setDreMode] = useState<"simples" | "completa">("simples");
   // Excel as supplementary data source for accounts not available in Sienge API
   const [excelSupplementary, setExcelSupplementary] = useState<Record<string, { name: string; amount: number }> | null>(null);
@@ -249,6 +260,15 @@ export function DreTab({
     });
   }, []);
 
+  const toggleDetailExpand = useCallback((key: string) => {
+    setExpandedDetails(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
   // Build DRE data - uses Excel data as primary source when available, falls back to Sienge API
   const dreData = useMemo(() => {
     if (Object.keys(dreMappings).length === 0) return null;
@@ -267,7 +287,7 @@ export function DreTab({
       accum[cat] = { total: 0, accounts: {} };
     }
 
-    const addToAccum = (dreCat: string, fcId: string, fcName: string, amount: number, detailName: string, observation?: string) => {
+    const addToAccum = (dreCat: string, fcId: string, fcName: string, amount: number, detailName: string, tx?: Partial<TransactionDetail>) => {
       if (!accum[dreCat]) return;
       accum[dreCat].total += amount;
       if (!accum[dreCat].accounts[fcId]) {
@@ -276,11 +296,20 @@ export function DreTab({
       accum[dreCat].accounts[fcId].amount += amount;
       const dKey = detailName || "Sem identificacao";
       if (!accum[dreCat].accounts[fcId].details[dKey]) {
-        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0, observations: [] };
+        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0, observations: [], transactions: [] };
       }
       accum[dreCat].accounts[fcId].details[dKey].amount += amount;
-      if (observation && !accum[dreCat].accounts[fcId].details[dKey].observations.includes(observation)) {
-        accum[dreCat].accounts[fcId].details[dKey].observations.push(observation);
+      if (tx?.observation && !accum[dreCat].accounts[fcId].details[dKey].observations.includes(tx.observation)) {
+        accum[dreCat].accounts[fcId].details[dKey].observations.push(tx.observation);
+      }
+      if (tx) {
+        accum[dreCat].accounts[fcId].details[dKey].transactions.push({
+          billId: tx.billId || 0,
+          paymentDate: tx.paymentDate || "",
+          amount: tx.amount || amount,
+          documentType: tx.documentType || "",
+          observation: tx.observation || "",
+        });
       }
     };
 
@@ -306,15 +335,21 @@ export function DreTab({
     };
 
     // Helper: add Level 3 detail only (does NOT change Level 1+2 totals)
-    const addDetailOnly = (dreCat: string, fcId: string, detailName: string, detailAmount: number, observation?: string) => {
+    const addDetailOnly = (dreCat: string, fcId: string, detailName: string, detailAmount: number, tx?: Partial<TransactionDetail>) => {
       if (!accum[dreCat]?.accounts[fcId]) return;
       const dKey = detailName || "Sem identificacao";
       if (!accum[dreCat].accounts[fcId].details[dKey]) {
-        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0, observations: [] };
+        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0, observations: [], transactions: [] };
       }
       accum[dreCat].accounts[fcId].details[dKey].amount += detailAmount;
-      if (observation && !accum[dreCat].accounts[fcId].details[dKey].observations.includes(observation)) {
-        accum[dreCat].accounts[fcId].details[dKey].observations.push(observation);
+      if (tx?.observation && !accum[dreCat].accounts[fcId].details[dKey].observations.includes(tx.observation)) {
+        accum[dreCat].accounts[fcId].details[dKey].observations.push(tx.observation);
+      }
+      if (tx) {
+        accum[dreCat].accounts[fcId].details[dKey].transactions.push({
+          billId: tx.billId || 0, paymentDate: tx.paymentDate || "", amount: tx.amount || detailAmount,
+          documentType: tx.documentType || "", observation: tx.observation || "",
+        });
       }
     };
 
@@ -349,7 +384,10 @@ export function DreTab({
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
             const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-            addDetailOnly(dreCat, fcId, item.creditorName || "", payment.netAmount * rate * sign, item.observation);
+            addDetailOnly(dreCat, fcId, item.creditorName || "", payment.netAmount * rate * sign, {
+              billId: item.billId, paymentDate: payment.paymentDate, amount: payment.netAmount * rate * sign,
+              documentType: item.documentIdentificationName || "", observation: item.observation || "",
+            });
             enrichedFcIds.add(fcId);
           }
         }
@@ -368,7 +406,10 @@ export function DreTab({
             const dreCat = excelFcToDre[fcId] || fcToDre[fcId];
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
-            addDetailOnly(dreCat, fcId, item.clientName || "", amount * rate, item.observation);
+            addDetailOnly(dreCat, fcId, item.clientName || "", amount * rate, {
+              billId: item.billId, paymentDate: payment.paymentDate, amount: amount * rate,
+              documentType: item.documentIdentificationName || "", observation: item.observation || "",
+            });
             enrichedFcIds.add(fcId);
           }
         }
@@ -415,7 +456,10 @@ export function DreTab({
             const rate = (pc.financialCategoryRate || 100) / 100;
             const allocated = payment.netAmount * rate;
             const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign, item.creditorName || "", item.observation);
+            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign, item.creditorName || "", {
+              billId: item.billId, paymentDate: payment.paymentDate, amount: allocated * sign,
+              documentType: item.documentIdentificationName || "", observation: item.observation || "",
+            });
           }
         }
       }
@@ -433,7 +477,10 @@ export function DreTab({
             const dreCat = fcToDre[String(pc.financialCategoryId)];
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
-            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, amount * rate, item.clientName || "", item.observation);
+            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, amount * rate, item.clientName || "", {
+              billId: item.billId, paymentDate: payment.paymentDate, amount: amount * rate,
+              documentType: item.documentIdentificationName || "", observation: item.observation || "",
+            });
           }
         }
       }
@@ -908,35 +955,84 @@ export function DreTab({
 
                               {/* Level 3: Details (creditor/client) */}
                               {isAccountExpanded && hasDetails && (
-                                <div className="bg-slate-100/50 py-1 box-shadow-inner border-y border-slate-100/80">
+                                <div className="bg-slate-100/50 dark:bg-slate-800/50 py-1 box-shadow-inner border-y border-slate-100/80 dark:border-slate-700/80">
                                   {Object.entries(acct.details)
                                     .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
                                     .map(([detailKey, detail]) => {
-                                      const obsText = detail.observations.length > 0
-                                        ? detail.observations.join("\n---\n")
-                                        : "";
+                                      const detailExpandKey = `${accountKey}:${detailKey}`;
+                                      const isDetailExpanded = expandedDetails.has(detailExpandKey);
+                                      const hasTx = detail.transactions.length > 0;
                                       return (
+                                      <React.Fragment key={detailKey}>
                                       <div
-                                        key={detailKey}
-                                        className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 group/detail"
-                                        title={obsText || undefined}
+                                        className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 ${hasTx ? "cursor-pointer hover:bg-slate-200/60 dark:hover:bg-slate-700/60" : ""}`}
+                                        onClick={hasTx ? () => toggleDetailExpand(detailExpandKey) : undefined}
                                       >
-                                        <span className="w-6" />
+                                        <span className="w-6 flex items-center justify-center">
+                                          {hasTx && (
+                                            isDetailExpanded
+                                              ? <ChevronDown className="h-3 w-3 text-slate-400" />
+                                              : <ChevronRight className="h-3 w-3 text-slate-400" />
+                                          )}
+                                        </span>
                                         <div className="flex items-center pl-10 pr-4 min-w-0">
-                                          <div className={`w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0 ${obsText ? "bg-blue-400" : "bg-slate-300"}`} />
-                                          <span className={`text-[11px] font-medium truncate pr-3 ${obsText ? "text-blue-600 dark:text-blue-400 cursor-help" : "text-slate-500"}`} title={obsText || detail.name}>
+                                          <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600 mr-2 flex-shrink-0" />
+                                          <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate pr-3" title={detail.name}>
                                             {detail.name}
                                           </span>
-                                          {obsText && <span className="text-[9px] text-blue-400 dark:text-blue-500 mr-2 flex-shrink-0">obs</span>}
+                                          {hasTx && <span className="text-[9px] text-slate-400 dark:text-slate-500 mr-2 flex-shrink-0">{detail.transactions.length}x</span>}
                                           <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                                         </div>
                                         <span className={`text-[11px] text-right tabular-nums font-medium ${
-                                          detail.amount < 0 ? "text-red-500" : "text-slate-600"
+                                          detail.amount < 0 ? "text-red-500" : "text-slate-600 dark:text-slate-400"
                                         }`}>
                                           {formatCurrency(Math.abs(detail.amount))}
                                           {detail.amount < 0 && <span className="ml-0.5">-</span>}
                                         </span>
                                       </div>
+
+                                      {/* Level 4: Individual transactions */}
+                                      {isDetailExpanded && hasTx && (
+                                        <div className="bg-slate-200/40 dark:bg-slate-900/40 py-0.5 border-y border-slate-200/60 dark:border-slate-700/60">
+                                          {detail.transactions
+                                            .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate))
+                                            .map((tx, txIdx) => (
+                                              <div
+                                                key={txIdx}
+                                                className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1"
+                                                title={tx.observation || undefined}
+                                              >
+                                                <span className="w-6" />
+                                                <div className="flex items-center pl-14 pr-4 min-w-0 gap-2">
+                                                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-slate-700 flex-shrink-0">
+                                                    {tx.paymentDate ? tx.paymentDate.split("-").reverse().join("/") : "-"}
+                                                  </span>
+                                                  {tx.documentType && (
+                                                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-slate-700 flex-shrink-0">
+                                                      {tx.documentType}
+                                                    </span>
+                                                  )}
+                                                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 flex-shrink-0">
+                                                    #{tx.billId}
+                                                  </span>
+                                                  {tx.observation && (
+                                                    <span className="text-[10px] text-blue-500 dark:text-blue-400 truncate" title={tx.observation}>
+                                                      {tx.observation}
+                                                    </span>
+                                                  )}
+                                                  <span className="flex-grow border-b border-dotted border-slate-300/40 opacity-40 relative top-[2px] min-w-[10px]"></span>
+                                                </div>
+                                                <span className={`text-[10px] text-right tabular-nums font-medium ${
+                                                  tx.amount < 0 ? "text-red-400" : "text-slate-500 dark:text-slate-500"
+                                                }`}>
+                                                  {formatCurrency(Math.abs(tx.amount))}
+                                                  {tx.amount < 0 && <span className="ml-0.5">-</span>}
+                                                </span>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      )}
+                                      </React.Fragment>
                                       );
                                     })}
                                 </div>
