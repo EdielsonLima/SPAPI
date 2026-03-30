@@ -101,6 +101,7 @@ const MONTH_NAMES: Record<string, string> = {
 interface AccountDetail {
   name: string;
   amount: number;
+  observations: string[];
 }
 
 // Level 2: financial account accumulator
@@ -266,7 +267,7 @@ export function DreTab({
       accum[cat] = { total: 0, accounts: {} };
     }
 
-    const addToAccum = (dreCat: string, fcId: string, fcName: string, amount: number, detailName: string) => {
+    const addToAccum = (dreCat: string, fcId: string, fcName: string, amount: number, detailName: string, observation?: string) => {
       if (!accum[dreCat]) return;
       accum[dreCat].total += amount;
       if (!accum[dreCat].accounts[fcId]) {
@@ -275,9 +276,12 @@ export function DreTab({
       accum[dreCat].accounts[fcId].amount += amount;
       const dKey = detailName || "Sem identificacao";
       if (!accum[dreCat].accounts[fcId].details[dKey]) {
-        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0 };
+        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0, observations: [] };
       }
       accum[dreCat].accounts[fcId].details[dKey].amount += amount;
+      if (observation && !accum[dreCat].accounts[fcId].details[dKey].observations.includes(observation)) {
+        accum[dreCat].accounts[fcId].details[dKey].observations.push(observation);
+      }
     };
 
     const matchesFilters = (date: string, companyName: string) => {
@@ -302,13 +306,16 @@ export function DreTab({
     };
 
     // Helper: add Level 3 detail only (does NOT change Level 1+2 totals)
-    const addDetailOnly = (dreCat: string, fcId: string, detailName: string, detailAmount: number) => {
+    const addDetailOnly = (dreCat: string, fcId: string, detailName: string, detailAmount: number, observation?: string) => {
       if (!accum[dreCat]?.accounts[fcId]) return;
       const dKey = detailName || "Sem identificacao";
       if (!accum[dreCat].accounts[fcId].details[dKey]) {
-        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0 };
+        accum[dreCat].accounts[fcId].details[dKey] = { name: dKey, amount: 0, observations: [] };
       }
       accum[dreCat].accounts[fcId].details[dKey].amount += detailAmount;
+      if (observation && !accum[dreCat].accounts[fcId].details[dKey].observations.includes(observation)) {
+        accum[dreCat].accounts[fcId].details[dKey].observations.push(observation);
+      }
     };
 
     // PRIMARY SOURCE: Excel data from database (matches Power BI exactly)
@@ -342,7 +349,7 @@ export function DreTab({
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
             const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-            addDetailOnly(dreCat, fcId, item.creditorName || "", payment.netAmount * rate * sign);
+            addDetailOnly(dreCat, fcId, item.creditorName || "", payment.netAmount * rate * sign, item.observation);
             enrichedFcIds.add(fcId);
           }
         }
@@ -361,7 +368,7 @@ export function DreTab({
             const dreCat = excelFcToDre[fcId] || fcToDre[fcId];
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
-            addDetailOnly(dreCat, fcId, item.clientName || "", amount * rate);
+            addDetailOnly(dreCat, fcId, item.clientName || "", amount * rate, item.observation);
             enrichedFcIds.add(fcId);
           }
         }
@@ -408,7 +415,7 @@ export function DreTab({
             const rate = (pc.financialCategoryRate || 100) / 100;
             const allocated = payment.netAmount * rate;
             const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
-            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign, item.creditorName || "");
+            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, allocated * sign, item.creditorName || "", item.observation);
           }
         }
       }
@@ -426,7 +433,7 @@ export function DreTab({
             const dreCat = fcToDre[String(pc.financialCategoryId)];
             if (!dreCat) continue;
             const rate = (pc.financialCategoryRate || 100) / 100;
-            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, amount * rate, item.clientName || "");
+            addToAccum(dreCat, String(pc.financialCategoryId), pc.financialCategoryName, amount * rate, item.clientName || "", item.observation);
           }
         }
       }
@@ -904,17 +911,23 @@ export function DreTab({
                                 <div className="bg-slate-100/50 py-1 box-shadow-inner border-y border-slate-100/80">
                                   {Object.entries(acct.details)
                                     .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
-                                    .map(([detailKey, detail]) => (
+                                    .map(([detailKey, detail]) => {
+                                      const obsText = detail.observations.length > 0
+                                        ? detail.observations.join("\n---\n")
+                                        : "";
+                                      return (
                                       <div
                                         key={detailKey}
-                                        className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5"
+                                        className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 group/detail"
+                                        title={obsText || undefined}
                                       >
                                         <span className="w-6" />
                                         <div className="flex items-center pl-10 pr-4 min-w-0">
-                                          <div className="w-1.5 h-1.5 rounded-full bg-slate-300 mr-2 flex-shrink-0" />
-                                          <span className="text-[11px] font-medium text-slate-500 truncate pr-3" title={detail.name}>
+                                          <div className={`w-1.5 h-1.5 rounded-full mr-2 flex-shrink-0 ${obsText ? "bg-blue-400" : "bg-slate-300"}`} />
+                                          <span className={`text-[11px] font-medium truncate pr-3 ${obsText ? "text-blue-600 dark:text-blue-400 cursor-help" : "text-slate-500"}`} title={obsText || detail.name}>
                                             {detail.name}
                                           </span>
+                                          {obsText && <span className="text-[9px] text-blue-400 dark:text-blue-500 mr-2 flex-shrink-0">obs</span>}
                                           <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                                         </div>
                                         <span className={`text-[11px] text-right tabular-nums font-medium ${
@@ -924,7 +937,8 @@ export function DreTab({
                                           {detail.amount < 0 && <span className="ml-0.5">-</span>}
                                         </span>
                                       </div>
-                                    ))}
+                                      );
+                                    })}
                                 </div>
                               )}
                             </React.Fragment>
