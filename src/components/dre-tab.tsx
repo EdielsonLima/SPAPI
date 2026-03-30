@@ -907,7 +907,7 @@ export function DreTab({
 
                   {/* Level 2: Sub-accounts (financial categories) */}
                   {isExpanded && hasAccounts && (
-                    <div className="bg-slate-50/50 border-l-4 border-l-slate-200">
+                    <div className="bg-white dark:bg-slate-900 border-l-4 border-l-slate-200 dark:border-l-slate-600">
                       {Object.entries(categoryAccounts)
                         .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
                         .map(([fcId, acct]) => {
@@ -924,7 +924,7 @@ export function DreTab({
                               {/* Level 2 row */}
                               <div
                                 className={`grid grid-cols-[auto_1fr_60px_180px] items-center px-5 py-2 transition-colors border-b border-slate-100 last:border-b-0 ${
-                                  hasDetails ? "cursor-pointer hover:bg-slate-100/80" : ""
+                                  hasDetails ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" : ""
                                 }`}
                                 onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
                               >
@@ -935,18 +935,18 @@ export function DreTab({
                                       : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
                                   )}
                                 </span>
-                                <span className="text-[12px] font-medium text-slate-600 pl-3 flex items-center min-w-0">
+                                <span className="text-[12px] font-medium text-slate-600 dark:text-slate-300 pl-3 flex items-center min-w-0">
                                   <span className="truncate pr-3">
-                                    <span className="text-slate-400 font-mono text-[11px] mr-2 bg-slate-100 py-0.5 px-1.5 rounded-md border border-slate-200/60">{fcId}</span>
+                                    <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px] mr-2 bg-slate-100 dark:bg-slate-800 py-0.5 px-1.5 rounded-md border border-slate-200/60 dark:border-slate-700">{fcId}</span>
                                     {acct.name}
                                   </span>
-                                  <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
+                                  <span className="flex-grow border-b-2 border-dotted border-slate-300/60 dark:border-slate-600/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                                 </span>
-                                <span className="text-[11px] text-right tabular-nums text-slate-400 font-medium">
+                                <span className="text-[11px] text-right tabular-nums text-slate-400 dark:text-slate-500 font-medium">
                                   {pct >= 0.1 ? `${pct.toFixed(1)}%` : "<0.1%"}
                                 </span>
                                 <span className={`text-[12px] text-right tabular-nums ${
-                                  acct.amount < 0 ? "text-red-600 font-semibold" : "text-slate-700 font-semibold"
+                                  acct.amount < 0 ? "text-red-600 dark:text-red-400 font-semibold" : "text-slate-700 dark:text-slate-200 font-semibold"
                                 }`}>
                                   {formatCurrency(Math.abs(acct.amount))}
                                   {acct.amount < 0 && <span className="ml-0.5">-</span>}
@@ -955,7 +955,7 @@ export function DreTab({
 
                               {/* Level 3: Details (creditor/client) */}
                               {isAccountExpanded && hasDetails && (
-                                <div className="bg-slate-100/50 dark:bg-slate-800/50 py-1 box-shadow-inner border-y border-slate-100/80 dark:border-slate-700/80">
+                                <div className="bg-white dark:bg-slate-950 py-1 border-y border-slate-100 dark:border-slate-800">
                                   {Object.entries(acct.details)
                                     .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
                                     .map(([detailKey, detail]) => {
@@ -965,7 +965,7 @@ export function DreTab({
                                       return (
                                       <React.Fragment key={detailKey}>
                                       <div
-                                        className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 ${hasTx ? "cursor-pointer hover:bg-slate-200/60 dark:hover:bg-slate-700/60" : ""}`}
+                                        className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 ${hasTx ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80" : ""}`}
                                         onClick={hasTx ? () => toggleDetailExpand(detailExpandKey) : undefined}
                                       >
                                         <span className="w-6 flex items-center justify-center">
@@ -993,7 +993,7 @@ export function DreTab({
 
                                       {/* Level 4: Individual transactions */}
                                       {isDetailExpanded && hasTx && (
-                                        <div className="bg-slate-200/40 dark:bg-slate-900/40 py-0.5 border-y border-slate-200/60 dark:border-slate-700/60">
+                                        <div className="bg-slate-50 dark:bg-slate-900/80 py-0.5 border-y border-slate-100 dark:border-slate-800">
                                           {detail.transactions
                                             .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate))
                                             .map((tx, txIdx) => (
