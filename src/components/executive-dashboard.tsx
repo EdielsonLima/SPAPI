@@ -3828,15 +3828,16 @@ export function ExecutiveDashboard() {
               <span className="text-sm">Carregando saldos bancarios...</span>
             </div>
           ) : (() => {
-            // Apply company filter first
-            const companyFiltered = selectedCompanies.size > 0
-              ? bankAccounts.filter(a => selectedCompanies.has(a.companyName))
-              : bankAccounts;
-
-            // All unique account numbers for filter (from company-filtered set)
-            const allAccountNums = Array.from(new Set(companyFiltered.map(a => a.accountNumber))).sort();
+            // All unique account numbers for the filter (always from ALL accounts, not company-filtered)
+            const allAccountNums = Array.from(new Set(bankAccounts.map(a => a.accountNumber))).sort();
             const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
-            const filteredAccounts = companyFiltered.filter(a => effectiveSelected.has(a.accountNumber));
+
+            // Apply both company filter AND account filter
+            const filteredAccounts = bankAccounts.filter(a => {
+              if (!effectiveSelected.has(a.accountNumber)) return false;
+              if (selectedCompanies.size > 0 && !selectedCompanies.has(a.companyName)) return false;
+              return true;
+            });
 
             // Group by company
             const byCompany: Record<string, { companyName: string; accounts: typeof bankAccounts }> = {};
@@ -3906,15 +3907,15 @@ export function ExecutiveDashboard() {
                           .filter(num => {
                             if (!filteredSearch) return true;
                             const acc = bankAccounts.find(a => a.accountNumber === num);
-                            const label = acc ? `${acc.bankAccountDescription} ${acc.accountNumber} ${acc.companyName}` : num;
-                            return label.toLowerCase().includes(filteredSearch);
+                            const searchStr = acc ? `${acc.accountNumber} ${acc.bankAccountDescription} ${acc.bankName} ${acc.companyName}` : num;
+                            return searchStr.toLowerCase().includes(filteredSearch);
                           })
                           .map(num => {
                             const acc = bankAccounts.find(a => a.accountNumber === num);
-                            const label = acc?.bankAccountDescription || `Conta ${num}`;
                             const company = acc?.companyName || "";
+                            const bankDesc = acc?.bankName || acc?.bankAccountDescription || "";
                             return (
-                              <div key={num} className="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
+                              <div key={num} className="flex items-center gap-2 px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded">
                                 <Checkbox
                                   checked={effectiveSelected.has(num)}
                                   onCheckedChange={(checked) => {
@@ -3926,10 +3927,13 @@ export function ExecutiveDashboard() {
                                     });
                                   }}
                                 />
-                                <div className="flex flex-col min-w-0">
-                                  <span className="text-xs font-medium truncate">{label}</span>
-                                  <span className="text-[10px] text-slate-400 truncate">{company} - {num}</span>
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <span className="text-xs font-bold font-mono truncate">{num}</span>
+                                  <span className="text-[10px] text-slate-400 truncate">{company}{bankDesc ? ` - ${bankDesc}` : ""}</span>
                                 </div>
+                                <span className={`text-[10px] font-semibold tabular-nums flex-shrink-0 ${(acc?.currentBalance ?? 0) >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                                  {formatCompactCurrency(acc?.currentBalance ?? 0)}
+                                </span>
                               </div>
                             );
                           })}
