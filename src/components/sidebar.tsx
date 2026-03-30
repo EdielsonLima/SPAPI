@@ -188,8 +188,8 @@ export function Sidebar() {
           collapsed ? "w-[72px]" : "w-[260px]"
         )}
       >
-        {/* Logo */}
-        <div className="flex items-center h-16 px-4 border-b border-slate-800">
+        {/* Logo + Toggle */}
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white overflow-hidden">
               <Image src="/logo-icon.jpg" alt="Logo" width={32} height={32} className="object-contain" />
@@ -203,6 +203,16 @@ export function Sidebar() {
               </div>
             )}
           </div>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="flex items-center justify-center h-8 w-8 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+          >
+            {collapsed ? (
+              <ChevronRight className="h-4 w-4" />
+            ) : (
+              <ChevronLeft className="h-4 w-4" />
+            )}
+          </button>
         </div>
 
         {/* Menu */}
@@ -334,17 +344,6 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* Toggle */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center justify-center h-12 text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
-        >
-          {collapsed ? (
-            <ChevronRight className="h-5 w-5" />
-          ) : (
-            <ChevronLeft className="h-5 w-5" />
-          )}
-        </button>
       </aside>
     </TooltipProvider>
   );
