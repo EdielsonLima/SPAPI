@@ -3220,7 +3220,7 @@ export function ExecutiveDashboard() {
       })()}
 
       {/* KPI Cards */}
-      {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
