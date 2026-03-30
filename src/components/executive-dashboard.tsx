@@ -3900,10 +3900,10 @@ export function ExecutiveDashboard() {
                       <div className="max-h-[300px] overflow-y-auto p-2">
                         <div className="flex items-center gap-2 px-2 py-1.5 border-b mb-1">
                           <Checkbox
-                            checked={selectedBankAccounts.size === allAccountNums.length || selectedBankAccounts.size === 0}
-                            onCheckedChange={(checked) => {
-                              if (checked) setSelectedBankAccounts(new Set(allAccountNums));
-                              else setSelectedBankAccounts(new Set());
+                            checked={selectedBankAccounts.size > 0 && selectedBankAccounts.size === allAccountNums.length}
+                            onCheckedChange={() => {
+                              if (selectedBankAccounts.size === allAccountNums.length) setSelectedBankAccounts(new Set());
+                              else setSelectedBankAccounts(new Set(allAccountNums));
                             }}
                           />
                           <span className="text-xs font-semibold">Selecionar tudo</span>
