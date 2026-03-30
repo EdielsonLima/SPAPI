@@ -4071,9 +4071,8 @@ export function ExecutiveDashboard() {
                                     <TableRow key={acc.bankAccountId} className="bg-slate-50/50 dark:bg-slate-800/50">
                                       <TableCell />
                                       <TableCell className="text-xs text-slate-500 dark:text-slate-400 pl-8">
-                                        <span className="font-medium text-slate-600 dark:text-slate-300">{acc.bankName || acc.bankAccountDescription}</span>
-                                        {acc.agencyNumber && <span className="ml-2 text-slate-400">Ag: {acc.agencyNumber}</span>}
-                                        {acc.accountNumber && <span className="ml-2 text-slate-400">Cc: {acc.accountNumber}</span>}
+                                        <span className="font-semibold text-slate-700 dark:text-slate-200">{acc.bankName || acc.bankAccountDescription || acc.accountNumber}</span>
+                                        <span className="ml-2 font-mono text-slate-400 text-[10px]">{acc.accountNumber}</span>
                                       </TableCell>
                                       <TableCell className={`text-xs font-semibold text-right tabular-nums ${acc.currentBalance >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500 dark:text-red-300/60"}`}>
                                         {formatCurrency(acc.currentBalance)}
