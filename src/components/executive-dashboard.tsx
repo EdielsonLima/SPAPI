@@ -4038,22 +4038,38 @@ export function ExecutiveDashboard() {
                         <TableBody>
                           {companies.map((company) => {
                             const companyTotal = company.accounts.reduce((s, a) => s + a.currentBalance, 0);
-                            const isExpanded = expandedBankCompanies.has(company.companyName);
+                            const companyKey = company.companyName;
+                            const isCompanyExpanded = expandedBankCompanies.has(companyKey);
+
+                            // Group accounts by bank within company
+                            const byBank: Record<string, typeof company.accounts> = {};
+                            for (const acc of company.accounts) {
+                              const bankKey = acc.bankName || acc.bankAccountDescription || "Outros";
+                              if (!byBank[bankKey]) byBank[bankKey] = [];
+                              byBank[bankKey].push(acc);
+                            }
+                            const banks = Object.entries(byBank).sort((a, b) => {
+                              const tA = a[1].reduce((s, ac) => s + ac.currentBalance, 0);
+                              const tB = b[1].reduce((s, ac) => s + ac.currentBalance, 0);
+                              return tB - tA;
+                            });
+
                             return (
-                              <React.Fragment key={company.companyName}>
+                              <React.Fragment key={companyKey}>
+                                {/* Level 1: Company */}
                                 <TableRow
                                   className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
                                   onClick={() => {
                                     setExpandedBankCompanies(prev => {
                                       const next = new Set(prev);
-                                      if (next.has(company.companyName)) next.delete(company.companyName);
-                                      else next.add(company.companyName);
+                                      if (next.has(companyKey)) next.delete(companyKey);
+                                      else next.add(companyKey);
                                       return next;
                                     });
                                   }}
                                 >
                                   <TableCell className="w-[40px] px-2">
-                                    {isExpanded
+                                    {isCompanyExpanded
                                       ? <ChevronDown className="h-4 w-4 text-slate-400" />
                                       : <ChevronRight className="h-4 w-4 text-slate-400" />
                                     }
@@ -4065,21 +4081,59 @@ export function ExecutiveDashboard() {
                                     {formatCurrency(companyTotal)}
                                   </TableCell>
                                 </TableRow>
-                                {isExpanded && company.accounts
-                                  .sort((a, b) => b.currentBalance - a.currentBalance)
-                                  .map(acc => (
-                                    <TableRow key={acc.bankAccountId} className="bg-slate-50/50 dark:bg-slate-800/50">
-                                      <TableCell />
-                                      <TableCell className="text-xs text-slate-500 dark:text-slate-400 pl-8">
-                                        <span className="font-semibold text-slate-700 dark:text-slate-200">{acc.bankName || acc.bankAccountDescription || acc.accountNumber}</span>
-                                        <span className="ml-2 font-mono text-slate-400 text-[10px]">{acc.accountNumber}</span>
-                                      </TableCell>
-                                      <TableCell className={`text-xs font-semibold text-right tabular-nums ${acc.currentBalance >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500 dark:text-red-300/60"}`}>
-                                        {formatCurrency(acc.currentBalance)}
-                                      </TableCell>
-                                    </TableRow>
-                                  ))
-                                }
+
+                                {/* Level 2: Banks within company */}
+                                {isCompanyExpanded && banks.map(([bankName, bankAccts]) => {
+                                  const bankTotal = bankAccts.reduce((s, a) => s + a.currentBalance, 0);
+                                  const bankKey = `${companyKey}::${bankName}`;
+                                  const isBankExpanded = expandedBankCompanies.has(bankKey);
+                                  return (
+                                    <React.Fragment key={bankKey}>
+                                      <TableRow
+                                        className="cursor-pointer bg-slate-50/50 dark:bg-slate-800/30 hover:bg-slate-100 dark:hover:bg-slate-700/50"
+                                        onClick={() => {
+                                          setExpandedBankCompanies(prev => {
+                                            const next = new Set(prev);
+                                            if (next.has(bankKey)) next.delete(bankKey);
+                                            else next.add(bankKey);
+                                            return next;
+                                          });
+                                        }}
+                                      >
+                                        <TableCell className="w-[40px] px-2 pl-6">
+                                          {isBankExpanded
+                                            ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                                            : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                                          }
+                                        </TableCell>
+                                        <TableCell className="text-xs font-semibold text-slate-600 dark:text-slate-300 pl-6">
+                                          <Landmark className="h-3.5 w-3.5 inline-block mr-1.5 text-slate-400" />
+                                          {bankName}
+                                          <Badge variant="secondary" className="ml-2 text-[10px] px-1">{bankAccts.length}</Badge>
+                                        </TableCell>
+                                        <TableCell className={`text-xs font-bold text-right tabular-nums ${bankTotal >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500 dark:text-red-300/60"}`}>
+                                          {formatCurrency(bankTotal)}
+                                        </TableCell>
+                                      </TableRow>
+
+                                      {/* Level 3: Individual accounts */}
+                                      {isBankExpanded && bankAccts
+                                        .sort((a, b) => b.currentBalance - a.currentBalance)
+                                        .map(acc => (
+                                          <TableRow key={acc.bankAccountId} className="bg-white dark:bg-slate-900">
+                                            <TableCell />
+                                            <TableCell className="text-[11px] text-slate-500 dark:text-slate-400 pl-12 font-mono">
+                                              {acc.accountNumber}
+                                            </TableCell>
+                                            <TableCell className={`text-[11px] font-semibold text-right tabular-nums ${acc.currentBalance >= 0 ? "text-slate-600 dark:text-slate-400" : "text-red-500 dark:text-red-300/60"}`}>
+                                              {formatCurrency(acc.currentBalance)}
+                                            </TableCell>
+                                          </TableRow>
+                                        ))
+                                      }
+                                    </React.Fragment>
+                                  );
+                                })}
                               </React.Fragment>
                             );
                           })}
