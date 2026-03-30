@@ -840,7 +840,7 @@ export function DreTab({
             /* ══════ DRE SIMPLES: Original view ══════ */
             <div className="mx-6 my-4 flex flex-col xl:flex-row items-start gap-6">
               {/* Table */}
-              <div className="border border-slate-200/80 rounded-2xl overflow-hidden flex-grow shadow-[0_4px_20px_rgb(0,0,0,0.03)] bg-white w-full max-w-4xl">
+              <div className="border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden flex-grow shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.2)] bg-white dark:bg-slate-900 w-full max-w-4xl">
               {/* Table Header */}
           <div className="grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 bg-slate-800 text-[11px] font-bold text-white uppercase tracking-widest">
             <span className="w-8" />
@@ -849,7 +849,7 @@ export function DreTab({
           </div>
 
           {/* Table Body */}
-          <div className="divide-y divide-slate-200/80">
+          <div className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
             {DRE_LINES.map(line => {
               const value = getValue(line);
               const isCalculated = line.type === "calculated";
@@ -865,9 +865,9 @@ export function DreTab({
                     className={`grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 transition-all duration-200 ${
                       isCalculated
                         ? value < 0
-                          ? "bg-red-50/60 relative font-semibold border-l-4 border-l-red-400"
-                          : "bg-emerald-50/60 relative font-semibold border-l-4 border-l-emerald-400"
-                        : "bg-white hover:bg-slate-50/80 border-l-4 border-l-transparent"
+                          ? "bg-red-50/60 dark:bg-red-950/30 relative font-semibold border-l-4 border-l-red-400 dark:border-l-red-500/50"
+                          : "bg-emerald-50/60 dark:bg-emerald-950/30 relative font-semibold border-l-4 border-l-emerald-400 dark:border-l-emerald-500/50"
+                        : "bg-white dark:bg-slate-900 hover:bg-slate-50/80 dark:hover:bg-slate-800/80 border-l-4 border-l-transparent"
                     } ${canExpand ? "cursor-pointer" : ""}`}
                     onClick={canExpand ? () => toggleExpand(line.key) : undefined}
                   >
@@ -884,18 +884,18 @@ export function DreTab({
                     <span className={`text-[13px] flex items-center min-w-0 ${
                       isCalculated
                         ? value < 0
-                          ? "font-bold text-red-800"
-                          : "font-bold text-emerald-800"
-                        : "font-semibold text-slate-700 tracking-tight"
+                          ? "font-bold text-red-800 dark:text-red-300/70"
+                          : "font-bold text-emerald-800 dark:text-emerald-300"
+                        : "font-semibold text-slate-700 dark:text-slate-200 tracking-tight"
                     }`}>
                       <span className="truncate pr-3">{line.label}</span>
-                      <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
+                      <span className="flex-grow border-b-2 border-dotted border-slate-300/60 dark:border-slate-600/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                     </span>
                     <span className={`text-[14px] text-right tabular-nums ${
                       isCalculated
                         ? value < 0
                           ? "font-bold text-red-700 dark:text-red-300/70"
-                          : "font-bold text-emerald-700 dark:text-emerald-400"
+                          : "font-bold text-emerald-700 dark:text-emerald-300"
                         : value < 0
                           ? "font-semibold text-red-600 dark:text-red-300/60"
                           : "font-semibold text-slate-800 dark:text-slate-200"
