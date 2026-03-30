@@ -3834,8 +3834,9 @@ export function ExecutiveDashboard() {
               <span className="text-sm">Carregando saldos bancarios...</span>
             </div>
           ) : (() => {
-            // All unique account numbers for the filter (always from ALL accounts, not company-filtered)
+            // All unique account numbers for the filter (always from ALL accounts)
             const allAccountNums = Array.from(new Set(bankAccounts.map(a => a.accountNumber))).sort();
+            const allSelected = allAccountNums.length > 0 && allAccountNums.every(n => selectedBankAccounts.has(n));
             const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
 
             // Apply both company filter AND account filter
@@ -3900,9 +3901,9 @@ export function ExecutiveDashboard() {
                       <div className="max-h-[300px] overflow-y-auto p-2">
                         <div className="flex items-center gap-2 px-2 py-1.5 border-b mb-1">
                           <Checkbox
-                            checked={selectedBankAccounts.size > 0 && selectedBankAccounts.size === allAccountNums.length}
+                            checked={allSelected}
                             onCheckedChange={() => {
-                              if (selectedBankAccounts.size === allAccountNums.length) setSelectedBankAccounts(new Set());
+                              if (allSelected) setSelectedBankAccounts(new Set());
                               else setSelectedBankAccounts(new Set(allAccountNums));
                             }}
                           />
