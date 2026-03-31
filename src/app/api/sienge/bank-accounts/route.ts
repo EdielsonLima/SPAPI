@@ -51,11 +51,26 @@ export async function GET() {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 
-    // 1. Fetch account balances
+    // 1. Fetch companies first
+    const companiesMap: Record<number, string> = {};
+    const companyIds: number[] = [];
+    try {
+      const cd = await siengeGet<R>("/companies", { offset: "0", limit: "100" });
+      (cd?.results || []).forEach((c: R) => {
+        companiesMap[c.id] = c.name;
+        companyIds.push(c.id);
+      });
+    } catch { /* ignore */ }
+
+    // 2. Fetch account balances - first try global, then per company for missing ones
+    const allAccounts: R[] = [];
+    const seenCompanies = new Set<number>();
+
+    // Global fetch
     const firstPage = await siengeGet<R>("/accounts-balances", { balanceDate: today, offset: "0", limit: "100" });
     const results = firstPage?.results || [];
     const total = firstPage?.resultSetMetadata?.count || results.length;
-    const allAccounts: R[] = [...results];
+    allAccounts.push(...results);
     let offset = results.length;
     while (offset < total) {
       const page = await siengeGet<R>("/accounts-balances", { balanceDate: today, offset: String(offset), limit: "100" });
@@ -65,12 +80,30 @@ export async function GET() {
       offset += pr.length;
     }
 
-    // 2. Fetch companies for name lookup
-    const companiesMap: Record<number, string> = {};
-    try {
-      const cd = await siengeGet<R>("/companies", { offset: "0", limit: "100" });
-      (cd?.results || []).forEach((c: R) => { companiesMap[c.id] = c.name; });
-    } catch { /* ignore */ }
+    // Track which companies were returned
+    for (const acc of allAccounts) {
+      if (acc.companyId) seenCompanies.add(acc.companyId);
+    }
+
+    // Fetch missing companies individually (e.g., Hannover companyId=7)
+    const missingCompanies = companyIds.filter(id => !seenCompanies.has(id));
+    if (missingCompanies.length > 0) {
+      console.log(`[accounts-balances] Missing companies from global fetch: ${missingCompanies.map(id => `${id}(${companiesMap[id]})`).join(", ")}`);
+      for (const compId of missingCompanies) {
+        try {
+          const compPage = await siengeGet<R>("/accounts-balances", {
+            balanceDate: today, companyId: String(compId), offset: "0", limit: "100"
+          });
+          const compResults = compPage?.results || [];
+          if (compResults.length > 0) {
+            console.log(`[accounts-balances] Found ${compResults.length} accounts for company ${compId} (${companiesMap[compId]})`);
+            allAccounts.push(...compResults);
+          }
+        } catch {
+          // companyId param might not be supported, skip
+        }
+      }
+    }
 
     // 3. Map to normalized structure with bank names from DimBanco
     // Use composite key companyId:accountNumber to uniquely identify accounts
@@ -103,7 +136,15 @@ export async function GET() {
     }
     console.log(`[accounts-balances] Found ${enriched.filter((e: R) => e.isInDimBanco).length} DimBanco accounts out of ${dimBancoNums.length}`);
 
-    return NextResponse.json({ data: enriched });
+    return NextResponse.json({
+      data: enriched,
+      _debug: {
+        missingDimBanco: missing,
+        totalFromApi: allAccounts.length,
+        dimBancoMatched: enriched.filter((e: R) => e.isInDimBanco).length,
+        allAccountNumbers: allAccounts.map((a: R) => `${a.companyId}:${a.accountNumber}`),
+      }
+    });
   } catch (error) {
     console.error("Error fetching accounts-balances:", error);
     return NextResponse.json({ error: "Failed to fetch account balances", details: String(error) }, { status: 500 });
