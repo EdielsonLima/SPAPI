@@ -155,20 +155,22 @@ function MultiSelectFilter({
             />
           </div>
         </div>
-        {/* Select All */}
+        {/* Select All / Deselect All */}
         {!search && (
           <div className="px-1 pt-1">
-            <label className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-slate-50 cursor-pointer text-sm font-medium text-slate-700 border-b mb-1 pb-2">
-              <Checkbox
-                checked={allSelected}
-                onCheckedChange={() => {
-                  if (allSelected) onClear();
-                  else onSelectAll();
-                }}
-              />
-              <span>Selecionar tudo</span>
+            <div
+              className="flex items-center gap-2.5 px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200 border-b mb-1 pb-2"
+              onClick={() => {
+                if (allSelected) onClear();
+                else onSelectAll();
+              }}
+            >
+              <div className={`h-4 w-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${allSelected ? "bg-primary border-primary" : "border-slate-300 dark:border-slate-600"}`}>
+                {allSelected && <span className="text-white text-[10px] font-bold">✓</span>}
+              </div>
+              <span>{allSelected ? "Desmarcar tudo" : "Selecionar tudo"}</span>
               <span className="ml-auto text-xs text-slate-400">{allOptions.length}</span>
-            </label>
+            </div>
           </div>
         )}
         <div className="max-h-[280px] overflow-y-auto p-1">
