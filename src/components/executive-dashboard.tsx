@@ -3915,6 +3915,26 @@ export function ExecutiveDashboard() {
                   <span className="text-xs text-slate-500 dark:text-slate-400">
                     Saldo do dia: <span className="font-semibold text-slate-700 dark:text-slate-200">{new Date().toLocaleDateString("pt-BR")}</span>
                   </span>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 text-xs text-slate-500"
+                    onClick={() => {
+                      localStorage.removeItem("dashboard_saldos_accounts");
+                      // Reset to DimBanco defaults
+                      const validNums = new Set<string>(
+                        bankAccounts
+                          .filter(a => a.isInDimBanco)
+                          .map(a => String(a.bankAccountId))
+                      );
+                      setSelectedBankAccounts(validNums);
+                      localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(validNums)));
+                      toast.success("Filtro resetado para padrao DimBanco!");
+                    }}
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" /> Resetar padrao
+                  </Button>
                 </div>
 
                 {/* KPI Card */}
