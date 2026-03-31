@@ -4164,11 +4164,11 @@ export function ExecutiveDashboard() {
                           .filter(a => effectiveSelected.has(a.accountId))
                           .reduce((s, a) => s + a.amount, 0);
                         return {
-                          date: date.split("-")[2], // just day number
+                          date: date.split("-")[2],
                           fullDate: date,
                           total,
                         };
-                      });
+                      }).filter(d => d.total !== 0); // Remove weekends/holidays with zero balance
 
                       return (
                         <div className="h-[300px]">
