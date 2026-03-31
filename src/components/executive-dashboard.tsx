@@ -462,7 +462,7 @@ export function ExecutiveDashboard() {
   // Fetch bank accounts when saldos tab is active
   const bankAccountsLoaded = useRef(false);
   useEffect(() => {
-    if (activeTab !== "saldos" || bankAccountsLoaded.current) return;
+    if ((activeTab !== "saldos" && activeTab !== "visao-geral") || bankAccountsLoaded.current) return;
     bankAccountsLoaded.current = true;
     setLoadingBankAccounts(true);
     fetch("/api/sienge/bank-accounts")
