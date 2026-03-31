@@ -1443,7 +1443,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                       <TableCell className="text-right font-mono text-sm text-slate-600">
                                         {daysOver}
                                       </TableCell>
-                                      <TableCell className="text-right font-mono text-sm text-red-600">
+                                      <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-300/70">
                                         {formatCurrency(encargos)}
                                       </TableCell>
                                       <TableCell className="text-right font-mono text-sm text-slate-500">
@@ -1601,7 +1601,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                                 <TableCell className="text-right font-mono text-xs py-1.5 text-amber-600">
                                                   {isPaidItem ? "-" : `${correcaoPct.toFixed(1)}%`}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaidItem ? "text-green-600" : isOverdue ? "text-red-600" : "text-slate-800"}`}>
+                                                <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaidItem ? "text-green-600" : isOverdue ? "text-red-600 dark:text-red-300/70" : "text-slate-800 dark:text-slate-200"}`}>
                                                   {formatCurrency(parcela.correctedBalanceAmount)}
                                                 </TableCell>
                                                 <TableCell className="text-xs py-1.5">

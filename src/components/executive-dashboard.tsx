@@ -1302,7 +1302,7 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(filteredAtrasadas, "balance"),
         monthly: buildMonthlyChart(filteredAtrasadas, "balance"),
         annual: buildAnnualChart(filteredAtrasadas, "balance"),
-        color: "hsl(0, 84%, 60%)",
+        color: "hsl(0, 84%, 68%)",
         label: "Atrasado",
       };
     } else if (activeTab === "a-receber") {
@@ -2702,7 +2702,7 @@ export function ExecutiveDashboard() {
                                   {formatCompactCurrency(value)}
                                 </text>
                                 {pct !== null && pct !== undefined && (
-                                  <text x={x + w / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill={pct >= 0 ? "#16a34a" : "#dc2626"}>
+                                  <text x={x + w / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill={pct >= 0 ? "#16a34a" : "#f87171"}>
                                     {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
                                   </text>
                                 )}
@@ -2715,7 +2715,7 @@ export function ExecutiveDashboard() {
                             const maxVal = Math.max(...values);
                             const minVal = Math.min(...values);
                             return comercialChart.map((entry, idx) => (
-                              <Cell key={idx} fill={entry.value === maxVal ? "#22c55e" : entry.value === minVal ? "#ef4444" : "#6366f1"} />
+                              <Cell key={idx} fill={entry.value === maxVal ? "#22c55e" : entry.value === minVal ? "#f87171" : "#6366f1"} />
                             ));
                           })()}
                         </Bar>
@@ -3496,7 +3496,7 @@ export function ExecutiveDashboard() {
                             {formatCompactCurrency(Number(value))}
                           </text>
                           {pct !== null && pct !== undefined && (
-                            <text x={cx} y={(y || 0) - 2} textAnchor="middle" fontSize={9} fill={pct >= 0 ? "#dc2626" : "#16a34a"} fontWeight={500}>
+                            <text x={cx} y={(y || 0) - 2} textAnchor="middle" fontSize={9} fill={pct >= 0 ? "#f87171" : "#16a34a"} fontWeight={500}>
                               {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
                             </text>
                           )}
