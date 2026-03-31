@@ -4142,12 +4142,57 @@ export function ExecutiveDashboard() {
                 </div>
 
                 {/* Daily Balance Line Chart */}
+                {(() => {
+                  // Compute line data before rendering so we can use it in the header
+                  let lineData: { date: string; fullDate: string; total: number }[] = [];
+                  if (dailyBalances) {
+                    const sortedDates = Object.keys(dailyBalances).sort();
+                    const validAccountIds = new Set(filteredAccounts.map(a => String(a.bankAccountId)));
+                    lineData = sortedDates.map(date => {
+                      const dayAccounts = dailyBalances[date] || [];
+                      const total = dayAccounts
+                        .filter(a => validAccountIds.has(a.accountId))
+                        .reduce((s, a) => s + a.amount, 0);
+                      return { date: date.split("-")[2], fullDate: date, total };
+                    }).filter(d => d.total !== 0);
+                  }
+                  const firstVal = lineData.length > 0 ? lineData[0].total : 0;
+                  const lastVal = lineData.length > 0 ? lineData[lineData.length - 1].total : 0;
+                  const varAbs = lastVal - firstVal;
+                  const varPct = firstVal !== 0 ? (varAbs / firstVal) * 100 : 0;
+                  const isPositiveVar = varAbs >= 0;
+
+                  return (
                 <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                      Evolução do Saldo — {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
-                    </CardTitle>
-                    <CardDescription className="text-xs text-slate-500">Saldo dia a dia das contas selecionadas</CardDescription>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                          Evolução do Saldo — {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                        </CardTitle>
+                        <CardDescription className="text-xs text-slate-500">Saldo dia a dia das contas selecionadas</CardDescription>
+                      </div>
+                      {lineData.length > 1 && (
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <div className="text-[10px] text-slate-400 uppercase tracking-wider">Variação no mês</div>
+                            <div className="flex items-center gap-1.5 justify-end">
+                              <span className="text-xs text-slate-500">{formatCompactCurrency(firstVal)}</span>
+                              <span className="text-xs text-slate-400">→</span>
+                              <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatCompactCurrency(lastVal)}</span>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className={`text-xs px-2 py-1 font-semibold rounded-full ${
+                            isPositiveVar
+                              ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
+                              : "bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                          }`}>
+                            {isPositiveVar ? <TrendingUp className="h-3.5 w-3.5 mr-1" /> : <TrendingDown className="h-3.5 w-3.5 mr-1" />}
+                            {isPositiveVar ? "+" : ""}{varPct.toFixed(1)}% ({isPositiveVar ? "+" : ""}{formatCompactCurrency(varAbs)})
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {loadingDaily ? (
@@ -4155,22 +4200,7 @@ export function ExecutiveDashboard() {
                         <Loader2 className="h-5 w-5 animate-spin" />
                         <span className="text-sm">Carregando evolução diária...</span>
                       </div>
-                    ) : dailyBalances ? (() => {
-                      // Build chart data from daily balances, filtered by selected accounts
-                      const sortedDates = Object.keys(dailyBalances).sort();
-                      // Use only accounts that pass BOTH company and account filters
-                      const validAccountIds = new Set(filteredAccounts.map(a => String(a.bankAccountId)));
-                      const lineData = sortedDates.map(date => {
-                        const dayAccounts = dailyBalances[date] || [];
-                        const total = dayAccounts
-                          .filter(a => validAccountIds.has(a.accountId))
-                          .reduce((s, a) => s + a.amount, 0);
-                        return {
-                          date: date.split("-")[2],
-                          fullDate: date,
-                          total,
-                        };
-                      }).filter(d => d.total !== 0); // Remove weekends/holidays with zero balance
+                    ) : dailyBalances && lineData.length > 0 ? (() => {
 
                       // Find max and min values for highlighting
                       const maxVal = Math.max(...lineData.map(d => d.total));
@@ -4244,6 +4274,8 @@ export function ExecutiveDashboard() {
                     )}
                   </CardContent>
                 </Card>
+                  );
+                })()}
               </>
             );
           })()}
