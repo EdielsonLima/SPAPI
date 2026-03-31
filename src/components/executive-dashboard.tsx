@@ -60,13 +60,14 @@ import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
 type Section = "cp" | "cr";
-type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "saldos";
+type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "saldos";
 
 // Each tab group has its own saved company filter
 function getTabGroup(tab: MainTab): string {
   switch (tab) {
     case "a-pagar": case "pagas": case "atrasadas": return "cp";
     case "a-receber": case "recebidas": case "inadimplencia": return "cr";
+    case "visao-geral": return "visao-geral";
     default: return tab;
   }
 }
@@ -266,7 +267,7 @@ export function ExecutiveDashboard() {
     return new Set(years);
   });
   const [selectedDuePeriods, setSelectedDuePeriods] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<MainTab>("a-pagar");
+  const [activeTab, setActiveTab] = useState<MainTab>("visao-geral");
   const [items, setItems] = useState<SiengeOutcome[]>([]);
   const [incomeItems, setIncomeItems] = useState<SiengeIncome[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1615,6 +1616,7 @@ export function ExecutiveDashboard() {
     comercial: [],
     dre: [],
     saldos: [],
+    "visao-geral": [],
   };
 
   const kpis = kpiConfigs[activeTab];
@@ -1672,7 +1674,18 @@ export function ExecutiveDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {/* Section Toggle */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-1 gap-0.5">
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-0.5">
+            <button
+              onClick={() => switchTab("visao-geral")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "visao-geral"
+                  ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Geral
+            </button>
             <button
               onClick={() => {
                 if (section !== "cp") {
@@ -1774,7 +1787,7 @@ export function ExecutiveDashboard() {
           </div>
 
           {/* Tabs */}
-          {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && <Tabs value={activeTab} onValueChange={v => {
+          {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             switchTab(tab);
             // Only reset time-based filters, keep company, docType and year selections stable
@@ -3321,7 +3334,7 @@ export function ExecutiveDashboard() {
       })()}
 
       {/* KPI Cards */}
-      {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
@@ -3877,6 +3890,241 @@ export function ExecutiveDashboard() {
       </>)}
 
       {/* DRE Tab */}
+      {/* ══════ VISÃO GERAL TAB ══════ */}
+      {activeTab === "visao-geral" && (() => {
+        // Compute overview metrics from all data (unfiltered by company for global view)
+        const now = new Date();
+        const todayStr = now.toISOString().split("T")[0];
+        const in7d = new Date(now.getTime() + 7 * 86400000).toISOString().split("T")[0];
+        const in30d = new Date(now.getTime() + 30 * 86400000).toISOString().split("T")[0];
+
+        // A Pagar
+        const totalAPagar = filteredAPagar.reduce((s, i) => s + effectiveAmount(i), 0);
+        const aPagar7d = filteredAPagar.filter(i => i.dueDate >= todayStr && i.dueDate <= in7d).reduce((s, i) => s + effectiveAmount(i), 0);
+        const aPagar30d = filteredAPagar.filter(i => i.dueDate >= todayStr && i.dueDate <= in30d).reduce((s, i) => s + effectiveAmount(i), 0);
+        const totalAtrasadas = filteredAtrasadas.reduce((s, i) => s + effectiveAmount(i), 0);
+
+        // A Receber
+        const totalAReceber = filteredAReceber.reduce((s, i) => s + effectiveAmount(i), 0);
+        const aReceber7d = filteredAReceber.filter(i => i.dueDate >= todayStr && i.dueDate <= in7d).reduce((s, i) => s + effectiveAmount(i), 0);
+        const totalInadimplencia = filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0);
+        const pctInadimplencia = totalAReceber > 0 ? (totalInadimplencia / totalAReceber) * 100 : 0;
+
+        // Saldos
+        const saldoTotal = bankAccounts
+          .filter(a => selectedBankAccounts.size === 0 || selectedBankAccounts.has(String(a.bankAccountId)))
+          .reduce((s, a) => s + a.currentBalance, 0);
+
+        // Fluxo projetado simples
+        const fluxoProjetado30d = saldoTotal + aReceber7d - aPagar7d;
+
+        return (
+          <div className="space-y-6">
+            {/* Row 1: Main KPIs */}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {/* Saldo Bancário */}
+              <div className="relative rounded-2xl p-4 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("saldos")}>
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-600" />
+                <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Saldo Bancário</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCompactCurrency(saldoTotal)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">hoje</p>
+              </div>
+
+              {/* A Pagar 7d */}
+              <div className="relative rounded-2xl p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("a-pagar")}>
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
+                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">A Pagar 7 dias</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCompactCurrency(aPagar7d)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">total: {formatCompactCurrency(totalAPagar)}</p>
+              </div>
+
+              {/* A Receber 7d */}
+              <div className="relative rounded-2xl p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("a-receber")}>
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
+                <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">A Receber 7 dias</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCompactCurrency(aReceber7d)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">total: {formatCompactCurrency(totalAReceber)}</p>
+              </div>
+
+              {/* Vencidas */}
+              <div className="relative rounded-2xl p-4 bg-red-50 dark:bg-red-950/40 border border-red-200/60 dark:border-red-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("atrasadas")}>
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-400 to-rose-500" />
+                <p className="text-[10px] font-semibold text-red-600 dark:text-red-300/70 uppercase tracking-wider mb-1">Contas Vencidas</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCompactCurrency(totalAtrasadas)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{filteredAtrasadas.length} parcelas</p>
+              </div>
+
+              {/* Inadimplência */}
+              <div className="relative rounded-2xl p-4 bg-orange-50 dark:bg-orange-950/40 border border-orange-200/60 dark:border-orange-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("inadimplencia")}>
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-amber-500" />
+                <p className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wider mb-1">Inadimplência</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{pctInadimplencia.toFixed(1)}%</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{formatCompactCurrency(totalInadimplencia)}</p>
+              </div>
+
+              {/* Fluxo Projetado */}
+              <div className={`relative rounded-2xl p-4 ${fluxoProjetado30d >= 0 ? "bg-sky-50 dark:bg-sky-950/40 border-sky-200/60 dark:border-sky-800/40" : "bg-red-50 dark:bg-red-950/40 border-red-200/60 dark:border-red-800/40"} border overflow-hidden`}>
+                <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${fluxoProjetado30d >= 0 ? "from-sky-500 to-blue-500" : "from-red-400 to-rose-500"}`} />
+                <p className="text-[10px] font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-1">Fluxo 7 dias</p>
+                <p className={`text-lg font-black tabular-nums ${fluxoProjetado30d >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-300/70"}`}>{formatCompactCurrency(fluxoProjetado30d)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">saldo + receber - pagar</p>
+              </div>
+            </div>
+
+            {/* Row 2: Fluxo de Caixa Projetado */}
+            <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Fluxo de Caixa Projetado — Próximos 30 dias</CardTitle>
+                <CardDescription className="text-xs text-slate-500">Saldo atual + recebimentos previstos - pagamentos previstos</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {(() => {
+                  // Build projected cash flow for next 30 days
+                  const days: { date: string; label: string; saldo: number; receber: number; pagar: number; projetado: number }[] = [];
+                  let acumReceber = 0;
+                  let acumPagar = 0;
+
+                  for (let d = 0; d <= 30; d++) {
+                    const dt = new Date(now.getTime() + d * 86400000);
+                    const dtStr = dt.toISOString().split("T")[0];
+                    const dayLabel = `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
+
+                    const recDia = filteredAReceber.filter(i => i.dueDate === dtStr).reduce((s, i) => s + effectiveAmount(i), 0);
+                    const pagDia = filteredAPagar.filter(i => i.dueDate === dtStr).reduce((s, i) => s + effectiveAmount(i), 0);
+                    acumReceber += recDia;
+                    acumPagar += pagDia;
+
+                    days.push({
+                      date: dtStr,
+                      label: dayLabel,
+                      saldo: saldoTotal,
+                      receber: acumReceber,
+                      pagar: acumPagar,
+                      projetado: saldoTotal + acumReceber - acumPagar,
+                    });
+                  }
+
+                  return (
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={days} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
+                          <defs>
+                            <linearGradient id="fluxoGrad" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="#6366f1" stopOpacity={0.2} />
+                              <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                          <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 10 }} />
+                          <RechartsTooltip
+                            content={({ active, payload }) => {
+                              if (!active || !payload || payload.length === 0) return null;
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              const d = payload[0].payload as any;
+                              return (
+                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-3 text-xs">
+                                  <div className="font-semibold mb-1.5">{d.date?.split("-").reverse().join("/")}</div>
+                                  <div className="flex justify-between gap-4"><span className="text-slate-500">Saldo atual:</span><span>{formatCurrency(d.saldo)}</span></div>
+                                  <div className="flex justify-between gap-4"><span className="text-emerald-500">+ Recebimentos:</span><span className="text-emerald-600">{formatCurrency(d.receber)}</span></div>
+                                  <div className="flex justify-between gap-4"><span className="text-amber-500">- Pagamentos:</span><span className="text-amber-600">{formatCurrency(d.pagar)}</span></div>
+                                  <div className="flex justify-between gap-4 pt-1 border-t mt-1"><span className="font-semibold">Projetado:</span><span className={`font-bold ${d.projetado >= 0 ? "text-indigo-600" : "text-red-400"}`}>{formatCurrency(d.projetado)}</span></div>
+                                </div>
+                              );
+                            }}
+                          />
+                          <Area type="monotone" dataKey="projetado" stroke="#6366f1" strokeWidth={2.5} fill="url(#fluxoGrad)" dot={false} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Row 3: Quick summaries */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* A Pagar próximos 30 dias */}
+              <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">A Pagar — Próximos 30 dias</CardTitle>
+                    <span className="text-lg font-black tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(aPagar30d)}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-slate-800 text-slate-100">
+                      <TableRow>
+                        <TableHead className="text-slate-200 text-xs">Credor</TableHead>
+                        <TableHead className="text-slate-200 text-xs">Vencimento</TableHead>
+                        <TableHead className="text-slate-200 text-xs text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAPagar
+                        .filter(i => i.dueDate >= todayStr && i.dueDate <= in30d)
+                        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+                        .slice(0, 10)
+                        .map((item, idx) => (
+                          <TableRow key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                            <TableCell className="text-xs truncate max-w-[200px]">{"creditorName" in item ? item.creditorName : ""}</TableCell>
+                            <TableCell className="text-xs">{formatDate(item.dueDate)}</TableCell>
+                            <TableCell className="text-xs font-semibold text-right tabular-nums">{formatCurrency(effectiveAmount(item))}</TableCell>
+                          </TableRow>
+                        ))
+                      }
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Inadimplência por empresa */}
+              <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Inadimplência por Empresa</CardTitle>
+                    <span className="text-lg font-black tabular-nums text-orange-600 dark:text-orange-400">{formatCurrency(totalInadimplencia)}</span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <Table>
+                    <TableHeader className="bg-slate-800 text-slate-100">
+                      <TableRow>
+                        <TableHead className="text-slate-200 text-xs">Empresa</TableHead>
+                        <TableHead className="text-slate-200 text-xs text-right">Parcelas</TableHead>
+                        <TableHead className="text-slate-200 text-xs text-right">Valor</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        const byComp: Record<string, { count: number; total: number }> = {};
+                        filteredInadimplencia.forEach(i => {
+                          const c = i.companyName || "Outros";
+                          if (!byComp[c]) byComp[c] = { count: 0, total: 0 };
+                          byComp[c].count++;
+                          byComp[c].total += effectiveAmount(i);
+                        });
+                        return Object.entries(byComp)
+                          .sort((a, b) => b[1].total - a[1].total)
+                          .slice(0, 10)
+                          .map(([name, data]) => (
+                            <TableRow key={name} className="hover:bg-slate-50 dark:hover:bg-slate-800">
+                              <TableCell className="text-xs truncate max-w-[200px]">{name}</TableCell>
+                              <TableCell className="text-xs text-right">{data.count}</TableCell>
+                              <TableCell className="text-xs font-semibold text-right tabular-nums text-red-600 dark:text-red-300/70">{formatCurrency(data.total)}</TableCell>
+                            </TableRow>
+                          ));
+                      })()}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        );
+      })()}
+
       {activeTab === "dre" && (
         <DreTab
           outcomeItems={consistentItems}
