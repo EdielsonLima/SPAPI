@@ -94,6 +94,15 @@ export async function GET() {
       };
     });
 
+    // Log which DimBanco accounts were found/missing
+    const foundAccNums = new Set(allAccounts.map((a: R) => a.accountNumber));
+    const dimBancoNums = Object.keys(BANK_NAMES);
+    const missing = dimBancoNums.filter(n => !foundAccNums.has(n));
+    if (missing.length > 0) {
+      console.log(`[accounts-balances] DimBanco accounts NOT found in API: ${missing.join(", ")}`);
+    }
+    console.log(`[accounts-balances] Found ${enriched.filter((e: R) => e.isInDimBanco).length} DimBanco accounts out of ${dimBancoNums.length}`);
+
     return NextResponse.json({ data: enriched });
   } catch (error) {
     console.error("Error fetching accounts-balances:", error);
