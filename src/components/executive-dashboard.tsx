@@ -61,6 +61,18 @@ import { DreTab } from "@/components/dre-tab";
 
 type Section = "cp" | "cr";
 type MainTab = "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "saldos";
+
+// Each tab group has its own saved company filter
+function getTabGroup(tab: MainTab): string {
+  switch (tab) {
+    case "a-pagar": case "pagas": case "atrasadas": return "cp";
+    case "a-receber": case "recebidas": case "inadimplencia": return "cr";
+    default: return tab;
+  }
+}
+function companyStorageKey(tab: MainTab): string {
+  return `dashboard_companies_${getTabGroup(tab)}`;
+}
 type ChartView = "mensal" | "anual";
 
 // === Reusable Multi-Select Filter ===
@@ -264,6 +276,28 @@ export function ExecutiveDashboard() {
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
   const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string }[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
+  // Per-tab company filter: save/restore when switching tabs
+  const perTabCompanies = useRef<Record<string, Set<string>>>({});
+  const switchTab = useCallback((newTab: MainTab) => {
+    // Save current tab's companies
+    perTabCompanies.current[getTabGroup(activeTab)] = new Set(selectedCompanies);
+    // Load new tab's companies
+    const saved = perTabCompanies.current[getTabGroup(newTab)];
+    if (saved) {
+      setSelectedCompanies(saved);
+    } else {
+      // Try localStorage
+      const lsKey = companyStorageKey(newTab);
+      const ls = typeof window !== "undefined" ? localStorage.getItem(lsKey) : null;
+      if (ls) {
+        setSelectedCompanies(new Set(JSON.parse(ls)));
+      } else {
+        // Fall back to default (no filter)
+        setSelectedCompanies(new Set());
+      }
+    }
+    setActiveTab(newTab);
+  }, [activeTab, selectedCompanies]);
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
@@ -547,13 +581,15 @@ export function ExecutiveDashboard() {
   useEffect(() => {
     if (allCompanyNames.length > 0 && !companiesInitialized.current) {
       companiesInitialized.current = true;
-      const saved = localStorage.getItem("dashboard_default_companies");
+      // Try per-tab key first, then legacy global key
+      const perTabKey = companyStorageKey(activeTab);
+      const saved = localStorage.getItem(perTabKey) || localStorage.getItem("dashboard_default_companies");
       if (saved) {
         const savedSet = new Set<string>(JSON.parse(saved));
-        // Only use saved if the companies still exist in data
         const valid = new Set([...savedSet].filter(c => allCompanyNames.includes(c)));
         if (valid.size > 0) {
           setSelectedCompanies(valid);
+          perTabCompanies.current[getTabGroup(activeTab)] = valid;
           return;
         }
       }
@@ -1639,7 +1675,7 @@ export function ExecutiveDashboard() {
               onClick={() => {
                 if (section !== "cp") {
                   setSection("cp");
-                  setActiveTab("a-pagar");
+                  switchTab("a-pagar");
                   setSelectedCompanies(new Set());
                   setSelectedDocTypes(new Set());
                   setSelectedMonths(new Set());
@@ -1660,7 +1696,7 @@ export function ExecutiveDashboard() {
               onClick={() => {
                 if (section !== "cr") {
                   setSection("cr");
-                  setActiveTab("a-receber");
+                  switchTab("a-receber");
                   setSelectedCompanies(new Set());
                   setSelectedDocTypes(new Set());
                   setSelectedMonths(new Set());
@@ -1680,7 +1716,7 @@ export function ExecutiveDashboard() {
             <button
               onClick={() => {
                 setSection("cp");
-                setActiveTab("orcamento");
+                switchTab("orcamento");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "orcamento"
@@ -1694,7 +1730,7 @@ export function ExecutiveDashboard() {
             <button
               onClick={() => {
                 setSection("cp");
-                setActiveTab("comercial");
+                switchTab("comercial");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "comercial"
@@ -1708,7 +1744,7 @@ export function ExecutiveDashboard() {
             <button
               onClick={() => {
                 setSection("cp");
-                setActiveTab("dre");
+                switchTab("dre");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "dre"
@@ -1722,7 +1758,7 @@ export function ExecutiveDashboard() {
             <button
               onClick={() => {
                 setSection("cp");
-                setActiveTab("saldos");
+                switchTab("saldos");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "saldos"
@@ -1738,7 +1774,7 @@ export function ExecutiveDashboard() {
           {/* Tabs */}
           {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
-            setActiveTab(tab);
+            switchTab(tab);
             // Only reset time-based filters, keep company, docType and year selections stable
             setSelectedMonths(new Set());
             setSelectedDays(new Set());
@@ -1802,7 +1838,7 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedCompanies(new Set())}
             activeColor="blue"
             onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
+              localStorage.setItem(companyStorageKey(activeTab), JSON.stringify([...selectedCompanies]));
               toast.success("Padrao de empresas salvo!");
             }}
           />
@@ -1834,7 +1870,7 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedCompanies(new Set())}
             activeColor="blue"
             onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
+              localStorage.setItem(companyStorageKey(activeTab), JSON.stringify([...selectedCompanies]));
               toast.success("Padrao de empresas salvo!");
             }}
           />
@@ -1875,7 +1911,7 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedCompanies(new Set())}
             activeColor="indigo"
             onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
+              localStorage.setItem(companyStorageKey(activeTab), JSON.stringify([...selectedCompanies]));
               toast.success("Padrão de empresas salvo!");
             }}
           />
@@ -1916,7 +1952,7 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedCompanies(new Set())}
             activeColor="blue"
             onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_companies", JSON.stringify([...selectedCompanies]));
+              localStorage.setItem(companyStorageKey(activeTab), JSON.stringify([...selectedCompanies]));
               toast.success("Padrao de empresas salvo!");
             }}
           />
@@ -2013,7 +2049,7 @@ export function ExecutiveDashboard() {
             variant="ghost"
             size="sm"
             onClick={() => {
-              const savedCo = localStorage.getItem("dashboard_default_companies");
+              const savedCo = localStorage.getItem(companyStorageKey(activeTab)) || localStorage.getItem("dashboard_default_companies");
               setSelectedCompanies(savedCo ? new Set(JSON.parse(savedCo)) : defaultCompanies());
               const savedDoc = localStorage.getItem("dashboard_default_docTypes");
               setSelectedDocTypes(savedDoc ? new Set(JSON.parse(savedDoc)) : new Set(allDocTypes.filter(t => !isExcludedDocType(t))));
