@@ -436,7 +436,7 @@ export function ExecutiveDashboard() {
             const validNums = new Set<string>(
               json.data
                 .filter((a: { isInDimBanco?: boolean }) => a.isInDimBanco)
-                .map((a: { accountNumber: string }) => a.accountNumber)
+                .map((a: { bankAccountId: string }) => String(a.bankAccountId))
             );
             setSelectedBankAccounts(validNums);
             // Auto-save so it persists
@@ -3847,11 +3847,11 @@ export function ExecutiveDashboard() {
             const companyFilteredAccounts = selectedCompanies.size > 0
               ? bankAccounts.filter(a => selectedCompanies.has(a.companyName))
               : bankAccounts;
-            const allAccountNums = Array.from(new Set(companyFilteredAccounts.map(a => a.accountNumber))).sort();
+            const allAccountNums = Array.from(new Set(companyFilteredAccounts.map(a => String(a.bankAccountId)))).sort();
             const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
 
             // Apply account filter on company-filtered set
-            const filteredAccounts = companyFilteredAccounts.filter(a => effectiveSelected.has(a.accountNumber));
+            const filteredAccounts = companyFilteredAccounts.filter(a => effectiveSelected.has(String(a.bankAccountId)));
 
             // Group by company
             const byCompany: Record<string, { companyName: string; accounts: typeof bankAccounts }> = {};
@@ -3897,13 +3897,13 @@ export function ExecutiveDashboard() {
                     onSelectAll={() => setSelectedBankAccounts(new Set(allAccountNums))}
                     onClear={() => setSelectedBankAccounts(new Set())}
                     activeColor="indigo"
-                    labelFn={(num) => {
-                      const acc = bankAccounts.find(a => a.accountNumber === num);
-                      if (acc?.bankName) return `${acc.bankName} (${num})`;
-                      return num;
+                    labelFn={(id) => {
+                      const acc = bankAccounts.find(a => String(a.bankAccountId) === id);
+                      if (acc?.bankName) return `${acc.bankName} (${acc.accountNumber})`;
+                      return acc?.accountNumber || id;
                     }}
-                    subtitleFn={(num) => {
-                      const acc = bankAccounts.find(a => a.accountNumber === num);
+                    subtitleFn={(id) => {
+                      const acc = bankAccounts.find(a => String(a.bankAccountId) === id);
                       return acc?.companyName || "";
                     }}
                     onSaveDefault={() => {

@@ -73,21 +73,24 @@ export async function GET() {
     } catch { /* ignore */ }
 
     // 3. Map to normalized structure with bank names from DimBanco
+    // Use composite key companyId:accountNumber to uniquely identify accounts
     const enriched = allAccounts.map((acc: R) => {
       const accNum = acc.accountNumber || "";
+      const compId = acc.companyId || 0;
+      const uniqueId = `${compId}:${accNum}`;
       return {
-        bankAccountId: accNum,
+        bankAccountId: uniqueId,
         bankAccountDescription: accNum,
         bankCode: "",
         bankName: BANK_NAMES[accNum] || "",
         agencyNumber: "",
         accountNumber: accNum,
-        companyId: acc.companyId || 0,
-        companyName: companiesMap[acc.companyId] || `Empresa ${acc.companyId}`,
+        companyId: compId,
+        companyName: companiesMap[compId] || `Empresa ${compId}`,
         currentBalance: acc.amount ?? 0,
         reconciledAmount: acc.reconciledAmount ?? 0,
         accountStatus: acc.accountStatus || "",
-        isInDimBanco: isInDimBanco(accNum, acc.companyId || 0),
+        isInDimBanco: isInDimBanco(accNum, compId),
       };
     });
 
