@@ -5,11 +5,14 @@ import { useSession } from "next-auth/react";
 import Image from "next/image";
 
 const EMPREENDIMENTOS = [
-  { src: "/empreendimentos/domus.jpg", nome: "Domus", descricao: "Balneário Camboriú" },
-  { src: "/empreendimentos/serenity.jpg", nome: "Serenity", descricao: "Balneário Camboriú" },
-  { src: "/empreendimentos/tesla.jpg", nome: "Tesla Residencial", descricao: "Balneário Camboriú" },
-  { src: "/empreendimentos/hannover.jpg", nome: "Residencial Hannover", descricao: "Balneário Camboriú" },
-  { src: "/empreendimentos/jardins.jpg", nome: "Edifício 135 Jardins", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/Domus.jpeg", nome: "Domus", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/Serenity.jpeg", nome: "Serenity", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/Tesla.jpeg", nome: "Tesla Residencial", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/Hannover.jpeg", nome: "Residencial Hannover", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/Jardins.jpeg", nome: "Edifício 135 Jardins", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/Palacio.jpeg", nome: "Palácio Elizabeth", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/Capri.jpeg", nome: "Solar di Capri", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/Siena.jpeg", nome: "Solar di Siena", descricao: "Balneário Camboriú" },
 ];
 
 function formatDateTime(date: Date): string {
