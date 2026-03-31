@@ -51,6 +51,8 @@ import {
   LabelList,
   AreaChart,
   Area,
+  ComposedChart,
+  Line,
 } from "recharts";
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } from "@/types/sienge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -345,6 +347,7 @@ export function ExecutiveDashboard() {
   const [dailyBalances, setDailyBalances] = useState<Record<string, { accountId: string; amount: number }[]> | null>(null);
   const [loadingDaily, setLoadingDaily] = useState(false);
   const [fluxoPeriodo, setFluxoPeriodo] = useState(30);
+  const [fluxoView, setFluxoView] = useState<"projetado" | "entradas-saidas">("projetado");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
@@ -3975,7 +3978,7 @@ export function ExecutiveDashboard() {
             {/* Row 2+3: Fluxo de Caixa + Insights */}
             {(() => {
               // Build projected cash flow for next 30 days
-              const days: { date: string; label: string; saldo: number; receber: number; pagar: number; projetado: number }[] = [];
+              const days: { date: string; label: string; saldo: number; receber: number; pagar: number; projetado: number; recDia: number; pagDia: number }[] = [];
               let acumReceber = 0;
               let acumPagar = 0;
               for (let d = 0; d <= fluxoPeriodo; d++) {
@@ -3986,7 +3989,7 @@ export function ExecutiveDashboard() {
                 const pagDia = filteredAPagar.filter(i => i.dueDate === dtStr).reduce((s, i) => s + effectiveAmount(i), 0);
                 acumReceber += recDia;
                 acumPagar += pagDia;
-                days.push({ date: dtStr, label: dayLabel, saldo: saldoTotal, receber: acumReceber, pagar: acumPagar, projetado: saldoTotal + acumReceber - acumPagar });
+                days.push({ date: dtStr, label: dayLabel, saldo: saldoTotal, receber: acumReceber, pagar: acumPagar, projetado: saldoTotal + acumReceber - acumPagar, recDia, pagDia });
               }
               return (
                 <>
@@ -4012,10 +4015,19 @@ export function ExecutiveDashboard() {
                             </button>
                           ))}
                         </div>
+                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                          <button onClick={() => setFluxoView("projetado")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "projetado" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                            Projetado
+                          </button>
+                          <button onClick={() => setFluxoView("entradas-saidas")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "entradas-saidas" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                            Entradas x Saídas
+                          </button>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="h-[300px]">
+                      <div className="h-[350px]">
+                        {fluxoView === "projetado" ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={days} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
                             <defs>
@@ -4093,6 +4105,41 @@ export function ExecutiveDashboard() {
                             />
                           </AreaChart>
                         </ResponsiveContainer>
+                        ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={days} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
+                            <defs>
+                              <linearGradient id="fluxoGradES" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.15} />
+                                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                            <YAxis yAxisId="bars" tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 10 }} />
+                            <YAxis yAxisId="line" orientation="right" tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 10 }} />
+                            <RechartsTooltip
+                              content={({ active, payload }) => {
+                                if (!active || !payload || payload.length === 0) return null;
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const d = payload[0].payload as any;
+                                return (
+                                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-3 text-xs">
+                                    <div className="font-semibold mb-1.5">{d.date?.split("-").reverse().join("/")}</div>
+                                    <div className="flex justify-between gap-4"><span className="text-emerald-500">Recebimentos:</span><span className="font-semibold text-emerald-600">{formatCurrency(d.recDia)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className="text-amber-500">Pagamentos:</span><span className="font-semibold text-amber-600">{formatCurrency(d.pagDia)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className={d.recDia - d.pagDia >= 0 ? "text-emerald-500" : "text-red-400"}>Resultado dia:</span><span className={`font-semibold ${d.recDia - d.pagDia >= 0 ? "text-emerald-600" : "text-red-400"}`}>{formatCurrency(d.recDia - d.pagDia)}</span></div>
+                                    <div className="flex justify-between gap-4 pt-1 border-t mt-1"><span className="font-semibold">Saldo projetado:</span><span className={`font-bold ${d.projetado >= 0 ? "text-indigo-600" : "text-red-400"}`}>{formatCurrency(d.projetado)}</span></div>
+                                  </div>
+                                );
+                              }}
+                            />
+                            <Bar yAxisId="bars" dataKey="recDia" fill="#10b981" opacity={0.7} radius={[3, 3, 0, 0]} name="Recebimentos" />
+                            <Bar yAxisId="bars" dataKey="pagDia" fill="#f59e0b" opacity={0.7} radius={[3, 3, 0, 0]} name="Pagamentos" />
+                            <Line yAxisId="line" type="monotone" dataKey="projetado" stroke="#6366f1" strokeWidth={2.5} dot={{ r: 2, fill: "#6366f1" }} name="Saldo Projetado" />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
