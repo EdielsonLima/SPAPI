@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { siengeGet } from "@/lib/sienge";
@@ -41,11 +41,42 @@ function isInDimBanco(accountNumber: string, companyId: number): boolean {
   return true;
 }
 
-export async function GET() {
+// Helper: fetch all accounts for a single date
+async function fetchBalancesForDate(date: string, companiesMap: Record<number, string>, companyIds: number[]): Promise<R[]> {
+  const allAccounts: R[] = [];
+  const firstPage = await siengeGet<R>("/accounts-balances", { balanceDate: date, offset: "0", limit: "100" });
+  const results = firstPage?.results || [];
+  const total = firstPage?.resultSetMetadata?.count || results.length;
+  allAccounts.push(...results);
+  let offset = results.length;
+  while (offset < total) {
+    const page = await siengeGet<R>("/accounts-balances", { balanceDate: date, offset: String(offset), limit: "100" });
+    const pr = page?.results || [];
+    if (pr.length === 0) break;
+    allAccounts.push(...pr);
+    offset += pr.length;
+  }
+  // Fetch missing companies
+  const seenCompanies = new Set(allAccounts.map((a: R) => a.companyId));
+  const missing = companyIds.filter(id => !seenCompanies.has(id));
+  for (const compId of missing) {
+    try {
+      const cp = await siengeGet<R>("/accounts-balances", { balanceDate: date, companyId: String(compId), offset: "0", limit: "100" });
+      allAccounts.push(...(cp?.results || []));
+    } catch { /* skip */ }
+  }
+  return allAccounts;
+}
+
+export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { searchParams } = new URL(request.url);
+  const daily = searchParams.get("daily") === "true";
+  const monthParam = searchParams.get("month"); // format: "2026-03"
 
   try {
     const now = new Date();
@@ -62,89 +93,68 @@ export async function GET() {
       });
     } catch { /* ignore */ }
 
-    // 2. Fetch account balances - first try global, then per company for missing ones
-    const allAccounts: R[] = [];
-    const seenCompanies = new Set<number>();
-
-    // Global fetch
-    const firstPage = await siengeGet<R>("/accounts-balances", { balanceDate: today, offset: "0", limit: "100" });
-    const results = firstPage?.results || [];
-    const total = firstPage?.resultSetMetadata?.count || results.length;
-    allAccounts.push(...results);
-    let offset = results.length;
-    while (offset < total) {
-      const page = await siengeGet<R>("/accounts-balances", { balanceDate: today, offset: String(offset), limit: "100" });
-      const pr = page?.results || [];
-      if (pr.length === 0) break;
-      allAccounts.push(...pr);
-      offset += pr.length;
+    // Helper to map raw accounts to enriched structure
+    const mapAccounts = (raw: R[]) => {
+      return raw.map((acc: R) => {
+        const accNum = acc.accountNumber || "";
+        const compId = acc.companyId || 0;
+        return {
+          bankAccountId: `${compId}:${accNum}`,
+          bankAccountDescription: accNum,
+          bankCode: "",
+          bankName: BANK_NAMES[accNum] || "",
+          agencyNumber: "",
+          accountNumber: accNum,
+          companyId: compId,
+          companyName: companiesMap[compId] || `Empresa ${compId}`,
+          currentBalance: acc.amount ?? 0,
+          reconciledAmount: acc.reconciledAmount ?? 0,
+          accountStatus: acc.accountStatus || "",
+          isInDimBanco: isInDimBanco(accNum, compId),
+        };
+      });
     }
 
-    // Track which companies were returned
-    for (const acc of allAccounts) {
-      if (acc.companyId) seenCompanies.add(acc.companyId);
-    }
+    // ── DAILY BALANCES MODE ──
+    if (daily) {
+      const month = monthParam || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+      const [yearStr, monthStr] = month.split("-");
+      const year = parseInt(yearStr);
+      const mon = parseInt(monthStr);
+      const lastDay = Math.min(new Date(year, mon, 0).getDate(), now.getFullYear() === year && now.getMonth() + 1 === mon ? now.getDate() : 31);
 
-    // Fetch missing companies individually (e.g., Hannover companyId=7)
-    const missingCompanies = companyIds.filter(id => !seenCompanies.has(id));
-    if (missingCompanies.length > 0) {
-      console.log(`[accounts-balances] Missing companies from global fetch: ${missingCompanies.map(id => `${id}(${companiesMap[id]})`).join(", ")}`);
-      for (const compId of missingCompanies) {
-        try {
-          const compPage = await siengeGet<R>("/accounts-balances", {
-            balanceDate: today, companyId: String(compId), offset: "0", limit: "100"
-          });
-          const compResults = compPage?.results || [];
-          if (compResults.length > 0) {
-            console.log(`[accounts-balances] Found ${compResults.length} accounts for company ${compId} (${companiesMap[compId]})`);
-            allAccounts.push(...compResults);
+      // Generate dates
+      const dates: string[] = [];
+      for (let d = 1; d <= lastDay; d++) {
+        dates.push(`${yearStr}-${monthStr}-${String(d).padStart(2, "0")}`);
+      }
+
+      // Fetch in batches of 3 to avoid rate limits
+      const dailyBalances: Record<string, { accountId: string; amount: number }[]> = {};
+      for (let i = 0; i < dates.length; i += 3) {
+        const batch = dates.slice(i, i + 3);
+        const promises = batch.map(async (date) => {
+          try {
+            const raw = await fetchBalancesForDate(date, companiesMap, companyIds);
+            dailyBalances[date] = raw.map((a: R) => ({
+              accountId: `${a.companyId}:${a.accountNumber}`,
+              amount: a.amount ?? 0,
+            }));
+          } catch {
+            dailyBalances[date] = [];
           }
-        } catch {
-          // companyId param might not be supported, skip
-        }
+        });
+        await Promise.all(promises);
       }
+
+      return NextResponse.json({ dailyBalances });
     }
 
-    // 3. Map to normalized structure with bank names from DimBanco
-    // Use composite key companyId:accountNumber to uniquely identify accounts
-    const enriched = allAccounts.map((acc: R) => {
-      const accNum = acc.accountNumber || "";
-      const compId = acc.companyId || 0;
-      const uniqueId = `${compId}:${accNum}`;
-      return {
-        bankAccountId: uniqueId,
-        bankAccountDescription: accNum,
-        bankCode: "",
-        bankName: BANK_NAMES[accNum] || "",
-        agencyNumber: "",
-        accountNumber: accNum,
-        companyId: compId,
-        companyName: companiesMap[compId] || `Empresa ${compId}`,
-        currentBalance: acc.amount ?? 0,
-        reconciledAmount: acc.reconciledAmount ?? 0,
-        accountStatus: acc.accountStatus || "",
-        isInDimBanco: isInDimBanco(accNum, compId),
-      };
-    });
+    // ── STANDARD MODE (today's balances) ──
+    const allAccounts = await fetchBalancesForDate(today, companiesMap, companyIds);
+    const enriched = mapAccounts(allAccounts);
 
-    // Log which DimBanco accounts were found/missing
-    const foundAccNums = new Set(allAccounts.map((a: R) => a.accountNumber));
-    const dimBancoNums = Object.keys(BANK_NAMES);
-    const missing = dimBancoNums.filter(n => !foundAccNums.has(n));
-    if (missing.length > 0) {
-      console.log(`[accounts-balances] DimBanco accounts NOT found in API: ${missing.join(", ")}`);
-    }
-    console.log(`[accounts-balances] Found ${enriched.filter((e: R) => e.isInDimBanco).length} DimBanco accounts out of ${dimBancoNums.length}`);
-
-    return NextResponse.json({
-      data: enriched,
-      _debug: {
-        missingDimBanco: missing,
-        totalFromApi: allAccounts.length,
-        dimBancoMatched: enriched.filter((e: R) => e.isInDimBanco).length,
-        allAccountNumbers: allAccounts.map((a: R) => `${a.companyId}:${a.accountNumber}`),
-      }
-    });
+    return NextResponse.json({ data: enriched });
   } catch (error) {
     console.error("Error fetching accounts-balances:", error);
     return NextResponse.json({ error: "Failed to fetch account balances", details: String(error) }, { status: 500 });

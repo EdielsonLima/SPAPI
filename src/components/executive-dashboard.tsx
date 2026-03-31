@@ -49,6 +49,8 @@ import {
   ResponsiveContainer,
   Cell,
   LabelList,
+  LineChart,
+  Line,
 } from "recharts";
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } from "@/types/sienge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -303,6 +305,8 @@ export function ExecutiveDashboard() {
   });
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [bankAccountsInitialized, setBankAccountsInitialized] = useState(false);
+  const [dailyBalances, setDailyBalances] = useState<Record<string, { accountId: string; amount: number }[]> | null>(null);
+  const [loadingDaily, setLoadingDaily] = useState(false);
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
@@ -455,6 +459,20 @@ export function ExecutiveDashboard() {
         bankAccountsLoaded.current = false;
       })
       .finally(() => setLoadingBankAccounts(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // Fetch daily balances for chart
+  useEffect(() => {
+    if (activeTab !== "saldos" || dailyBalances !== null || loadingDaily) return;
+    setLoadingDaily(true);
+    fetch("/api/sienge/bank-accounts?daily=true")
+      .then(res => res.json())
+      .then(json => {
+        if (json.dailyBalances) setDailyBalances(json.dailyBalances);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingDaily(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
@@ -4122,6 +4140,70 @@ export function ExecutiveDashboard() {
                     </CardContent>
                   </Card>
                 </div>
+
+                {/* Daily Balance Line Chart */}
+                <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                      Evolução do Saldo — {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                    </CardTitle>
+                    <CardDescription className="text-xs text-slate-500">Saldo dia a dia das contas selecionadas</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loadingDaily ? (
+                      <div className="flex items-center justify-center py-16 gap-2 text-slate-500">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <span className="text-sm">Carregando evolução diária...</span>
+                      </div>
+                    ) : dailyBalances ? (() => {
+                      // Build chart data from daily balances, filtered by selected accounts
+                      const sortedDates = Object.keys(dailyBalances).sort();
+                      const lineData = sortedDates.map(date => {
+                        const dayAccounts = dailyBalances[date] || [];
+                        const total = dayAccounts
+                          .filter(a => effectiveSelected.has(a.accountId))
+                          .reduce((s, a) => s + a.amount, 0);
+                        return {
+                          date: date.split("-")[2], // just day number
+                          fullDate: date,
+                          total,
+                        };
+                      });
+
+                      return (
+                        <div className="h-[300px]">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={lineData} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
+                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                              <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11 }} />
+                              <RechartsTooltip
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                formatter={(value: any) => [formatCurrency(Number(value)), "Saldo"]}
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                labelFormatter={(label: any) => {
+                                  const item = lineData.find(d => d.date === String(label));
+                                  if (item) return item.fullDate.split("-").reverse().join("/");
+                                  return String(label);
+                                }}
+                              />
+                              <Line
+                                type="monotone"
+                                dataKey="total"
+                                stroke="#6366f1"
+                                strokeWidth={2.5}
+                                dot={{ r: 3, fill: "#6366f1" }}
+                                activeDot={{ r: 5 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
+                      );
+                    })() : (
+                      <p className="text-sm text-slate-400 text-center py-12">Dados diários não disponíveis</p>
+                    )}
+                  </CardContent>
+                </Card>
               </>
             );
           })()}
