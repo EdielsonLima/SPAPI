@@ -242,7 +242,7 @@ function CustomTooltip({ active, payload, label }: any) {
       {pct !== null && pct !== undefined && (
         <div className="flex items-center justify-between gap-4 mt-2 pt-2 border-t border-slate-100">
           <span className="text-slate-400">Variacao</span>
-          <span className={`font-semibold tabular-nums ${pct >= 0 ? "text-red-500" : "text-emerald-500"}`}>
+          <span className={`font-semibold tabular-nums ${pct >= 0 ? "text-red-500 dark:text-red-300/70" : "text-emerald-500 dark:text-emerald-400"}`}>
             {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
           </span>
         </div>
@@ -1392,7 +1392,7 @@ export function ExecutiveDashboard() {
         label: "Vence Hoje",
         value: formatCurrency(previsaoHoje),
         subtitle: (() => { const d = new Date(); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} - ${filteredAPagar.filter(i => i.dueDate === d.toISOString().split("T")[0]).length} parcelas`; })(),
-        icon: <AlertTriangle className="h-7 w-7 text-red-500" />,
+        icon: <AlertTriangle className="h-7 w-7 text-red-500 dark:text-red-300/70" />,
         iconBg: "bg-red-50",
         gradient: "from-red-500 to-red-600",
       },
@@ -1468,7 +1468,7 @@ export function ExecutiveDashboard() {
         label: "Total Atrasado",
         value: formatCurrency(totalAtrasado),
         subtitle: `${filteredAtrasadas.length} parcelas`,
-        icon: <AlertTriangle className="h-7 w-7 text-red-500" />,
+        icon: <AlertTriangle className="h-7 w-7 text-red-500 dark:text-red-300/70" />,
         iconBg: "bg-red-50",
         gradient: "from-red-500 to-red-600",
       },
@@ -1603,7 +1603,7 @@ export function ExecutiveDashboard() {
         label: "Clientes",
         value: String(new Set(filteredInadimplencia.map(i => i.clientName)).size),
         subtitle: showDelinquentTable ? "clique para fechar" : "clique para detalhar",
-        icon: <Users className="h-7 w-7 text-red-500" />,
+        icon: <Users className="h-7 w-7 text-red-500 dark:text-red-300/70" />,
         iconBg: "bg-red-50",
         gradient: "from-red-500 to-red-600",
         onClick: () => { setShowDelinquentTable(v => !v); setExpandedClients(new Set()); },
@@ -1791,7 +1791,7 @@ export function ExecutiveDashboard() {
                     <CheckCircle className="h-4 w-4" />
                     Contas Pagas
                   </TabsTrigger>
-                  <TabsTrigger value="atrasadas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "atrasadas" ? "border-red-500 bg-red-50 text-red-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                  <TabsTrigger value="atrasadas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "atrasadas" ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300/80 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
                     <AlertTriangle className="h-4 w-4" />
                     Contas em Atraso
                     {itemsAtrasadas.length > 0 && (
@@ -3057,7 +3057,7 @@ export function ExecutiveDashboard() {
                                   </div>
                                   <span className="font-bold text-[13px] text-slate-700">{group.name}</span>
                                   <span className="text-[11px] text-slate-400 ml-2">{group.units.length} un.</span>
-                                  {vendidas > 0 && <span className="text-[10px] font-semibold text-red-500 bg-red-50 px-1.5 py-0.5 rounded">{vendidas} vendidas</span>}
+                                  {vendidas > 0 && <span className="text-[10px] font-semibold text-red-500 dark:text-red-300/70 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded">{vendidas} vendidas</span>}
                                   {disponiveis > 0 && <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded">{disponiveis} disp.</span>}
                                 </div>
                               </TableCell>
@@ -3244,7 +3244,7 @@ export function ExecutiveDashboard() {
                         <div className="flex items-center gap-4">
                           <span className="text-sm font-bold text-slate-700">{qUnits.length} unidades</span>
                           <div className="flex items-center gap-3 text-xs">
-                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400" /><span className="text-slate-500">Vendidas: <strong className="text-red-600">{qVendidas}</strong></span></span>
+                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400" /><span className="text-slate-500">Vendidas: <strong className="text-red-600 dark:text-red-300/70">{qVendidas}</strong></span></span>
                             <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400" /><span className="text-slate-500">Disponíveis: <strong className="text-emerald-600">{qDisponiveis}</strong></span></span>
                             {qReserva > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-400" /><span className="text-slate-500">Reserva: <strong className="text-blue-600">{qReserva}</strong></span></span>}
                             {qProposta > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-400" /><span className="text-slate-500">Proposta: <strong className="text-orange-600">{qProposta}</strong></span></span>}
@@ -3603,7 +3603,7 @@ export function ExecutiveDashboard() {
                             {creditor.creditorName}
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge variant="secondary" className="bg-red-50 text-red-700 font-semibold">
+                            <Badge variant="secondary" className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300/70 font-semibold">
                               {creditor.installments}
                             </Badge>
                           </TableCell>
@@ -3619,7 +3619,7 @@ export function ExecutiveDashboard() {
                               ))}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-bold text-red-600 tabular-nums">
+                          <TableCell className="text-right font-bold text-red-600 dark:text-red-300/70 tabular-nums">
                             {formatCurrency(creditor.totalOverdue)}
                           </TableCell>
                         </TableRow>
@@ -3658,7 +3658,7 @@ export function ExecutiveDashboard() {
                                             </span>
                                           </td>
                                           <td className="py-2 text-right tabular-nums text-slate-600">{formatCurrency(item.originalAmount)}</td>
-                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600">{formatCurrency(effectiveAmount(item))}</td>
+                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70">{formatCurrency(effectiveAmount(item))}</td>
                                           <td className="py-2 text-slate-600 text-xs">{item.companyName}</td>
                                           <td className="py-2 text-slate-600 text-xs">{item.projectName}</td>
                                         </tr>
@@ -3681,7 +3681,7 @@ export function ExecutiveDashboard() {
                 <span><strong className="text-slate-700">{overdueByCreditor.length}</strong> credores</span>
                 <span><strong className="text-slate-700">{filteredAtrasadas.length}</strong> parcelas</span>
               </div>
-              <div className="text-sm font-bold text-red-600">
+              <div className="text-sm font-bold text-red-600 dark:text-red-300/70">
                 Total: {formatCurrency(filteredAtrasadas.reduce((s, i) => s + effectiveAmount(i), 0))}
               </div>
             </div>
@@ -3797,7 +3797,7 @@ export function ExecutiveDashboard() {
                               ))}
                             </div>
                           </TableCell>
-                          <TableCell className="text-right font-bold text-red-600 tabular-nums">
+                          <TableCell className="text-right font-bold text-red-600 dark:text-red-300/70 tabular-nums">
                             {formatCurrency(client.totalOverdue)}
                           </TableCell>
                         </TableRow>
@@ -3840,9 +3840,9 @@ export function ExecutiveDashboard() {
                                           </td>
                                           <td className="py-2 text-right tabular-nums text-slate-600">{formatCurrency(item.originalAmount)}</td>
                                           <td className="py-2 text-right tabular-nums text-slate-800">{formatCurrency(item.correctedBalanceAmount)}</td>
-                                          <td className="py-2 text-right tabular-nums text-red-600">{formatCurrency(calcEncargos(item))}</td>
+                                          <td className="py-2 text-right tabular-nums text-red-600 dark:text-red-300/70">{formatCurrency(calcEncargos(item))}</td>
                                           <td className="py-2 text-right tabular-nums text-slate-500">{formatCurrency(item.discountAmount || 0)}</td>
-                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600">{formatCurrency(item.correctedBalanceAmount + calcEncargos(item))}</td>
+                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70">{formatCurrency(item.correctedBalanceAmount + calcEncargos(item))}</td>
                                           <td className="py-2 text-slate-600 text-xs">{item.companyName}</td>
                                           <td className="py-2 text-slate-600 text-xs">{item.projectName}</td>
                                         </tr>
@@ -3865,7 +3865,7 @@ export function ExecutiveDashboard() {
                 <span><strong className="text-slate-700">{delinquentsByClient.length}</strong> clientes</span>
                 <span><strong className="text-slate-700">{filteredInadimplencia.length}</strong> parcelas</span>
               </div>
-              <div className="text-sm font-bold text-red-600">
+              <div className="text-sm font-bold text-red-600 dark:text-red-300/70">
                 Total: {formatCurrency(filteredInadimplencia.reduce((s, i) => s + i.correctedBalanceAmount + calcEncargos(i), 0))}
               </div>
             </div>
