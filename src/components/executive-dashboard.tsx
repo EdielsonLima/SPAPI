@@ -4158,10 +4158,12 @@ export function ExecutiveDashboard() {
                     ) : dailyBalances ? (() => {
                       // Build chart data from daily balances, filtered by selected accounts
                       const sortedDates = Object.keys(dailyBalances).sort();
+                      // Use only accounts that pass BOTH company and account filters
+                      const validAccountIds = new Set(filteredAccounts.map(a => String(a.bankAccountId)));
                       const lineData = sortedDates.map(date => {
                         const dayAccounts = dailyBalances[date] || [];
                         const total = dayAccounts
-                          .filter(a => effectiveSelected.has(a.accountId))
+                          .filter(a => validAccountIds.has(a.accountId))
                           .reduce((s, a) => s + a.amount, 0);
                         return {
                           date: date.split("-")[2],
