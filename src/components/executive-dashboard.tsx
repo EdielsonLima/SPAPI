@@ -1679,7 +1679,7 @@ export function ExecutiveDashboard() {
               onClick={() => switchTab("visao-geral")}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "visao-geral"
-                  ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                  ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-md ring-2 ring-slate-300 dark:ring-slate-500"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -1699,8 +1699,8 @@ export function ExecutiveDashboard() {
                 }
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                section === "cp"
-                  ? "bg-white text-red-600 shadow-sm"
+                section === "cp" && !["orcamento", "comercial", "dre", "saldos", "visao-geral"].includes(activeTab)
+                  ? "bg-white dark:bg-slate-700 text-red-600 dark:text-red-400 shadow-md ring-2 ring-red-300 dark:ring-red-500/50"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -1720,8 +1720,8 @@ export function ExecutiveDashboard() {
                 }
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                section === "cr"
-                  ? "bg-white text-emerald-600 shadow-sm"
+                section === "cr" && ["a-receber", "recebidas", "inadimplencia"].includes(activeTab)
+                  ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md ring-2 ring-emerald-300 dark:ring-emerald-500/50"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -1735,7 +1735,7 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "orcamento"
-                  ? "bg-white text-purple-600 shadow-sm"
+                  ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-md ring-2 ring-purple-300 dark:ring-purple-500/50"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -1749,7 +1749,7 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "comercial"
-                  ? "bg-white text-indigo-600 shadow-sm"
+                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-md ring-2 ring-indigo-300 dark:ring-indigo-500/50"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -1763,7 +1763,7 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "dre"
-                  ? "bg-white text-teal-600 shadow-sm"
+                  ? "bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-md ring-2 ring-teal-300 dark:ring-teal-500/50"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -1777,7 +1777,7 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "saldos"
-                  ? "bg-white text-indigo-600 shadow-sm"
+                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-md ring-2 ring-indigo-300 dark:ring-indigo-500/50"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -3926,7 +3926,7 @@ export function ExecutiveDashboard() {
               <div className="relative rounded-2xl p-4 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("saldos")}>
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-600" />
                 <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Saldo Bancário</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCompactCurrency(saldoTotal)}</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(saldoTotal)}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">hoje</p>
               </div>
 
@@ -3934,23 +3934,23 @@ export function ExecutiveDashboard() {
               <div className="relative rounded-2xl p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("a-pagar")}>
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
                 <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">A Pagar 7 dias</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCompactCurrency(aPagar7d)}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">total: {formatCompactCurrency(totalAPagar)}</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(aPagar7d)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">total: {formatCurrency(totalAPagar)}</p>
               </div>
 
               {/* A Receber 7d */}
               <div className="relative rounded-2xl p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("a-receber")}>
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
                 <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">A Receber 7 dias</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCompactCurrency(aReceber7d)}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">total: {formatCompactCurrency(totalAReceber)}</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(aReceber7d)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">total: {formatCurrency(totalAReceber)}</p>
               </div>
 
               {/* Vencidas */}
               <div className="relative rounded-2xl p-4 bg-red-50 dark:bg-red-950/40 border border-red-200/60 dark:border-red-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("atrasadas")}>
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-400 to-rose-500" />
                 <p className="text-[10px] font-semibold text-red-600 dark:text-red-300/70 uppercase tracking-wider mb-1">Contas Vencidas</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCompactCurrency(totalAtrasadas)}</p>
+                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(totalAtrasadas)}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">{filteredAtrasadas.length} parcelas</p>
               </div>
 
@@ -3959,14 +3959,14 @@ export function ExecutiveDashboard() {
                 <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-amber-500" />
                 <p className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wider mb-1">Inadimplência</p>
                 <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{pctInadimplencia.toFixed(1)}%</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{formatCompactCurrency(totalInadimplencia)}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{formatCurrency(totalInadimplencia)}</p>
               </div>
 
               {/* Fluxo Projetado */}
               <div className={`relative rounded-2xl p-4 ${fluxoProjetado30d >= 0 ? "bg-sky-50 dark:bg-sky-950/40 border-sky-200/60 dark:border-sky-800/40" : "bg-red-50 dark:bg-red-950/40 border-red-200/60 dark:border-red-800/40"} border overflow-hidden`}>
                 <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${fluxoProjetado30d >= 0 ? "from-sky-500 to-blue-500" : "from-red-400 to-rose-500"}`} />
                 <p className="text-[10px] font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-1">Fluxo 7 dias</p>
-                <p className={`text-lg font-black tabular-nums ${fluxoProjetado30d >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-300/70"}`}>{formatCompactCurrency(fluxoProjetado30d)}</p>
+                <p className={`text-lg font-black tabular-nums ${fluxoProjetado30d >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-300/70"}`}>{formatCurrency(fluxoProjetado30d)}</p>
                 <p className="text-[10px] text-slate-400 mt-0.5">saldo + receber - pagar</p>
               </div>
             </div>
