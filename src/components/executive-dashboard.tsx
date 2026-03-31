@@ -3939,8 +3939,8 @@ export function ExecutiveDashboard() {
                     size="sm"
                     className="h-7 text-xs text-slate-500"
                     onClick={() => {
+                      if (!window.confirm("Tem certeza que deseja resetar o filtro de contas para o padrão? Suas seleções atuais serão perdidas.")) return;
                       localStorage.removeItem("dashboard_saldos_accounts");
-                      // Reset to DimBanco defaults
                       const validNums = new Set<string>(
                         bankAccounts
                           .filter(a => a.isInDimBanco)
