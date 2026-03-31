@@ -4019,11 +4019,58 @@ export function ExecutiveDashboard() {
                                     <div className="flex justify-between gap-4"><span className="text-emerald-500">+ Recebimentos:</span><span className="text-emerald-600">{formatCurrency(d.receber)}</span></div>
                                     <div className="flex justify-between gap-4"><span className="text-amber-500">- Pagamentos:</span><span className="text-amber-600">{formatCurrency(d.pagar)}</span></div>
                                     <div className="flex justify-between gap-4 pt-1 border-t mt-1"><span className="font-semibold">Projetado:</span><span className={`font-bold ${d.projetado >= 0 ? "text-indigo-600" : "text-red-400"}`}>{formatCurrency(d.projetado)}</span></div>
+                                    {(() => {
+                                      const idx = days.findIndex(dd => dd.date === d.date);
+                                      if (idx > 0) {
+                                        const prev = days[idx - 1].projetado;
+                                        const varAbs = d.projetado - prev;
+                                        const varPct = prev !== 0 ? (varAbs / prev) * 100 : 0;
+                                        return (
+                                          <div className="flex justify-between gap-4 mt-0.5">
+                                            <span className="text-slate-400">Var. dia:</span>
+                                            <span className={`font-medium ${varAbs >= 0 ? "text-emerald-500" : "text-red-400"}`}>
+                                              {varAbs >= 0 ? "+" : ""}{formatCompactCurrency(varAbs)} ({varAbs >= 0 ? "+" : ""}{varPct.toFixed(1)}%)
+                                            </span>
+                                          </div>
+                                        );
+                                      }
+                                      return null;
+                                    })()}
                                   </div>
                                 );
                               }}
                             />
-                            <Area type="monotone" dataKey="projetado" stroke="#6366f1" strokeWidth={2.5} fill="url(#fluxoGrad)" dot={false} />
+                            <Area
+                              type="monotone"
+                              dataKey="projetado"
+                              stroke="#6366f1"
+                              strokeWidth={2.5}
+                              fill="url(#fluxoGrad)"
+                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                              dot={(props: any) => {
+                                const { cx, cy, payload, index } = props;
+                                const maxP = Math.max(...days.map(d => d.projetado));
+                                const minP = Math.min(...days.map(d => d.projetado));
+                                if (payload.projetado === maxP) {
+                                  return (
+                                    <g key={`fd-${index}`}>
+                                      <circle cx={cx} cy={cy} r={6} fill="#10b981" stroke="#fff" strokeWidth={2} />
+                                      <text x={cx} y={cy - 12} textAnchor="middle" fontSize={9} fontWeight={700} fill="#10b981">{formatCompactCurrency(maxP)}</text>
+                                    </g>
+                                  );
+                                }
+                                if (payload.projetado === minP) {
+                                  return (
+                                    <g key={`fd-${index}`}>
+                                      <circle cx={cx} cy={cy} r={6} fill="#f87171" stroke="#fff" strokeWidth={2} />
+                                      <text x={cx} y={cy + 18} textAnchor="middle" fontSize={9} fontWeight={700} fill="#f87171">{formatCompactCurrency(minP)}</text>
+                                    </g>
+                                  );
+                                }
+                                return <circle key={`fd-${index}`} cx={cx} cy={cy} r={2} fill="#6366f1" />;
+                              }}
+                              activeDot={{ r: 5, stroke: "#6366f1", strokeWidth: 2, fill: "#fff" }}
+                            />
                           </AreaChart>
                         </ResponsiveContainer>
                       </div>
