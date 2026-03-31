@@ -4218,6 +4218,11 @@ export function ExecutiveDashboard() {
                       // eslint-disable-next-line @typescript-eslint/no-explicit-any
                       const renderDot = (props: any) => {
                         const { cx, cy, payload } = props;
+                        const dayVarPct = payload.dayVarPct || 0;
+                        const showVarLabel = Math.abs(dayVarPct) >= 0.1 && payload.dayVar !== 0;
+                        const varColor = dayVarPct >= 0 ? "#10b981" : "#f87171";
+                        const varLabel = `${dayVarPct >= 0 ? "+" : ""}${dayVarPct.toFixed(1)}%`;
+
                         if (payload.total === maxVal) {
                           return (
                             <g key={`dot-${payload.date}`}>
@@ -4238,7 +4243,16 @@ export function ExecutiveDashboard() {
                             </g>
                           );
                         }
-                        return <circle key={`dot-${payload.date}`} cx={cx} cy={cy} r={3} fill="#6366f1" />;
+                        return (
+                          <g key={`dot-${payload.date}`}>
+                            <circle cx={cx} cy={cy} r={3} fill="#6366f1" />
+                            {showVarLabel && (
+                              <text x={cx} y={cy - 10} textAnchor="middle" fontSize={9} fontWeight={600} fill={varColor}>
+                                {varLabel}
+                              </text>
+                            )}
+                          </g>
+                        );
                       };
 
                       return (
