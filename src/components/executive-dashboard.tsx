@@ -344,6 +344,7 @@ export function ExecutiveDashboard() {
   const [bankAccountsInitialized, setBankAccountsInitialized] = useState(false);
   const [dailyBalances, setDailyBalances] = useState<Record<string, { accountId: string; amount: number }[]> | null>(null);
   const [loadingDaily, setLoadingDaily] = useState(false);
+  const [fluxoPeriodo, setFluxoPeriodo] = useState(30);
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
 
@@ -3977,7 +3978,7 @@ export function ExecutiveDashboard() {
               const days: { date: string; label: string; saldo: number; receber: number; pagar: number; projetado: number }[] = [];
               let acumReceber = 0;
               let acumPagar = 0;
-              for (let d = 0; d <= 30; d++) {
+              for (let d = 0; d <= fluxoPeriodo; d++) {
                 const dt = new Date(now.getTime() + d * 86400000);
                 const dtStr = dt.toISOString().split("T")[0];
                 const dayLabel = `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
@@ -3991,8 +3992,27 @@ export function ExecutiveDashboard() {
                 <>
                   <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Fluxo de Caixa Projetado — Próximos 30 dias</CardTitle>
-                      <CardDescription className="text-xs text-slate-500">Saldo atual + recebimentos previstos - pagamentos previstos</CardDescription>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Fluxo de Caixa Projetado — Próximos {fluxoPeriodo} dias</CardTitle>
+                          <CardDescription className="text-xs text-slate-500">Saldo atual + recebimentos previstos - pagamentos previstos</CardDescription>
+                        </div>
+                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                          {[30, 60, 90, 120, 180, 365].map(p => (
+                            <button
+                              key={p}
+                              onClick={() => setFluxoPeriodo(p)}
+                              className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
+                                fluxoPeriodo === p
+                                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                              }`}
+                            >
+                              {p <= 90 ? `${p}d` : p === 120 ? "4m" : p === 180 ? "6m" : "1a"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </CardHeader>
                     <CardContent>
                       <div className="h-[300px]">
@@ -4108,7 +4128,7 @@ export function ExecutiveDashboard() {
 
               {/* Saldo final projetado */}
               <div className={`rounded-2xl p-4 border ${days[days.length - 1]?.projetado >= 0 ? "bg-sky-50 dark:bg-sky-950/30 border-sky-200/60 dark:border-sky-800/40" : "bg-red-50 dark:bg-red-950/30 border-red-200/60 dark:border-red-800/40"}`}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Saldo em 30 dias</p>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Saldo em {fluxoPeriodo} dias</p>
                 <p className={`text-lg font-black tabular-nums ${days[days.length - 1]?.projetado >= 0 ? "text-sky-700 dark:text-sky-400" : "text-red-600 dark:text-red-300/70"}`}>
                   {formatCurrency(days[days.length - 1]?.projetado || 0)}
                 </p>
