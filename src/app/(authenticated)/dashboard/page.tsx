@@ -1,80 +1,35 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
-import {
-  Building,
-  Landmark,
-  FileSpreadsheet,
-  AlertCircle,
-  CalendarClock,
-  BarChart3,
-  CheckCircle2,
-} from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
-import type { SiengeOutcome } from "@/types/sienge";
+import Image from "next/image";
 
-const formatCurrency = new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-});
-
-const MONTH_LABELS = [
-  "Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
-  "Jul", "Ago", "Set", "Out", "Nov", "Dez",
+const EMPREENDIMENTOS = [
+  { src: "/empreendimentos/domus.jpg", nome: "Domus", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/serenity.jpg", nome: "Serenity", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/tesla.jpg", nome: "Tesla Residencial", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/hannover.jpg", nome: "Residencial Hannover", descricao: "Balneário Camboriú" },
+  { src: "/empreendimentos/jardins.jpg", nome: "Edifício 135 Jardins", descricao: "Balneário Camboriú" },
 ];
 
 function formatDateTime(date: Date): string {
-  const days = [
-    "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira",
-    "Quinta-feira", "Sexta-feira", "Sábado",
-  ];
-  const months = [
-    "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-    "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
-  ];
-  const dayName = days[date.getDay()];
-  const day = date.getDate();
-  const month = months[date.getMonth()];
-  const year = date.getFullYear();
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${dayName}, ${day} de ${month} de ${year} - ${hours}:${minutes}`;
+  const days = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  const months = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  return `${days[date.getDay()]}, ${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
 }
 
-interface DashboardStats {
-  companies: number;
-  costCenters: number;
-  financialPlans: number;
-}
-
-interface MonthlyData {
-  month: string;
-  total: number;
-  isPast: boolean;
+function getGreeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
 }
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const router = useRouter();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [outcomes, setOutcomes] = useState<SiengeOutcome[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [outcomeLoading, setOutcomeLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [availableImages, setAvailableImages] = useState<typeof EMPREENDIMENTOS>([]);
 
   useEffect(() => {
     setCurrentTime(new Date());
@@ -82,285 +37,108 @@ export default function DashboardPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [companiesRes, costCentersRes, financialPlansRes] =
-        await Promise.allSettled([
-          fetch("/api/sienge/companies?limit=1&offset=0"),
-          fetch("/api/sienge/cost-centers?limit=1&offset=0"),
-          fetch("/api/sienge/financial-plans?limit=1&offset=0"),
-        ]);
-
-      const getCount = async (res: PromiseSettledResult<Response>) => {
-        if (res.status === "fulfilled" && res.value.ok) {
-          const data = await res.value.json();
-          if (Array.isArray(data)) return data.length;
-          return data.resultSetMetadata?.count ?? 0;
-        }
-        return 0;
-      };
-
-      setStats({
-        companies: await getCount(companiesRes),
-        costCenters: await getCount(costCentersRes),
-        financialPlans: await getCount(financialPlansRes),
-      });
-    } catch {
-      toast.error("Erro ao carregar estatísticas do dashboard");
-      setStats({ companies: 0, costCenters: 0, financialPlans: 0 });
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const fetchOutcomes = useCallback(async () => {
-    try {
-      const year = new Date().getFullYear();
-      const endDate = new Date().toISOString().split("T")[0];
-      const res = await fetch(`/api/sienge/outcome?startDate=${year}-01-01&endDate=${endDate}`);
-      if (!res.ok) throw new Error("Erro ao buscar contas");
-      const data = await res.json();
-      const items: SiengeOutcome[] = Array.isArray(data) ? data : data.data ?? [];
-      setOutcomes(items);
-    } catch {
-      toast.error("Erro ao carregar dados de contas a pagar");
-      setOutcomes([]);
-    } finally {
-      setOutcomeLoading(false);
-    }
-  }, []);
-
+  // Check which images exist
   useEffect(() => {
-    fetchData();
-    fetchOutcomes();
-  }, [fetchData, fetchOutcomes]);
+    const checkImages = async () => {
+      const available: typeof EMPREENDIMENTOS = [];
+      for (const emp of EMPREENDIMENTOS) {
+        try {
+          const res = await fetch(emp.src, { method: "HEAD" });
+          if (res.ok) available.push(emp);
+        } catch { /* skip */ }
+      }
+      // If no images found, show at least a placeholder
+      if (available.length === 0) {
+        setAvailableImages([{ src: "", nome: "Silva Packer", descricao: "Construtora e Incorporadora" }]);
+      } else {
+        setAvailableImages(available);
+      }
+    };
+    checkImages();
+  }, []);
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().split("T")[0];
+  // Auto-rotate carousel
+  useEffect(() => {
+    if (availableImages.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % availableImages.length);
+    }, 8000); // 8 seconds per slide
+    return () => clearInterval(interval);
+  }, [availableImages.length]);
 
-  const sevenDaysLater = new Date(today);
-  sevenDaysLater.setDate(sevenDaysLater.getDate() + 7);
-  const sevenDaysStr = sevenDaysLater.toISOString().split("T")[0];
-
-  const overdue = outcomes.filter(
-    (o) => o.dueDate < todayStr && o.balanceAmount > 0
-  );
-  const overdueTotal = overdue.reduce((sum, o) => sum + o.balanceAmount, 0);
-
-  const upcoming = outcomes.filter(
-    (o) => o.dueDate >= todayStr && o.dueDate <= sevenDaysStr && o.balanceAmount > 0
-  );
-  const upcomingTotal = upcoming.reduce((sum, o) => sum + o.balanceAmount, 0);
-
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
-
-  const monthlyData: MonthlyData[] = MONTH_LABELS.map((label, idx) => {
-    const monthOutcomes = outcomes.filter((o) => {
-      const d = new Date(o.dueDate + "T00:00:00");
-      return d.getFullYear() === currentYear && d.getMonth() === idx;
-    });
-    const total = monthOutcomes.reduce((sum, o) => sum + o.balanceAmount, 0);
-    return { month: label, total, isPast: idx < currentMonth };
-  });
-
-  const userName = session?.user?.name || "Usuário";
+  const userName = session?.user?.name?.split(" ")[0] || "Usuário";
+  const fullName = session?.user?.name || "Usuário";
+  const currentEmp = availableImages[currentSlide];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-800">
-          Bem-vindo, {userName}!
-        </h1>
-        <p className="text-slate-500 mt-1">{currentTime ? formatDateTime(currentTime) : "\u00A0"}</p>
+    <div className="relative h-[calc(100vh-4rem)] -m-4 md:-m-6 overflow-hidden">
+      {/* Background Image */}
+      <div className="absolute inset-0">
+        {currentEmp?.src ? (
+          <>
+            {availableImages.map((emp, idx) => (
+              <div
+                key={emp.src}
+                className={`absolute inset-0 transition-opacity duration-1000 ${idx === currentSlide ? "opacity-100" : "opacity-0"}`}
+              >
+                <Image
+                  src={emp.src}
+                  alt={emp.nome}
+                  fill
+                  className="object-cover"
+                  priority={idx === 0}
+                />
+              </div>
+            ))}
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900" />
+        )}
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/50" />
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {[
-          {
-            title: "Empresas",
-            value: stats?.companies ?? 0,
-            icon: Building,
-            color: "text-blue-600",
-            bg: "bg-blue-50",
-            link: "/cadastros/empresas",
-          },
-          {
-            title: "Centros de Custo",
-            value: stats?.costCenters ?? 0,
-            icon: Landmark,
-            color: "text-emerald-600",
-            bg: "bg-emerald-50",
-            link: "/cadastros/centros-custo",
-          },
-          {
-            title: "Planos Financeiros",
-            value: stats?.financialPlans ?? 0,
-            icon: FileSpreadsheet,
-            color: "text-purple-600",
-            bg: "bg-purple-50",
-            link: "/cadastros/plano-financeiro",
-          },
-        ].map((card) => (
-          <Card
-            key={card.title}
-            className="border-0 shadow-sm cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all duration-200"
-            onClick={() => router.push(card.link)}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-slate-500">
-                    {card.title}
-                  </p>
-                  {loading ? (
-                    <Skeleton className="h-8 w-16 mt-1" />
-                  ) : (
-                    <p className="text-3xl font-bold text-slate-800 mt-1">
-                      {card.value}
-                    </p>
-                  )}
-                </div>
-                <div className={`p-3 rounded-xl ${card.bg}`}>
-                  <card.icon className={`h-6 w-6 ${card.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Content */}
+      <div className="relative z-10 h-full flex flex-col justify-end p-8 md:p-12">
+        {/* Welcome text */}
+        <div className="max-w-2xl">
+          <p className="text-white/60 text-sm font-medium tracking-widest uppercase mb-2">
+            {currentTime ? formatDateTime(currentTime) : "\u00A0"}
+          </p>
+          <h1 className="text-4xl md:text-5xl font-black text-white mb-2">
+            {getGreeting()}, <span className="text-indigo-300">{userName}</span>
+          </h1>
+          <p className="text-white/50 text-lg">
+            {fullName} — {process.env.NEXT_PUBLIC_COMPANY_NAME || "Silva Packer"}
+          </p>
+        </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card
-          className="border-0 shadow-sm cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all duration-200"
-          onClick={() => router.push("/financeiro/contas-vencidas")}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Contas Vencidas
-                </p>
-                {outcomeLoading ? (
-                  <>
-                    <Skeleton className="h-8 w-32 mt-1" />
-                    <Skeleton className="h-4 w-20 mt-2" />
-                  </>
-                ) : (
-                  <>
-                    <p className="text-2xl font-bold text-red-600 mt-1">
-                      {formatCurrency.format(overdueTotal)}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {overdue.length} título{overdue.length !== 1 ? "s" : ""}
-                    </p>
-                  </>
-                )}
-              </div>
-              <div className="p-3 rounded-xl bg-red-50">
-                <AlertCircle className="h-6 w-6 text-red-600" />
-              </div>
+        {/* Enterprise info + Carousel dots */}
+        <div className="flex items-end justify-between mt-8">
+          {currentEmp && (
+            <div>
+              <p className="text-white/80 text-xl font-bold">{currentEmp.nome}</p>
+              <p className="text-white/40 text-sm">{currentEmp.descricao}</p>
             </div>
-          </CardContent>
-        </Card>
+          )}
 
-        <Card
-          className="border-0 shadow-sm cursor-pointer hover:shadow-md hover:scale-[1.02] transition-all duration-200"
-          onClick={() => router.push("/financeiro/contas-pagar")}
-        >
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">
-                  Contas a Pagar - Próximos 7 dias
-                </p>
-                {outcomeLoading ? (
-                  <>
-                    <Skeleton className="h-8 w-32 mt-1" />
-                    <Skeleton className="h-4 w-20 mt-2" />
-                  </>
-                ) : (
-                  <>
-                    <p className="text-2xl font-bold text-amber-600 mt-1">
-                      {formatCurrency.format(upcomingTotal)}
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      {upcoming.length} título{upcoming.length !== 1 ? "s" : ""}
-                    </p>
-                  </>
-                )}
-              </div>
-              <div className="p-3 rounded-xl bg-amber-50">
-                <CalendarClock className="h-6 w-6 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="border-0 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg text-slate-800 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-blue-600" />
-            Contas a Pagar - Mensal ({currentYear})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {outcomeLoading ? (
-            <div className="flex items-end gap-2 h-[300px] pt-8">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end gap-2">
-                  <Skeleton
-                    className="w-full rounded"
-                    style={{ height: `${40 + Math.random() * 160}px` }}
-                  />
-                  <Skeleton className="h-3 w-8" />
-                </div>
+          {availableImages.length > 1 && (
+            <div className="flex items-center gap-2">
+              {availableImages.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentSlide(idx)}
+                  className={`transition-all duration-300 rounded-full ${
+                    idx === currentSlide
+                      ? "w-8 h-2 bg-white"
+                      : "w-2 h-2 bg-white/40 hover:bg-white/60"
+                  }`}
+                />
               ))}
             </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v: number) =>
-                    v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)
-                  }
-                />
-                <Tooltip
-                  formatter={(value?: number) => [formatCurrency.format(value ?? 0), "Total"]}
-                  labelFormatter={(label) => `Mês: ${label}`}
-                  contentStyle={{ borderRadius: "8px", fontSize: "13px" }}
-                />
-                <Bar dataKey="total" radius={[4, 4, 0, 0]} maxBarSize={48}>
-                  {monthlyData.map((entry, idx) => (
-                    <Cell
-                      key={idx}
-                      fill={entry.isPast ? "#ef4444" : "#3b82f6"}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
           )}
-        </CardContent>
-      </Card>
-
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-            </span>
-            Dados sincronizados com o Sienge
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
