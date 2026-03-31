@@ -4185,10 +4185,10 @@ export function ExecutiveDashboard() {
                           <Badge variant="outline" className={`text-xs px-2 py-1 font-semibold rounded-full ${
                             isPositiveVar
                               ? "bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
-                              : "bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"
+                              : "bg-red-50 dark:bg-red-950/50 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300/70"
                           }`}>
                             {isPositiveVar ? <TrendingUp className="h-3.5 w-3.5 mr-1" /> : <TrendingDown className="h-3.5 w-3.5 mr-1" />}
-                            {isPositiveVar ? "+" : ""}{varPct.toFixed(1)}% ({isPositiveVar ? "+" : ""}{formatCompactCurrency(varAbs)})
+                            {isPositiveVar ? "+" : ""}{varPct.toFixed(1)}% ({isPositiveVar ? "+" : ""}{formatCurrency(varAbs)})
                           </Badge>
                         </div>
                       )}
@@ -4201,6 +4201,14 @@ export function ExecutiveDashboard() {
                         <span className="text-sm">Carregando evolução diária...</span>
                       </div>
                     ) : dailyBalances && lineData.length > 0 ? (() => {
+
+                      // Enrich with previous day and daily variation
+                      for (let i = 0; i < lineData.length; i++) {
+                        const prev = i > 0 ? lineData[i - 1].total : lineData[i].total;
+                        (lineData[i] as Record<string, unknown>).prevTotal = prev;
+                        (lineData[i] as Record<string, unknown>).dayVar = lineData[i].total - prev;
+                        (lineData[i] as Record<string, unknown>).dayVarPct = prev !== 0 ? ((lineData[i].total - prev) / prev) * 100 : 0;
+                      }
 
                       // Find max and min values for highlighting
                       const maxVal = Math.max(...lineData.map(d => d.total));
@@ -4247,13 +4255,34 @@ export function ExecutiveDashboard() {
                               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                               <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11 }} />
                               <RechartsTooltip
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                formatter={(value: any) => [formatCurrency(Number(value)), "Saldo"]}
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                labelFormatter={(label: any) => {
-                                  const item = lineData.find(d => d.date === String(label));
-                                  if (item) return item.fullDate.split("-").reverse().join("/");
-                                  return String(label);
+                                content={({ active, payload }) => {
+                                  if (!active || !payload || payload.length === 0) return null;
+                                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                  const data = payload[0].payload as any;
+                                  const dayVar = data.dayVar || 0;
+                                  const dayVarPct = data.dayVarPct || 0;
+                                  const isUp = dayVar >= 0;
+                                  return (
+                                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-3 text-xs">
+                                      <div className="font-semibold text-slate-700 dark:text-slate-200 mb-1.5">
+                                        {data.fullDate?.split("-").reverse().join("/")}
+                                      </div>
+                                      <div className="flex justify-between gap-4 mb-1">
+                                        <span className="text-slate-500">Saldo:</span>
+                                        <span className="font-bold text-slate-800 dark:text-slate-100">{formatCurrency(data.total)}</span>
+                                      </div>
+                                      <div className="flex justify-between gap-4 mb-1">
+                                        <span className="text-slate-500">Dia anterior:</span>
+                                        <span className="text-slate-600 dark:text-slate-400">{formatCurrency(data.prevTotal)}</span>
+                                      </div>
+                                      <div className="flex justify-between gap-4 pt-1 border-t border-slate-100 dark:border-slate-700">
+                                        <span className="text-slate-500">Variação:</span>
+                                        <span className={`font-semibold ${isUp ? "text-emerald-600" : "text-red-400"}`}>
+                                          {isUp ? "+" : ""}{formatCurrency(dayVar)} ({isUp ? "+" : ""}{dayVarPct.toFixed(1)}%)
+                                        </span>
+                                      </div>
+                                    </div>
+                                  );
                                 }}
                               />
                               <Area
