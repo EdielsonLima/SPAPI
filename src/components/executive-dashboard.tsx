@@ -3971,156 +3971,106 @@ export function ExecutiveDashboard() {
               </div>
             </div>
 
-            {/* Row 2: Fluxo de Caixa Projetado */}
-            <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Fluxo de Caixa Projetado — Próximos 30 dias</CardTitle>
-                <CardDescription className="text-xs text-slate-500">Saldo atual + recebimentos previstos - pagamentos previstos</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {(() => {
-                  // Build projected cash flow for next 30 days
-                  const days: { date: string; label: string; saldo: number; receber: number; pagar: number; projetado: number }[] = [];
-                  let acumReceber = 0;
-                  let acumPagar = 0;
+            {/* Row 2+3: Fluxo de Caixa + Insights */}
+            {(() => {
+              // Build projected cash flow for next 30 days
+              const days: { date: string; label: string; saldo: number; receber: number; pagar: number; projetado: number }[] = [];
+              let acumReceber = 0;
+              let acumPagar = 0;
+              for (let d = 0; d <= 30; d++) {
+                const dt = new Date(now.getTime() + d * 86400000);
+                const dtStr = dt.toISOString().split("T")[0];
+                const dayLabel = `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
+                const recDia = filteredAReceber.filter(i => i.dueDate === dtStr).reduce((s, i) => s + effectiveAmount(i), 0);
+                const pagDia = filteredAPagar.filter(i => i.dueDate === dtStr).reduce((s, i) => s + effectiveAmount(i), 0);
+                acumReceber += recDia;
+                acumPagar += pagDia;
+                days.push({ date: dtStr, label: dayLabel, saldo: saldoTotal, receber: acumReceber, pagar: acumPagar, projetado: saldoTotal + acumReceber - acumPagar });
+              }
+              return (
+                <>
+                  <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Fluxo de Caixa Projetado — Próximos 30 dias</CardTitle>
+                      <CardDescription className="text-xs text-slate-500">Saldo atual + recebimentos previstos - pagamentos previstos</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={days} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
+                            <defs>
+                              <linearGradient id="fluxoGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.2} />
+                                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                            <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 10 }} />
+                            <RechartsTooltip
+                              content={({ active, payload }) => {
+                                if (!active || !payload || payload.length === 0) return null;
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                                const d = payload[0].payload as any;
+                                return (
+                                  <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-3 text-xs">
+                                    <div className="font-semibold mb-1.5">{d.date?.split("-").reverse().join("/")}</div>
+                                    <div className="flex justify-between gap-4"><span className="text-slate-500">Saldo atual:</span><span>{formatCurrency(d.saldo)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className="text-emerald-500">+ Recebimentos:</span><span className="text-emerald-600">{formatCurrency(d.receber)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className="text-amber-500">- Pagamentos:</span><span className="text-amber-600">{formatCurrency(d.pagar)}</span></div>
+                                    <div className="flex justify-between gap-4 pt-1 border-t mt-1"><span className="font-semibold">Projetado:</span><span className={`font-bold ${d.projetado >= 0 ? "text-indigo-600" : "text-red-400"}`}>{formatCurrency(d.projetado)}</span></div>
+                                  </div>
+                                );
+                              }}
+                            />
+                            <Area type="monotone" dataKey="projetado" stroke="#6366f1" strokeWidth={2.5} fill="url(#fluxoGrad)" dot={false} />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                  for (let d = 0; d <= 30; d++) {
-                    const dt = new Date(now.getTime() + d * 86400000);
-                    const dtStr = dt.toISOString().split("T")[0];
-                    const dayLabel = `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}`;
-
-                    const recDia = filteredAReceber.filter(i => i.dueDate === dtStr).reduce((s, i) => s + effectiveAmount(i), 0);
-                    const pagDia = filteredAPagar.filter(i => i.dueDate === dtStr).reduce((s, i) => s + effectiveAmount(i), 0);
-                    acumReceber += recDia;
-                    acumPagar += pagDia;
-
-                    days.push({
-                      date: dtStr,
-                      label: dayLabel,
-                      saldo: saldoTotal,
-                      receber: acumReceber,
-                      pagar: acumPagar,
-                      projetado: saldoTotal + acumReceber - acumPagar,
-                    });
-                  }
-
-                  return (
-                    <div className="h-[300px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={days} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
-                          <defs>
-                            <linearGradient id="fluxoGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#6366f1" stopOpacity={0.2} />
-                              <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
-                          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-                          <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 10 }} />
-                          <RechartsTooltip
-                            content={({ active, payload }) => {
-                              if (!active || !payload || payload.length === 0) return null;
-                              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                              const d = payload[0].payload as any;
-                              return (
-                                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-3 text-xs">
-                                  <div className="font-semibold mb-1.5">{d.date?.split("-").reverse().join("/")}</div>
-                                  <div className="flex justify-between gap-4"><span className="text-slate-500">Saldo atual:</span><span>{formatCurrency(d.saldo)}</span></div>
-                                  <div className="flex justify-between gap-4"><span className="text-emerald-500">+ Recebimentos:</span><span className="text-emerald-600">{formatCurrency(d.receber)}</span></div>
-                                  <div className="flex justify-between gap-4"><span className="text-amber-500">- Pagamentos:</span><span className="text-amber-600">{formatCurrency(d.pagar)}</span></div>
-                                  <div className="flex justify-between gap-4 pt-1 border-t mt-1"><span className="font-semibold">Projetado:</span><span className={`font-bold ${d.projetado >= 0 ? "text-indigo-600" : "text-red-400"}`}>{formatCurrency(d.projetado)}</span></div>
-                                </div>
-                              );
-                            }}
-                          />
-                          <Area type="monotone" dataKey="projetado" stroke="#6366f1" strokeWidth={2.5} fill="url(#fluxoGrad)" dot={false} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  );
-                })()}
-              </CardContent>
-            </Card>
-
-            {/* Row 3: Quick summaries */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* A Pagar próximos 30 dias */}
-              <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">A Pagar — Próximos 30 dias</CardTitle>
-                    <span className="text-lg font-black tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(aPagar30d)}</span>
+                  {/* Insight cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Pico mínimo */}
+              {(() => {
+                const minDay = days.reduce((min, d) => d.projetado < min.projetado ? d : min, days[0]);
+                const isNegative = minDay.projetado < 0;
+                return (
+                  <div className={`rounded-2xl p-4 border ${isNegative ? "bg-red-50 dark:bg-red-950/30 border-red-200/60 dark:border-red-800/40" : "bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-800/40"}`}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Ponto Crítico</p>
+                    <p className={`text-lg font-black tabular-nums ${isNegative ? "text-red-600 dark:text-red-300/70" : "text-amber-700 dark:text-amber-400"}`}>{formatCurrency(minDay.projetado)}</p>
+                    <p className="text-[10px] text-slate-400">em {minDay.label} — menor saldo projetado</p>
                   </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader className="bg-slate-800 text-slate-100">
-                      <TableRow>
-                        <TableHead className="text-slate-200 text-xs">Credor</TableHead>
-                        <TableHead className="text-slate-200 text-xs">Vencimento</TableHead>
-                        <TableHead className="text-slate-200 text-xs text-right">Valor</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredAPagar
-                        .filter(i => i.dueDate >= todayStr && i.dueDate <= in30d)
-                        .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
-                        .slice(0, 10)
-                        .map((item, idx) => (
-                          <TableRow key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                            <TableCell className="text-xs truncate max-w-[200px]">{"creditorName" in item ? item.creditorName : ""}</TableCell>
-                            <TableCell className="text-xs">{formatDate(item.dueDate)}</TableCell>
-                            <TableCell className="text-xs font-semibold text-right tabular-nums">{formatCurrency(effectiveAmount(item))}</TableCell>
-                          </TableRow>
-                        ))
-                      }
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                );
+              })()}
 
-              {/* Inadimplência por empresa */}
-              <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Inadimplência por Empresa</CardTitle>
-                    <span className="text-lg font-black tabular-nums text-orange-600 dark:text-orange-400">{formatCurrency(totalInadimplencia)}</span>
+              {/* Cobertura */}
+              {(() => {
+                const diasCobertura = aPagar30d > 0 ? Math.floor((saldoTotal / aPagar30d) * 30) : 999;
+                return (
+                  <div className={`rounded-2xl p-4 border ${diasCobertura < 15 ? "bg-red-50 dark:bg-red-950/30 border-red-200/60 dark:border-red-800/40" : diasCobertura < 30 ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-800/40" : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-800/40"}`}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Cobertura de Caixa</p>
+                    <p className={`text-lg font-black tabular-nums ${diasCobertura < 15 ? "text-red-600 dark:text-red-300/70" : diasCobertura < 30 ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>
+                      {diasCobertura > 365 ? "+365" : diasCobertura} dias
+                    </p>
+                    <p className="text-[10px] text-slate-400">saldo atual cobre pagamentos por este período</p>
                   </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader className="bg-slate-800 text-slate-100">
-                      <TableRow>
-                        <TableHead className="text-slate-200 text-xs">Empresa</TableHead>
-                        <TableHead className="text-slate-200 text-xs text-right">Parcelas</TableHead>
-                        <TableHead className="text-slate-200 text-xs text-right">Valor</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(() => {
-                        const byComp: Record<string, { count: number; total: number }> = {};
-                        filteredInadimplencia.forEach(i => {
-                          const c = i.companyName || "Outros";
-                          if (!byComp[c]) byComp[c] = { count: 0, total: 0 };
-                          byComp[c].count++;
-                          byComp[c].total += effectiveAmount(i);
-                        });
-                        return Object.entries(byComp)
-                          .sort((a, b) => b[1].total - a[1].total)
-                          .slice(0, 10)
-                          .map(([name, data]) => (
-                            <TableRow key={name} className="hover:bg-slate-50 dark:hover:bg-slate-800">
-                              <TableCell className="text-xs truncate max-w-[200px]">{name}</TableCell>
-                              <TableCell className="text-xs text-right">{data.count}</TableCell>
-                              <TableCell className="text-xs font-semibold text-right tabular-nums text-red-600 dark:text-red-300/70">{formatCurrency(data.total)}</TableCell>
-                            </TableRow>
-                          ));
-                      })()}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+                );
+              })()}
+
+              {/* Saldo final projetado */}
+              <div className={`rounded-2xl p-4 border ${days[days.length - 1]?.projetado >= 0 ? "bg-sky-50 dark:bg-sky-950/30 border-sky-200/60 dark:border-sky-800/40" : "bg-red-50 dark:bg-red-950/30 border-red-200/60 dark:border-red-800/40"}`}>
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Saldo em 30 dias</p>
+                <p className={`text-lg font-black tabular-nums ${days[days.length - 1]?.projetado >= 0 ? "text-sky-700 dark:text-sky-400" : "text-red-600 dark:text-red-300/70"}`}>
+                  {formatCurrency(days[days.length - 1]?.projetado || 0)}
+                </p>
+                <p className="text-[10px] text-slate-400">projeção para {days[days.length - 1]?.label}</p>
+              </div>
             </div>
+                </>
+              );
+            })()}
           </div>
         );
       })()}
