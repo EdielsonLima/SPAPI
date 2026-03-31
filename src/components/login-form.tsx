@@ -86,14 +86,14 @@ export function LoginForm() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
               <Label htmlFor="username" className="text-slate-700 font-medium">
-                Usuario
+                Email ou usuario
               </Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <Input
                   id="username"
                   type="text"
-                  placeholder="Digite seu usuario"
+                  placeholder="Digite seu email ou usuario"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="pl-10 h-11 border-slate-200 focus:border-red-600 focus:ring-red-600"

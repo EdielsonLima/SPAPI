@@ -693,6 +693,24 @@ export async function getArrivalConfirmationFilePath(id: number): Promise<{ file
   };
 }
 
+// ─── Users ────────────────────────────────────────────────────────────────
+
+export async function getUserByEmail(email: string): Promise<{ id: number; name: string; email: string; passwordHash: string; active: boolean } | null> {
+  const result = await pool.query(
+    `SELECT id, name, email, password_hash AS "passwordHash", active FROM users WHERE email = $1 AND active = TRUE`,
+    [email]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+export async function createUser(name: string, email: string, passwordHash: string) {
+  await pool.query(
+    `INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3)
+     ON CONFLICT (email) DO UPDATE SET name = $1, password_hash = $2`,
+    [name, email, passwordHash]
+  );
+}
+
 // ─── Daily Bank Balances Cache ────────────────────────────────────────────
 
 export async function getCachedDailyBalance(date: string): Promise<unknown[] | null> {

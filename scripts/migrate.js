@@ -61,6 +61,26 @@ async function migrate() {
     } catch (pkErr) {
       console.log("[migrate] PK migration note:", pkErr.message);
     }
+    // Seed default users (only if not already present)
+    try {
+      const bcrypt = require("bcryptjs");
+      const defaultUsers = [
+        { name: "Carlos Humberto", email: "carlos@silvapacker.com.br", password: "silvapacker@carlos" },
+      ];
+      for (const u of defaultUsers) {
+        const exists = await pool.query("SELECT id FROM users WHERE email = $1", [u.email]);
+        if (exists.rows.length === 0) {
+          const hash = await bcrypt.hash(u.password, 10);
+          await pool.query(
+            "INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3)",
+            [u.name, u.email, hash]
+          );
+          console.log(`[migrate] User "${u.name}" (${u.email}) created.`);
+        }
+      }
+    } catch (seedErr) {
+      console.log("[migrate] User seed note:", seedErr.message);
+    }
   } catch (err) {
     console.error("[migrate] Error:", err.message);
     process.exit(1);
