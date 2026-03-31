@@ -49,8 +49,8 @@ import {
   ResponsiveContainer,
   Cell,
   LabelList,
-  LineChart,
-  Line,
+  AreaChart,
+  Area,
 } from "recharts";
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } from "@/types/sienge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -4172,10 +4172,47 @@ export function ExecutiveDashboard() {
                         };
                       }).filter(d => d.total !== 0); // Remove weekends/holidays with zero balance
 
+                      // Find max and min values for highlighting
+                      const maxVal = Math.max(...lineData.map(d => d.total));
+                      const minVal = Math.min(...lineData.map(d => d.total));
+
+                      // Custom dot renderer: green for max, red for min, default for others
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      const renderDot = (props: any) => {
+                        const { cx, cy, payload } = props;
+                        if (payload.total === maxVal) {
+                          return (
+                            <g key={`dot-${payload.date}`}>
+                              <circle cx={cx} cy={cy} r={7} fill="#10b981" stroke="#fff" strokeWidth={2} />
+                              <text x={cx} y={cy - 14} textAnchor="middle" fontSize={10} fontWeight={700} fill="#10b981">
+                                {formatCompactCurrency(maxVal)}
+                              </text>
+                            </g>
+                          );
+                        }
+                        if (payload.total === minVal) {
+                          return (
+                            <g key={`dot-${payload.date}`}>
+                              <circle cx={cx} cy={cy} r={7} fill="#ef4444" stroke="#fff" strokeWidth={2} />
+                              <text x={cx} y={cy + 20} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ef4444">
+                                {formatCompactCurrency(minVal)}
+                              </text>
+                            </g>
+                          );
+                        }
+                        return <circle key={`dot-${payload.date}`} cx={cx} cy={cy} r={3} fill="#6366f1" />;
+                      };
+
                       return (
-                        <div className="h-[300px]">
+                        <div className="h-[350px]">
                           <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={lineData} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
+                            <AreaChart data={lineData} margin={{ left: 10, right: 10, top: 25, bottom: 5 }}>
+                              <defs>
+                                <linearGradient id="saldoGradient" x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="#6366f1" stopOpacity={0.25} />
+                                  <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
+                                </linearGradient>
+                              </defs>
                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
                               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                               <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11 }} />
@@ -4189,15 +4226,16 @@ export function ExecutiveDashboard() {
                                   return String(label);
                                 }}
                               />
-                              <Line
+                              <Area
                                 type="monotone"
                                 dataKey="total"
                                 stroke="#6366f1"
                                 strokeWidth={2.5}
-                                dot={{ r: 3, fill: "#6366f1" }}
-                                activeDot={{ r: 5 }}
+                                fill="url(#saldoGradient)"
+                                dot={renderDot}
+                                activeDot={{ r: 6, stroke: "#6366f1", strokeWidth: 2, fill: "#fff" }}
                               />
-                            </LineChart>
+                            </AreaChart>
                           </ResponsiveContainer>
                         </div>
                       );
