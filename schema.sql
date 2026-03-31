@@ -214,3 +214,12 @@ CREATE INDEX IF NOT EXISTS idx_cached_companies_name       ON cached_companies (
 CREATE INDEX IF NOT EXISTS idx_cached_cost_centers_name    ON cached_cost_centers (name);
 CREATE INDEX IF NOT EXISTS idx_cached_financial_plans_name ON cached_financial_plans (name);
 CREATE INDEX IF NOT EXISTS idx_arrival_confirmations_order ON arrival_confirmations (purchase_order_id);
+
+-- ── Saldos Bancários Diários (Daily Bank Balances Cache) ──────────────────
+-- Saldos de dias passados não mudam, então ficam em cache permanente.
+CREATE TABLE IF NOT EXISTS cached_daily_balances (
+  balance_date TEXT  NOT NULL,
+  data         JSONB NOT NULL,
+  cached_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (balance_date)
+);

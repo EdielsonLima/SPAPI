@@ -4223,8 +4223,8 @@ export function ExecutiveDashboard() {
                         if (payload.total === minVal) {
                           return (
                             <g key={`dot-${payload.date}`}>
-                              <circle cx={cx} cy={cy} r={7} fill="#ef4444" stroke="#fff" strokeWidth={2} />
-                              <text x={cx} y={cy + 20} textAnchor="middle" fontSize={10} fontWeight={700} fill="#ef4444">
+                              <circle cx={cx} cy={cy} r={7} fill="#f87171" stroke="#fff" strokeWidth={2} />
+                              <text x={cx} y={cy + 20} textAnchor="middle" fontSize={10} fontWeight={700} fill="#f87171">
                                 {formatCompactCurrency(minVal)}
                               </text>
                             </g>

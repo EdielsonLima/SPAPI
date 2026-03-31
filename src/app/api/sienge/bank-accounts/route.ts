@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { siengeGet } from "@/lib/sienge";
+import { getCachedDailyBalance, cacheDailyBalance } from "@/lib/db";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type R = any;
@@ -129,17 +130,39 @@ export async function GET(request: NextRequest) {
         dates.push(`${yearStr}-${monthStr}-${String(d).padStart(2, "0")}`);
       }
 
-      // Fetch in batches of 3 to avoid rate limits
+      // Fetch with DB cache — past days from cache, today from API
       const dailyBalances: Record<string, { accountId: string; amount: number }[]> = {};
-      for (let i = 0; i < dates.length; i += 3) {
-        const batch = dates.slice(i, i + 3);
+      const datesToFetch: string[] = [];
+
+      // Check DB cache for past days
+      for (const date of dates) {
+        if (date < today) {
+          const cached = await getCachedDailyBalance(date);
+          if (cached) {
+            dailyBalances[date] = cached as { accountId: string; amount: number }[];
+            continue;
+          }
+        }
+        datesToFetch.push(date);
+      }
+
+      console.log(`[daily-balances] ${dates.length - datesToFetch.length} from cache, ${datesToFetch.length} to fetch from API`);
+
+      // Fetch remaining dates in batches of 3
+      for (let i = 0; i < datesToFetch.length; i += 3) {
+        const batch = datesToFetch.slice(i, i + 3);
         const promises = batch.map(async (date) => {
           try {
             const raw = await fetchBalancesForDate(date, companiesMap, companyIds);
-            dailyBalances[date] = raw.map((a: R) => ({
+            const mapped = raw.map((a: R) => ({
               accountId: `${a.companyId}:${a.accountNumber}`,
               amount: a.amount ?? 0,
             }));
+            dailyBalances[date] = mapped;
+            // Cache past days permanently (today's balance may still change)
+            if (date < today) {
+              await cacheDailyBalance(date, mapped);
+            }
           } catch {
             dailyBalances[date] = [];
           }

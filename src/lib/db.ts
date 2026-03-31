@@ -693,4 +693,22 @@ export async function getArrivalConfirmationFilePath(id: number): Promise<{ file
   };
 }
 
+// ─── Daily Bank Balances Cache ────────────────────────────────────────────
+
+export async function getCachedDailyBalance(date: string): Promise<unknown[] | null> {
+  const result = await pool.query(
+    `SELECT data FROM cached_daily_balances WHERE balance_date = $1`,
+    [date]
+  );
+  return result.rows.length > 0 ? result.rows[0].data : null;
+}
+
+export async function cacheDailyBalance(date: string, data: unknown[]) {
+  await pool.query(
+    `INSERT INTO cached_daily_balances (balance_date, data, cached_at) VALUES ($1, $2, NOW())
+     ON CONFLICT (balance_date) DO UPDATE SET data = $2, cached_at = NOW()`,
+    [date, JSON.stringify(data)]
+  );
+}
+
 export default pool;
