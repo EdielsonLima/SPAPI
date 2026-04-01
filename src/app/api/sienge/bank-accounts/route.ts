@@ -151,16 +151,23 @@ export async function GET(request: NextRequest) {
 
     // ── DAILY BALANCES MODE ──
     if (daily) {
-      const month = monthParam || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-      const [yearStr, monthStr] = month.split("-");
-      const year = parseInt(yearStr);
-      const mon = parseInt(monthStr);
-      const lastDay = Math.min(new Date(year, mon, 0).getDate(), now.getFullYear() === year && now.getMonth() + 1 === mon ? now.getDate() : 31);
-
-      // Generate dates
       const dates: string[] = [];
-      for (let d = 1; d <= lastDay; d++) {
-        dates.push(`${yearStr}-${monthStr}-${String(d).padStart(2, "0")}`);
+
+      if (monthParam === "last7") {
+        // Last 7 calendar days
+        for (let d = 6; d >= 0; d--) {
+          const dt = new Date(now.getTime() - d * 86400000);
+          dates.push(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`);
+        }
+      } else {
+        const month = monthParam || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+        const [yearStr, monthStr] = month.split("-");
+        const year = parseInt(yearStr);
+        const mon = parseInt(monthStr);
+        const lastDay = Math.min(new Date(year, mon, 0).getDate(), now.getFullYear() === year && now.getMonth() + 1 === mon ? now.getDate() : 31);
+        for (let d = 1; d <= lastDay; d++) {
+          dates.push(`${yearStr}-${monthStr}-${String(d).padStart(2, "0")}`);
+        }
       }
 
       // Fetch with DB cache — past days from cache, today from API

@@ -346,6 +346,10 @@ export function ExecutiveDashboard() {
   const [bankAccountsInitialized, setBankAccountsInitialized] = useState(false);
   const [dailyBalances, setDailyBalances] = useState<Record<string, { accountId: string; amount: number }[]> | null>(null);
   const [loadingDaily, setLoadingDaily] = useState(false);
+  const [saldosMonth, setSaldosMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
   const [fluxoPeriodo, setFluxoPeriodo] = useState(30);
   const [fluxoView, setFluxoView] = useState<"projetado" | "entradas-saidas">("projetado");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
@@ -503,11 +507,12 @@ export function ExecutiveDashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  // Fetch daily balances for chart
+  // Fetch daily balances for chart (re-fetches when month changes)
   useEffect(() => {
-    if (activeTab !== "saldos" || dailyBalances !== null || loadingDaily) return;
+    if (activeTab !== "saldos") return;
     setLoadingDaily(true);
-    fetch("/api/sienge/bank-accounts?daily=true")
+    setDailyBalances(null);
+    fetch(`/api/sienge/bank-accounts?daily=true&month=${saldosMonth === "last7" ? "last7" : saldosMonth}`)
       .then(res => res.json())
       .then(json => {
         if (json.dailyBalances) setDailyBalances(json.dailyBalances);
@@ -515,7 +520,7 @@ export function ExecutiveDashboard() {
       .catch(() => {})
       .finally(() => setLoadingDaily(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, saldosMonth]);
 
   useEffect(() => {
     fetch("/api/bill-exclusions")
@@ -4519,9 +4524,45 @@ export function ExecutiveDashboard() {
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
                         <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">
-                          Evolução do Saldo — {new Date().toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+                          Evolução do Saldo — {saldosMonth === "last7" ? "Últimos 7 dias" : (() => {
+                            const [y, m] = saldosMonth.split("-");
+                            const d = new Date(parseInt(y), parseInt(m) - 1);
+                            return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+                          })()}
                         </CardTitle>
                         <CardDescription className="text-xs text-slate-500">Saldo dia a dia das contas selecionadas</CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {/* Month selector */}
+                        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                          <button
+                            onClick={() => setSaldosMonth("last7")}
+                            className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === "last7" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                          >
+                            7 dias
+                          </button>
+                          {(() => {
+                            const now = new Date();
+                            const months: string[] = [];
+                            for (let i = 2; i >= 0; i--) {
+                              const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                              months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+                            }
+                            return months.map(m => {
+                              const [y, mo] = m.split("-");
+                              const label = new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+                              return (
+                                <button
+                                  key={m}
+                                  onClick={() => setSaldosMonth(m)}
+                                  className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === m ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            });
+                          })()}
+                        </div>
                       </div>
                       {lineData.length > 1 && (
                         <div className="flex items-center gap-3">
