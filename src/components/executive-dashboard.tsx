@@ -1799,28 +1799,29 @@ export function ExecutiveDashboard() {
               Saldos
             </button>
           </div>
+        </div>
 
-          {/* Tabs */}
-          {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && <Tabs value={activeTab} onValueChange={v => {
+        {/* Sub-tabs CP/CR - separate line for prominence */}
+        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && (
+          <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             switchTab(tab);
-            // Only reset time-based filters, keep company, docType and year selections stable
             setSelectedMonths(new Set());
             setSelectedDays(new Set());
             setSelectedDuePeriods(new Set());
           }}>
-            <TabsList className="h-12 bg-transparent p-0 gap-1">
+            <TabsList className="h-12 bg-transparent p-0 gap-1 border-b border-slate-200 dark:border-slate-700 w-full justify-start">
               {section === "cp" ? (
                 <>
-                  <TabsTrigger value="a-pagar" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "a-pagar" ? "border-blue-500 bg-blue-50 text-blue-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                  <TabsTrigger value="a-pagar" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "a-pagar" ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     <Clock className="h-4 w-4" />
                     Contas a Pagar
                   </TabsTrigger>
-                  <TabsTrigger value="pagas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "pagas" ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                  <TabsTrigger value="pagas" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "pagas" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     <CheckCircle className="h-4 w-4" />
                     Contas Pagas
                   </TabsTrigger>
-                  <TabsTrigger value="atrasadas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "atrasadas" ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300/80 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                  <TabsTrigger value="atrasadas" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "atrasadas" ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300/80 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     <AlertTriangle className="h-4 w-4" />
                     Contas em Atraso
                     {itemsAtrasadas.length > 0 && (
@@ -1832,17 +1833,17 @@ export function ExecutiveDashboard() {
                 </>
               ) : (
                 <>
-                  <TabsTrigger value="a-receber" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "a-receber" ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                  <TabsTrigger value="a-receber" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "a-receber" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     <Banknote className="h-4 w-4" />
                     Contas a Receber
                   </TabsTrigger>
-                  <TabsTrigger value="recebidas" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "recebidas" ? "border-sky-500 bg-sky-50 text-sky-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                  <TabsTrigger value="recebidas" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "recebidas" ? "border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     <CheckCircle className="h-4 w-4" />
                     Contas Recebidas
                   </TabsTrigger>
-                  <TabsTrigger value="inadimplencia" className={`gap-2 px-5 h-10 rounded-none border-b-[3px] transition-all ${activeTab === "inadimplencia" ? "border-orange-500 bg-orange-50 text-orange-700 font-semibold shadow-sm" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>
+                  <TabsTrigger value="inadimplencia" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "inadimplencia" ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
                     <AlertTriangle className="h-4 w-4" />
-                    Inadimplencia
+                    Inadimplência
                     {itemsInadimplencia.length > 0 && (
                       <span className="ml-1 bg-orange-500 text-white text-[10px] font-bold rounded-full px-1.5 py-0.5 leading-none">
                         {itemsInadimplencia.length}
@@ -1852,8 +1853,8 @@ export function ExecutiveDashboard() {
                 </>
               )}
             </TabsList>
-          </Tabs>}
-        </div>
+          </Tabs>
+        )}
 
         {/* Filters */}
         {activeTab === "orcamento" && <div className="flex items-center gap-2">
