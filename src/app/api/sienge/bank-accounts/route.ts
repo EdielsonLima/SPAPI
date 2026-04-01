@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { siengeGet } from "@/lib/sienge";
 import { getCachedDailyBalance, cacheDailyBalance } from "@/lib/db";
+import pool from "@/lib/db";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type R = any;
@@ -185,6 +186,44 @@ export async function GET(request: NextRequest) {
 
     // ── STANDARD MODE (today's balances) ──
     const allAccounts = await fetchBalancesForDate(today, companiesMap, companyIds);
+
+    // Fill in missing DimBanco accounts from the most recent cached day
+    const seenAccountKeys = new Set(allAccounts.map((a: R) => `${a.companyId}:${a.accountNumber}`));
+    const dimBancoKeys = Object.keys(BANK_NAMES).flatMap(accNum => {
+      // Find which companies have this account from past data
+      return companyIds.map(cid => ({ companyId: cid, accountNumber: accNum, key: `${cid}:${accNum}` }));
+    });
+    const missingDimBanco = dimBancoKeys.filter(dk => BANK_NAMES[dk.accountNumber] && !seenAccountKeys.has(dk.key));
+
+    if (missingDimBanco.length > 0) {
+      // Try to find last known balances from cached_daily_balances
+      try {
+        const { rows } = await pool.query(
+          `SELECT data FROM cached_daily_balances WHERE balance_date < $1 ORDER BY balance_date DESC LIMIT 1`,
+          [today]
+        );
+        if (rows.length > 0) {
+          const cachedDay = rows[0].data as { accountId: string; amount: number }[];
+          for (const missing of missingDimBanco) {
+            const cached = cachedDay.find(c => c.accountId === missing.key);
+            if (cached && cached.amount !== 0) {
+              allAccounts.push({
+                accountNumber: missing.accountNumber,
+                companyId: missing.companyId,
+                amount: cached.amount,
+                reconciledAmount: 0,
+                accountStatus: "ENABLED",
+                links: [],
+              });
+              console.log(`[accounts-balances] Filled missing ${missing.key} from cache: ${cached.amount}`);
+            }
+          }
+        }
+      } catch (err) {
+        console.log("[accounts-balances] Could not fill from cache:", err);
+      }
+    }
+
     const enriched = mapAccounts(allAccounts);
 
     return NextResponse.json({ data: enriched });
