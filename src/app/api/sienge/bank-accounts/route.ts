@@ -184,6 +184,19 @@ export async function GET(request: NextRequest) {
       // All expected DimBanco account keys
       const expectedKeys = Object.entries(DIMBAN_ACCOUNT_COMPANY).map(([accNum, compId]) => `${compId}:${accNum}`);
 
+      // Load last known balances from DB as fallback for missing accounts
+      const lastKnownBalances: Record<string, number> = {};
+      try {
+        const { rows } = await pool.query(
+          `SELECT data FROM cached_daily_balances ORDER BY balance_date DESC LIMIT 1`
+        );
+        if (rows.length > 0) {
+          for (const entry of rows[0].data as { accountId: string; amount: number }[]) {
+            lastKnownBalances[entry.accountId] = entry.amount;
+          }
+        }
+      } catch { /* ignore */ }
+
       // Fetch remaining dates in batches of 3
       for (let i = 0; i < datesToFetch.length; i += 3) {
         const batch = datesToFetch.slice(i, i + 3);
@@ -194,13 +207,13 @@ export async function GET(request: NextRequest) {
               accountId: `${a.companyId}:${a.accountNumber}`,
               amount: a.amount ?? 0,
             }));
-            // Fill missing DimBanco accounts with 0 or last known value
+            // Fill missing DimBanco accounts with last known value
             const seenKeys = new Set(mapped.map(m => m.accountId));
             for (const ek of expectedKeys) {
               if (!seenKeys.has(ek)) {
-                // Try previous day's data as reference
+                // Try: 1) previous day in current fetch, 2) DB cache fallback
+                let prevAmount = lastKnownBalances[ek] ?? 0;
                 const prevDates = Object.keys(dailyBalances).sort().reverse();
-                let prevAmount = 0;
                 for (const pd of prevDates) {
                   const prev = dailyBalances[pd]?.find(d => d.accountId === ek);
                   if (prev) { prevAmount = prev.amount; break; }
@@ -208,6 +221,8 @@ export async function GET(request: NextRequest) {
                 mapped.push({ accountId: ek, amount: prevAmount });
               }
             }
+            // Update lastKnownBalances for next day's reference
+            for (const m of mapped) { lastKnownBalances[m.accountId] = m.amount; }
             dailyBalances[date] = mapped;
             if (date < today) {
               await cacheDailyBalance(date, mapped);
