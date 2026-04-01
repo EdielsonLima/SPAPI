@@ -181,6 +181,9 @@ export async function GET(request: NextRequest) {
 
       console.log(`[daily-balances] ${dates.length - datesToFetch.length} from cache, ${datesToFetch.length} to fetch from API`);
 
+      // All expected DimBanco account keys
+      const expectedKeys = Object.entries(DIMBAN_ACCOUNT_COMPANY).map(([accNum, compId]) => `${compId}:${accNum}`);
+
       // Fetch remaining dates in batches of 3
       for (let i = 0; i < datesToFetch.length; i += 3) {
         const batch = datesToFetch.slice(i, i + 3);
@@ -191,8 +194,21 @@ export async function GET(request: NextRequest) {
               accountId: `${a.companyId}:${a.accountNumber}`,
               amount: a.amount ?? 0,
             }));
+            // Fill missing DimBanco accounts with 0 or last known value
+            const seenKeys = new Set(mapped.map(m => m.accountId));
+            for (const ek of expectedKeys) {
+              if (!seenKeys.has(ek)) {
+                // Try previous day's data as reference
+                const prevDates = Object.keys(dailyBalances).sort().reverse();
+                let prevAmount = 0;
+                for (const pd of prevDates) {
+                  const prev = dailyBalances[pd]?.find(d => d.accountId === ek);
+                  if (prev) { prevAmount = prev.amount; break; }
+                }
+                mapped.push({ accountId: ek, amount: prevAmount });
+              }
+            }
             dailyBalances[date] = mapped;
-            // Cache past days permanently (today's balance may still change)
             if (date < today) {
               await cacheDailyBalance(date, mapped);
             }
