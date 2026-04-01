@@ -259,7 +259,6 @@ export async function GET(request: NextRequest) {
 
       // Try cache — search multiple recent days to find each missing account
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      let filledFromCache = 0;
       try {
         const { rows } = await pool.query(
           `SELECT balance_date, data FROM cached_daily_balances ORDER BY balance_date DESC LIMIT 10`
@@ -281,7 +280,6 @@ export async function GET(request: NextRequest) {
                 links: [],
               });
               stillNeeded.delete(missing.key);
-              filledFromCache++;
               console.log(`[accounts-balances] Filled ${missing.key} = ${cached.amount} from cache (${row.balance_date})`);
             }
           }

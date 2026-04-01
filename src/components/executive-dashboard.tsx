@@ -350,6 +350,10 @@ export function ExecutiveDashboard() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   });
+  const [saldosCompareMonth, setSaldosCompareMonth] = useState<string | null>(null);
+  const [compareBalances, setCompareBalances] = useState<Record<string, { accountId: string; amount: number }[]> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [loadingCompare, setLoadingCompare] = useState(false);
   const [fluxoPeriodo, setFluxoPeriodo] = useState(30);
   const [fluxoView, setFluxoView] = useState<"projetado" | "entradas-saidas">("projetado");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
@@ -521,6 +525,21 @@ export function ExecutiveDashboard() {
       .finally(() => setLoadingDaily(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, saldosMonth]);
+
+  // Fetch compare month data
+  useEffect(() => {
+    if (!saldosCompareMonth || activeTab !== "saldos") {
+      setCompareBalances(null);
+      return;
+    }
+    setLoadingCompare(true);
+    fetch(`/api/sienge/bank-accounts?daily=true&month=${saldosCompareMonth}`)
+      .then(res => res.json())
+      .then(json => { if (json.dailyBalances) setCompareBalances(json.dailyBalances); })
+      .catch(() => {})
+      .finally(() => setLoadingCompare(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saldosCompareMonth, activeTab]);
 
   useEffect(() => {
     fetch("/api/bill-exclusions")
@@ -4500,16 +4519,32 @@ export function ExecutiveDashboard() {
                 {/* Daily Balance Line Chart */}
                 {(() => {
                   // Compute line data before rendering so we can use it in the header
-                  let lineData: { date: string; fullDate: string; total: number }[] = [];
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  let lineData: any[] = [];
                   if (dailyBalances) {
                     const sortedDates = Object.keys(dailyBalances).sort();
                     const validAccountIds = new Set(filteredAccounts.map(a => String(a.bankAccountId)));
+
+                    // Build compare data indexed by day number
+                    const compareByDay: Record<string, number> = {};
+                    if (compareBalances && saldosCompareMonth) {
+                      const compareDates = Object.keys(compareBalances).sort();
+                      for (const cd of compareDates) {
+                        const dayNum = cd.split("-")[2];
+                        const total = (compareBalances[cd] || [])
+                          .filter(a => validAccountIds.has(a.accountId))
+                          .reduce((s, a) => s + a.amount, 0);
+                        if (total !== 0) compareByDay[dayNum] = total;
+                      }
+                    }
+
                     lineData = sortedDates.map(date => {
                       const dayAccounts = dailyBalances[date] || [];
                       const total = dayAccounts
                         .filter(a => validAccountIds.has(a.accountId))
                         .reduce((s, a) => s + a.amount, 0);
-                      return { date: date.split("-")[2], fullDate: date, total };
+                      const dayNum = date.split("-")[2];
+                      return { date: dayNum, fullDate: date, total, compare: compareByDay[dayNum] ?? null };
                     }).filter(d => d.total !== 0);
                   }
                   const firstVal = lineData.length > 0 ? lineData[0].total : 0;
@@ -4563,6 +4598,40 @@ export function ExecutiveDashboard() {
                             });
                           })()}
                         </div>
+
+                        {/* Compare selector */}
+                        {saldosMonth !== "last7" && (
+                          <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                            <span className="text-[10px] text-slate-400 px-1">vs</span>
+                            <button
+                              onClick={() => setSaldosCompareMonth(null)}
+                              className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${!saldosCompareMonth ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                            >
+                              —
+                            </button>
+                            {(() => {
+                              const now = new Date();
+                              const months: string[] = [];
+                              for (let i = 5; i >= 1; i--) {
+                                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                                months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+                              }
+                              return months.filter(m => m !== saldosMonth).map(m => {
+                                const [y, mo] = m.split("-");
+                                const label = new Date(parseInt(y), parseInt(mo) - 1).toLocaleDateString("pt-BR", { month: "short" }).replace(".", "");
+                                return (
+                                  <button
+                                    key={m}
+                                    onClick={() => setSaldosCompareMonth(m)}
+                                    className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosCompareMonth === m ? "bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                  >
+                                    {label}
+                                  </button>
+                                );
+                              });
+                            })()}
+                          </div>
+                        )}
                       </div>
                       {lineData.length > 1 && (
                         <div className="flex items-center gap-3">
@@ -4687,6 +4756,18 @@ export function ExecutiveDashboard() {
                                           {isUp ? "+" : ""}{formatCurrency(dayVar)} ({isUp ? "+" : ""}{dayVarPct.toFixed(1)}%)
                                         </span>
                                       </div>
+                                      {data.compare !== null && data.compare !== undefined && (() => {
+                                        const diff = data.total - data.compare;
+                                        const diffPct = data.compare !== 0 ? (diff / data.compare) * 100 : 0;
+                                        return (
+                                          <div className="flex justify-between gap-4 pt-1 border-t border-slate-100 dark:border-slate-700 mt-1">
+                                            <span className="text-amber-500">vs comparação:</span>
+                                            <span className={`font-semibold ${diff >= 0 ? "text-emerald-600" : "text-red-400"}`}>
+                                              {diff >= 0 ? "+" : ""}{formatCompactCurrency(diff)} ({diff >= 0 ? "+" : ""}{diffPct.toFixed(1)}%)
+                                            </span>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   );
                                 }}
@@ -4700,6 +4781,18 @@ export function ExecutiveDashboard() {
                                 dot={renderDot}
                                 activeDot={{ r: 6, stroke: "#6366f1", strokeWidth: 2, fill: "#fff" }}
                               />
+                              {saldosCompareMonth && (
+                                <Line
+                                  type="monotone"
+                                  dataKey="compare"
+                                  stroke="#f59e0b"
+                                  strokeWidth={2}
+                                  strokeDasharray="6 3"
+                                  dot={{ r: 2, fill: "#f59e0b" }}
+                                  connectNulls={false}
+                                  name="Comparação"
+                                />
+                              )}
                             </AreaChart>
                           </ResponsiveContainer>
                         </div>
