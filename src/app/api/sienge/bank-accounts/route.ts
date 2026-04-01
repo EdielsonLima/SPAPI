@@ -30,8 +30,30 @@ const BANK_NAMES: Record<string, string> = {
   "00910779-3": "BTG Pactual - JP",
 };
 
+// Exact mapping: accountNumber → companyId (from Sienge data)
+// This ensures we know which company owns each DimBanco account
+const DIMBAN_ACCOUNT_COMPANY: Record<string, number> = {
+  "00483730-8": 1,  // BTG Pactual - CH → Silva Packer
+  "00910779-3": 1,  // BTG Pactual - JP → Silva Packer
+  "0257918-9": 1,   // Banco Bradesco → Silva Packer
+  "A0257918-9": 1,  // Aplicação Bradesco → Silva Packer
+  "2261-8": 1,      // Caixa Econômica → Silva Packer
+  "CAIXA": 1,       // Cash → Silva Packer
+  "275226-3": 1,    // Banco do Brasil → Silva Packer
+  "570920-2": 1,    // Banco XP → Silva Packer
+  "0241711-1": 3,   // Banco Bradesco → Sul Brasil
+  "5370-8": 3,      // Banco do Brasil → Sul Brasil
+  "572226-0": 3,    // Banco XP → Sul Brasil
+  "5026-3": 3,      // Caixa Econômica → Sul Brasil
+  "490-1": 4,       // Banco do Brasil → Edifício 135 Jardins
+  "274-7": 5,       // Banco do Brasil → Solar di Capri
+  "479-0": 6,       // Banco do Brasil → Palacio Elizabeth
+  "487-1": 7,       // Banco do Brasil → Residencial Hannover
+  "277-1": 8,       // Banco do Brasil → Solar di Siena
+  "276-3": 9,       // Banco do Brasil → Tesla Residencial
+};
+
 // Accounts that are only valid for specific companies (companyId)
-// CAIXA exists in all companies but only Silva Packer (companyId=1) should be in DimBanco
 const COMPANY_RESTRICTED_ACCOUNTS: Record<string, number> = {
   "CAIXA": 1, // Only Silva Packer
 };
@@ -187,26 +209,28 @@ export async function GET(request: NextRequest) {
     // ── STANDARD MODE (today's balances) ──
     const allAccounts = await fetchBalancesForDate(today, companiesMap, companyIds);
 
-    // Fill in missing DimBanco accounts from the most recent cached day
+    // Fill in missing DimBanco accounts using exact account→company mapping
     const seenAccountKeys = new Set(allAccounts.map((a: R) => `${a.companyId}:${a.accountNumber}`));
-    const dimBancoKeys = Object.keys(BANK_NAMES).flatMap(accNum => {
-      // Find which companies have this account from past data
-      return companyIds.map(cid => ({ companyId: cid, accountNumber: accNum, key: `${cid}:${accNum}` }));
-    });
-    const missingDimBanco = dimBancoKeys.filter(dk => BANK_NAMES[dk.accountNumber] && !seenAccountKeys.has(dk.key));
+    const expectedAccounts = Object.entries(DIMBAN_ACCOUNT_COMPANY).map(([accNum, compId]) => ({
+      accountNumber: accNum, companyId: compId, key: `${compId}:${accNum}`
+    }));
+    const missingAccounts = expectedAccounts.filter(ea => !seenAccountKeys.has(ea.key));
 
-    if (missingDimBanco.length > 0) {
-      // Try to find last known balances from cached_daily_balances
+    if (missingAccounts.length > 0) {
+      console.log(`[accounts-balances] Missing DimBanco accounts: ${missingAccounts.map(m => m.key).join(", ")}`);
+
+      // Try cache first
+      let filledFromCache = 0;
       try {
         const { rows } = await pool.query(
-          `SELECT data FROM cached_daily_balances WHERE balance_date < $1 ORDER BY balance_date DESC LIMIT 1`,
-          [today]
+          `SELECT balance_date, data FROM cached_daily_balances ORDER BY balance_date DESC LIMIT 1`
         );
         if (rows.length > 0) {
           const cachedDay = rows[0].data as { accountId: string; amount: number }[];
-          for (const missing of missingDimBanco) {
+          const cacheDate = rows[0].balance_date;
+          for (const missing of missingAccounts) {
             const cached = cachedDay.find(c => c.accountId === missing.key);
-            if (cached && cached.amount !== 0) {
+            if (cached) {
               allAccounts.push({
                 accountNumber: missing.accountNumber,
                 companyId: missing.companyId,
@@ -215,12 +239,29 @@ export async function GET(request: NextRequest) {
                 accountStatus: "ENABLED",
                 links: [],
               });
-              console.log(`[accounts-balances] Filled missing ${missing.key} from cache: ${cached.amount}`);
+              filledFromCache++;
             }
+          }
+          if (filledFromCache > 0) {
+            console.log(`[accounts-balances] Filled ${filledFromCache} accounts from cache (${cacheDate})`);
           }
         }
       } catch (err) {
-        console.log("[accounts-balances] Could not fill from cache:", err);
+        console.log("[accounts-balances] Cache lookup error:", err);
+      }
+
+      // For any still missing (not in cache either), add with balance 0
+      const stillMissing = missingAccounts.filter(m => !allAccounts.some((a: R) => `${a.companyId}:${a.accountNumber}` === m.key));
+      for (const m of stillMissing) {
+        allAccounts.push({
+          accountNumber: m.accountNumber,
+          companyId: m.companyId,
+          amount: 0,
+          reconciledAmount: 0,
+          accountStatus: "ENABLED",
+          links: [],
+        });
+        console.log(`[accounts-balances] Added missing ${m.key} with balance 0 (no cache available)`);
       }
     }
 
