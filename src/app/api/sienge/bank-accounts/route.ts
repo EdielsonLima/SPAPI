@@ -45,13 +45,14 @@ function isInDimBanco(accountNumber: string, companyId: number): boolean {
 // Helper: fetch all accounts for a single date
 async function fetchBalancesForDate(date: string, companiesMap: Record<number, string>, companyIds: number[]): Promise<R[]> {
   const allAccounts: R[] = [];
-  const firstPage = await siengeGet<R>("/accounts-balances", { balanceDate: date, offset: "0", limit: "100" });
+  const firstPage = await siengeGet<R>("/accounts-balances", { balanceDate: date, offset: "0", limit: "200" });
   const results = firstPage?.results || [];
   const total = firstPage?.resultSetMetadata?.count || results.length;
   allAccounts.push(...results);
+  console.log(`[accounts-balances] ${date}: got ${results.length} of ${total} accounts`);
   let offset = results.length;
   while (offset < total) {
-    const page = await siengeGet<R>("/accounts-balances", { balanceDate: date, offset: String(offset), limit: "100" });
+    const page = await siengeGet<R>("/accounts-balances", { balanceDate: date, offset: String(offset), limit: "200" });
     const pr = page?.results || [];
     if (pr.length === 0) break;
     allAccounts.push(...pr);
@@ -60,11 +61,20 @@ async function fetchBalancesForDate(date: string, companiesMap: Record<number, s
   // Fetch missing companies
   const seenCompanies = new Set(allAccounts.map((a: R) => a.companyId));
   const missing = companyIds.filter(id => !seenCompanies.has(id));
+  if (missing.length > 0) {
+    console.log(`[accounts-balances] Missing companies for ${date}: ${missing.join(",")}`);
+  }
   for (const compId of missing) {
     try {
       const cp = await siengeGet<R>("/accounts-balances", { balanceDate: date, companyId: String(compId), offset: "0", limit: "100" });
-      allAccounts.push(...(cp?.results || []));
-    } catch { /* skip */ }
+      const cpResults = cp?.results || [];
+      if (cpResults.length > 0) {
+        console.log(`[accounts-balances] Found ${cpResults.length} accounts for company ${compId} on ${date}`);
+        allAccounts.push(...cpResults);
+      }
+    } catch (err) {
+      console.log(`[accounts-balances] Error fetching company ${compId} on ${date}: ${err}`);
+    }
   }
   return allAccounts;
 }
