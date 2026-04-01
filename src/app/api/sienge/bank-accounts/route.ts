@@ -257,18 +257,21 @@ export async function GET(request: NextRequest) {
     if (missingAccounts.length > 0) {
       console.log(`[accounts-balances] Missing DimBanco accounts: ${missingAccounts.map(m => m.key).join(", ")}`);
 
-      // Try cache first
+      // Try cache — search multiple recent days to find each missing account
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       let filledFromCache = 0;
       try {
         const { rows } = await pool.query(
-          `SELECT balance_date, data FROM cached_daily_balances ORDER BY balance_date DESC LIMIT 1`
+          `SELECT balance_date, data FROM cached_daily_balances ORDER BY balance_date DESC LIMIT 10`
         );
-        if (rows.length > 0) {
-          const cachedDay = rows[0].data as { accountId: string; amount: number }[];
-          const cacheDate = rows[0].balance_date;
+        const stillNeeded = new Set(missingAccounts.map(m => m.key));
+        for (const row of rows) {
+          if (stillNeeded.size === 0) break;
+          const cachedDay = row.data as { accountId: string; amount: number }[];
           for (const missing of missingAccounts) {
+            if (!stillNeeded.has(missing.key)) continue;
             const cached = cachedDay.find(c => c.accountId === missing.key);
-            if (cached) {
+            if (cached && cached.amount !== 0) {
               allAccounts.push({
                 accountNumber: missing.accountNumber,
                 companyId: missing.companyId,
@@ -277,11 +280,10 @@ export async function GET(request: NextRequest) {
                 accountStatus: "ENABLED",
                 links: [],
               });
+              stillNeeded.delete(missing.key);
               filledFromCache++;
+              console.log(`[accounts-balances] Filled ${missing.key} = ${cached.amount} from cache (${row.balance_date})`);
             }
-          }
-          if (filledFromCache > 0) {
-            console.log(`[accounts-balances] Filled ${filledFromCache} accounts from cache (${cacheDate})`);
           }
         }
       } catch (err) {
