@@ -4211,15 +4211,16 @@ export function ExecutiveDashboard() {
               <span className="text-sm">Carregando saldos bancarios...</span>
             </div>
           ) : (() => {
-            // Account list filtered by selected companies (if any)
-            const companyFilteredAccounts = selectedCompanies.size > 0
-              ? bankAccounts.filter(a => selectedCompanies.has(a.companyName))
-              : bankAccounts;
-            const allAccountNums = Array.from(new Set(companyFilteredAccounts.map(a => String(a.bankAccountId)))).sort();
+            // Account filter dropdown always shows ALL accounts (not filtered by company)
+            const allAccountNums = Array.from(new Set(bankAccounts.map(a => String(a.bankAccountId)))).sort();
             const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
 
-            // Apply account filter on company-filtered set
-            const filteredAccounts = companyFilteredAccounts.filter(a => effectiveSelected.has(String(a.bankAccountId)));
+            // Data display: apply BOTH company filter AND account filter
+            const filteredAccounts = bankAccounts.filter(a => {
+              if (!effectiveSelected.has(String(a.bankAccountId))) return false;
+              if (selectedCompanies.size > 0 && !selectedCompanies.has(a.companyName)) return false;
+              return true;
+            });
 
             // Group by company
             const byCompany: Record<string, { companyName: string; accounts: typeof bankAccounts }> = {};
