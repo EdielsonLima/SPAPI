@@ -1716,15 +1716,8 @@ export function ExecutiveDashboard() {
             </button>
             <button
               onClick={() => {
-                if (section !== "cp") {
-                  setSection("cp");
-                  switchTab("a-pagar");
-                  setSelectedCompanies(new Set());
-                  setSelectedDocTypes(new Set());
-                  setSelectedMonths(new Set());
-                  setSelectedDays(new Set());
-                  setSelectedDuePeriods(new Set());
-                }
+                setSection("cp");
+                switchTab("a-pagar");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 section === "cp" && !["orcamento", "comercial", "dre", "saldos", "visao-geral"].includes(activeTab)
@@ -1737,15 +1730,8 @@ export function ExecutiveDashboard() {
             </button>
             <button
               onClick={() => {
-                if (section !== "cr") {
-                  setSection("cr");
-                  switchTab("a-receber");
-                  setSelectedCompanies(new Set());
-                  setSelectedDocTypes(new Set());
-                  setSelectedMonths(new Set());
-                  setSelectedDays(new Set());
-                  setSelectedDuePeriods(new Set());
-                }
+                setSection("cr");
+                switchTab("a-receber");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 section === "cr" && ["a-receber", "recebidas", "inadimplencia"].includes(activeTab)
