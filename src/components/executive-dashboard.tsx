@@ -1698,8 +1698,8 @@ export function ExecutiveDashboard() {
         </div>
       </div>
 
-      {/* Section Toggle (CP / CR) + Main Tabs + Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Section Toggle (CP / CR) + Filters */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           {/* Section Toggle */}
           <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-0.5">
@@ -1801,7 +1801,7 @@ export function ExecutiveDashboard() {
           </div>
         </div>
 
-        {/* Sub-tabs CP/CR - separate line for prominence */}
+        {/* Sub-tabs CP/CR - separate line */}
         {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && (
           <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
@@ -1809,7 +1809,7 @@ export function ExecutiveDashboard() {
             setSelectedMonths(new Set());
             setSelectedDays(new Set());
             setSelectedDuePeriods(new Set());
-          }}>
+          }} className="basis-full">
             <TabsList className="h-12 bg-transparent p-0 gap-1 border-b border-slate-200 dark:border-slate-700 w-full justify-start">
               {section === "cp" ? (
                 <>
