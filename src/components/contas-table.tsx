@@ -45,7 +45,7 @@ import {
   FolderOpen,
   Users,
 } from "lucide-react";
-import { SiengeOutcome, SiengeIncome } from "@/types/sienge";
+import { SiengeOutcome, SiengeIncome, SiengeBankMovement } from "@/types/sienge";
 import { toast } from "sonner";
 
 type ContasItem = SiengeOutcome | SiengeIncome;
@@ -422,7 +422,79 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       );
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
-      setItems(data.data || []);
+      let allItems: ContasItem[] = data.data || [];
+
+      // For "pagas" outcome mode: also fetch bank movements (tarifas bancárias)
+      // to match Sienge "Contas Pagas Sintético" which includes bank fees
+      if (isPagas && !isIncome) {
+        try {
+          const bmRes = await fetch(
+            `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}` +
+            (forceRefresh ? "&forceRefresh=true" : "")
+          );
+          if (bmRes.ok) {
+            const bmData = await bmRes.json();
+            const bankMovements: SiengeBankMovement[] = bmData.data || [];
+            // Convert bank movements to ContasItem format
+            const bmAsItems: ContasItem[] = bankMovements
+              .filter(bm => bm.bankMovementAmount !== 0)
+              .map(bm => ({
+                billId: bm.billId || bm.bankMovementId,
+                installmentId: 1,
+                installmentCount: 1,
+                companyId: bm.companyId,
+                companyName: bm.companyName,
+                creditorId: 0,
+                creditorName: bm.bankMovementHistoricName || "Tarifa Bancária",
+                documentIdentificationId: bm.documentIdentificationId || "MB",
+                documentIdentificationName: bm.documentIdentificationName || "MOV. BANCÁRIO",
+                documentIdentificationNumber: bm.documentIdentificationNumber || "",
+                consistencyStatus: "S",
+                originId: "BM",
+                originalAmount: Math.abs(bm.bankMovementAmount),
+                discountAmount: 0,
+                taxAmount: 0,
+                dueDate: bm.bankMovementDate,
+                issueDate: bm.billDate || bm.bankMovementDate,
+                balanceAmount: 0,
+                correctedBalanceAmount: 0,
+                authorizationStatus: "",
+                billDate: bm.billDate || bm.bankMovementDate,
+                registeredBy: "",
+                registeredDate: "",
+                paymentsCategories: bm.financialCategories?.map(fc => ({
+                  costCenterId: fc.costCenterId,
+                  costCenterName: fc.costCenterName,
+                  financialCategoryId: Number(fc.financialCategoryId),
+                  financialCategoryName: fc.financialCategoryName,
+                  financialCategoryRate: fc.financialCategoryRate,
+                })) || [],
+                payments: [{
+                  operationTypeId: 0,
+                  operationTypeName: "Movimento Bancário",
+                  netAmount: Math.abs(bm.bankMovementAmount),
+                  grossAmount: Math.abs(bm.bankMovementAmount),
+                  paymentDate: bm.bankMovementDate,
+                  taxAmount: 0,
+                  monetaryCorrectionAmount: 0,
+                  interestAmount: 0,
+                  fineAmount: 0,
+                  discountAmount: 0,
+                  calculationDate: bm.bankMovementDate,
+                  paymentAuthentication: "",
+                  sequencialNumber: 0,
+                  correctedNetAmount: Math.abs(bm.bankMovementAmount),
+                }],
+                buildingsCosts: [],
+              } as unknown as SiengeOutcome));
+            allItems = [...allItems, ...bmAsItems];
+          }
+        } catch {
+          // Bank movements are supplementary — don't fail if they can't be fetched
+        }
+      }
+
+      setItems(allItems);
       setPage(0);
       setBillNotes({});
       fetchedNotesRef.current = new Set();
@@ -435,7 +507,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     } finally {
       setLoading(false);
     }
-  }, [startDate, endDate, apiEndpoint]);
+  }, [startDate, endDate, apiEndpoint, isPagas, isIncome]);
 
   // Only fetch on mount. Subsequent fetches are triggered explicitly by the
   // "Buscar" and "Atualizar" buttons so that changing the date inputs does
