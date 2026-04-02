@@ -435,13 +435,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (bmRes.ok) {
             const bmData = await bmRes.json();
             const bankMovements: SiengeBankMovement[] = bmData.data || [];
-            // Only include bank fees (tarifas bancárias ref. cobrança escritural)
-            // to match Sienge "Contas Pagas Sintético" with tarifas bancárias checked
+            // Include all detached bank movements (tarifas bancárias)
+            // The API already filters to onlyDetachedMovement=S (not linked to bills)
             const bmAsItems: ContasItem[] = bankMovements
-              .filter(bm => bm.bankMovementAmount !== 0 && (bm.financialCategories || []).some(fc =>
-                fc.financialCategoryName?.toLowerCase().includes("taxa") &&
-                fc.financialCategoryName?.toLowerCase().includes("banc")
-              ))
+              .filter(bm => bm.bankMovementAmount !== 0)
               .map(bm => ({
                 billId: bm.billId || bm.bankMovementId,
                 installmentId: 1,
