@@ -134,15 +134,19 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   };
   const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
 
-  // Devoluções have positive netAmount but operationTypeName = "Devolução"
-  // They must be subtracted from the total to match Sienge behavior
+  // Devoluções (returns) are excluded — Sienge already accounts for them
+  // in the Valor baixa before calculating Líquido
   const payments = (item.payments || [])
-    .filter(p => p.netAmount !== 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
-  return payments.reduce((s, p) => {
-    const isDevolucao = (p.operationTypeName || "").toLowerCase().includes("devolução") ||
-                        (p.operationTypeName || "").toLowerCase().includes("devolucao");
-    return s + (isDevolucao ? -p.netAmount : p.netAmount);
-  }, 0);
+    .filter(p => {
+      if (p.netAmount === 0) return false;
+      if (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))) {
+        const opName = (p.operationTypeName || "").toLowerCase();
+        if (opName.includes("devolução") || opName.includes("devolucao")) return false;
+        return true;
+      }
+      return false;
+    });
+  return payments.reduce((s, p) => s + p.netAmount, 0);
 }
 // ▲▲▲ END VALIDATED — paidTotal ▲▲▲
 
