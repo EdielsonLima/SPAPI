@@ -144,6 +144,7 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
         const opName = (p.operationTypeName || "").toLowerCase();
         if (opName.includes("devolução") || opName.includes("devolucao")) return false;
         if (opName.includes("abatimento")) return false;
+        if (opName.includes("por bens")) return false;
         return true;
       }
       return false;
