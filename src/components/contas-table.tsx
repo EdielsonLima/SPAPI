@@ -134,14 +134,16 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   };
   const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
 
-  // Devoluções (returns) are excluded — Sienge already accounts for them
-  // in the Valor baixa before calculating Líquido
+  // Exclude operations that Sienge shows as Líquido = 0:
+  // - Devolução (returns)
+  // - Abatimento de Adiantamento (advance offset against invoice)
   const payments = (item.payments || [])
     .filter(p => {
       if (p.netAmount === 0) return false;
       if (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))) {
         const opName = (p.operationTypeName || "").toLowerCase();
         if (opName.includes("devolução") || opName.includes("devolucao")) return false;
+        if (opName.includes("abatimento")) return false;
         return true;
       }
       return false;
