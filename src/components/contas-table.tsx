@@ -126,7 +126,8 @@ function latestPaymentDate(item: ContasItem, yearFilter?: string, monthFilter?: 
 // Valor líquido = netAmount (matches Sienge "Contas Pagas" Líquido column)
 // netAmount from API already equals Valor baixa - Desconto (líquido)
 // taxAmount is imposto retido and should NOT be subtracted
-function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string): number {
+// allowedOpTypes: when set, only includes payments with matching operationTypeName
+function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string, allowedOpTypes?: Set<string>): number {
   const matchesPeriod = (paymentDate: string) => {
     if (yearFilter && yearFilter !== "all" && !paymentDate.startsWith(yearFilter)) return false;
     if (monthFilter && monthFilter !== "all" && paymentDate.substring(5, 7) !== monthFilter) return false;
@@ -134,20 +135,12 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   };
   const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
 
-  // Exclude operations that Sienge shows as Líquido = 0:
-  // - Devolução (returns)
-  // - Abatimento de Adiantamento (advance offset against invoice)
   const payments = (item.payments || [])
     .filter(p => {
       if (p.netAmount === 0) return false;
-      if (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))) {
-        const opName = (p.operationTypeName || "").toLowerCase();
-        if (opName.includes("devolução") || opName.includes("devolucao")) return false;
-        if (opName.includes("abatimento")) return false;
-        if (opName.includes("por bens")) return false;
-        return true;
-      }
-      return false;
+      if (hasFilter && !(p.paymentDate && matchesPeriod(p.paymentDate))) return false;
+      if (allowedOpTypes && allowedOpTypes.size > 0 && !(p.operationTypeName && allowedOpTypes.has(p.operationTypeName))) return false;
+      return true;
     });
   return payments.reduce((s, p) => s + p.netAmount, 0);
 }
@@ -369,6 +362,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return new Set<string>();
   });
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
+  const [tipoBaixaInitialized, setTipoBaixaInitialized] = useState(false);
+  // Default exclusions for pagas mode
+  const EXCLUDED_OP_TYPES = ["devolução", "abatimento", "por bens"];
   const [filterAno, setFilterAno] = useState(isOverdue ? "all" : String(currentYear));
   const [filterMes, setFilterMes] = useState("all");
   const [filterDia, setFilterDia] = useState<string[]>([]);
@@ -630,7 +626,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   }, [items]);
 
   const tiposBaixa = useMemo(() => {
-    if (!isIncome) return [];
+    if (!isIncome && !isPagas) return [];
     const set = new Set<string>();
     items.forEach((item) => {
       (item.payments || []).forEach((p) => {
@@ -638,7 +634,24 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       });
     });
     return Array.from(set).sort();
-  }, [items, isIncome]);
+  }, [items, isIncome, isPagas]);
+
+  // Auto-initialize tipo baixa filter for pagas: select all except excluded types
+  useEffect(() => {
+    if (isPagas && !isIncome && tiposBaixa.length > 0 && !tipoBaixaInitialized && filterTipoBaixa.size === 0) {
+      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_tipoBaixa`);
+      if (saved) {
+        setFilterTipoBaixa(new Set(JSON.parse(saved)));
+      } else {
+        const defaults = new Set(tiposBaixa.filter(t =>
+          !EXCLUDED_OP_TYPES.some(ex => t.toLowerCase().includes(ex))
+        ));
+        setFilterTipoBaixa(defaults);
+      }
+      setTipoBaixaInitialized(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tiposBaixa, isPagas, isIncome]);
 
   const toggleDia = (dia: string) => {
     setFilterDia((prev) =>
@@ -795,7 +808,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       if (filterTitulo.size > 0 && !filterTitulo.has(String(item.billId)))
         return false;
 
-      if (filterTipoBaixa.size > 0 && isIncome) {
+      if (filterTipoBaixa.size > 0 && (isIncome || isPagas)) {
         const hasType = (item.payments || []).some(p =>
           p.operationTypeName && filterTipoBaixa.has(p.operationTypeName)
         );
@@ -847,7 +860,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
         case "balanceAmount": cmp = a.correctedBalanceAmount - b.correctedBalanceAmount; break;
         case "paymentDate": cmp = (latestPaymentDate(a, filterAno, filterMes) || "").localeCompare(latestPaymentDate(b, filterAno, filterMes) || ""); break;
-        case "paidAmount": cmp = paidTotal(a, filterAno, filterMes) - paidTotal(b, filterAno, filterMes); break;
+        case "paidAmount": cmp = paidTotal(a, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined) - paidTotal(b, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined); break;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -893,8 +906,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted]
   );
   const totalPaid = useMemo(
-    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno, filterMes), 0),
-    [sorted, filterAno, filterMes]
+    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined), 0),
+    [sorted, filterAno, filterMes, filterTipoBaixa, isPagas]
   );
   const totalComEncargos = useMemo(
     () => isOverdue ? sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) + calcEncargos(item), 0) : 0,
@@ -1363,17 +1376,18 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 />
               </div>
 
-              {isIncome && tiposBaixa.length > 0 && (
+              {(isIncome || isPagas) && tiposBaixa.length > 0 && (
                 <div className="min-w-[180px]">
-                  <label className="text-xs font-medium text-slate-500 mb-1 block">Tipo de Baixa</label>
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Tipo Operação</label>
                   <MultiSelectFilter
-                    label="Tipo Baixa"
+                    label="Tipo Operação"
                     icon={<ArrowDown className="h-4 w-4 text-slate-400" />}
                     allOptions={tiposBaixa}
                     selected={filterTipoBaixa}
                     onToggle={(name) => { setFilterTipoBaixa(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
                     onSelectAll={() => { setFilterTipoBaixa(new Set(tiposBaixa)); setPage(0); }}
                     onClear={() => { setFilterTipoBaixa(new Set()); setPage(0); }}
+                    onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_tipoBaixa`, JSON.stringify([...filterTipoBaixa])); toast.success("Padrao de tipo operacao salvo!"); }}
                   />
                 </div>
               )}
@@ -1523,7 +1537,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             <TableCell className="text-right font-mono text-sm">{formatCurrency(item.originalAmount)}</TableCell>
                             {isPagas ? (
                               <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">
-                                {formatCurrency(paidTotal(item, filterAno, filterMes))}
+                                {formatCurrency(paidTotal(item, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined))}
                               </TableCell>
                             ) : (
                               <>
