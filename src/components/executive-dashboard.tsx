@@ -796,8 +796,9 @@ export function ExecutiveDashboard() {
   }, [itemsRecebidas, selectedCompanies, selectedDocNumbers]);
 
   // === Budget vs Actual (Orçado vs Realizado) ===
-  // ▼▼▼ VALIDATED 2026-03-18 — Budget vs Realizado — DO NOT MODIFY without explicit user request ▼▼▼
-  // Realizado = sum of (netAmount - taxAmount) for ALL non-previsão payments (all years)
+  // ▼▼▼ VALIDATED 2026-04-02 — Budget vs Realizado — DO NOT MODIFY without explicit user request ▼▼▼
+  // Realizado = sum of netAmount for ALL non-previsão payments (all years)
+  // netAmount from API = Valor baixa - Desconto (líquido, without subtracting tax)
   // Must match "Contas Pagas" page with Ano=Todos for each company
   // Orçado = areaM2 * factor * cubValue
   // NOTE: No year filter — budget sums ALL payments regardless of selectedYears
@@ -808,8 +809,8 @@ export function ExecutiveDashboard() {
     return companySettings.filter(cs => selectedCompanies.size === 0 || selectedCompanies.has(cs.companyName)).map(cs => {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
-      // Sum ALL payments for this company using valor líquido (netAmount - taxAmount)
-      // Same logic as contas-table paidTotal: filter netAmount > 0, sum (netAmount - taxAmount)
+      // Sum ALL payments for this company using valor líquido (netAmount)
+      // Same logic as contas-table paidTotal: filter netAmount > 0, sum netAmount
       // Always excludes previsão documents (hardcoded, not dependent on filter state)
       // No year filter: budget represents total cost to date (matches Contas Pagas with Ano=Todos)
       let realized = 0;
@@ -819,7 +820,7 @@ export function ExecutiveDashboard() {
         if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
         (item.payments || []).forEach(p => {
           if (p.netAmount > 0 && p.paymentDate) {
-            realized += p.netAmount - (p.taxAmount || 0);
+            realized += p.netAmount;
           }
         });
       });

@@ -122,8 +122,10 @@ function latestPaymentDate(item: ContasItem, yearFilter?: string, monthFilter?: 
   return dates.sort().reverse()[0];
 }
 
-// ▼▼▼ VALIDATED 2026-03-18 — paidTotal — DO NOT MODIFY without explicit user request ▼▼▼
-// Valor líquido = netAmount - taxAmount (matches Sienge "Contas Pagas Sintético" Líquido column)
+// ▼▼▼ VALIDATED 2026-04-02 — paidTotal — DO NOT MODIFY without explicit user request ▼▼▼
+// Valor líquido = netAmount (matches Sienge "Contas Pagas" Líquido column)
+// netAmount from API already equals Valor baixa - Desconto (líquido)
+// taxAmount is imposto retido and should NOT be subtracted
 function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string): number {
   const matchesPeriod = (paymentDate: string) => {
     if (yearFilter && yearFilter !== "all" && !paymentDate.startsWith(yearFilter)) return false;
@@ -132,11 +134,9 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   };
   const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
 
-  // Always sum from payments array using valor líquido (netAmount - taxAmount)
-  // to match Sienge "Contas Pagas Sintético" Líquido column
   const payments = (item.payments || [])
     .filter(p => p.netAmount > 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
-  return payments.reduce((s, p) => s + (p.netAmount - (p.taxAmount || 0)), 0);
+  return payments.reduce((s, p) => s + p.netAmount, 0);
 }
 // ▲▲▲ END VALIDATED — paidTotal ▲▲▲
 
