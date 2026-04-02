@@ -4533,6 +4533,12 @@ export function ExecutiveDashboard() {
                       const dayNum = date.split("-")[2];
                       return { date: dayNum, fullDate: date, total, compare: compareByDay[dayNum] ?? null };
                     }).filter(d => d.total !== 0);
+
+                    // Ensure last point matches the card total (grandTotal) for current month
+                    const nowMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
+                    if (lineData.length > 0 && (saldosMonth === nowMonth || saldosMonth === "last7") && grandTotal > 0) {
+                      lineData[lineData.length - 1].total = grandTotal;
+                    }
                   }
                   const firstVal = lineData.length > 0 ? lineData[0].total : 0;
                   const lastVal = lineData.length > 0 ? lineData[lineData.length - 1].total : 0;
