@@ -438,23 +438,19 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       // to match Sienge "Contas Pagas Sintético" which includes bank fees
       if (isPagas && !isIncome) {
         try {
-          // Fetch ALL bank movements (not just detached) to capture all bank fees
+          // Fetch detached bank movements (avulsos - not linked to bills)
           const bmRes = await fetch(
-            `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N` +
+            `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}` +
             (forceRefresh ? "&forceRefresh=true" : "")
           );
           if (bmRes.ok) {
             const bmData = await bmRes.json();
             const bankMovements: SiengeBankMovement[] = bmData.data || [];
-            // Exclude bank movements that already exist as outcome payments (avoid double-counting)
-            const existingBillIds = new Set(allItems.map(item => `${item.companyId}:${item.billId}`));
-            // Include all bank movements EXCEPT income (rendimentos, aplicações) and already-counted
+            // Include detached bank movements EXCEPT income (rendimentos, aplicações)
             const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
             const bmAsItems: ContasItem[] = bankMovements
               .filter(bm => {
                 if (bm.bankMovementAmount === 0) return false;
-                // Skip if this bill is already in the outcomes
-                if (bm.billId && existingBillIds.has(`${bm.companyId}:${bm.billId}`)) return false;
                 const historic = (bm.bankMovementHistoricName || "").toLowerCase();
                 const hasIncomePattern = incomePatterns.some(p => historic.includes(p));
                 if (hasIncomePattern) return false;
