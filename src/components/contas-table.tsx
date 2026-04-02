@@ -135,7 +135,7 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   // Always sum from payments array using valor líquido (netAmount - taxAmount)
   // to match Sienge "Contas Pagas Sintético" Líquido column
   const payments = (item.payments || [])
-    .filter(p => p.netAmount > 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
+    .filter(p => !hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate)));
   return payments.reduce((s, p) => s + (p.netAmount - (p.taxAmount || 0)), 0);
 }
 // ▲▲▲ END VALIDATED — paidTotal ▲▲▲
