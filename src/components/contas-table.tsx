@@ -438,19 +438,31 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       // to match Sienge "Contas Pagas Sintético" which includes bank fees
       if (isPagas && !isIncome) {
         try {
-          // Fetch detached bank movements (avulsos - not linked to bills)
+          // Fetch ALL bank movements to capture Caixa/Bancos entries (tarifas, etc.)
           const bmRes = await fetch(
-            `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}` +
+            `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N` +
             (forceRefresh ? "&forceRefresh=true" : "")
           );
           if (bmRes.ok) {
             const bmData = await bmRes.json();
             const bankMovements: SiengeBankMovement[] = bmData.data || [];
-            // Include detached bank movements EXCEPT income (rendimentos, aplicações)
+            // Include Caixa/Bancos entries (tarifas, fees) but NOT regular payment operations
+            // Regular payments linked to outcomes have billId matching an outcome
+            // and originId indicating a payment operation (not avulso)
+            const existingBills = new Set(allItems.flatMap(item => {
+              // Build set of all payment identifiers from outcomes
+              return (item.payments || []).map(p =>
+                `${item.companyId}:${item.billId}:${p.paymentDate}:${Math.round(Math.abs(p.netAmount) * 100)}`
+              );
+            }));
             const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
             const bmAsItems: ContasItem[] = bankMovements
               .filter(bm => {
                 if (bm.bankMovementAmount === 0) return false;
+                // Deduplicate: skip if this exact movement matches an existing outcome payment
+                const bmKey = `${bm.companyId}:${bm.billId}:${bm.bankMovementDate}:${Math.round(Math.abs(bm.bankMovementAmount) * 100)}`;
+                if (bm.billId && bm.billId > 0 && existingBills.has(bmKey)) return false;
+                // Exclude income patterns
                 const historic = (bm.bankMovementHistoricName || "").toLowerCase();
                 const hasIncomePattern = incomePatterns.some(p => historic.includes(p));
                 if (hasIncomePattern) return false;
