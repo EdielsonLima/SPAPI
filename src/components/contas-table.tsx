@@ -134,11 +134,15 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   };
   const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
 
-  // Include all payments (positive = normal, negative = devoluções/returns)
-  // Devoluções reduce the total, matching Sienge behavior
+  // Devoluções have positive netAmount but operationTypeName = "Devolução"
+  // They must be subtracted from the total to match Sienge behavior
   const payments = (item.payments || [])
     .filter(p => p.netAmount !== 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
-  return payments.reduce((s, p) => s + p.netAmount, 0);
+  return payments.reduce((s, p) => {
+    const isDevolucao = (p.operationTypeName || "").toLowerCase().includes("devolução") ||
+                        (p.operationTypeName || "").toLowerCase().includes("devolucao");
+    return s + (isDevolucao ? -p.netAmount : p.netAmount);
+  }, 0);
 }
 // ▲▲▲ END VALIDATED — paidTotal ▲▲▲
 
