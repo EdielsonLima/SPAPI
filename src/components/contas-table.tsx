@@ -435,10 +435,19 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (bmRes.ok) {
             const bmData = await bmRes.json();
             const bankMovements: SiengeBankMovement[] = bmData.data || [];
-            // Include only DEBIT bank movements (costs/fees, not income like rendimentos)
-            // bankMovementOperationType: "D" = debit (outflow), "C" = credit (inflow)
+            // Include all bank movements EXCEPT income (rendimentos, aplicações)
+            const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
             const bmAsItems: ContasItem[] = bankMovements
-              .filter(bm => bm.bankMovementAmount !== 0 && bm.bankMovementOperationType === "D")
+              .filter(bm => {
+                if (bm.bankMovementAmount === 0) return false;
+                const historic = (bm.bankMovementHistoricName || "").toLowerCase();
+                const hasIncomePattern = incomePatterns.some(p => historic.includes(p));
+                if (hasIncomePattern) return false;
+                // Also check financial categories for income patterns
+                const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+                if (incomePatterns.some(p => catNames.includes(p))) return false;
+                return true;
+              })
               .map(bm => ({
                 billId: bm.billId || bm.bankMovementId,
                 installmentId: 1,
