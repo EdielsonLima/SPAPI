@@ -438,21 +438,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       // to match Sienge "Contas Pagas Sintético" which includes bank fees
       if (isPagas && !isIncome) {
         try {
-          // Two fetches: detached (avulsos) + all with billId=0 (Caixa/Bancos tarifas)
-          const [bmDetachedRes, bmAllRes] = await Promise.all([
-            fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}` + (forceRefresh ? "&forceRefresh=true" : "")),
-            fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N` + (forceRefresh ? "&forceRefresh=true" : "")),
-          ]);
-
-          const detachedMovements: SiengeBankMovement[] = bmDetachedRes.ok ? (await bmDetachedRes.json()).data || [] : [];
-          const allMovements: SiengeBankMovement[] = bmAllRes.ok ? (await bmAllRes.json()).data || [] : [];
-
-          // Merge: detached + non-detached with billId=0 (tarifas not linked to any bill)
-          const detachedIds = new Set(detachedMovements.map(bm => bm.bankMovementId));
-          const linkedTarifas = allMovements.filter(bm => !detachedIds.has(bm.bankMovementId) && (!bm.billId || bm.billId === 0));
-          const bankMovements = [...detachedMovements, ...linkedTarifas];
-
-          if (bankMovements.length > 0) {
+          // Fetch detached bank movements (avulsos) — stable approach
+          const bmRes = await fetch(
+            `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}` +
+            (forceRefresh ? "&forceRefresh=true" : "")
+          );
+          if (bmRes.ok) {
+            const bmData = await bmRes.json();
+            const bankMovements: SiengeBankMovement[] = bmData.data || [];
             const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
             const bmAsItems: ContasItem[] = bankMovements
               .filter(bm => {
