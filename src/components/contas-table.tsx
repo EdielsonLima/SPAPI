@@ -135,7 +135,7 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   // Always sum from payments array using valor líquido (netAmount - taxAmount)
   // to match Sienge "Contas Pagas Sintético" Líquido column
   const payments = (item.payments || [])
-    .filter(p => !hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate)));
+    .filter(p => p.netAmount > 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
   return payments.reduce((s, p) => s + (p.netAmount - (p.taxAmount || 0)), 0);
 }
 // ▲▲▲ END VALIDATED — paidTotal ▲▲▲
@@ -435,9 +435,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (bmRes.ok) {
             const bmData = await bmRes.json();
             const bankMovements: SiengeBankMovement[] = bmData.data || [];
-            // Convert bank movements to ContasItem format
+            // Only include bank fees (tarifas bancárias ref. cobrança escritural)
+            // to match Sienge "Contas Pagas Sintético" with tarifas bancárias checked
             const bmAsItems: ContasItem[] = bankMovements
-              .filter(bm => bm.bankMovementAmount !== 0)
+              .filter(bm => bm.bankMovementAmount !== 0 && (bm.financialCategories || []).some(fc =>
+                fc.financialCategoryName?.toLowerCase().includes("taxa") &&
+                fc.financialCategoryName?.toLowerCase().includes("banc")
+              ))
               .map(bm => ({
                 billId: bm.billId || bm.bankMovementId,
                 installmentId: 1,
