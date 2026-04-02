@@ -435,10 +435,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (bmRes.ok) {
             const bmData = await bmRes.json();
             const bankMovements: SiengeBankMovement[] = bmData.data || [];
-            // Include all detached bank movements (tarifas bancárias)
-            // The API already filters to onlyDetachedMovement=S (not linked to bills)
+            // Include only DEBIT bank movements (costs/fees, not income like rendimentos)
+            // bankMovementOperationType: "D" = debit (outflow), "C" = credit (inflow)
             const bmAsItems: ContasItem[] = bankMovements
-              .filter(bm => bm.bankMovementAmount !== 0)
+              .filter(bm => bm.bankMovementAmount !== 0 && bm.bankMovementOperationType === "D")
               .map(bm => ({
                 billId: bm.billId || bm.bankMovementId,
                 installmentId: 1,
