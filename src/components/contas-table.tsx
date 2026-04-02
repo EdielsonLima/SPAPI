@@ -134,8 +134,10 @@ function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string):
   };
   const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
 
+  // Include all payments (positive = normal, negative = devoluções/returns)
+  // Devoluções reduce the total, matching Sienge behavior
   const payments = (item.payments || [])
-    .filter(p => p.netAmount > 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
+    .filter(p => p.netAmount !== 0 && (!hasFilter || (p.paymentDate && matchesPeriod(p.paymentDate))));
   return payments.reduce((s, p) => s + p.netAmount, 0);
 }
 // ▲▲▲ END VALIDATED — paidTotal ▲▲▲

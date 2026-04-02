@@ -819,7 +819,7 @@ export function ExecutiveDashboard() {
         const docName = (item.documentIdentificationName || "").toUpperCase();
         if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
         (item.payments || []).forEach(p => {
-          if (p.netAmount > 0 && p.paymentDate) {
+          if (p.netAmount !== 0 && p.paymentDate) {
             realized += p.netAmount;
           }
         });
