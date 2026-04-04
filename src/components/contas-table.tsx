@@ -364,8 +364,6 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tipoBaixaInitialized, setTipoBaixaInitialized] = useState(false);
-  // Default exclusions for pagas mode
-  const EXCLUDED_OP_TYPES = ["devolução", "abatimento", "por bens"];
   const [filterAno, setFilterAno] = useState(isOverdue ? "all" : String(currentYear));
   const [filterMes, setFilterMes] = useState("all");
   const [filterDia, setFilterDia] = useState<string[]>([]);
