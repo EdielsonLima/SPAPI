@@ -644,20 +644,16 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return Array.from(filterEmpresas).sort().join(",");
   }, [filterEmpresas]);
 
-  // Load tipo operação defaults when empresa changes or on first load
+  // Load tipo operação per-company or select all by default
   useEffect(() => {
     if (isPagas && !isIncome && tiposBaixa.length > 0) {
-      // Try per-company key first, then global, then auto defaults
       const perCompanyKey = `contas_${dataSource}_${mode}_default_tipoBaixa_${empresaKeyForTipoBaixa}`;
-      const globalKey = `contas_${dataSource}_${mode}_default_tipoBaixa`;
-      const saved = localStorage.getItem(perCompanyKey) || localStorage.getItem(globalKey);
+      const saved = localStorage.getItem(perCompanyKey);
       if (saved) {
         setFilterTipoBaixa(new Set(JSON.parse(saved)));
       } else {
-        const defaults = new Set(tiposBaixa.filter(t =>
-          !EXCLUDED_OP_TYPES.some(ex => t.toLowerCase().includes(ex))
-        ));
-        setFilterTipoBaixa(defaults);
+        // No saved default: select ALL types (user decides what to exclude)
+        setFilterTipoBaixa(new Set(tiposBaixa));
       }
       setTipoBaixaInitialized(true);
     }
