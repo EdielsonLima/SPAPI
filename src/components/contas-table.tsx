@@ -362,6 +362,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return new Set<string>();
   });
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tipoBaixaInitialized, setTipoBaixaInitialized] = useState(false);
   // Default exclusions for pagas mode
   const EXCLUDED_OP_TYPES = ["devolução", "abatimento", "por bens"];
@@ -637,9 +638,19 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   }, [items, isIncome, isPagas]);
 
   // Auto-initialize tipo baixa filter for pagas: select all except excluded types
+  // Build empresa key for per-company tipo operação saving
+  const empresaKeyForTipoBaixa = useMemo(() => {
+    if (filterEmpresas.size === 0) return "all";
+    return Array.from(filterEmpresas).sort().join(",");
+  }, [filterEmpresas]);
+
+  // Load tipo operação defaults when empresa changes or on first load
   useEffect(() => {
-    if (isPagas && !isIncome && tiposBaixa.length > 0 && !tipoBaixaInitialized && filterTipoBaixa.size === 0) {
-      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_tipoBaixa`);
+    if (isPagas && !isIncome && tiposBaixa.length > 0) {
+      // Try per-company key first, then global, then auto defaults
+      const perCompanyKey = `contas_${dataSource}_${mode}_default_tipoBaixa_${empresaKeyForTipoBaixa}`;
+      const globalKey = `contas_${dataSource}_${mode}_default_tipoBaixa`;
+      const saved = localStorage.getItem(perCompanyKey) || localStorage.getItem(globalKey);
       if (saved) {
         setFilterTipoBaixa(new Set(JSON.parse(saved)));
       } else {
@@ -651,7 +662,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       setTipoBaixaInitialized(true);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tiposBaixa, isPagas, isIncome]);
+  }, [tiposBaixa, isPagas, isIncome, empresaKeyForTipoBaixa]);
 
   const toggleDia = (dia: string) => {
     setFilterDia((prev) =>
@@ -1387,7 +1398,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                     onToggle={(name) => { setFilterTipoBaixa(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
                     onSelectAll={() => { setFilterTipoBaixa(new Set(tiposBaixa)); setPage(0); }}
                     onClear={() => { setFilterTipoBaixa(new Set()); setPage(0); }}
-                    onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_tipoBaixa`, JSON.stringify([...filterTipoBaixa])); toast.success("Padrao de tipo operacao salvo!"); }}
+                    onSaveDefault={() => {
+                      const key = `contas_${dataSource}_${mode}_default_tipoBaixa_${empresaKeyForTipoBaixa}`;
+                      localStorage.setItem(key, JSON.stringify([...filterTipoBaixa]));
+                      toast.success(filterEmpresas.size > 0 ? `Padrão salvo para ${Array.from(filterEmpresas).join(", ")}` : "Padrão global de tipo operação salvo!");
+                    }}
                   />
                 </div>
               )}
@@ -1426,6 +1441,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   )}
                   <SortableHead field="billId" className="min-w-[80px]">Titulo</SortableHead>
                   <SortableHead field="documentType" className="min-w-[80px]">Tipo Doc.</SortableHead>
+                  {isPagas && !isIncome && (
+                    <TableHead className="min-w-[100px] text-xs font-semibold">Tipo Op.</TableHead>
+                  )}
                   {isIncome && <TableHead className="min-w-[80px] text-xs font-semibold">Índice</TableHead>}
                   <SortableHead field="originalAmount" className="text-right min-w-[120px]">Valor Original</SortableHead>
                   {isPagas ? (
@@ -1527,6 +1545,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             <TableCell className="text-xs">
                               <Badge variant="outline" className="text-xs font-mono">{item.documentIdentificationId?.trim() || "-"}</Badge>
                             </TableCell>
+                            {isPagas && !isIncome && (
+                              <TableCell className="text-xs text-slate-500 truncate max-w-[120px]" title={(item.payments || [])[0]?.operationTypeName || "-"}>
+                                {(item.payments || [])[0]?.operationTypeName || "-"}
+                              </TableCell>
+                            )}
                             {isIncome && (
                               <TableCell className="text-xs">
                                 <Badge variant="secondary" className="text-[10px]">
