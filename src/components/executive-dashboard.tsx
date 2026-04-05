@@ -62,7 +62,7 @@ import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
 type Section = "cp" | "cr";
-type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "saldos";
+type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "saldos" | "resumo";
 
 // Each tab group has its own saved company filter
 function getTabGroup(tab: MainTab): string {
@@ -70,6 +70,7 @@ function getTabGroup(tab: MainTab): string {
     case "a-pagar": case "pagas": case "atrasadas": return "cp";
     case "a-receber": case "recebidas": case "inadimplencia": return "cr";
     case "visao-geral": return "visao-geral";
+    case "resumo": return "resumo";
     default: return tab;
   }
 }
@@ -1646,6 +1647,7 @@ export function ExecutiveDashboard() {
     dre: [],
     saldos: [],
     "visao-geral": [],
+    resumo: [],
   };
 
   const kpis = kpiConfigs[activeTab];
@@ -1799,11 +1801,25 @@ export function ExecutiveDashboard() {
               <Landmark className="h-3.5 w-3.5" />
               Saldos
             </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("resumo");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "resumo"
+                  ? "bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 shadow-md ring-2 ring-cyan-300 dark:ring-cyan-500/50"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Resumo
+            </button>
           </div>
         </div>
 
         {/* Sub-tabs CP/CR - separate line */}
-        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && (
+        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && activeTab !== "resumo" && (
           <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             switchTab(tab);
@@ -3350,7 +3366,7 @@ export function ExecutiveDashboard() {
       })()}
 
       {/* KPI Cards */}
-      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && activeTab !== "resumo" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
@@ -4803,6 +4819,214 @@ export function ExecutiveDashboard() {
           })()}
         </div>
       )}
+
+      {/* ══════ RESUMO FINANCEIRO TAB ══════ */}
+      {activeTab === "resumo" && (() => {
+        // Build per-company financial summary
+        const companySummary: Record<string, {
+          companyName: string;
+          totalRecebido: number;
+          totalPago: number;
+          totalAReceber: number;
+          qtDisp: number;
+          qtResTec: number;
+          valorEstoque: number;
+          status: string;
+        }> = {};
+
+        // All unique company names from all data
+        const allCos = new Set<string>();
+        consistentItems.forEach(i => allCos.add(i.companyName));
+        consistentIncome.forEach(i => allCos.add(i.companyName));
+        companySettings.forEach(cs => allCos.add(cs.companyName));
+
+        for (const co of allCos) {
+          companySummary[co] = {
+            companyName: co,
+            totalRecebido: 0,
+            totalPago: 0,
+            totalAReceber: 0,
+            qtDisp: 0,
+            qtResTec: 0,
+            valorEstoque: 0,
+            status: companySettings.find(cs => cs.companyName === co)?.status || "Ativa",
+          };
+        }
+
+        // Total Recebido (income payments)
+        consistentIncome.forEach(item => {
+          const co = item.companyName;
+          if (!companySummary[co]) return;
+          (item.payments || []).forEach(p => {
+            if (p.netAmount > 0 && p.paymentDate) {
+              companySummary[co].totalRecebido += p.netAmount;
+            }
+          });
+        });
+
+        // Total Pago (outcome payments)
+        consistentItems.forEach(item => {
+          const co = item.companyName;
+          if (!companySummary[co]) return;
+          (item.payments || []).forEach(p => {
+            if (p.netAmount !== 0 && p.paymentDate) {
+              companySummary[co].totalPago += p.netAmount;
+            }
+          });
+        });
+
+        // Total a Receber
+        consistentIncome.forEach(item => {
+          const co = item.companyName;
+          if (!companySummary[co]) return;
+          if (item.balanceAmount > 0) {
+            companySummary[co].totalAReceber += item.balanceAmount;
+          }
+        });
+
+        // Units: Qt. Disponíveis, Res. Técnica, Valor Estoque
+        apiUnits.forEach(u => {
+          const co = u.companyName;
+          if (!companySummary[co]) return;
+          if (u.commercialStock === "Disponível") {
+            companySummary[co].qtDisp++;
+            companySummary[co].valorEstoque += u.privateArea * (companySettings.find(cs => cs.companyName === co)?.factor || 0) * (cubData?.currentValue || 0);
+          } else if (u.commercialStock === "Reserva Técnica") {
+            companySummary[co].qtResTec++;
+          }
+        });
+
+        // Sort: Ativa first, then by totalRecebido desc
+        const sorted = Object.values(companySummary)
+          .filter(c => c.totalRecebido > 0 || c.totalPago > 0 || c.totalAReceber > 0)
+          .sort((a, b) => {
+            if (a.status !== b.status) return a.status === "Ativa" ? -1 : 1;
+            return b.totalRecebido - a.totalRecebido;
+          });
+
+        // Totals
+        const totRecebido = sorted.reduce((s, c) => s + c.totalRecebido, 0);
+        const totPago = sorted.reduce((s, c) => s + c.totalPago, 0);
+        const totSaldo = totRecebido - totPago;
+        const totLucratividade = totRecebido > 0 ? (totSaldo / totRecebido) * 100 : 0;
+
+        return (
+          <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="relative rounded-2xl p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
+                <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Total Recebido</p>
+                <p className="text-xl font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(totRecebido)}</p>
+              </div>
+              <div className="relative rounded-2xl p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
+                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Total Pago</p>
+                <p className="text-xl font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(totPago)}</p>
+              </div>
+              <div className={`relative rounded-2xl p-4 ${totSaldo >= 0 ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200/60 dark:border-blue-800/40" : "bg-red-50 dark:bg-red-950/40 border-red-200/60 dark:border-red-800/40"} border overflow-hidden`}>
+                <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${totSaldo >= 0 ? "from-blue-500 to-indigo-500" : "from-red-400 to-rose-500"}`} />
+                <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Saldo</p>
+                <p className={`text-xl font-black tabular-nums ${totSaldo >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</p>
+              </div>
+              <div className="relative rounded-2xl p-4 bg-violet-50 dark:bg-violet-950/40 border border-violet-200/60 dark:border-violet-800/40 overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 to-purple-500" />
+                <p className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider mb-1">Lucratividade</p>
+                <p className="text-xl font-black tabular-nums text-slate-800 dark:text-slate-100">{totLucratividade.toFixed(2)}%</p>
+              </div>
+            </div>
+
+            {/* Table */}
+            <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900 overflow-hidden">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-800 text-slate-100 sticky top-0 z-10">
+                      <TableRow>
+                        <TableHead className="text-slate-200 text-[11px] font-bold min-w-[180px] sticky left-0 bg-slate-800 z-20">Empresa</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Total Recebido</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Total Pago</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Lucro Realizado</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Total a Receber</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[120px]">Valor Estoque</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Lucro Potencial</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-center min-w-[60px]">Disp.</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-center min-w-[60px]">Res.Téc.</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[100px]">Lucratividade</TableHead>
+                        <TableHead className="text-slate-200 text-[11px] font-bold text-center min-w-[80px]">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sorted.map(co => {
+                        const lucroRealizado = co.totalRecebido - co.totalPago;
+                        const lucroPotencial = co.totalAReceber + co.valorEstoque;
+                        const lucratividade = co.totalRecebido > 0 ? (lucroRealizado / co.totalRecebido) * 100 : 0;
+                        const isFinalizada = co.status === "Finalizada";
+
+                        return (
+                          <TableRow key={co.companyName} className={isFinalizada ? "bg-slate-50/50 dark:bg-slate-800/30 opacity-70" : "hover:bg-slate-50 dark:hover:bg-slate-800"}>
+                            <TableCell className="text-xs font-semibold text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10">
+                              {co.companyName}
+                            </TableCell>
+                            <TableCell className="text-xs font-semibold text-right tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(co.totalRecebido)}</TableCell>
+                            <TableCell className="text-xs font-semibold text-right tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
+                            <TableCell className={`text-xs font-bold text-right tabular-nums ${lucroRealizado >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
+                              {formatCurrency(lucroRealizado)}
+                            </TableCell>
+                            <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{formatCurrency(co.totalAReceber)}</TableCell>
+                            <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{co.valorEstoque > 0 ? formatCurrency(co.valorEstoque) : "-"}</TableCell>
+                            <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{lucroPotencial > 0 ? formatCurrency(lucroPotencial) : "-"}</TableCell>
+                            <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">{co.qtDisp > 0 ? co.qtDisp : "-"}</TableCell>
+                            <TableCell className="text-xs text-center tabular-nums text-slate-500">{co.qtResTec > 0 ? co.qtResTec : "-"}</TableCell>
+                            <TableCell className="text-xs text-right tabular-nums">
+                              <div className="flex items-center justify-end gap-2">
+                                <div className="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${lucratividade >= 80 ? "bg-emerald-500" : lucratividade >= 50 ? "bg-blue-500" : lucratividade >= 20 ? "bg-amber-500" : "bg-red-400"}`}
+                                    style={{ width: `${Math.min(100, Math.max(0, lucratividade))}%` }}
+                                  />
+                                </div>
+                                <span className={`font-semibold ${lucratividade >= 50 ? "text-emerald-600 dark:text-emerald-400" : lucratividade >= 20 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-300/70"}`}>
+                                  {lucratividade.toFixed(1)}%
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={isFinalizada ? "secondary" : "outline"} className={`text-[10px] ${isFinalizada ? "bg-slate-200 dark:bg-slate-700 text-slate-500" : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"}`}>
+                                {co.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                      {/* Total Row */}
+                      <TableRow className="bg-slate-100 dark:bg-slate-800 border-t-2 border-slate-300 dark:border-slate-600 font-bold">
+                        <TableCell className="text-sm font-bold text-slate-800 dark:text-slate-100 sticky left-0 bg-slate-100 dark:bg-slate-800 z-10">Total</TableCell>
+                        <TableCell className="text-sm font-black text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(totRecebido)}</TableCell>
+                        <TableCell className="text-sm font-black text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(totPago)}</TableCell>
+                        <TableCell className={`text-sm font-black text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</TableCell>
+                        <TableCell className="text-sm font-black text-right tabular-nums text-slate-700 dark:text-slate-300">
+                          {formatCurrency(sorted.reduce((s, c) => s + c.totalAReceber, 0))}
+                        </TableCell>
+                        <TableCell className="text-sm font-black text-right tabular-nums text-slate-700 dark:text-slate-300">
+                          {formatCurrency(sorted.reduce((s, c) => s + c.valorEstoque, 0))}
+                        </TableCell>
+                        <TableCell className="text-sm font-black text-right tabular-nums text-slate-700 dark:text-slate-300">
+                          {formatCurrency(sorted.reduce((s, c) => s + c.totalAReceber + c.valorEstoque, 0))}
+                        </TableCell>
+                        <TableCell className="text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDisp, 0)}</TableCell>
+                        <TableCell className="text-sm font-bold text-center tabular-nums text-slate-600 dark:text-slate-400">{sorted.reduce((s, c) => s + c.qtResTec, 0)}</TableCell>
+                        <TableCell className="text-sm font-black text-right tabular-nums text-violet-700 dark:text-violet-400">{totLucratividade.toFixed(2)}%</TableCell>
+                        <TableCell />
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      })()}
 
     </div>
   );
