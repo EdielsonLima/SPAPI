@@ -4835,13 +4835,18 @@ export function ExecutiveDashboard() {
           status: string;
         }> = {};
 
-        // All unique company names from all data
+        // All unique company names from all data (filtered by selectedCompanies if active)
         const allCos = new Set<string>();
         consistentItems.forEach(i => allCos.add(i.companyName));
         consistentIncome.forEach(i => allCos.add(i.companyName));
         companySettings.forEach(cs => allCos.add(cs.companyName));
 
-        for (const co of allCos) {
+        // Apply company filter
+        const filteredCos = selectedCompanies.size > 0
+          ? new Set([...allCos].filter(co => selectedCompanies.has(co)))
+          : allCos;
+
+        for (const co of filteredCos) {
           companySummary[co] = {
             companyName: co,
             totalRecebido: 0,
