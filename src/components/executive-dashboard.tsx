@@ -356,6 +356,7 @@ export function ExecutiveDashboard() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [fluxoPeriodo, setFluxoPeriodo] = useState(30);
+  const [resumoSort, setResumoSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalRecebido", dir: "desc" });
   const [fluxoView, setFluxoView] = useState<"projetado" | "entradas-saidas">("projetado");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
@@ -4896,12 +4897,30 @@ export function ExecutiveDashboard() {
           }
         });
 
-        // Sort: Ativa first, then by totalRecebido desc
+        // Sort: Ativa first, then by selected field
+        const toggleResumoSort = (field: string) => {
+          setResumoSort(prev => prev.field === field ? { field, dir: prev.dir === "asc" ? "desc" : "asc" } : { field, dir: "desc" });
+        };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const getVal = (c: any, field: string): number => {
+          if (field === "lucroRealizado") return c.totalRecebido - c.totalPago;
+          if (field === "lucroPotencial") return c.totalAReceber + c.valorEstoque;
+          if (field === "lucratividade") return c.totalRecebido > 0 ? (c.totalRecebido - c.totalPago) / c.totalRecebido * 100 : 0;
+          if (field === "companyName") return 0; // handled separately
+          return c[field] || 0;
+        };
         const sorted = Object.values(companySummary)
           .filter(c => c.totalRecebido > 0 || c.totalPago > 0 || c.totalAReceber > 0)
           .sort((a, b) => {
             if (a.status !== b.status) return a.status === "Ativa" ? -1 : 1;
-            return b.totalRecebido - a.totalRecebido;
+            const { field, dir } = resumoSort;
+            let cmp: number;
+            if (field === "companyName") {
+              cmp = a.companyName.localeCompare(b.companyName);
+            } else {
+              cmp = getVal(a, field) - getVal(b, field);
+            }
+            return dir === "desc" ? -cmp : cmp;
           });
 
         // Totals
@@ -4943,17 +4962,35 @@ export function ExecutiveDashboard() {
                   <Table>
                     <TableHeader className="bg-slate-800 text-slate-100 sticky top-0 z-10">
                       <TableRow>
-                        <TableHead className="text-slate-200 text-[11px] font-bold min-w-[180px] sticky left-0 bg-slate-800 z-20">Empresa</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Total Recebido</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Total Pago</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Lucro Realizado</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Total a Receber</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[120px]">Valor Estoque</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[130px]">Lucro Potencial</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-center min-w-[60px]">Disp.</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-center min-w-[60px]">Res.Téc.</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-right min-w-[100px]">Lucratividade</TableHead>
-                        <TableHead className="text-slate-200 text-[11px] font-bold text-center min-w-[80px]">Status</TableHead>
+                        {[
+                          { field: "companyName", label: "Empresa", align: "left", minW: "180px", sticky: true },
+                          { field: "totalRecebido", label: "Total Recebido", align: "right", minW: "130px" },
+                          { field: "totalPago", label: "Total Pago", align: "right", minW: "130px" },
+                          { field: "lucroRealizado", label: "Lucro Realizado", align: "right", minW: "130px" },
+                          { field: "totalAReceber", label: "Total a Receber", align: "right", minW: "130px" },
+                          { field: "valorEstoque", label: "Valor Estoque", align: "right", minW: "120px" },
+                          { field: "lucroPotencial", label: "Lucro Potencial", align: "right", minW: "130px" },
+                          { field: "qtDisp", label: "Disp.", align: "center", minW: "60px" },
+                          { field: "qtResTec", label: "Res.Téc.", align: "center", minW: "60px" },
+                          { field: "lucratividade", label: "Lucratividade", align: "right", minW: "100px" },
+                          { field: "status", label: "Status", align: "center", minW: "80px" },
+                        ].map(col => (
+                          <TableHead
+                            key={col.field}
+                            className={`text-[11px] font-bold cursor-pointer hover:bg-slate-700 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-800 z-20" : ""}`}
+                            style={{ minWidth: col.minW }}
+                            onClick={() => toggleResumoSort(col.field)}
+                          >
+                            <span className="inline-flex items-center gap-1 text-slate-200">
+                              {col.label}
+                              {resumoSort.field === col.field ? (
+                                resumoSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                              ) : (
+                                <ArrowUpDown className="h-3 w-3 opacity-30" />
+                              )}
+                            </span>
+                          </TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
