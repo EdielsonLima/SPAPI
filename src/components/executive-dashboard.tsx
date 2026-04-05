@@ -4912,7 +4912,9 @@ export function ExecutiveDashboard() {
         const sorted = Object.values(companySummary)
           .filter(c => c.totalRecebido > 0 || c.totalPago > 0 || c.totalAReceber > 0)
           .sort((a, b) => {
-            if (a.status !== b.status) return a.status === "Ativa" ? -1 : 1;
+            const aFin = a.status.toLowerCase().includes("finalizada");
+            const bFin = b.status.toLowerCase().includes("finalizada");
+            if (aFin !== bFin) return aFin ? 1 : -1;
             const { field, dir } = resumoSort;
             let cmp: number;
             if (field === "companyName") {
@@ -4998,7 +5000,7 @@ export function ExecutiveDashboard() {
                         const lucroRealizado = co.totalRecebido - co.totalPago;
                         const lucroPotencial = co.totalAReceber + co.valorEstoque;
                         const lucratividade = co.totalRecebido > 0 ? (lucroRealizado / co.totalRecebido) * 100 : 0;
-                        const isFinalizada = co.status === "Finalizada";
+                        const isFinalizada = co.status.toLowerCase().includes("finalizada");
 
                         return (
                           <TableRow key={co.companyName} className={isFinalizada ? "bg-slate-50/50 dark:bg-slate-800/30 opacity-70" : "hover:bg-slate-50 dark:hover:bg-slate-800"}>
