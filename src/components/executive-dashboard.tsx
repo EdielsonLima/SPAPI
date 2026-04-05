@@ -4870,15 +4870,32 @@ export function ExecutiveDashboard() {
           });
         });
 
-        // Total Pago (outcome payments)
+        // Total Pago (outcome payments) — same logic as contas-table paidTotal
+        // Excludes Devolução, Abatimento, Por Bens
+        const excludedOps = ["devolução", "devolucao", "abatimento", "por bens"];
         consistentItems.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
           (item.payments || []).forEach(p => {
             if (p.netAmount !== 0 && p.paymentDate) {
+              const opName = (p.operationTypeName || "").toLowerCase();
+              if (excludedOps.some(ex => opName.includes(ex))) return;
               companySummary[co].totalPago += p.netAmount;
             }
           });
+        });
+
+        // Add detached bank movements (tarifas bancárias) to Total Pago
+        const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
+        allBankMovements.forEach(bm => {
+          const co = bm.companyName;
+          if (!companySummary[co]) return;
+          if (bm.bankMovementAmount === 0) return;
+          const historic = (bm.bankMovementHistoricName || "").toLowerCase();
+          if (incomePatterns.some(p => historic.includes(p))) return;
+          const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+          if (incomePatterns.some(p => catNames.includes(p))) return;
+          companySummary[co].totalPago += Math.abs(bm.bankMovementAmount);
         });
 
         // Total a Receber
