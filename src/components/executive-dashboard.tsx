@@ -4908,9 +4908,19 @@ export function ExecutiveDashboard() {
         });
 
         // Units: Qt. Disponíveis, Res. Técnica, Valor Estoque
+        // Only count "Apartamento" type units (exclude vagas, salas, lojas, etc.)
+        const isApartamento = (name: string): boolean => {
+          const n = name.toUpperCase();
+          if (/VAGA|GARAGEM|ESTACION/i.test(n)) return false;
+          if (/\bSL\b|\bSALA\b|COMERCIAL/i.test(n)) return false;
+          if (/\bLJ\b|\bLOJA\b/i.test(n)) return false;
+          if (/\bDEP\b|DEPOSITO|\bBOX\b/i.test(n)) return false;
+          return true;
+        };
         apiUnits.forEach(u => {
           const co = u.companyName;
           if (!companySummary[co]) return;
+          if (!isApartamento(u.name)) return;
           if (u.commercialStock === "Disponível") {
             companySummary[co].qtDisp++;
             companySummary[co].valorEstoque += u.privateArea * (companySettings.find(cs => cs.companyName === co)?.factor || 0) * (cubData?.currentValue || 0);
