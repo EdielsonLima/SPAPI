@@ -357,6 +357,8 @@ export function ExecutiveDashboard() {
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [fluxoPeriodo, setFluxoPeriodo] = useState(30);
   const [resumoSort, setResumoSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalRecebido", dir: "desc" });
+  const [resumoTipoOp, setResumoTipoOp] = useState<Set<string>>(new Set());
+  const [resumoTipoOpInit, setResumoTipoOpInit] = useState(false);
   const [fluxoView, setFluxoView] = useState<"projetado" | "entradas-saidas">("projetado");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
@@ -4823,6 +4825,22 @@ export function ExecutiveDashboard() {
 
       {/* ══════ RESUMO FINANCEIRO TAB ══════ */}
       {activeTab === "resumo" && (() => {
+        // Collect all operation types from outcome payments
+        const allOpTypes = Array.from(new Set(
+          consistentItems.flatMap(item => (item.payments || []).map(p => p.operationTypeName).filter(Boolean))
+        )).sort() as string[];
+
+        // Initialize filter on first render
+        if (!resumoTipoOpInit && allOpTypes.length > 0) {
+          const saved = localStorage.getItem("resumo_default_tipoOp");
+          if (saved) {
+            setResumoTipoOp(new Set(JSON.parse(saved)));
+          } else {
+            setResumoTipoOp(new Set(allOpTypes));
+          }
+          setResumoTipoOpInit(true);
+        }
+
         // Build per-company financial summary
         const companySummary: Record<string, {
           companyName: string;
@@ -4870,27 +4888,13 @@ export function ExecutiveDashboard() {
           });
         });
 
-        // Total Pago — uses per-company saved tipo operação filter from localStorage
-        // This matches exactly what the user configured in Contas Pagas for each empresa
-        const getCompanyAllowedOps = (companyName: string): Set<string> | null => {
-          // Try per-company key
-          const key = `contas_outcome_pagas_default_tipoBaixa_${companyName}`;
-          const saved = localStorage.getItem(key);
-          if (saved) return new Set(JSON.parse(saved));
-          // Try "all" key
-          const allKey = `contas_outcome_pagas_default_tipoBaixa_all`;
-          const savedAll = localStorage.getItem(allKey);
-          if (savedAll) return new Set(JSON.parse(savedAll));
-          return null; // no filter saved — include all
-        };
-
+        // Total Pago — filtered by resumoTipoOp (user-selected operation types)
         consistentItems.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
-          const allowedOps = getCompanyAllowedOps(co);
           (item.payments || []).forEach(p => {
             if (p.netAmount !== 0 && p.paymentDate) {
-              if (allowedOps && allowedOps.size > 0 && !(p.operationTypeName && allowedOps.has(p.operationTypeName))) return;
+              if (resumoTipoOp.size > 0 && !(p.operationTypeName && resumoTipoOp.has(p.operationTypeName))) return;
               companySummary[co].totalPago += p.netAmount;
             }
           });
@@ -4976,6 +4980,27 @@ export function ExecutiveDashboard() {
 
         return (
           <div className="space-y-6">
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-3">
+              <MultiSelectFilter
+                label="Tipo Operação"
+                icon={<ArrowDown className="h-3.5 w-3.5" />}
+                allOptions={allOpTypes}
+                selected={resumoTipoOp}
+                onToggle={(name) => { setResumoTipoOp(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); }}
+                onSelectAll={() => setResumoTipoOp(new Set(allOpTypes))}
+                onClear={() => setResumoTipoOp(new Set())}
+                activeColor="cyan"
+                onSaveDefault={() => {
+                  localStorage.setItem("resumo_default_tipoOp", JSON.stringify([...resumoTipoOp]));
+                  toast.success("Padrão de tipo operação salvo para o Resumo!");
+                }}
+              />
+              {resumoTipoOp.size > 0 && resumoTipoOp.size < allOpTypes.length && (
+                <span className="text-xs text-slate-500">{resumoTipoOp.size} de {allOpTypes.length} tipos selecionados</span>
+              )}
+            </div>
+
             {/* KPI Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="relative rounded-2xl p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 overflow-hidden">
