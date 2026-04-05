@@ -4870,16 +4870,27 @@ export function ExecutiveDashboard() {
           });
         });
 
-        // Total Pago (outcome payments) — same logic as contas-table paidTotal
-        // Excludes Devolução, Abatimento, Por Bens
-        const excludedOps = ["devolução", "devolucao", "abatimento", "por bens"];
+        // Total Pago — uses per-company saved tipo operação filter from localStorage
+        // This matches exactly what the user configured in Contas Pagas for each empresa
+        const getCompanyAllowedOps = (companyName: string): Set<string> | null => {
+          // Try per-company key
+          const key = `contas_outcome_pagas_default_tipoBaixa_${companyName}`;
+          const saved = localStorage.getItem(key);
+          if (saved) return new Set(JSON.parse(saved));
+          // Try "all" key
+          const allKey = `contas_outcome_pagas_default_tipoBaixa_all`;
+          const savedAll = localStorage.getItem(allKey);
+          if (savedAll) return new Set(JSON.parse(savedAll));
+          return null; // no filter saved — include all
+        };
+
         consistentItems.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
+          const allowedOps = getCompanyAllowedOps(co);
           (item.payments || []).forEach(p => {
             if (p.netAmount !== 0 && p.paymentDate) {
-              const opName = (p.operationTypeName || "").toLowerCase();
-              if (excludedOps.some(ex => opName.includes(ex))) return;
+              if (allowedOps && allowedOps.size > 0 && !(p.operationTypeName && allowedOps.has(p.operationTypeName))) return;
               companySummary[co].totalPago += p.netAmount;
             }
           });
