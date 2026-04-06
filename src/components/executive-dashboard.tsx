@@ -365,7 +365,7 @@ export function ExecutiveDashboard() {
 
   const availableYears = useMemo(() => {
     const arr: string[] = [];
-    if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia" || activeTab === "dre" || activeTab === "comercial") {
+    if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia" || activeTab === "dre" || activeTab === "comercial" || activeTab === "resumo") {
       for (let y = currentYear - 10; y <= currentYear; y++) arr.push(String(y));
     } else {
       // Contas a Pagar / a Receber: mostra ano atual em diante
@@ -4877,12 +4877,14 @@ export function ExecutiveDashboard() {
           };
         }
 
-        // Total Recebido (income payments)
+        // Total Recebido (income payments) — filtered by year/month
         consistentIncome.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
           (item.payments || []).forEach(p => {
             if (p.netAmount > 0 && p.paymentDate) {
+              if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;
+              if (selectedMonths.size > 0 && !selectedMonths.has(p.paymentDate.substring(5, 7))) return;
               companySummary[co].totalRecebido += p.netAmount;
             }
           });
@@ -4903,18 +4905,25 @@ export function ExecutiveDashboard() {
           if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
           (item.payments || []).forEach(p => {
             if (p.netAmount !== 0 && p.paymentDate) {
+              // Apply year filter
+              if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;
+              // Apply month filter
+              if (selectedMonths.size > 0 && !selectedMonths.has(p.paymentDate.substring(5, 7))) return;
               if (resumoTipoOp.size > 0 && !(p.operationTypeName && resumoTipoOp.has(p.operationTypeName))) return;
               companySummary[co].totalPago += p.netAmount;
             }
           });
         });
 
-        // Add detached bank movements (tarifas bancárias) to Total Pago
+        // Add detached bank movements (tarifas bancárias) to Total Pago — filtered by year/month
         const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
         allBankMovements.forEach(bm => {
           const co = bm.companyName;
           if (!companySummary[co]) return;
           if (bm.bankMovementAmount === 0) return;
+          if (!bm.bankMovementDate) return;
+          if (selectedYears.size > 0 && !selectedYears.has(bm.bankMovementDate.substring(0, 4))) return;
+          if (selectedMonths.size > 0 && !selectedMonths.has(bm.bankMovementDate.substring(5, 7))) return;
           const historic = (bm.bankMovementHistoricName || "").toLowerCase();
           if (incomePatterns.some(p => historic.includes(p))) return;
           const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
