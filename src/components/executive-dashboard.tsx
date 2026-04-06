@@ -4888,10 +4888,19 @@ export function ExecutiveDashboard() {
           });
         });
 
-        // Total Pago — filtered by resumoTipoOp (user-selected operation types)
+        // Total Pago — filtered by resumoTipoOp AND selectedDocTypes
+        // Excludes previsão documents (same as Contas Pagas)
         consistentItems.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
+          // Apply doc type filter (same as Contas Pagas header filter)
+          if (selectedDocTypes.size > 0) {
+            const tipo = (item.documentIdentificationId || "").trim();
+            if (!selectedDocTypes.has(tipo)) return;
+          }
+          // Always exclude previsão documents
+          const docName = (item.documentIdentificationName || "").toUpperCase();
+          if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
           (item.payments || []).forEach(p => {
             if (p.netAmount !== 0 && p.paymentDate) {
               if (resumoTipoOp.size > 0 && !(p.operationTypeName && resumoTipoOp.has(p.operationTypeName))) return;
