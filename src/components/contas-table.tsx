@@ -907,7 +907,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted]
   );
   const totalBalance = useMemo(
-    () => sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0), 0),
+    () => sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) - (item.discountAmount || 0), 0),
     [sorted]
   );
   const totalPaid = useMemo(
@@ -915,7 +915,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted, filterAno, filterMes, filterTipoBaixa, isPagas]
   );
   const totalComEncargos = useMemo(
-    () => isOverdue ? sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) + calcEncargos(item), 0) : 0,
+    () => isOverdue ? sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) + calcEncargos(item) - (item.discountAmount || 0), 0) : 0,
     [sorted, isOverdue, calcEncargos]
   );
 
@@ -1588,11 +1588,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                 </TableCell>
                                 {isOverdue ? (
                                   <TableCell className="text-right font-mono text-sm font-medium text-red-600">
-                                    {formatCurrency(item.correctedBalanceAmount + calcEncargos(item))}
+                                    {formatCurrency(item.correctedBalanceAmount + calcEncargos(item) - (item.discountAmount || 0))}
                                   </TableCell>
                                 ) : (
                                   <TableCell className="text-right font-mono text-sm font-medium text-slate-800">
-                                    {formatCurrency(item.correctedBalanceAmount)}
+                                    {formatCurrency(item.correctedBalanceAmount - (item.discountAmount || 0))}
                                   </TableCell>
                                 )}
                               </>
@@ -1728,7 +1728,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                                   {isPaidItem ? "-" : `${correcaoPct.toFixed(1)}%`}
                                                 </TableCell>
                                                 <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaidItem ? "text-green-600" : isOverdue ? "text-red-600 dark:text-red-300/70" : "text-slate-800 dark:text-slate-200"}`}>
-                                                  {formatCurrency(parcela.correctedBalanceAmount)}
+                                                  {formatCurrency(isPaidItem ? parcela.correctedBalanceAmount : parcela.correctedBalanceAmount - (parcela.discountAmount || 0))}
                                                 </TableCell>
                                                 <TableCell className="text-xs py-1.5">
                                                   {isPaidItem ? (

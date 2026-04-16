@@ -359,6 +359,8 @@ export function ExecutiveDashboard() {
   const [resumoSort, setResumoSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalRecebido", dir: "desc" });
   const [resumoTipoOp, setResumoTipoOp] = useState<Set<string>>(new Set());
   const [resumoTipoOpInit, setResumoTipoOpInit] = useState(false);
+  const [resumoTipoOpRec, setResumoTipoOpRec] = useState<Set<string>>(new Set());
+  const [resumoTipoOpRecInit, setResumoTipoOpRecInit] = useState(false);
   const [fluxoView, setFluxoView] = useState<"projetado" | "entradas-saidas">("projetado");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
@@ -4830,7 +4832,12 @@ export function ExecutiveDashboard() {
           consistentItems.flatMap(item => (item.payments || []).map(p => p.operationTypeName).filter(Boolean))
         )).sort() as string[];
 
-        // Initialize filter on first render
+        // Collect all operation types from income payments
+        const allOpTypesRec = Array.from(new Set(
+          consistentIncome.flatMap(item => (item.payments || []).map(p => p.operationTypeName).filter(Boolean))
+        )).sort() as string[];
+
+        // Initialize outcome filter on first render
         if (!resumoTipoOpInit && allOpTypes.length > 0) {
           const saved = localStorage.getItem("resumo_default_tipoOp");
           if (saved) {
@@ -4839,6 +4846,17 @@ export function ExecutiveDashboard() {
             setResumoTipoOp(new Set(allOpTypes));
           }
           setResumoTipoOpInit(true);
+        }
+
+        // Initialize income filter on first render
+        if (!resumoTipoOpRecInit && allOpTypesRec.length > 0) {
+          const saved = localStorage.getItem("resumo_default_tipoOpRec");
+          if (saved) {
+            setResumoTipoOpRec(new Set(JSON.parse(saved)));
+          } else {
+            setResumoTipoOpRec(new Set(allOpTypesRec));
+          }
+          setResumoTipoOpRecInit(true);
         }
 
         // Build per-company financial summary
@@ -4877,7 +4895,7 @@ export function ExecutiveDashboard() {
           };
         }
 
-        // Total Recebido (income payments) — filtered by year/month
+        // Total Recebido (income payments) — filtered by year/month and resumoTipoOpRec
         consistentIncome.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
@@ -4885,6 +4903,7 @@ export function ExecutiveDashboard() {
             if (p.netAmount > 0 && p.paymentDate) {
               if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;
               if (selectedMonths.size > 0 && !selectedMonths.has(p.paymentDate.substring(5, 7))) return;
+              if (resumoTipoOpRec.size > 0 && !(p.operationTypeName && resumoTipoOpRec.has(p.operationTypeName))) return;
               companySummary[co].totalRecebido += p.netAmount;
             }
           });
@@ -5001,21 +5020,38 @@ export function ExecutiveDashboard() {
             {/* Filters */}
             <div className="flex flex-wrap items-center gap-3">
               <MultiSelectFilter
-                label="Tipo Operação"
+                label="Tipo Op. Pagar"
                 icon={<ArrowDown className="h-3.5 w-3.5" />}
                 allOptions={allOpTypes}
                 selected={resumoTipoOp}
                 onToggle={(name) => { setResumoTipoOp(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); }}
                 onSelectAll={() => setResumoTipoOp(new Set(allOpTypes))}
                 onClear={() => setResumoTipoOp(new Set())}
-                activeColor="cyan"
+                activeColor="rose"
                 onSaveDefault={() => {
                   localStorage.setItem("resumo_default_tipoOp", JSON.stringify([...resumoTipoOp]));
-                  toast.success("Padrão de tipo operação salvo para o Resumo!");
+                  toast.success("Padrão de tipo operação (pagar) salvo!");
                 }}
               />
               {resumoTipoOp.size > 0 && resumoTipoOp.size < allOpTypes.length && (
-                <span className="text-xs text-slate-500">{resumoTipoOp.size} de {allOpTypes.length} tipos selecionados</span>
+                <span className="text-xs text-slate-500">{resumoTipoOp.size}/{allOpTypes.length} pag.</span>
+              )}
+              <MultiSelectFilter
+                label="Tipo Op. Receber"
+                icon={<ArrowDown className="h-3.5 w-3.5" />}
+                allOptions={allOpTypesRec}
+                selected={resumoTipoOpRec}
+                onToggle={(name) => { setResumoTipoOpRec(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); }}
+                onSelectAll={() => setResumoTipoOpRec(new Set(allOpTypesRec))}
+                onClear={() => setResumoTipoOpRec(new Set())}
+                activeColor="emerald"
+                onSaveDefault={() => {
+                  localStorage.setItem("resumo_default_tipoOpRec", JSON.stringify([...resumoTipoOpRec]));
+                  toast.success("Padrão de tipo operação (receber) salvo!");
+                }}
+              />
+              {resumoTipoOpRec.size > 0 && resumoTipoOpRec.size < allOpTypesRec.length && (
+                <span className="text-xs text-slate-500">{resumoTipoOpRec.size}/{allOpTypesRec.length} rec.</span>
               )}
             </div>
 
