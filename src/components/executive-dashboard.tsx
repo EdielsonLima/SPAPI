@@ -2124,11 +2124,7 @@ export function ExecutiveDashboard() {
             selected={selectedYears}
             onToggle={(y) => toggleInSet(setSelectedYears, y)}
             onSelectAll={() => setSelectedYears(new Set(availableYears))}
-            onClear={() => {
-              const defaultYrs: string[] = [];
-              for (let y = currentYear - 10; y <= currentYear; y++) defaultYrs.push(String(y));
-              setSelectedYears(new Set(defaultYrs));
-            }}
+            onClear={() => setSelectedYears(new Set())}
             activeColor="blue"
             onSaveDefault={() => {
               localStorage.setItem("dashboard_default_years", JSON.stringify([...selectedYears]));
