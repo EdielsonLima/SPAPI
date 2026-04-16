@@ -814,6 +814,7 @@ export function ExecutiveDashboard() {
 
     return companySettings
       .filter(cs => cs.controlaOrcamento)
+      .filter(cs => cs.areaM2 > 0)
       .filter(cs => selectedCompanies.size === 0 || selectedCompanies.has(cs.companyName))
       .map(cs => {
       const budget = cs.areaM2 * cs.factor * cubValue;
