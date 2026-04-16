@@ -77,7 +77,7 @@ function getTabGroup(tab: MainTab): string {
 function companyStorageKey(tab: MainTab): string {
   return `dashboard_companies_${getTabGroup(tab)}`;
 }
-type ChartView = "mensal" | "anual";
+type ChartView = "mensal" | "anual" | "diario";
 
 // === Reusable Multi-Select Filter ===
 function MultiSelectFilter({
@@ -307,7 +307,7 @@ export function ExecutiveDashboard() {
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
-  const [chartView, setChartView] = useState<ChartView>("anual");
+  const [chartView, setChartView] = useState<ChartView>("mensal");
   const [showDelinquentTable, setShowDelinquentTable] = useState(false);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [delinquentSort, setDelinquentSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
@@ -1266,6 +1266,62 @@ export function ExecutiveDashboard() {
     }).filter(Boolean) as { month: string; value: number }[];
   }
 
+  // Daily chart: requires exactly 1 year + 1 month selected. Groups by day-of-month (01-NN).
+  function buildDailyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received"): { month: string; value: number }[] {
+    if (selectedYears.size !== 1 || selectedMonths.size !== 1) return [];
+    const yearStr = [...selectedYears][0];
+    const monthStr = [...selectedMonths][0]; // "01".."12"
+    const year = Number(yearStr);
+    const monthIdx = Number(monthStr) - 1;
+    const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
+    const dayTotals = new Map<number, number>();
+
+    if (field === "paid") {
+      filteredItems.forEach(item => {
+        (item.payments || [])
+          .filter(p =>
+            (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
+            p.paymentDate && p.paymentDate.startsWith(`${yearStr}-${monthStr}`)
+          )
+          .forEach(p => {
+            const d = Number(p.paymentDate.substring(8, 10));
+            dayTotals.set(d, (dayTotals.get(d) || 0) + p.netAmount);
+          });
+      });
+      filteredBankFees.forEach(bm => {
+        if (bm.bankMovementDate && bm.bankMovementDate.startsWith(`${yearStr}-${monthStr}`)) {
+          const d = Number(bm.bankMovementDate.substring(8, 10));
+          dayTotals.set(d, (dayTotals.get(d) || 0) + Math.abs(bm.bankMovementAmount));
+        }
+      });
+    } else if (field === "received") {
+      filteredItems.forEach(item => {
+        (item.payments || [])
+          .filter(p =>
+            p.netAmount > 0 &&
+            p.paymentDate && p.paymentDate.startsWith(`${yearStr}-${monthStr}`)
+          )
+          .forEach(p => {
+            const d = Number(p.paymentDate.substring(8, 10));
+            dayTotals.set(d, (dayTotals.get(d) || 0) + p.netAmount);
+          });
+      });
+    } else {
+      filteredItems.forEach(i => {
+        if (i.dueDate && i.dueDate.startsWith(`${yearStr}-${monthStr}`)) {
+          const d = Number(i.dueDate.substring(8, 10));
+          dayTotals.set(d, (dayTotals.get(d) || 0) + effectiveAmount(i));
+        }
+      });
+    }
+
+    const out: { month: string; value: number }[] = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      out.push({ month: String(d).padStart(2, "0"), value: dayTotals.get(d) || 0 });
+    }
+    return out;
+  }
+
   function buildAnnualChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received") {
     if (field === "paid") {
       // Agrupa pagamentos por ano do paymentDate, filtrando pelo ano selecionado
@@ -1324,6 +1380,7 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(filteredAPagar, "balance"),
         monthly: buildMonthlyChart(filteredAPagar, "balance", true),
         annual: buildAnnualChart(filteredAPagar, "balance"),
+        daily: buildDailyChart(filteredAPagar, "balance"),
         color: "hsl(217, 91%, 60%)",
         label: "A Pagar",
       };
@@ -1332,6 +1389,7 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(filteredPagas, "paid"),
         monthly: buildMonthlyChart(filteredPagas, "paid"),
         annual: buildAnnualChart(filteredPagas, "paid"),
+        daily: buildDailyChart(filteredPagas, "paid"),
         color: "hsl(160, 60%, 45%)",
         label: "Pago",
       };
@@ -1340,6 +1398,7 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(filteredAtrasadas, "balance"),
         monthly: buildMonthlyChart(filteredAtrasadas, "balance"),
         annual: buildAnnualChart(filteredAtrasadas, "balance"),
+        daily: buildDailyChart(filteredAtrasadas, "balance"),
         color: "hsl(0, 84%, 68%)",
         label: "Atrasado",
       };
@@ -1348,6 +1407,7 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(filteredAReceber, "balance"),
         monthly: buildMonthlyChart(filteredAReceber, "balance", true),
         annual: buildAnnualChart(filteredAReceber, "balance"),
+        daily: buildDailyChart(filteredAReceber, "balance"),
         color: "hsl(142, 71%, 45%)",
         label: "A Receber",
       };
@@ -1356,6 +1416,7 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(filteredRecebidas, "received"),
         monthly: buildMonthlyChart(filteredRecebidas, "received"),
         annual: buildAnnualChart(filteredRecebidas, "received"),
+        daily: buildDailyChart(filteredRecebidas, "received"),
         color: "hsl(199, 89%, 48%)",
         label: "Recebido",
       };
@@ -1365,6 +1426,7 @@ export function ExecutiveDashboard() {
         companyChart: buildCompanyChart(filteredInadimplencia, "balance"),
         monthly: buildMonthlyChart(filteredInadimplencia, "balance"),
         annual: buildAnnualChart(filteredInadimplencia, "balance"),
+        daily: buildDailyChart(filteredInadimplencia, "balance"),
         color: "hsl(25, 95%, 53%)",
         label: "Inadimplente",
       };
@@ -1656,8 +1718,8 @@ export function ExecutiveDashboard() {
   };
 
   const kpis = kpiConfigs[activeTab];
-  const { companyChart, monthly, annual, color, label: seriesLabel } = tabData;
-  const chartDataRaw = chartView === "anual" ? annual : monthly;
+  const { companyChart, monthly, annual, daily, color, label: seriesLabel } = tabData;
+  const chartDataRaw = chartView === "anual" ? annual : chartView === "diario" ? daily : monthly;
   const chartData = chartDataRaw.map((item, idx) => {
     const prev = idx > 0 ? chartDataRaw[idx - 1].value : 0;
     const pct = prev > 0 ? ((item.value - prev) / prev) * 100 : null;
@@ -2727,7 +2789,7 @@ export function ExecutiveDashboard() {
                       </CardTitle>
                       <CardDescription className="text-slate-400">Evolução das vendas no período</CardDescription>
                     </div>
-                    <Tabs value={chartView} onValueChange={v => setChartView(v as ChartView)}>
+                    <Tabs value={chartView === "diario" ? "mensal" : chartView} onValueChange={v => setChartView(v as ChartView)}>
                       <TabsList className="h-8">
                         <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
                         <TabsTrigger value="anual" className="text-xs px-3 h-7">Anual</TabsTrigger>
@@ -3494,7 +3556,7 @@ export function ExecutiveDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg text-slate-800">
-                  {chartView === "mensal" ? "Evolucao Mensal" : "Evolucao Anual"}
+                  {chartView === "mensal" ? "Evolucao Mensal" : chartView === "diario" ? "Evolucao Diaria" : "Evolucao Anual"}
                   {(selectedCompanies.size !== defaultCompanies().size || [...selectedCompanies].some(n => isExcludedCompany(n)) || selectedMonths.size > 0 || selectedDays.size > 0 || selectedDuePeriods.size > 0 || [...selectedDocTypes].some(t => isExcludedDocType(t)) || selectedDocTypes.size !== allDocTypes.filter(t => !isExcludedDocType(t)).length) && (
                     <span className="text-sm font-normal text-blue-500 ml-2">
                       (filtrado)
@@ -3502,18 +3564,27 @@ export function ExecutiveDashboard() {
                   )}
                 </CardTitle>
                 <CardDescription className="text-slate-400">
-                  {seriesLabel} por {chartView === "mensal" ? "mes" : "ano"}
+                  {seriesLabel} por {chartView === "mensal" ? "mes" : chartView === "diario" ? "dia" : "ano"}
                 </CardDescription>
               </div>
               <Tabs value={chartView} onValueChange={v => setChartView(v as ChartView)}>
                 <TabsList className="h-8">
                   <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
                   <TabsTrigger value="anual" className="text-xs px-3 h-7">Anual</TabsTrigger>
+                  <TabsTrigger value="diario" className="text-xs px-3 h-7">Diário</TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
           </CardHeader>
           <CardContent>
+            {chartView === "diario" && (selectedYears.size !== 1 || selectedMonths.size !== 1) ? (
+              <div className="flex items-center justify-center h-[480px] text-slate-400 text-sm text-center px-6">
+                <div>
+                  <p className="font-medium mb-1">Selecione <strong>um único ano</strong> e <strong>um único mês</strong></p>
+                  <p className="text-xs">para visualizar os pagamentos por dia</p>
+                </div>
+              </div>
+            ) : (
             <ResponsiveContainer width="100%" height={480}>
               <BarChart data={chartData} margin={{ top: 35, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -3559,6 +3630,7 @@ export function ExecutiveDashboard() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
