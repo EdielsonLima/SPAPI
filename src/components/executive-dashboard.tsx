@@ -2787,8 +2787,8 @@ export function ExecutiveDashboard() {
                     </div>
                     <Tabs value={chartView === "diario" ? "mensal" : chartView} onValueChange={v => setChartView(v as ChartView)}>
                       <TabsList className="h-8">
-                        <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
                         <TabsTrigger value="anual" className="text-xs px-3 h-7">Anual</TabsTrigger>
+                        <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
                       </TabsList>
                     </Tabs>
                   </div>
@@ -3565,8 +3565,8 @@ export function ExecutiveDashboard() {
               </div>
               <Tabs value={chartView} onValueChange={v => setChartView(v as ChartView)}>
                 <TabsList className="h-8">
-                  <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
                   <TabsTrigger value="anual" className="text-xs px-3 h-7">Anual</TabsTrigger>
+                  <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>
                   <TabsTrigger value="diario" className="text-xs px-3 h-7">Diário</TabsTrigger>
                 </TabsList>
               </Tabs>
