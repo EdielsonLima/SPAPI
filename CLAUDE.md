@@ -1,5 +1,16 @@
 # CLAUDE.md — Regras do Projeto DTSIENGE
 
+## Contas a Pagar / Vencidas - Regra de Saldo (Validado em 2026-04-16)
+
+### NAO ALTERAR sem pedido explicito do usuario:
+- Coluna "Saldo" (A Pagar) e "Total" (Vencidas) em `src/components/contas-table.tsx`:
+  - Fórmula: `correctedBalanceAmount - discountAmount - taxAmount` (só para outcome, isIncome=false)
+  - `taxAmount` = imposto retido (ISS/INSS) que será deduzido do pagamento ao credor
+  - Validado contra Sienge "Contas a Pagar (por Credor) Sintético" — coluna "Desconto" do relatório é o taxAmount
+  - Campo `discountAmount` do /outcome é 0 para parcelas abertas — o ajuste real vem do taxAmount
+- KPI card "Saldo Pendente" usa o mesmo cálculo via totalBalance
+- Para Income (Contas a Receber/Recebidas) NÃO subtrair taxAmount (isIncome branch)
+
 ## Contas Pagas - Regras Criticas (Validado em 2026-04-05)
 
 ### NAO ALTERAR sem pedido explicito do usuario:
