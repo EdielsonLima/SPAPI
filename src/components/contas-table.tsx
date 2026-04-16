@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -542,6 +543,20 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         setExclusionSet(set);
       })
       .catch(() => {});
+  }, []);
+
+  // Deep-link query params from header alert: ?filtroOrc=sem-item&empresa=XYZ
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const filtroOrc = searchParams?.get("filtroOrc");
+    const empresa = searchParams?.get("empresa");
+    if (filtroOrc === "sem-item") {
+      setFilterItemOrcamento(new Set(["(Sem item)"]));
+      if (empresa) setFilterEmpresas(new Set([empresa]));
+      setPage(0);
+    }
+    // Run only on first mount; further navigation within same page is user-driven
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Which companies should have Item de Orçamento checking (red highlight)
