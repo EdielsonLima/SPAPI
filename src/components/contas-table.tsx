@@ -1014,7 +1014,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       const d = new Date(item.dueDate + "T00:00:00");
       return isOverdue ? d >= limit && d <= yesterday : d >= tomorrow && d <= limit;
     });
-    const valor = weekItems.reduce((s, i) => s + (i.correctedBalanceAmount || 0), 0);
+    const valor = weekItems.reduce((s, i) => s + (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (isIncome ? 0 : (i.taxAmount || 0)), 0);
     const titulos = new Set(weekItems.map((i) => i.billId)).size;
     const credores = new Set(weekItems.map((i) => getCounterpartId(i))).size;
     return { valor, titulos, credores, parcelas: weekItems.length };
@@ -1145,7 +1145,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         <Card className={`border-0 shadow-md overflow-hidden ${isPagas ? "bg-green-50/60" : "bg-indigo-50/60"}`}>
           <div className={`h-1.5 ${isPagas ? "bg-gradient-to-r from-green-500 to-green-400" : "bg-gradient-to-r from-indigo-500 to-indigo-400"}`} />
           <CardContent className="p-4">
-            <div className={`text-xs font-bold uppercase tracking-widest ${isPagas ? "text-green-600/80" : "text-indigo-600/80"}`}>{isPagas ? (isIncome ? "Total Recebido" : "Total Pago") : "Valor Original"}</div>
+            <div className={`text-xs font-bold uppercase tracking-widest ${isPagas ? "text-green-600/80" : "text-indigo-600/80"}`}>{isPagas ? (isIncome ? "Total Recebido" : "Total Pago") : "Valor no Vencimento"}</div>
             <div className={`text-2xl font-black mt-1 ${isPagas ? "text-green-700" : "text-indigo-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(isPagas ? totalPaid : totalAmount)}
             </div>
