@@ -280,7 +280,7 @@ export function ExecutiveDashboard() {
   const [salesContracts, setSalesContracts] = useState<SiengeSalesContract[]>([]);
   const [apiUnits, setApiUnits] = useState<{ enterpriseName: string; companyName: string; name: string; propertyType: string; commercialStock: string; floor: string; contractNumber: string; privateArea: number }[]>([]);
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
-  const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string }[]>([]);
+  const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string; controlaOrcamento?: boolean }[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   // Per-tab company filter: save/restore when switching tabs
   const perTabCompanies = useRef<Record<string, Set<string>>>({});
@@ -812,7 +812,10 @@ export function ExecutiveDashboard() {
     if (!cubData || companySettings.length === 0) return [];
     const cubValue = cubData.currentValue;
 
-    return companySettings.filter(cs => selectedCompanies.size === 0 || selectedCompanies.has(cs.companyName)).map(cs => {
+    return companySettings
+      .filter(cs => cs.controlaOrcamento)
+      .filter(cs => selectedCompanies.size === 0 || selectedCompanies.has(cs.companyName))
+      .map(cs => {
       const budget = cs.areaM2 * cs.factor * cubValue;
 
       // Sum ALL payments for this company using valor líquido (netAmount)
