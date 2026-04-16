@@ -3579,9 +3579,17 @@ export function ExecutiveDashboard() {
           <CardContent>
             {chartView === "diario" && (selectedYears.size !== 1 || selectedMonths.size !== 1) ? (
               <div className="flex items-center justify-center h-[480px] text-slate-400 text-sm text-center px-6">
-                <div>
-                  <p className="font-medium mb-1">Selecione <strong>um único ano</strong> e <strong>um único mês</strong></p>
-                  <p className="text-xs">para visualizar os pagamentos por dia</p>
+                <div className="space-y-2">
+                  <p className="font-medium">Para ver a visão Diária, ajuste os filtros:</p>
+                  <ul className="text-xs space-y-1 inline-block text-left">
+                    <li className={selectedYears.size === 1 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                      {selectedYears.size === 1 ? "✓" : "✗"} Anos: <strong>{selectedYears.size}</strong> selecionado(s) · precisa ser <strong>1</strong>
+                    </li>
+                    <li className={selectedMonths.size === 1 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                      {selectedMonths.size === 1 ? "✓" : "✗"} Meses: <strong>{selectedMonths.size}</strong> selecionado(s) · precisa ser <strong>1</strong>
+                    </li>
+                  </ul>
+                  <p className="text-xs text-slate-400">Use os filtros <strong>Anos</strong> e <strong>Meses</strong> no topo da aba</p>
                 </div>
               </div>
             ) : (
