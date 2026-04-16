@@ -1522,11 +1522,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                           <SortableHead field="balanceAmount" className="text-right min-w-[120px]">Saldo Atual</SortableHead>
                           <SortableHead field="daysOverdue" className="text-right min-w-[60px]">Dias</SortableHead>
                           <TableHead className="text-right min-w-[110px] text-xs font-semibold">Acréscimo</TableHead>
-                          <TableHead className="text-right min-w-[100px] text-xs font-semibold">Desconto</TableHead>
                         </>
                       )}
-                      <TableHead className="text-right min-w-[110px] text-xs font-semibold">Correção</TableHead>
-                      <TableHead className="text-right min-w-[70px] text-xs font-semibold">%</TableHead>
+                      {!isIncome && (
+                        <TableHead className="text-right min-w-[100px] text-xs font-semibold">Desconto</TableHead>
+                      )}
                       {isOverdue ? (
                         <TableHead className="text-right min-w-[120px] text-xs font-semibold">Total</TableHead>
                       ) : (
@@ -1538,13 +1538,22 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
               </TableHeader>
               <TableBody>
                 {loading
-                  ? Array.from({ length: 8 }).map((_, i) => (
-                      <TableRow key={i}>
-                        {Array.from({ length: (isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)) + (isIncome ? 1 : 0) + (isOverdue ? 4 : 0) }).map((_, j) => (
-                          <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
-                        ))}
-                      </TableRow>
-                    ))
+                  ? Array.from({ length: 8 }).map((_, i) => {
+                      const skelCount =
+                        isPagas && isIncome ? 12 :
+                        isPagas && !isIncome ? 14 :
+                        isOverdue && isIncome ? 15 :
+                        isOverdue && !isIncome ? 17 :
+                        isIncome ? 11 :
+                        13;
+                      return (
+                        <TableRow key={i}>
+                          {Array.from({ length: skelCount }).map((_, j) => (
+                            <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
+                          ))}
+                        </TableRow>
+                      );
+                    })
                   : (() => {
                       const seenExpandedBills = new Set<number>();
                       return paginatedItems.map((item, idx) => {
@@ -1555,10 +1564,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                       const isFirstOfBill = !seenExpandedBills.has(item.billId);
                       if (isExpanded) seenExpandedBills.add(item.billId);
                       const showExpandedPanel = isExpanded && isFirstOfBill;
-                      const incomeExtra = isIncome ? 1 : 0; // +1 for Índice column
-                      const overdueExtra = isOverdue ? 4 : 0; // +4 for Saldo Atual, Dias, Acréscimo, Desconto columns
-                      const baseCount = (isPagas ? (isIncome ? 10 : 11) : isOverdue ? (isIncome ? 12 : 13) : (isIncome ? 11 : 12)) + incomeExtra + overdueExtra;
-                      const colCount = baseCount;
+                      // Count matches the headers exactly
+                      const colCount =
+                        isPagas && isIncome ? 12 :
+                        isPagas && !isIncome ? 14 :
+                        isOverdue && isIncome ? 15 :
+                        isOverdue && !isIncome ? 17 :
+                        isIncome ? 11 :
+                        13;
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
                           <TableRow
@@ -1645,20 +1658,17 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                       <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-300/70">
                                         {formatCurrency(encargos)}
                                       </TableCell>
-                                      <TableCell className="text-right font-mono text-sm text-slate-500">
-                                        {formatCurrency(item.discountAmount || 0)}
-                                      </TableCell>
                                     </>
                                   );
                                 })()}
-                                <TableCell className="text-right font-mono text-sm text-amber-600">
-                                  {formatCurrency(item.correctedBalanceAmount - item.balanceAmount)}
-                                </TableCell>
-                                <TableCell className="text-right font-mono text-xs text-amber-600">
-                                  {item.balanceAmount > 0
-                                    ? `${(((item.correctedBalanceAmount - item.balanceAmount) / item.balanceAmount) * 100).toFixed(1)}%`
-                                    : "-"}
-                                </TableCell>
+                                {!isIncome && (() => {
+                                  const desc = (item.discountAmount || 0) + (item.taxAmount || 0);
+                                  return (
+                                    <TableCell className={`text-right font-mono text-sm ${desc > 0 ? "font-medium text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-slate-500"}`}>
+                                      {formatCurrency(desc)}
+                                    </TableCell>
+                                  );
+                                })()}
                                 {isOverdue ? (
                                   <TableCell className="text-right font-mono text-sm font-medium text-red-600">
                                     {formatCurrency(item.correctedBalanceAmount + calcEncargos(item) - (item.discountAmount || 0) - (isIncome ? 0 : (item.taxAmount || 0)))}
