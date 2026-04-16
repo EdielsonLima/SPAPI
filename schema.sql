@@ -130,12 +130,13 @@ CREATE TABLE IF NOT EXISTS cached_sales_contracts (
 
 -- ── Configurações de Empresas (M² e Fator) ─────────────────────────────────
 CREATE TABLE IF NOT EXISTS company_settings (
-  company_id   INTEGER PRIMARY KEY REFERENCES cached_companies(id),
-  company_name TEXT    NOT NULL,
-  area_m2      NUMERIC(12,2) NOT NULL DEFAULT 0,
-  factor       NUMERIC(6,4) NOT NULL DEFAULT 1,
-  status       TEXT    NOT NULL DEFAULT 'ativa',
-  updated_at   TIMESTAMP NOT NULL DEFAULT NOW()
+  company_id         INTEGER PRIMARY KEY REFERENCES cached_companies(id),
+  company_name       TEXT    NOT NULL,
+  area_m2            NUMERIC(12,2) NOT NULL DEFAULT 0,
+  factor             NUMERIC(6,4) NOT NULL DEFAULT 1,
+  status             TEXT    NOT NULL DEFAULT 'ativa',
+  controla_orcamento BOOLEAN NOT NULL DEFAULT FALSE,
+  updated_at         TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 -- ── Cache CUB SC ────────────────────────────────────────────────────────────

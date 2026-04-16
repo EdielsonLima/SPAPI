@@ -1,5 +1,13 @@
 # CLAUDE.md — Regras do Projeto DTSIENGE
 
+## Controle de Orçamento por Empresa (Criado em 2026-04-16)
+
+- Campo `controla_orcamento` (BOOLEAN) na tabela `company_settings` (default FALSE)
+- Configurado em Cadastros > Empreendimentos (coluna "Controla Orçamento", badge Sim/Não)
+- Só destaca em vermelho (bg-red-50 + border-red-300) as parcelas em Contas a Pagar/Vencidas/Pagas de empresas com `controlaOrcamento=true` que não têm Item de Orçamento vinculado
+- A legenda clicável acima da tabela só aparece quando há parcelas destacadas (empresas controladas com buildingsCosts vazio/sem costEstimationSheetName)
+- Clique na legenda aplica/limpa o filtro "(Sem item)" do Item Orçamento
+
 ## Contas a Pagar / Vencidas - Regra de Saldo (Validado em 2026-04-16)
 
 ### NAO ALTERAR sem pedido explicito do usuario:

@@ -340,29 +340,35 @@ export interface CompanySetting {
   areaM2: number;
   factor: number;
   status: string;
+  controlaOrcamento: boolean;
   updatedAt: string;
 }
 
 export async function getCompanySettings(): Promise<CompanySetting[]> {
   const result = await pool.query(
-    `SELECT company_id, company_name, area_m2, factor, COALESCE(status, 'ativa') as status, updated_at FROM company_settings ORDER BY company_name`
+    `SELECT company_id, company_name, area_m2, factor,
+            COALESCE(status, 'ativa') as status,
+            COALESCE(controla_orcamento, FALSE) as controla_orcamento,
+            updated_at
+     FROM company_settings ORDER BY company_name`
   );
-  return result.rows.map((r: { company_id: number; company_name: string; area_m2: string; factor: string; status: string; updated_at: string }) => ({
+  return result.rows.map((r: { company_id: number; company_name: string; area_m2: string; factor: string; status: string; controla_orcamento: boolean; updated_at: string }) => ({
     companyId: r.company_id,
     companyName: r.company_name,
     areaM2: parseFloat(r.area_m2),
     factor: parseFloat(r.factor),
     status: r.status,
+    controlaOrcamento: !!r.controla_orcamento,
     updatedAt: r.updated_at,
   }));
 }
 
-export async function upsertCompanySetting(companyId: number, companyName: string, areaM2: number, factor: number, status: string) {
+export async function upsertCompanySetting(companyId: number, companyName: string, areaM2: number, factor: number, status: string, controlaOrcamento: boolean = false) {
   await pool.query(
-    `INSERT INTO company_settings (company_id, company_name, area_m2, factor, status, updated_at)
-     VALUES ($1, $2, $3, $4, $5, NOW())
-     ON CONFLICT (company_id) DO UPDATE SET company_name = $2, area_m2 = $3, factor = $4, status = $5, updated_at = NOW()`,
-    [companyId, companyName, areaM2, factor, status]
+    `INSERT INTO company_settings (company_id, company_name, area_m2, factor, status, controla_orcamento, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, NOW())
+     ON CONFLICT (company_id) DO UPDATE SET company_name = $2, area_m2 = $3, factor = $4, status = $5, controla_orcamento = $6, updated_at = NOW()`,
+    [companyId, companyName, areaM2, factor, status, controlaOrcamento]
   );
 }
 

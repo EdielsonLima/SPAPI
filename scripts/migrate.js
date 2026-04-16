@@ -61,6 +61,19 @@ async function migrate() {
     } catch (pkErr) {
       console.log("[migrate] PK migration note:", pkErr.message);
     }
+    // Migration: ensure company_settings has controla_orcamento column
+    try {
+      const { rows } = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'company_settings' AND column_name = 'controla_orcamento'
+      `);
+      if (rows.length === 0) {
+        console.log("[migrate] Adding controla_orcamento column to company_settings...");
+        await pool.query(`ALTER TABLE company_settings ADD COLUMN controla_orcamento BOOLEAN NOT NULL DEFAULT FALSE`);
+      }
+    } catch (coErr) {
+      console.log("[migrate] controla_orcamento migration note:", coErr.message);
+    }
     // Seed default users (only if not already present)
     try {
       const bcrypt = require("bcryptjs");

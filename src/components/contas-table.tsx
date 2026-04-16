@@ -544,6 +544,22 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       .catch(() => {});
   }, []);
 
+  // Which companies should have Item de Orçamento checking (red highlight)
+  const [companiesControlaOrcamento, setCompaniesControlaOrcamento] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    fetch("/api/company-settings")
+      .then(res => res.ok ? res.json() : null)
+      .then(json => {
+        if (!json?.data) return;
+        const set = new Set<string>();
+        (json.data as { companyName: string; controlaOrcamento?: boolean }[]).forEach(cs => {
+          if (cs.controlaOrcamento) set.add(cs.companyName);
+        });
+        setCompaniesControlaOrcamento(set);
+      })
+      .catch(() => {});
+  }, []);
+
   const today = useMemo(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
@@ -914,6 +930,17 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     () => sorted.reduce((sum, item) => sum + (item.discountAmount || 0) + (isIncome ? 0 : (item.taxAmount || 0)), 0),
     [sorted, isIncome]
   );
+  const semOrcamentoStats = useMemo(() => {
+    if (isIncome) return { count: 0, valor: 0 };
+    const unlinked = sorted.filter(i => {
+      if (!companiesControlaOrcamento.has(i.companyName)) return false;
+      const costs = getBuildingsCosts(i);
+      return costs.length === 0 || costs.every(bc => !bc.costEstimationSheetName);
+    });
+    const valor = unlinked.reduce((s, i) =>
+      s + (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0), 0);
+    return { count: unlinked.length, valor };
+  }, [sorted, isIncome, companiesControlaOrcamento]);
   const totalPaid = useMemo(
     () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined), 0),
     [sorted, filterAno, filterMes, filterTipoBaixa, isPagas]
@@ -1431,6 +1458,32 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         </CardHeader>
 
         <CardContent className="px-0 pb-0">
+          {!isIncome && semOrcamentoStats.count > 0 && (() => {
+            const isFiltered = filterItemOrcamento.size === 1 && filterItemOrcamento.has(NO_ITEM_ORCAMENTO);
+            return (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilterItemOrcamento(isFiltered ? new Set() : new Set([NO_ITEM_ORCAMENTO]));
+                  setPage(0);
+                }}
+                className={`flex items-center gap-2 text-xs px-4 py-2 mb-1 w-full text-left transition-colors ${
+                  isFiltered
+                    ? "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-950/60"
+                    : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                }`}
+                title={isFiltered ? "Clique para limpar este filtro" : "Clique para mostrar apenas estas parcelas"}
+              >
+                <span className="inline-block w-3 h-3 rounded-sm bg-red-100 dark:bg-red-900/40 border-l-2 border-red-400" />
+                <span>
+                  Linhas em vermelho: parcelas <strong>sem Item de Orçamento vinculado</strong>
+                  {" — "}{semOrcamentoStats.count} {semOrcamentoStats.count === 1 ? "parcela" : "parcelas"}
+                  {" ("}{formatCurrency(semOrcamentoStats.valor)}{")"}
+                  {isFiltered ? " · filtrado (clique para limpar)" : " · clique para filtrar"}
+                </span>
+              </button>
+            );
+          })()}
           <div>
             <Table containerClassName="overflow-visible">
               <TableHeader className="bg-slate-800 text-slate-100 sticky -top-4 md:-top-6 z-20 shadow-md [&_th]:text-slate-200">
@@ -1509,7 +1562,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
                           <TableRow
-                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-blue-100 border-l-4 border-blue-500 hover:bg-blue-100" : (!isIncome && (getBuildingsCosts(item).length === 0 || getBuildingsCosts(item).every(bc => !bc.costEstimationSheetName))) ? "bg-red-50 hover:bg-red-100 border-l-4 border-red-300" : "hover:bg-slate-50 border-l-4 border-transparent"}`}
+                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-blue-100 border-l-4 border-blue-500 hover:bg-blue-100" : (!isIncome && companiesControlaOrcamento.has(item.companyName) && (getBuildingsCosts(item).length === 0 || getBuildingsCosts(item).every(bc => !bc.costEstimationSheetName))) ? "bg-red-50 hover:bg-red-100 border-l-4 border-red-300" : "hover:bg-slate-50 border-l-4 border-transparent"}`}
                             onClick={() => toggleBillExpand(item.billId)}
                           >
                             <TableCell className="w-[40px] px-2">

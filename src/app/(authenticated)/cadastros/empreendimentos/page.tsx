@@ -24,6 +24,7 @@ interface CompanySetting {
   areaM2: number;
   factor: number;
   status: string;
+  controlaOrcamento?: boolean;
 }
 
 interface EditRow {
@@ -32,6 +33,7 @@ interface EditRow {
   areaM2: string;
   factor: string;
   status: string;
+  controlaOrcamento: boolean;
 }
 
 interface CubOverride {
@@ -103,6 +105,7 @@ export default function EmpreendimentosPage() {
           areaM2: String(s.areaM2),
           factor: String(s.factor),
           status: s.status || "ativa",
+          controlaOrcamento: !!s.controlaOrcamento,
         }))
       );
 
@@ -142,6 +145,7 @@ export default function EmpreendimentosPage() {
         areaM2: "0",
         factor: "1",
         status: "ativa",
+        controlaOrcamento: false,
       },
     ]);
     setShowAddRow(false);
@@ -173,6 +177,14 @@ export default function EmpreendimentosPage() {
     );
   };
 
+  const toggleControlaOrcamento = (companyId: number) => {
+    setRows((prev) =>
+      prev.map((r) =>
+        r.companyId === companyId ? { ...r, controlaOrcamento: !r.controlaOrcamento } : r
+      )
+    );
+  };
+
   const handleSaveAll = async () => {
     setSaving(true);
     try {
@@ -187,6 +199,7 @@ export default function EmpreendimentosPage() {
               areaM2: parseFloat(r.areaM2) || 0,
               factor: parseFloat(r.factor) || 1,
               status: r.status,
+              controlaOrcamento: r.controlaOrcamento,
             }),
           })
         )
@@ -466,6 +479,7 @@ export default function EmpreendimentosPage() {
                   <TableHead className="w-32 text-center">Status</TableHead>
                   <TableHead className="w-40 text-right">M²</TableHead>
                   <TableHead className="w-32 text-right">Fator</TableHead>
+                  <TableHead className="w-44 text-center" title="Se marcado, a Contas a Pagar destacará em vermelho parcelas desta empresa sem Item de Orçamento vinculado">Controla Orçamento</TableHead>
                   <TableHead className="w-16"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -478,6 +492,7 @@ export default function EmpreendimentosPage() {
                         <TableCell><Skeleton className="h-6 w-20 mx-auto" /></TableCell>
                         <TableCell><Skeleton className="h-8 w-28 ml-auto" /></TableCell>
                         <TableCell><Skeleton className="h-8 w-20 ml-auto" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-12 mx-auto" /></TableCell>
                         <TableCell><Skeleton className="h-4 w-8" /></TableCell>
                       </TableRow>
                     ))
@@ -530,6 +545,25 @@ export default function EmpreendimentosPage() {
                             step="0.01"
                           />
                         </TableCell>
+                        <TableCell className="text-center">
+                          <button
+                            onClick={() => toggleControlaOrcamento(row.companyId)}
+                            className="inline-flex items-center gap-1.5 transition-colors"
+                            title={row.controlaOrcamento ? "Destacar parcelas sem Item de Orçamento (em vermelho) — clique para desativar" : "Não destacar — clique para ativar"}
+                          >
+                            {row.controlaOrcamento ? (
+                              <Badge className="bg-red-100 text-red-700 hover:bg-red-200 cursor-pointer">
+                                <span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1.5" />
+                                Sim
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-slate-200 text-slate-500 hover:bg-slate-300 cursor-pointer">
+                                <span className="inline-block w-2 h-2 rounded-full bg-slate-400 mr-1.5" />
+                                Não
+                              </Badge>
+                            )}
+                          </button>
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -544,7 +578,7 @@ export default function EmpreendimentosPage() {
                     ))}
                 {!loading && filtered.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                       {rows.length === 0
                         ? "Nenhum empreendimento configurado. Clique em \"Adicionar\" para comecar."
                         : "Nenhum empreendimento encontrado"}
