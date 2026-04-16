@@ -910,6 +910,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     () => sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) - (item.discountAmount || 0) - (isIncome ? 0 : (item.taxAmount || 0)), 0),
     [sorted, isIncome]
   );
+  const totalDiscount = useMemo(
+    () => sorted.reduce((sum, item) => sum + (item.discountAmount || 0) + (isIncome ? 0 : (item.taxAmount || 0)), 0),
+    [sorted, isIncome]
+  );
   const totalPaid = useMemo(
     () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined), 0),
     [sorted, filterAno, filterMes, filterTipoBaixa, isPagas]
@@ -1095,7 +1099,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       </div>
 
       {/* Summary Cards */}
-      <div className={`grid gap-4 md:grid-cols-3 ${isOverdue ? "lg:grid-cols-6" : "lg:grid-cols-5"}`}>
+      <div className={`grid gap-4 md:grid-cols-3 ${isOverdue ? (isPagas || isIncome ? "lg:grid-cols-6" : "lg:grid-cols-7") : (isPagas || isIncome ? "lg:grid-cols-5" : "lg:grid-cols-6")}`}>
         <Card className={`border-0 shadow-md overflow-hidden ${isPagas ? "bg-emerald-50/60" : isOverdue ? "bg-red-50/60" : "bg-amber-50/60"}`}>
           <div className={`h-1.5 ${isPagas ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : isOverdue ? "bg-gradient-to-r from-red-500 to-red-400" : "bg-gradient-to-r from-amber-500 to-amber-400"}`} />
           <CardContent className="p-4">
@@ -1151,6 +1155,22 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
             </div>
           </CardContent>
         </Card>
+        {!isPagas && !isIncome && (
+          <Card className="border-0 shadow-md overflow-hidden bg-rose-50/60">
+            <div className="h-1.5 bg-gradient-to-r from-rose-500 to-rose-400" />
+            <CardContent className="p-4">
+              <div className="text-xs font-bold uppercase tracking-widest text-rose-600/80">Desconto</div>
+              <div className="text-2xl font-black text-rose-700 mt-1">
+                {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(totalDiscount)}
+              </div>
+              {!loading && (
+                <div className="text-xs text-slate-400 mt-1.5">
+                  Impostos retidos (ISS/INSS)
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
         <Card className={`border-0 shadow-md overflow-hidden ${isOverdue ? "bg-red-50/60" : "bg-violet-50/60"}`}>
           <div className={`h-1.5 ${isOverdue ? "bg-gradient-to-r from-red-500 to-red-400" : "bg-gradient-to-r from-violet-500 to-violet-400"}`} />
           <CardContent className="p-4">
