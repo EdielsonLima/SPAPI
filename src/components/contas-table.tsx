@@ -673,7 +673,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return Array.from(filterEmpresas).sort().join(",");
   }, [filterEmpresas]);
 
-  // Load tipo operação per-company or select all by default
+  // Load tipo operação per-company or select all minus default-excluded types
   useEffect(() => {
     if (isPagas && !isIncome && tiposBaixa.length > 0) {
       const perCompanyKey = `contas_${dataSource}_${mode}_default_tipoBaixa_${empresaKeyForTipoBaixa}`;
@@ -681,8 +681,18 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       if (saved) {
         setFilterTipoBaixa(new Set(JSON.parse(saved)));
       } else {
-        // No saved default: select ALL types (user decides what to exclude)
-        setFilterTipoBaixa(new Set(tiposBaixa));
+        // No saved default: select all EXCEPT operation types that the Sienge
+        // "Contas Pagas (por Centro de Custo) Sintético" report ignores.
+        // Validated against PDF on 2026-05-01 — these are double-counting
+        // entries (Substituição replaces a prior payment, Cancelamento and
+        // Estorno are reversals). Real cash flows like Pagamento, Adiantamento,
+        // Por Bens, Devolução, Abatimento ARE included by default.
+        const DEFAULT_EXCLUDED = ["substitui", "cancelamento", "estorno"];
+        const initial = tiposBaixa.filter(op => {
+          const lower = op.toLowerCase();
+          return !DEFAULT_EXCLUDED.some(x => lower.includes(x));
+        });
+        setFilterTipoBaixa(new Set(initial));
       }
       setTipoBaixaInitialized(true);
     }

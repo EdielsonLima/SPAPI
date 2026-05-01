@@ -328,8 +328,12 @@ export function ExecutiveDashboard() {
       const saved = localStorage.getItem("dashboard_default_opTypes");
       if (saved) return new Set(JSON.parse(saved));
     }
-    return new Set(["Pagamento"]);
+    // Empty marker — actual defaults are populated by useEffect below once
+    // allOpTypes is known (selects all minus Substituição/Cancelamento/Estorno
+    // which double-count in the Sienge reports, validated 2026-05-01).
+    return new Set();
   });
+  const [opTypesInitialized, setOpTypesInitialized] = useState(false);
   const [bankFees, setBankFees] = useState<SiengeBankMovement[]>([]);
   const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>([]);
   const [allBankMovementsFull, setAllBankMovementsFull] = useState<SiengeBankMovement[]>([]);
@@ -707,6 +711,25 @@ export function ExecutiveDashboard() {
     );
     return Array.from(types).sort();
   }, [activeItems]);
+
+  // Initialize selectedOpTypes once data arrives. Skips Substituição,
+  // Cancelamento and Estorno — these are reversal/replacement entries that
+  // the Sienge "Contas Pagas Sintético" report does not include.
+  useEffect(() => {
+    if (opTypesInitialized || allOpTypes.length === 0) return;
+    if (typeof window !== "undefined" && localStorage.getItem("dashboard_default_opTypes")) {
+      // User has a saved default; respect it (already loaded by useState init)
+      setOpTypesInitialized(true);
+      return;
+    }
+    const EXCLUDED = ["substitui", "cancelamento", "estorno"];
+    const initial = allOpTypes.filter(op => {
+      const lower = op.toLowerCase();
+      return !EXCLUDED.some(x => lower.includes(x));
+    });
+    setSelectedOpTypes(new Set(initial));
+    setOpTypesInitialized(true);
+  }, [allOpTypes, opTypesInitialized]);
 
   // Números de documento disponíveis nos dados de income (CR)
   const allDocNumbers = useMemo(() => {
