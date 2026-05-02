@@ -806,16 +806,25 @@ export function ExecutiveDashboard() {
   // Bancário", mirroring the standalone Contas Pagas page. This lets bank
   // movements flow through the same filter chain (selectedDocTypes,
   // selectedCompanies, etc.) so the Painel matches the standalone exactly.
+  //
+  // Exclusion patterns: rendimento/aplicação/resgate (income side) AND
+  // transferência/saque/depósito (cash management — not payments to credors).
+  // Validated 2026-05-02 against Sienge "Contas Pagas (por Credor) Sintético"
+  // for SILVA PACKER: a R$ 203M "Transferência" bucket was over-counting the
+  // total — Sienge's report doesn't include these as paid bills.
   const bankMovementsAsItems = useMemo(() => {
     if (allBankMovements.length === 0) return [] as SiengeOutcome[];
-    const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
+    const EXCLUDE_PATTERNS = [
+      "rendimento", "aplicação", "aplicacao", "resgate",
+      "transferência", "transferencia", "saque", "depósito", "deposito",
+    ];
     return allBankMovements
       .filter(bm => {
         if (bm.bankMovementAmount === 0) return false;
         const historic = (bm.bankMovementHistoricName || "").toLowerCase();
-        if (incomePatterns.some(p => historic.includes(p))) return false;
+        if (EXCLUDE_PATTERNS.some(p => historic.includes(p))) return false;
         const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
-        if (incomePatterns.some(p => catNames.includes(p))) return false;
+        if (EXCLUDE_PATTERNS.some(p => catNames.includes(p))) return false;
         return true;
       })
       .map(bm => ({
