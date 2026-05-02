@@ -48,4 +48,5 @@ next-env.d.ts
 attached_assets/
 analyze-*.js
 check-*.js
+!scripts/check-validations.js
 switch-company.sh

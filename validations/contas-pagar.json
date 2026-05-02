@@ -1,0 +1,15 @@
+{
+  "_doc": "Snapshot de validações batidas contra relatórios Sienge. Cada entrada congela um total já conferido para detectar regressões em mudanças futuras de código de cálculo. Adicione novas entradas conforme validar empresa por empresa. Valor esperado em reais com 2 casas decimais.",
+  "validations": [
+    {
+      "company": "DOMUS",
+      "mode": "a-pagar",
+      "year": "2026",
+      "month": "05",
+      "expected": 519504.68,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/05/2026"
+    }
+  ]
+}

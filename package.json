@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start -p ${PORT:-5000} -H 0.0.0.0",
     "db:migrate": "node scripts/migrate.js",
+    "check": "node scripts/check-validations.js",
     "lint": "next lint"
   },
   "dependencies": {
