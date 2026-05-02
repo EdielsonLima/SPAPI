@@ -812,14 +812,87 @@ export function ExecutiveDashboard() {
   const itemsAtrasadas = useMemo(() =>
     consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentItems, todayStr]);
 
+  // Synthesize bank movements as outcome items with op type "Movimento
+  // Bancário", mirroring the standalone Contas Pagas page. This lets bank
+  // movements flow through the same filter chain (selectedDocTypes,
+  // selectedCompanies, etc.) so the Painel matches the standalone exactly.
+  const bankMovementsAsItems = useMemo(() => {
+    if (allBankMovements.length === 0) return [] as SiengeOutcome[];
+    const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
+    return allBankMovements
+      .filter(bm => {
+        if (bm.bankMovementAmount === 0) return false;
+        const historic = (bm.bankMovementHistoricName || "").toLowerCase();
+        if (incomePatterns.some(p => historic.includes(p))) return false;
+        const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+        if (incomePatterns.some(p => catNames.includes(p))) return false;
+        return true;
+      })
+      .map(bm => ({
+        billId: bm.billId || bm.bankMovementId,
+        installmentId: 1,
+        companyId: bm.companyId,
+        companyName: bm.companyName,
+        creditorId: 0,
+        creditorName: bm.bankMovementHistoricName || "Tarifa Bancária",
+        documentIdentificationId: bm.documentIdentificationId || "MB",
+        documentIdentificationName: bm.documentIdentificationName || "MOV. BANCÁRIO",
+        documentNumber: "",
+        consistencyStatus: "S",
+        originId: "BM",
+        originalAmount: Math.abs(bm.bankMovementAmount),
+        discountAmount: 0,
+        taxAmount: 0,
+        dueDate: bm.bankMovementDate,
+        issueDate: bm.billDate || bm.bankMovementDate,
+        balanceAmount: 0,
+        correctedBalanceAmount: 0,
+        forecastDocument: "N",
+        authorizationStatus: "",
+        billDate: bm.billDate || bm.bankMovementDate,
+        registeredBy: "",
+        registeredDate: "",
+        paymentsCategories: (bm.financialCategories || []).map(fc => ({
+          costCenterId: fc.costCenterId,
+          costCenterName: fc.costCenterName,
+          financialCategoryId: fc.financialCategoryId,
+          financialCategoryName: fc.financialCategoryName,
+          financialCategoryRate: fc.financialCategoryRate,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        })) as any,
+        payments: [{
+          operationTypeId: 0,
+          operationTypeName: "Movimento Bancário",
+          netAmount: Math.abs(bm.bankMovementAmount),
+          grossAmount: Math.abs(bm.bankMovementAmount),
+          paymentDate: bm.bankMovementDate,
+          taxAmount: 0,
+          monetaryCorrectionAmount: 0,
+          interestAmount: 0,
+          fineAmount: 0,
+          discountAmount: 0,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        }] as any,
+        buildingsCosts: [],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any as SiengeOutcome));
+  }, [allBankMovements]);
+
+  // For Pagas computations, include synthesized bank movements alongside
+  // outcome items so they flow through all the same filters.
+  const consistentItemsForPagas = useMemo(
+    () => [...consistentItems, ...bankMovementsAsItems],
+    [consistentItems, bankMovementsAsItems]
+  );
+
   const itemsPagas = useMemo(() =>
-    consistentItems.filter(i =>
+    consistentItemsForPagas.filter(i =>
       (i.payments || []).some(p =>
         p.netAmount > 0 &&
         (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
         p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
       )
-    ), [consistentItems, selectedOpTypes, selectedYears]);
+    ), [consistentItemsForPagas, selectedOpTypes, selectedYears]);
 
   // === CR Filtered item sets ===
   const itemsAReceber = useMemo(() =>
@@ -1103,8 +1176,10 @@ export function ExecutiveDashboard() {
   const totalAtrasado = useMemo(() =>
     filteredAtrasadas.reduce((s, i) => s + effectiveAmount(i), 0), [filteredAtrasadas]);
 
+  // bank movements now flow into filteredPagas via bankMovementsAsItems —
+  // no need to add totalBankFees separately
   const totalPago = useMemo(() =>
-    filteredPagas.reduce((s, i) => s + paidSum(i), 0) + totalBankFees, [filteredPagas, paidSum, totalBankFees]);
+    filteredPagas.reduce((s, i) => s + paidSum(i), 0), [filteredPagas, paidSum]);
 
   const previsaoHoje = useMemo(() => {
     const todayStr = new Date().toISOString().split("T")[0];
@@ -1258,15 +1333,7 @@ export function ExecutiveDashboard() {
         map.set(item.companyName, (map.get(item.companyName) || 0) + val);
       }
     });
-    // Adiciona tarifas bancárias ao gráfico de empresas
-    if (field === "paid") {
-      filteredBankFees.forEach(bm => {
-        const amt = Math.abs(bm.bankMovementAmount);
-        if (amt > 0) {
-          map.set(bm.companyName, (map.get(bm.companyName) || 0) + amt);
-        }
-      });
-    }
+    // Bank movements are already part of filteredPagas via bankMovementsAsItems
     return Array.from(map.entries())
       .map(([name, value]) => ({
         name: name.length > 20 ? name.substring(0, 20) + "..." : name,
@@ -1292,11 +1359,7 @@ export function ExecutiveDashboard() {
             monthTotals.set(m, (monthTotals.get(m) || 0) + p.netAmount);
           });
       });
-      // Adiciona tarifas bancárias por mês
-      filteredBankFees.forEach(bm => {
-        const m = new Date(bm.bankMovementDate + "T00:00:00").getMonth();
-        monthTotals.set(m, (monthTotals.get(m) || 0) + Math.abs(bm.bankMovementAmount));
-      });
+      // Bank movements are already part of filteredPagas via bankMovementsAsItems
       return MONTH_LABELS.map((label, idx) => {
         const value = monthTotals.get(idx) || 0;
         if (value === 0 && idx > currentMonth) return null; // Não mostra meses futuros sem dados
@@ -1356,12 +1419,7 @@ export function ExecutiveDashboard() {
             dayTotals.set(d, (dayTotals.get(d) || 0) + p.netAmount);
           });
       });
-      filteredBankFees.forEach(bm => {
-        if (bm.bankMovementDate && bm.bankMovementDate.startsWith(`${yearStr}-${monthStr}`)) {
-          const d = Number(bm.bankMovementDate.substring(8, 10));
-          dayTotals.set(d, (dayTotals.get(d) || 0) + Math.abs(bm.bankMovementAmount));
-        }
-      });
+      // Bank movements are already part of filteredItems via bankMovementsAsItems
     } else if (field === "received") {
       filteredItems.forEach(item => {
         (item.payments || [])
@@ -1405,11 +1463,7 @@ export function ExecutiveDashboard() {
             yearMap.set(y, (yearMap.get(y) || 0) + p.netAmount);
           });
       });
-      // Adiciona tarifas bancárias por ano
-      filteredBankFees.forEach(bm => {
-        const y = new Date(bm.bankMovementDate + "T00:00:00").getFullYear();
-        yearMap.set(y, (yearMap.get(y) || 0) + Math.abs(bm.bankMovementAmount));
-      });
+      // Bank movements are already part of filteredItems via bankMovementsAsItems
       return Array.from(yearMap.entries())
         .sort((a, b) => a[0] - b[0])
         .map(([year, value]) => ({ month: String(year), value }));
@@ -1593,7 +1647,11 @@ export function ExecutiveDashboard() {
       {
         label: "Total Pago",
         value: formatCurrency(totalPago),
-        subtitle: `${filteredPagas.length} titulos${totalBankFees > 0 ? ` + ${filteredBankFees.length} tarifas` : ""}`,
+        subtitle: (() => {
+          const tarifas = filteredPagas.filter(i => i.originId === "BM").length;
+          const titulos = filteredPagas.length - tarifas;
+          return tarifas > 0 ? `${titulos} titulos + ${tarifas} tarifas` : `${titulos} titulos`;
+        })(),
         icon: <CheckCircle className="h-7 w-7 text-emerald-500" />,
         iconBg: "bg-emerald-50",
         gradient: "from-emerald-500 to-emerald-600",
