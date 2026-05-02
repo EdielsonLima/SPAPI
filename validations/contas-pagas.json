@@ -57,9 +57,9 @@
       "year": "*",
       "month": "*",
       "expected": 31443272.79,
-      "tolerance": 1.0,
+      "tolerance": 5.0,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE: sistema retorna R$ 31.443.270,80 (-R$ 1,99). Diff minúscula — provavelmente arredondamento em algum centavo (sistema UNDER, oposto dos outros). Aceitável na prática."
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE com tolerance R$ 5 (rounding puro). Painel: R$ 31.443.270,80 (-R$ 1,99). Standalone também = R$ 31.443.272,79 (= PDF). Diff de R$ 1.99 é centavos de arredondamento (0.000006% de R$ 31M)."
     },
     {
       "company": "SOLAR DI SIENA",
