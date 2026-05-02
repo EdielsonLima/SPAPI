@@ -456,6 +456,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
               "rendimento", "aplicação", "aplicacao", "resgate",
               "transferência", "transferencia", "saque", "depósito", "deposito",
               "estorno", // reversals are not real expenses
+              "recebimento", // incoming money, not a payment
             ];
             const bmAsItems: ContasItem[] = bankMovements
               .filter(bm => {

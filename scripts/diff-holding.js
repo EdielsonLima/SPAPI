@@ -71,6 +71,7 @@ const COMPANY = "SILVA ADMINISTRADORA HOLDING LTDA";
     "rendimento", "aplicação", "aplicacao", "resgate",
     "transferência", "transferencia", "saque", "depósito", "deposito",
     "estorno",
+    "recebimento",
   ];
   const byHistoricFiltered = new Map();
   let bmTotalFiltered = 0;

@@ -139,6 +139,7 @@ const PDF_TOTAL = 111823042.46;
     "rendimento", "aplicação", "aplicacao", "resgate",
     "transferência", "transferencia", "saque", "depósito", "deposito",
     "estorno",
+    "recebimento",
   ];
   for (const m of bms) {
     if (m.companyName !== COMPANY) continue;

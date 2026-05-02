@@ -823,6 +823,7 @@ export function ExecutiveDashboard() {
       "rendimento", "aplicação", "aplicacao", "resgate",
       "transferência", "transferencia", "saque", "depósito", "deposito",
       "estorno", // reversals are not real expenses
+      "recebimento", // incoming money, not a payment
     ];
     return allBankMovements
       .filter(bm => {
