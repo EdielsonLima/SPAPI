@@ -79,7 +79,7 @@
       "expected": 48694258.85,
       "tolerance": 1.0,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: sistema R$ 49.679.433,30 (+R$ 985.174,45). Causa: PDF tem Valor baixa R$ 50.033.702,33 - Desconto R$ 371.022,77 = R$ 49.676.688,87, mas Líquido = R$ 48.694.258,85 (R$ 982k a menos sem aparecer no Desconto). Sienge aplica reduções ocultas na coluna Líquido que não são expostas pela API /outcome. Investigar credor por credor para identificar as reduções."
+      "source": "Sienge Contas Pagas Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). Confirmado: relatórios (por Credor) e (por Data) retornam o mesmo Líquido R$ 48.694.258,85 — tarifas incluídas em ambos. NÃO BATE: sistema R$ 49.679.433,30 (+R$ 985.174,45). Causa real: aritmética do PDF tem Valor 50.033.702,33 + Acréscimo 14.009,31 - Desconto 371.022,77 = R$ 49.676.688,87, mas Líquido mostrado = R$ 48.694.258,85. Sienge aplica R$ 982k de reduções ocultas na coluna Líquido que não aparecem em Desconto e não são expostas pela API /outcome. Para identificar: comparar credor por credor no PDF onde Valor baixa - Desconto != Líquido."
     },
     {
       "company": "GALPÃO - RUA CANELINHA PROJ: 120/15",
