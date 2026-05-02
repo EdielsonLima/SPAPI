@@ -19,7 +19,7 @@ const fmt = v => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, max
 
 // Tipos de operação que dobram contagem ou são reversões — mesma lista
 // aplicada como default em executive-dashboard.tsx e contas-table.tsx.
-const EXCLUDED_OP = ["substitui", "cancelamento", "estorno"];
+const EXCLUDED_OP = ["substitui", "cancelamento", "estorno", "abatimento"];
 function isExcludedOp(name) {
   const lower = (name || "").toLowerCase();
   return EXCLUDED_OP.some(x => lower.includes(x));

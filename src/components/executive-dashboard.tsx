@@ -725,7 +725,7 @@ export function ExecutiveDashboard() {
       setOpTypesInitialized(true);
       return;
     }
-    const EXCLUDED = ["substitui", "cancelamento", "estorno"];
+    const EXCLUDED = ["substitui", "cancelamento", "estorno", "abatimento"];
     const initial = allOpTypes.filter(op => {
       const lower = op.toLowerCase();
       return !EXCLUDED.some(x => lower.includes(x));
@@ -753,7 +753,7 @@ export function ExecutiveDashboard() {
       try { setSelectedOpTypes(new Set(JSON.parse(saved))); return; } catch { /* ignore */ }
     }
     // No save: emulate standalone's auto-default
-    const EXCLUDED = ["substitui", "cancelamento", "estorno"];
+    const EXCLUDED = ["substitui", "cancelamento", "estorno", "abatimento"];
     const initial = allOpTypes.filter(op => {
       const lower = op.toLowerCase();
       return !EXCLUDED.some(x => lower.includes(x));

@@ -29,7 +29,7 @@ const COMPANY = "SILVA ADMINISTRADORA HOLDING LTDA";
   console.log(`Empresa: ${COMPANY}\n`);
 
   // Outcome breakdown by op type
-  const EXCLUDED_OP = ["substitui", "cancelamento", "estorno"];
+  const EXCLUDED_OP = ["substitui", "cancelamento", "estorno", "abatimento"];
   const byOp = new Map();
   let outcomeTotal = 0;
   for (const item of items) {

@@ -117,7 +117,7 @@ const PDF_TOTAL = 111823042.46;
   const bm = await pool.query("SELECT data FROM cached_bank_movements ORDER BY cached_at DESC LIMIT 1");
   const bms = bm.rows[0]?.data?.data || bm.rows[0]?.data || [];
 
-  const EXCLUDED_OP = ["substitui", "cancelamento", "estorno"];
+  const EXCLUDED_OP = ["substitui", "cancelamento", "estorno", "abatimento"];
   const COMPANY = "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA";
 
   // Aggregate cache per-credor (outcome payments)

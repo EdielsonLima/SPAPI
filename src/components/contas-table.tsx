@@ -695,7 +695,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         // entries (Substituição replaces a prior payment, Cancelamento and
         // Estorno are reversals). Real cash flows like Pagamento, Adiantamento,
         // Por Bens, Devolução, Abatimento ARE included by default.
-        const DEFAULT_EXCLUDED = ["substitui", "cancelamento", "estorno"];
+        // Abatimento entries have Líquido = 0 in Sienge (accounting marker
+        // only, no real cash movement) so they should be excluded too.
+        const DEFAULT_EXCLUDED = ["substitui", "cancelamento", "estorno", "abatimento"];
         const initial = tiposBaixa.filter(op => {
           const lower = op.toLowerCase();
           return !DEFAULT_EXCLUDED.some(x => lower.includes(x));
