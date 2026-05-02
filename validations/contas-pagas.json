@@ -97,9 +97,9 @@
       "year": "*",
       "month": "*",
       "expected": 14950266.42,
-      "tolerance": 1.0,
+      "tolerance": 0.5,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE em nenhuma das views após fix: Painel (7 op types) R$ 16.363.681,91 (+R$ 1.413.415,49), standalone (11 op types) R$ 13.446.208,97 (-R$ 1.504.057,45). PDF está entre os dois — nem standalone nem Painel batem. Causa: HOLDING é empresa admin/holding com alto volume de movimentos bancários. Filtro 'taxa banc' do Painel (217 tarifas) captura mais que Sienge considera 'Tarifas ref. cobrança escritural'. Standalone também tem filtro inadequado para essa empresa específica. Resolução exige refinamento de filtros bank-fee para empresas admin."
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE 100% (R$ 14.950.266,42 = PDF). Diff caiu de R$ 1,4M para R$ 0 após série de fixes: (1) BMs sintetizados como op type 'Movimento Bancário', (2) exclusão de transferência/saque/depósito/estorno/recebimento por historic name, (3) abatimento adicionado aos op types excluídos por default."
     },
     {
       "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
