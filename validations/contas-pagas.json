@@ -109,7 +109,7 @@
       "expected": 84020589.96,
       "tolerance": 1.0,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE com fix per-company só-saved: standalone (8 op types) R$ 84.039.357,75 (+R$ 18.767,79), Painel (2 op types) R$ 84.005.075,87 (-R$ 15.514,09). Após commit 56f7df8 (Painel emula auto-default da standalone), ambos devem convergir para R$ 84.039.357,75. Diff residual de R$ 18.767,79 vs PDF é Sienge hidden reduction (0,02%)."
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). Após fix 56f7df8: Painel (7 op types) R$ 84.012.994,75 (-R$ 7.595,21), standalone (8 op types) R$ 84.039.357,75 (+R$ 18.767,79). Painel está com 1 op type a menos que standalone porque allOpTypes do Painel é global (todas empresas) e pode estar perdendo um tipo que só existe em SUL BRASIL. Diff Painel vs PDF é 0,009%."
     },
     {
       "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
