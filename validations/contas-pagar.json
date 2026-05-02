@@ -80,6 +80,16 @@
       "tolerance": 0.5,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (sem parcelas a vencer)"
+    },
+    {
+      "company": "EDIFICIO 135 JARDINS",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 3856768.56,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
     }
   ]
 }
