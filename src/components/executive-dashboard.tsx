@@ -681,7 +681,10 @@ export function ExecutiveDashboard() {
   }, []);
 
   // Valor efetivo: saldo corrigido menos impostos retidos (para bater com relatório Sienge)
-  const effectiveAmount = (i: SiengeOutcome | SiengeIncome) => i.correctedBalanceAmount - (i.taxAmount || 0);
+  // Saldo efetivo a pagar = balance - desconto financeiro - imposto retido (ISS/INSS)
+  // Mesma fórmula da página Contas a Pagar (validada contra Sienge "por Credor Sintético")
+  const effectiveAmount = (i: SiengeOutcome | SiengeIncome) =>
+    (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
 
   // Soma de pagamentos filtrada por tipo de operação e ano do pagamento
   const paidSum = useCallback((i: SiengeOutcome | SiengeIncome) =>
