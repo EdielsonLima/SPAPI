@@ -735,9 +735,13 @@ export function ExecutiveDashboard() {
   }, [allOpTypes, opTypesInitialized]);
 
   // When exactly 1 company is selected, sync selectedOpTypes with the
-  // per-company filter saved by the standalone Contas Pagas page so that
-  // both views produce the same totals. Falls back to the global default
-  // when 0 or 2+ companies are selected.
+  // standalone Contas Pagas page logic:
+  // 1. If user has saved a per-company filter, use that (explicit override)
+  // 2. Else, fall back to "all op types except Substituição/Cancelamento/Estorno"
+  //    (mirrors the standalone's auto-default when no save exists)
+  // This ensures Painel and standalone show the same totals when filtered by
+  // the same single company, regardless of whether the user has saved a
+  // custom filter for it.
   useEffect(() => {
     if (typeof window === "undefined") return;
     if (allOpTypes.length === 0) return;
@@ -746,8 +750,15 @@ export function ExecutiveDashboard() {
     const perCompanyKey = `contas_outcome_pagas_default_tipoBaixa_${empresaKey}`;
     const saved = localStorage.getItem(perCompanyKey);
     if (saved) {
-      try { setSelectedOpTypes(new Set(JSON.parse(saved))); } catch { /* ignore */ }
+      try { setSelectedOpTypes(new Set(JSON.parse(saved))); return; } catch { /* ignore */ }
     }
+    // No save: emulate standalone's auto-default
+    const EXCLUDED = ["substitui", "cancelamento", "estorno"];
+    const initial = allOpTypes.filter(op => {
+      const lower = op.toLowerCase();
+      return !EXCLUDED.some(x => lower.includes(x));
+    });
+    setSelectedOpTypes(new Set(initial));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCompanies, allOpTypes.length]);
 
