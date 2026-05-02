@@ -47,6 +47,7 @@ import {
   Users,
 } from "lucide-react";
 import { SiengeOutcome, SiengeIncome, SiengeBankMovement } from "@/types/sienge";
+import { getEstornoPairs } from "@/lib/dashboard-utils";
 import { toast } from "sonner";
 
 type ContasItem = SiengeOutcome | SiengeIncome;
@@ -128,6 +129,9 @@ function latestPaymentDate(item: ContasItem, yearFilter?: Set<string>, monthFilt
 // netAmount from API already equals Valor baixa - Desconto (líquido)
 // taxAmount is imposto retido and should NOT be subtracted
 // allowedOpTypes: when set, only includes payments with matching operationTypeName
+// 2026-05-02: pareamento Adiantamento+Estorno adicionado — Sienge cancela
+// pares (mesma data, valores opostos) do Líquido total. Sem isto, o Estorno
+// é filtrado por allowedOpTypes mas o Adiantamento positivo continua somado.
 function paidTotal(item: ContasItem, yearFilter?: Set<string>, monthFilter?: string, allowedOpTypes?: Set<string>): number {
   const matchesPeriod = (paymentDate: string) => {
     if (yearFilter && yearFilter.size > 0 && !yearFilter.has(paymentDate.substring(0, 4))) return false;
@@ -136,8 +140,11 @@ function paidTotal(item: ContasItem, yearFilter?: Set<string>, monthFilter?: str
   };
   const hasFilter = (yearFilter && yearFilter.size > 0) || (monthFilter && monthFilter !== "all");
 
-  const payments = (item.payments || [])
+  const allPayments = item.payments || [];
+  const canceled = getEstornoPairs(allPayments);
+  const payments = allPayments
     .filter(p => {
+      if (canceled.has(p)) return false;
       if (p.netAmount === 0) return false;
       if (hasFilter && !(p.paymentDate && matchesPeriod(p.paymentDate))) return false;
       if (allowedOpTypes && allowedOpTypes.size > 0 && !(p.operationTypeName && allowedOpTypes.has(p.operationTypeName))) return false;

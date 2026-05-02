@@ -57,7 +57,7 @@ import {
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } from "@/types/sienge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
-import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS } from "@/lib/dashboard-utils";
+import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs } from "@/lib/dashboard-utils";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
@@ -680,15 +680,21 @@ export function ExecutiveDashboard() {
   const effectiveAmount = (i: SiengeOutcome | SiengeIncome) =>
     (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
 
-  // Soma de pagamentos filtrada por tipo de operação e ano do pagamento
-  const paidSum = useCallback((i: SiengeOutcome | SiengeIncome) =>
-    (i.payments || [])
+  // Soma de pagamentos filtrada por tipo de operação e ano do pagamento.
+  // Pareia Adiantamento+Estorno (mesma data, valores opostos) e exclui ambos —
+  // Sienge cancela esses pares do Líquido. Sem pareamento, EXCLUDED_OP filtra
+  // o Estorno mas deixa o Adiantamento, gerando over-count.
+  const paidSum = useCallback((i: SiengeOutcome | SiengeIncome) => {
+    const payments = i.payments || [];
+    const canceled = getEstornoPairs(payments);
+    return payments
       .filter(p =>
+        !canceled.has(p) &&
         (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
         p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
       )
-      .reduce((s, p) => s + p.netAmount, 0),
-    [selectedOpTypes, selectedYears]);
+      .reduce((s, p) => s + p.netAmount, 0);
+  }, [selectedOpTypes, selectedYears]);
 
   // Soma de recebimentos filtrada apenas por ano (opType do CP não se aplica ao CR)
   const receivedSum = useCallback((i: SiengeIncome) =>
@@ -1211,14 +1217,17 @@ export function ExecutiveDashboard() {
   // Pagamentos realizados hoje
   const pagoHoje = useMemo(() => {
     const hoje = new Date().toISOString().split("T")[0];
-    return filteredPagas.reduce((s, i) =>
-      s + (i.payments || [])
+    return filteredPagas.reduce((s, i) => {
+      const payments = i.payments || [];
+      const canceled = getEstornoPairs(payments);
+      return s + payments
         .filter(p =>
+          !canceled.has(p) &&
           p.paymentDate === hoje &&
           (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName))
         )
-        .reduce((ps, p) => ps + p.netAmount, 0)
-    , 0);
+        .reduce((ps, p) => ps + p.netAmount, 0);
+    }, 0);
   }, [filteredPagas, selectedOpTypes]);
 
   // Pagamentos realizados nos últimos 7 dias
@@ -1228,14 +1237,17 @@ export function ExecutiveDashboard() {
     d7.setDate(d7.getDate() - 7);
     const d7Str = d7.toISOString().split("T")[0];
     const hojeStr = hoje.toISOString().split("T")[0];
-    return filteredPagas.reduce((s, i) =>
-      s + (i.payments || [])
+    return filteredPagas.reduce((s, i) => {
+      const payments = i.payments || [];
+      const canceled = getEstornoPairs(payments);
+      return s + payments
         .filter(p =>
+          !canceled.has(p) &&
           p.paymentDate && p.paymentDate >= d7Str && p.paymentDate <= hojeStr &&
           (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName))
         )
-        .reduce((ps, p) => ps + p.netAmount, 0)
-    , 0);
+        .reduce((ps, p) => ps + p.netAmount, 0);
+    }, 0);
   }, [filteredPagas, selectedOpTypes]);
 
   const trends = { pagoDelta: null as number | null, aPagarDelta: null as number | null };
@@ -1342,8 +1354,11 @@ export function ExecutiveDashboard() {
       // Agrupa pagamentos por paymentDate (data real do pagamento), filtrando pelo ano selecionado
       const monthTotals = new Map<number, number>();
       filteredItems.forEach(item => {
-        (item.payments || [])
+        const payments = item.payments || [];
+        const canceled = getEstornoPairs(payments);
+        payments
           .filter(p =>
+            !canceled.has(p) &&
             (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
             p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
           )
@@ -5117,7 +5132,10 @@ export function ExecutiveDashboard() {
           // Always exclude previsão documents
           const docName = (item.documentIdentificationName || "").toUpperCase();
           if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
-          (item.payments || []).forEach(p => {
+          const payments = item.payments || [];
+          const canceled = getEstornoPairs(payments);
+          payments.forEach(p => {
+            if (canceled.has(p)) return;
             if (p.netAmount !== 0 && p.paymentDate) {
               // Apply year filter
               if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;

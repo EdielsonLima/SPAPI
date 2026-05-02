@@ -25,6 +25,27 @@ function isExcludedOp(name) {
   return EXCLUDED_OP.some(x => lower.includes(x));
 }
 
+// Pareia Adiantamento+Estorno (mesma data, netAmount oposto) no mesmo item.
+// Sienge "Contas Pagas Sintético" cancela ambos do Líquido. Sem o pareamento,
+// EXCLUDED_OP filtra o Estorno mas deixa o Adiantamento contado.
+function getEstornoPairs(payments) {
+  const canceled = new Set();
+  const estornos = payments.filter(p => (p.operationTypeName || "").toLowerCase().includes("estorno"));
+  for (const e of estornos) {
+    const orig = payments.find(p =>
+      p !== e &&
+      p.paymentDate === e.paymentDate &&
+      Math.abs((p.netAmount || 0) + (e.netAmount || 0)) < 0.01 &&
+      !canceled.has(p)
+    );
+    if (orig) {
+      canceled.add(orig);
+      canceled.add(e);
+    }
+  }
+  return canceled;
+}
+
 // Total a Pagar para uma empresa, opcionalmente filtrando por ano/mês.
 // year/month em null/undefined/"*" significam "qualquer".
 // Mesma fórmula usada na UI: effectiveAmount = corrected - discount - tax.
@@ -57,7 +78,10 @@ function computePagas(items, bankMovements, company, year, month) {
     if (item.companyName !== company) continue;
     const docName = (item.documentIdentificationName || "").toUpperCase();
     if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) continue;
-    for (const p of (item.payments || [])) {
+    const payments = item.payments || [];
+    const canceled = getEstornoPairs(payments);
+    for (const p of payments) {
+      if (canceled.has(p)) continue;
       if (p.netAmount === 0) continue;
       if (!p.paymentDate) continue;
       if (yearFilter && !p.paymentDate.startsWith(yearFilter)) continue;

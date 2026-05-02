@@ -17,7 +17,10 @@ const fmt = v => `R$ ${(v || 0).toLocaleString("pt-BR", { minimumFractionDigits:
 
 const COMPANY = "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA";
 const YEAR = "2024";
-const EXCLUDED_OP = ["substitui", "cancelamento", "estorno", "abatimento"];
+// Inclui "por bens" pois SILVA PACKER usa "por Credor" report que exclui Por Bens.
+// Simula o filtro per-empresa salvo via standalone Contas Pagas.
+const EXCLUDED_OP = ["substitui", "cancelamento", "estorno", "abatimento", "por bens"];
+const PDF_TOTAL_2024 = 8473580.88;
 const EXCLUDE_HISTORIC_PATTERNS = [
   "rendimento", "aplicação", "aplicacao", "resgate",
   "transferência", "transferencia", "saque", "depósito", "deposito",
@@ -41,7 +44,25 @@ const EXCLUDE_HISTORIC_PATTERNS = [
     const docName = (item.documentIdentificationName || "").toUpperCase();
     if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) continue;
 
-    for (const p of (item.payments || [])) {
+    // Detect Adiantamento+Estorno pairs in the same item: same date, opposite
+    // values. Sienge cancels these from the Líquido total — we must too,
+    // otherwise the Adiantamento side gets counted while the Estorno is
+    // filtered out by EXCLUDED_OP (net result: +1× the value).
+    const estornados = new Set();
+    const payments = item.payments || [];
+    const estornos = payments.filter(p => (p.operationTypeName || "").toLowerCase().includes("estorno"));
+    for (const e of estornos) {
+      const orig = payments.find(p =>
+        p !== e &&
+        p.paymentDate === e.paymentDate &&
+        Math.abs((p.netAmount || 0) + (e.netAmount || 0)) < 0.01 &&
+        !estornados.has(p)
+      );
+      if (orig) estornados.add(orig);
+    }
+
+    for (const p of payments) {
+      if (estornados.has(p)) continue;
       if (p.netAmount === 0) continue;
       if (!p.paymentDate || !p.paymentDate.startsWith(YEAR)) continue;
       if (EXCLUDED_OP.some(x => (p.operationTypeName || "").toLowerCase().includes(x))) continue;
@@ -82,7 +103,10 @@ const EXCLUDE_HISTORIC_PATTERNS = [
   }
 
   console.log(`SILVA PACKER ${YEAR}`);
-  console.log(`Cache total: ${fmt(total)} (${countPayments} payments outcome + ${perCredor.size} credores total, BMs ${fmt(bmTotal)})\n`);
+  console.log(`Cache total (sim. filtro per-empresa s/ Por Bens): ${fmt(total)}`);
+  console.log(`PDF Sienge 2024:                                  ${fmt(PDF_TOTAL_2024)}`);
+  console.log(`Diff (cache - PDF):                               ${fmt(total - PDF_TOTAL_2024)}`);
+  console.log(`(${countPayments} payments outcome + BMs ${fmt(bmTotal)})\n`);
 
   // Sort credors by total desc
   const sorted = Array.from(perCredor.entries())
