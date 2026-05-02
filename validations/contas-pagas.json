@@ -87,9 +87,9 @@
       "year": "*",
       "month": "*",
       "expected": 1125981.75,
-      "tolerance": 1.0,
+      "tolerance": 0.5,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE: sistema retorna R$ 1.844.301,75 (+R$ 718.320,00). Causa: GIACOMOSSI ESTRUTURAS EIRELI tem Valor baixa R$ 1.448.320 vs Líquido R$ 718.322 no PDF — R$ 729.997,89 de ajuste oculto no Sienge não exposto pela API (provável write-off ou redução contratual). Investigar este credor no Sienge admin."
+      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. BATE 100% após fix do Painel Executivo ler filtro per-company da standalone (3 op types selecionados na standalone GALPÃO)."
     },
     {
       "company": "SILVA ADMINISTRADORA HOLDING LTDA",
