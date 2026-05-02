@@ -334,7 +334,8 @@ export function ExecutiveDashboard() {
     return new Set();
   });
   const [opTypesInitialized, setOpTypesInitialized] = useState(false);
-  const [bankFees, setBankFees] = useState<SiengeBankMovement[]>([]);
+  // Note: bankFees state was removed — bank movements are now synthesized as
+  // outcome items via bankMovementsAsItems memo and flow through filteredPagas
   const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>([]);
   const [allBankMovementsFull, setAllBankMovementsFull] = useState<SiengeBankMovement[]>([]);
   const [bankAccounts, setBankAccounts] = useState<{ bankAccountId: number; bankAccountDescription: string; bankCode: string; bankName: string; agencyNumber: string; accountNumber: string; companyId: number; companyName: string; currentBalance: number; isInDimBanco?: boolean }[]>([]);
@@ -449,23 +450,6 @@ export function ExecutiveDashboard() {
         const bmData = await bmRes.json();
         const allBm: SiengeBankMovement[] = bmData.data || [];
         setAllBankMovements(allBm);
-        // Narrow filter: only bank movements explicitly classified as bank
-        // fees (financialCategoryName contains "taxa" AND "banc"). The earlier
-        // attempt to broaden this to match the standalone Contas Pagas page
-        // (all detached movements minus rendimento/aplicação/resgate) caused
-        // massive over-counting in the Painel because the standalone also
-        // filters bank movements by Tipo Documento / Plano Financeiro /
-        // Item Orçamento — filters not currently applied to bankFees here.
-        // To fully align would require applying the full filter chain to
-        // bank movements, which is a bigger refactor. For now, keep the
-        // narrow filter so the Painel doesn't over-count.
-        const fees = allBm.filter(bm =>
-          (bm.financialCategories || []).some(fc =>
-            fc.financialCategoryName?.toLowerCase().includes("taxa") &&
-            fc.financialCategoryName?.toLowerCase().includes("banc")
-          )
-        );
-        setBankFees(fees);
       }
 
       // Fetch ALL bank movements (including linked to outcomes/incomes) for DRE Level 3 enrichment
@@ -1155,20 +1139,6 @@ export function ExecutiveDashboard() {
   }, [filteredAtrasadas, overdueSort]);
 
   // Tarifas bancárias filtradas por ano e empresa selecionados
-  const filteredBankFees = useMemo(() => {
-    let result = bankFees.filter(bm =>
-      bm.bankMovementDate && selectedYears.has(bm.bankMovementDate.substring(0, 4))
-    );
-    if (selectedCompanies.size > 0) {
-      result = result.filter(bm => selectedCompanies.has(bm.companyName));
-    }
-    return result;
-  }, [bankFees, selectedYears, selectedCompanies]);
-
-  const totalBankFees = useMemo(() =>
-    filteredBankFees.reduce((s, bm) => s + Math.abs(bm.bankMovementAmount), 0),
-    [filteredBankFees]);
-
   // === KPIs (use filtered data) ===
   const totalAPagar = useMemo(() =>
     filteredAPagar.reduce((s, i) => s + effectiveAmount(i), 0), [filteredAPagar]);
@@ -1554,7 +1524,7 @@ export function ExecutiveDashboard() {
       };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, items, incomeItems, todayStr, selectedCompanies, selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes, filteredBankFees]);
+  }, [activeTab, items, incomeItems, todayStr, selectedCompanies, selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes]);
 
   // === Loading State ===
   if (loading) {
