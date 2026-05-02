@@ -70,6 +70,26 @@
       "tolerance": 0.5,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026 (Total geral)"
+    },
+    {
+      "company": "TESLA RESIDENCIAL",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 48694258.85,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: sistema R$ 49.679.433,30 (+R$ 985.174,45). Causa: PDF tem Valor baixa R$ 50.033.702,33 - Desconto R$ 371.022,77 = R$ 49.676.688,87, mas Líquido = R$ 48.694.258,85 (R$ 982k a menos sem aparecer no Desconto). Sienge aplica reduções ocultas na coluna Líquido que não são expostas pela API /outcome. Investigar credor por credor para identificar as reduções."
+    },
+    {
+      "company": "GALPÃO - RUA CANELINHA PROJ: 120/15",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 1125981.75,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE: sistema retorna R$ 1.844.301,75 (+R$ 718.320,00). Causa: GIACOMOSSI ESTRUTURAS EIRELI tem Valor baixa R$ 1.448.320 vs Líquido R$ 718.322 no PDF — R$ 729.997,89 de ajuste oculto no Sienge não exposto pela API (provável write-off ou redução contratual). Investigar este credor no Sienge admin."
     }
   ]
 }
