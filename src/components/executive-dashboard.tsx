@@ -734,6 +734,23 @@ export function ExecutiveDashboard() {
     setOpTypesInitialized(true);
   }, [allOpTypes, opTypesInitialized]);
 
+  // When exactly 1 company is selected, sync selectedOpTypes with the
+  // per-company filter saved by the standalone Contas Pagas page so that
+  // both views produce the same totals. Falls back to the global default
+  // when 0 or 2+ companies are selected.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (allOpTypes.length === 0) return;
+    if (selectedCompanies.size !== 1) return;
+    const empresaKey = Array.from(selectedCompanies)[0];
+    const perCompanyKey = `contas_outcome_pagas_default_tipoBaixa_${empresaKey}`;
+    const saved = localStorage.getItem(perCompanyKey);
+    if (saved) {
+      try { setSelectedOpTypes(new Set(JSON.parse(saved))); } catch { /* ignore */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCompanies, allOpTypes.length]);
+
   // Números de documento disponíveis nos dados de income (CR)
   const allDocNumbers = useMemo(() => {
     const nums = new Set<string>();
