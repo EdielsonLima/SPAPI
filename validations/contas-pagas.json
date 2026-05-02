@@ -100,6 +100,16 @@
       "tolerance": 1.0,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: sistema R$ 16.363.681,91 (+R$ 1.413.415,49). Causa: HOLDING é empresa administradora com 217 tarifas no sistema vs ~140 no PDF — o filtro 'Taxa Bancária' do sistema (financialCategoryName contém 'taxa' E 'banc') captura mais movimentos do que Sienge considera 'Tarifas bancárias ref. cobrança escritural'. Diff de tarifas: R$ 1.41M. Refinar filtro de tarifas no sistema para se aproximar da definição Sienge."
+    },
+    {
+      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 84020589.96,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: sistema R$ 84.011.826,29 (-R$ 8.763,67). Diff pequena (0,01%) e na direção OPOSTA das outras — sistema UNDER o PDF. Pode ser tarifas que nosso filtro não captura ou pagamentos específicos. PDF próprio tem R$ 7.918 de redução oculta (Valor + Acréscimo - Desconto = R$ 84.028.508,84, Líquido = R$ 84.020.589,96). Diff sistema vs Líquido = R$ 8,7k."
     }
   ]
 }
