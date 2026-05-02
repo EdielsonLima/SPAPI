@@ -1,0 +1,15 @@
+{
+  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas Pagas (por Data) Sintético' com Processar parcelas: Ambos (Contas a Pagar + Caixa/Bancos) e Tarifas bancárias ref. cobrança escritural marcado. Cada entrada congela um total já conferido para detectar regressões de código. mode='pagas' filtra por paymentDate, exclui Substituição/Cancelamento/Estorno/PREVISÃO, inclui bank movements detached (exceto rendimento/aplicação/resgate). Valor esperado em reais com 2 casas decimais.",
+  "validations": [
+    {
+      "company": "DOMUS",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 7405509.48,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (Total empresa)"
+    }
+  ]
+}

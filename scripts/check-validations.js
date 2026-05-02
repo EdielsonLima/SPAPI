@@ -88,12 +88,16 @@ function computePagas(items, bankMovements, company, year, month) {
 }
 
 (async () => {
-  const file = path.join(__dirname, "..", "validations", "contas-pagar.json");
-  const cfg = JSON.parse(fs.readFileSync(file, "utf8"));
-  const validations = cfg.validations || [];
+  const validationsDir = path.join(__dirname, "..", "validations");
+  const files = fs.readdirSync(validationsDir).filter(f => f.endsWith(".json"));
+  const validations = [];
+  for (const f of files) {
+    const cfg = JSON.parse(fs.readFileSync(path.join(validationsDir, f), "utf8"));
+    (cfg.validations || []).forEach(v => validations.push(v));
+  }
 
   if (validations.length === 0) {
-    console.log("Nenhuma validação registrada em validations/contas-pagar.json");
+    console.log("Nenhuma validação registrada em validations/*.json");
     process.exit(0);
   }
 
