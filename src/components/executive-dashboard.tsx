@@ -700,14 +700,20 @@ export function ExecutiveDashboard() {
       .reduce((s, p) => s + p.netAmount, 0),
     [selectedYears]);
 
-  // Tipos de operação disponíveis nos dados
+  // Tipos de operação disponíveis nos dados.
+  // Para CP, inclui "Movimento Bancário" como op type sintético quando existem
+  // bank movements (sintetizados como outcome items). Isso alinha com o
+  // standalone Contas Pagas que sempre mostra esse op type quando há tarifas.
   const allOpTypes = useMemo(() => {
     const types = new Set<string>();
     activeItems.forEach(i =>
       (i.payments || []).forEach(p => { if (p.operationTypeName) types.add(p.operationTypeName); })
     );
+    if (section === "cp" && allBankMovements.length > 0) {
+      types.add("Movimento Bancário");
+    }
     return Array.from(types).sort();
-  }, [activeItems]);
+  }, [activeItems, allBankMovements, section]);
 
   // Initialize selectedOpTypes once data arrives. Skips Substituição,
   // Cancelamento and Estorno — these are reversal/replacement entries that
