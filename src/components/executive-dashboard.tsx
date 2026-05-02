@@ -449,12 +449,20 @@ export function ExecutiveDashboard() {
         const bmData = await bmRes.json();
         const allBm: SiengeBankMovement[] = bmData.data || [];
         setAllBankMovements(allBm);
-        const fees = allBm.filter(bm =>
-          (bm.financialCategories || []).some(fc =>
-            fc.financialCategoryName?.toLowerCase().includes("taxa") &&
-            fc.financialCategoryName?.toLowerCase().includes("banc")
-          )
-        );
+        // Match the standalone Contas Pagas page: include all detached bank
+        // movements except rendimento/aplicação/resgate (which are income).
+        // The standalone synthesizes these as parcels with op type
+        // "Movimento Bancário"; we filter the same way here so the totals
+        // match between the two views.
+        const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
+        const fees = allBm.filter(bm => {
+          if (bm.bankMovementAmount === 0) return false;
+          const historic = (bm.bankMovementHistoricName || "").toLowerCase();
+          if (incomePatterns.some(p => historic.includes(p))) return false;
+          const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+          if (incomePatterns.some(p => catNames.includes(p))) return false;
+          return true;
+        });
         setBankFees(fees);
       }
 
@@ -706,14 +714,18 @@ export function ExecutiveDashboard() {
       .reduce((s, p) => s + p.netAmount, 0),
     [selectedYears]);
 
-  // Tipos de operação disponíveis nos dados
+  // Tipos de operação disponíveis nos dados.
+  // Inclui "Movimento Bancário" como op type sintético quando há bank fees,
+  // alinhando com o standalone Contas Pagas que sintetiza tarifas como parcelas
+  // com esse op type. Permite ao usuário filtrar bank fees via Tipo Operação.
   const allOpTypes = useMemo(() => {
     const types = new Set<string>();
     activeItems.forEach(i =>
       (i.payments || []).forEach(p => { if (p.operationTypeName) types.add(p.operationTypeName); })
     );
+    if (bankFees.length > 0 && section === "cp") types.add("Movimento Bancário");
     return Array.from(types).sort();
-  }, [activeItems]);
+  }, [activeItems, bankFees, section]);
 
   // Initialize selectedOpTypes once data arrives. Skips Substituição,
   // Cancelamento and Estorno — these are reversal/replacement entries that
@@ -1073,6 +1085,12 @@ export function ExecutiveDashboard() {
 
   // Tarifas bancárias filtradas por ano e empresa selecionados
   const filteredBankFees = useMemo(() => {
+    // Mirror standalone behavior: bank movements are treated as op type
+    // "Movimento Bancário". If user has explicitly selected op types and
+    // didn't include "Movimento Bancário", exclude bank fees from totals.
+    if (selectedOpTypes.size > 0 && !selectedOpTypes.has("Movimento Bancário")) {
+      return [];
+    }
     let result = bankFees.filter(bm =>
       bm.bankMovementDate && selectedYears.has(bm.bankMovementDate.substring(0, 4))
     );
@@ -1080,7 +1098,7 @@ export function ExecutiveDashboard() {
       result = result.filter(bm => selectedCompanies.has(bm.companyName));
     }
     return result;
-  }, [bankFees, selectedYears, selectedCompanies]);
+  }, [bankFees, selectedYears, selectedCompanies, selectedOpTypes]);
 
   const totalBankFees = useMemo(() =>
     filteredBankFees.reduce((s, bm) => s + Math.abs(bm.bankMovementAmount), 0),
