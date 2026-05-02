@@ -119,7 +119,7 @@
       "expected": 111823042.46,
       "tolerance": 1.0,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: sistema R$ 108.433.700,56 (-R$ 3.389.341,90). Diff grande (3%) e na direção UNDER (sistema menor que PDF). PDF próprio tem R$ 101.940 de redução oculta. Sistema está R$ 3.39M abaixo do Líquido — possíveis causas: pagamentos não capturados pela nossa API, op types específicos incluídos no PDF mas excluídos pelo sistema, ou tarifas bancárias específicas. Requer investigação credor por credor com cache fresco."
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). Standalone (8 op types) R$ 111.913.600,30 (+R$ 90.557,84) — muito próximo do PDF. Painel (7 op types) R$ 108.396.144,64 (-R$ 3.426.897,82). Diff Painel vs Standalone = R$ 3,5M revela DIFERENÇA ESTRUTURAL: standalone inclui bank movements avulsos como op type 'Movimento Bancário' (11 tipos), Painel usa filtro 'taxa banc' separado (10 tipos globais). Standalone bate quase 100%, Painel não — Painel precisa replicar a lógica de bank-movement-as-op-type da standalone."
     },
     {
       "company": "ROZZA",
