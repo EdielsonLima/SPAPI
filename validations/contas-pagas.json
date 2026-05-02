@@ -49,7 +49,7 @@
       "expected": 26924856.29,
       "tolerance": 1.0,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE: sistema retorna R$ 26.932.055,24 (+R$ 7.198,95). Diff maior que PALACIO/SERENITY — pode ser combinação de credores com ajuste oculto. Investigar no Sienge admin: comparar credor por credor entre PDF e sistema."
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE após fix per-company: Painel R$ 26.929.830,31 (+R$ 4.974,02) e standalone R$ 26.940.281,22 (+R$ 15.424,93). Painel está MAIS próximo do PDF que standalone — situação inversa das outras. Standalone tem 8 op types selecionados vs Painel com 2. Diff R$ 4-15k provavelmente combinação de reduções ocultas Sienge + diferenças de filtro Tipo Op."
     },
     {
       "company": "SOLAR DI CAPRI",
