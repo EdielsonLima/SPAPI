@@ -110,11 +110,11 @@ function daysDiff(dateStr: string) {
   return Math.ceil((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-function latestPaymentDate(item: ContasItem, yearFilter?: string, monthFilter?: string): string {
+function latestPaymentDate(item: ContasItem, yearFilter?: Set<string>, monthFilter?: string): string {
   const dates = (item.payments || [])
     .filter(p => {
       if (!p.paymentDate || p.netAmount <= 0) return false;
-      if (yearFilter && yearFilter !== "all" && !p.paymentDate.startsWith(yearFilter)) return false;
+      if (yearFilter && yearFilter.size > 0 && !yearFilter.has(p.paymentDate.substring(0, 4))) return false;
       if (monthFilter && monthFilter !== "all" && p.paymentDate.substring(5, 7) !== monthFilter) return false;
       return true;
     })
@@ -128,13 +128,13 @@ function latestPaymentDate(item: ContasItem, yearFilter?: string, monthFilter?: 
 // netAmount from API already equals Valor baixa - Desconto (líquido)
 // taxAmount is imposto retido and should NOT be subtracted
 // allowedOpTypes: when set, only includes payments with matching operationTypeName
-function paidTotal(item: ContasItem, yearFilter?: string, monthFilter?: string, allowedOpTypes?: Set<string>): number {
+function paidTotal(item: ContasItem, yearFilter?: Set<string>, monthFilter?: string, allowedOpTypes?: Set<string>): number {
   const matchesPeriod = (paymentDate: string) => {
-    if (yearFilter && yearFilter !== "all" && !paymentDate.startsWith(yearFilter)) return false;
+    if (yearFilter && yearFilter.size > 0 && !yearFilter.has(paymentDate.substring(0, 4))) return false;
     if (monthFilter && monthFilter !== "all" && paymentDate.substring(5, 7) !== monthFilter) return false;
     return true;
   };
-  const hasFilter = (yearFilter && yearFilter !== "all") || (monthFilter && monthFilter !== "all");
+  const hasFilter = (yearFilter && yearFilter.size > 0) || (monthFilter && monthFilter !== "all");
 
   const payments = (item.payments || [])
     .filter(p => {
@@ -365,7 +365,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tipoBaixaInitialized, setTipoBaixaInitialized] = useState(false);
-  const [filterAno, setFilterAno] = useState(isOverdue ? "all" : String(currentYear));
+  const [filterAnos, setFilterAnos] = useState<Set<string>>(() =>
+    isOverdue ? new Set<string>() : new Set([String(currentYear)])
+  );
   const [filterMes, setFilterMes] = useState("all");
   const [filterDia, setFilterDia] = useState<string[]>([]);
 
@@ -728,16 +730,23 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     if (filterMes === "all") {
       return Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, "0"));
     }
-    const yr = filterAno === "all" ? currentYear : parseInt(filterAno, 10);
+    // For determining number of days, use the largest selected year (or current)
+    const yr = filterAnos.size === 0 ? currentYear : Math.max(...Array.from(filterAnos).map(y => parseInt(y, 10)));
     const lastDay = new Date(yr, parseInt(filterMes, 10), 0).getDate();
     return Array.from({ length: lastDay }, (_, i) => String(i + 1).padStart(2, "0"));
-  }, [filterMes, filterAno, currentYear]);
+  }, [filterMes, filterAnos, currentYear]);
 
   // Filter
   const filtered = useMemo(() => {
     return items.filter((item) => {
       // Exclude bills configured in Configuracoes > Exclusao de Titulos
       if (exclusionSet.size > 0 && exclusionSet.has(`${item.companyId}:${item.billId}`)) return false;
+
+      const matchesYear = (date: string | undefined) => {
+        if (filterAnos.size === 0) return true;
+        if (!date) return false;
+        return filterAnos.has(date.substring(0, 4));
+      };
 
       if (isPagas) {
         if (isIncome) {
@@ -751,10 +760,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (!hasReceipts) return false;
 
           // Filter by year
-          if (filterAno !== "all") {
-            const hasInYear = payments.some(p =>
-              p.paymentDate && p.paymentDate.startsWith(filterAno)
-            );
+          if (filterAnos.size > 0) {
+            const hasInYear = payments.some(p => matchesYear(p.paymentDate));
             if (!hasInYear) return false;
           }
 
@@ -762,16 +769,15 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (filterMes !== "all") {
             const hasInMonth = payments.some(p =>
               p.paymentDate &&
-              (filterAno === "all" || p.paymentDate.startsWith(filterAno)) &&
+              matchesYear(p.paymentDate) &&
               p.paymentDate.substring(5, 7) === filterMes
             );
             if (!hasInMonth) return false;
           }
         } else {
-          // For outcome "pagas" mode: must have payments in the selected year
+          // For outcome "pagas" mode: must have payments in the selected year(s)
           const hasPaidInYear = (item.payments || []).some(p =>
-            p.netAmount > 0 && p.paymentDate &&
-            (filterAno === "all" || p.paymentDate.startsWith(filterAno))
+            p.netAmount > 0 && p.paymentDate && matchesYear(p.paymentDate)
           );
           if (!hasPaidInYear) return false;
 
@@ -779,7 +785,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (filterMes !== "all") {
             const hasPayInMonth = (item.payments || []).some(p =>
               p.netAmount > 0 && p.paymentDate &&
-              (filterAno === "all" || p.paymentDate.startsWith(filterAno)) &&
+              matchesYear(p.paymentDate) &&
               p.paymentDate.substring(5, 7) === filterMes
             );
             if (!hasPayInMonth) return false;
@@ -794,7 +800,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         if (!isOverdue && dueDate < today) return false;
 
         // Year filter
-        if (filterAno !== "all" && item.dueDate?.substring(0, 4) !== filterAno)
+        if (filterAnos.size > 0 && !matchesYear(item.dueDate))
           return false;
 
         // Month filter
@@ -875,7 +881,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAno, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
+  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAnos, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -905,12 +911,12 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         case "financialCategory": cmp = (a.paymentsCategories?.[0]?.financialCategoryName || "").localeCompare(b.paymentsCategories?.[0]?.financialCategoryName || ""); break;
         case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
         case "balanceAmount": cmp = a.correctedBalanceAmount - b.correctedBalanceAmount; break;
-        case "paymentDate": cmp = (latestPaymentDate(a, filterAno, filterMes) || "").localeCompare(latestPaymentDate(b, filterAno, filterMes) || ""); break;
-        case "paidAmount": cmp = paidTotal(a, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined) - paidTotal(b, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined); break;
+        case "paymentDate": cmp = (latestPaymentDate(a, filterAnos, filterMes) || "").localeCompare(latestPaymentDate(b, filterAnos, filterMes) || ""); break;
+        case "paidAmount": cmp = paidTotal(a, filterAnos, filterMes, isPagas ? filterTipoBaixa : undefined) - paidTotal(b, filterAnos, filterMes, isPagas ? filterTipoBaixa : undefined); break;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [filtered, sortField, sortDir, filterAno, filterMes]);
+  }, [filtered, sortField, sortDir, filterAnos, filterMes]);
 
   // Group parcelas by billId
   const parcelasByBill = useMemo(() => {
@@ -967,8 +973,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return { count: unlinked.length, valor };
   }, [sorted, isIncome, companiesControlaOrcamento]);
   const totalPaid = useMemo(
-    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined), 0),
-    [sorted, filterAno, filterMes, filterTipoBaixa, isPagas]
+    () => sorted.reduce((sum, item) => sum + paidTotal(item, filterAnos, filterMes, isPagas ? filterTipoBaixa : undefined), 0),
+    [sorted, filterAnos, filterMes, filterTipoBaixa, isPagas]
   );
   const totalComEncargos = useMemo(
     () => isOverdue ? sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) + calcEncargos(item) - (item.discountAmount || 0) - (isIncome ? 0 : (item.taxAmount || 0)), 0) : 0,
@@ -1266,13 +1272,25 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
             <div className="flex flex-wrap items-end gap-3">
               <div className="min-w-[100px]">
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Ano</label>
-                <Select value={filterAno} onValueChange={(v) => { setFilterAno(v); setFilterMes("all"); setFilterDia([]); setPage(0); }}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    {anosDisponiveis.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <MultiSelectFilter
+                  label={filterAnos.size === 0 ? "Todos" : filterAnos.size === 1 ? Array.from(filterAnos)[0] : `${filterAnos.size} anos`}
+                  icon={<Calendar className="h-4 w-4" />}
+                  allOptions={anosDisponiveis}
+                  selected={filterAnos}
+                  onToggle={(y) => {
+                    setFilterAnos(prev => {
+                      const next = new Set(prev);
+                      if (next.has(y)) next.delete(y); else next.add(y);
+                      return next;
+                    });
+                    setFilterMes("all");
+                    setFilterDia([]);
+                    setPage(0);
+                  }}
+                  onSelectAll={() => { setFilterAnos(new Set(anosDisponiveis)); setFilterMes("all"); setFilterDia([]); setPage(0); }}
+                  onClear={() => { setFilterAnos(new Set()); setFilterMes("all"); setFilterDia([]); setPage(0); }}
+                  activeColor="violet"
+                />
               </div>
               <div className="min-w-[120px]">
                 <label className="text-xs font-medium text-slate-500 mb-1 block">Mês</label>
@@ -1615,7 +1633,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             </TableCell>
                             <TableCell className="font-mono text-sm">{formatDate(item.dueDate)}</TableCell>
                             {isPagas && (
-                              <TableCell className="font-mono text-sm text-emerald-600">{formatDate(latestPaymentDate(item, filterAno, filterMes) || item.dueDate)}</TableCell>
+                              <TableCell className="font-mono text-sm text-emerald-600">{formatDate(latestPaymentDate(item, filterAnos, filterMes) || item.dueDate)}</TableCell>
                             )}
                             {isOverdue && (
                               <TableCell>
@@ -1665,7 +1683,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             <TableCell className="text-right font-mono text-sm">{formatCurrency(item.originalAmount)}</TableCell>
                             {isPagas ? (
                               <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">
-                                {formatCurrency(paidTotal(item, filterAno, filterMes, isPagas ? filterTipoBaixa : undefined))}
+                                {formatCurrency(paidTotal(item, filterAnos, filterMes, isPagas ? filterTipoBaixa : undefined))}
                               </TableCell>
                             ) : (
                               <>
