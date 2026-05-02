@@ -120,6 +120,16 @@
       "tolerance": 1.0,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: sistema R$ 108.433.700,56 (-R$ 3.389.341,90). Diff grande (3%) e na direção UNDER (sistema menor que PDF). PDF próprio tem R$ 101.940 de redução oculta. Sistema está R$ 3.39M abaixo do Líquido — possíveis causas: pagamentos não capturados pela nossa API, op types específicos incluídos no PDF mas excluídos pelo sistema, ou tarifas bancárias específicas. Requer investigação credor por credor com cache fresco."
+    },
+    {
+      "company": "ROZZA",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 12202461.90,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE 100% após fix do Painel Executivo ler filtro per-company da standalone. ROZZA exclui Por Bens (R$ 13,5M de permutas AMORIM) via filtro salvo na standalone."
     }
   ]
 }
