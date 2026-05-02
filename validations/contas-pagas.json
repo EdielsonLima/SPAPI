@@ -130,6 +130,16 @@
       "tolerance": 0.5,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE 100% após fix do Painel Executivo ler filtro per-company da standalone. ROZZA exclui Por Bens (R$ 13,5M de permutas AMORIM) via filtro salvo na standalone."
+    },
+    {
+      "company": "EDIFICIO 135 JARDINS",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 83833653.91,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: Painel R$ 83.839.573,31 (+R$ 5.919,40), standalone idêntico (filtro per-company funcionando). PDF próprio tem R$ 43.820 de redução oculta (V+A-D = R$ 83.877.473,86 vs Líquido R$ 83.833.653,91). Sistema está entre o esperado e o Líquido — combinação de op types e reduções ocultas. Diff de 0,007% sobre R$ 83M."
     }
   ]
 }
