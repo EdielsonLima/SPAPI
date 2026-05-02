@@ -9,6 +9,7 @@
     "db:migrate": "node scripts/migrate.js",
     "check": "node scripts/check-validations.js",
     "diff:silva": "node scripts/diff-silva-packer.js",
+    "diff:holding": "node scripts/diff-holding.js",
     "lint": "next lint"
   },
   "dependencies": {

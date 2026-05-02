@@ -807,24 +807,28 @@ export function ExecutiveDashboard() {
   // movements flow through the same filter chain (selectedDocTypes,
   // selectedCompanies, etc.) so the Painel matches the standalone exactly.
   //
-  // Exclusion patterns: rendimento/aplicação/resgate (income side) AND
-  // transferência/saque/depósito (cash management — not payments to credors).
-  // Validated 2026-05-02 against Sienge "Contas Pagas (por Credor) Sintético"
-  // for SILVA PACKER: a R$ 203M "Transferência" bucket was over-counting the
-  // total — Sienge's report doesn't include these as paid bills.
+  // Exclusion is based ONLY on the bankMovementHistoricName (descriptive enough).
+  // Earlier we also checked financialCategories, but that produced false
+  // positives for HOLDING: "Retenção impostos" with category "Taxa IR da
+  // Aplicação (Banco)" was wrongly excluded because of the "aplicação" pattern,
+  // even though it's a real tax-withholding expense, not an income.
+  //
+  // Patterns excluded:
+  // - rendimento/aplicação/resgate: income side (yields and money moved into
+  //   investments)
+  // - transferência/saque/depósito: cash management (not payments to credors)
   const bankMovementsAsItems = useMemo(() => {
     if (allBankMovements.length === 0) return [] as SiengeOutcome[];
-    const EXCLUDE_PATTERNS = [
+    const EXCLUDE_HISTORIC_PATTERNS = [
       "rendimento", "aplicação", "aplicacao", "resgate",
       "transferência", "transferencia", "saque", "depósito", "deposito",
+      "estorno", // reversals are not real expenses
     ];
     return allBankMovements
       .filter(bm => {
         if (bm.bankMovementAmount === 0) return false;
         const historic = (bm.bankMovementHistoricName || "").toLowerCase();
-        if (EXCLUDE_PATTERNS.some(p => historic.includes(p))) return false;
-        const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
-        if (EXCLUDE_PATTERNS.some(p => catNames.includes(p))) return false;
+        if (EXCLUDE_HISTORIC_PATTERNS.some(p => historic.includes(p))) return false;
         return true;
       })
       .map(bm => ({

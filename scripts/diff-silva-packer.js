@@ -134,18 +134,17 @@ const PDF_TOTAL = 111823042.46;
     }
   }
   // Add bank movements as "Movimento Bancário" entries grouped by historic.
-  // Same exclusion list applied in the Painel (executive-dashboard.tsx).
-  const EXCLUDE_PATTERNS = [
+  // Same exclusion as the Painel: only checks historic name (no category check).
+  const EXCLUDE_HISTORIC_PATTERNS = [
     "rendimento", "aplicação", "aplicacao", "resgate",
     "transferência", "transferencia", "saque", "depósito", "deposito",
+    "estorno",
   ];
   for (const m of bms) {
     if (m.companyName !== COMPANY) continue;
     if (m.bankMovementAmount === 0) continue;
     const historic = (m.bankMovementHistoricName || "").toLowerCase();
-    if (EXCLUDE_PATTERNS.some(p => historic.includes(p))) continue;
-    const catNames = (m.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
-    if (EXCLUDE_PATTERNS.some(p => catNames.includes(p))) continue;
+    if (EXCLUDE_HISTORIC_PATTERNS.some(p => historic.includes(p))) continue;
     const credor = (m.bankMovementHistoricName || "Tarifa Bancária").trim();
     cacheByCredor.set(credor, (cacheByCredor.get(credor) || 0) + Math.abs(m.bankMovementAmount));
   }

@@ -117,9 +117,9 @@
       "year": "*",
       "month": "*",
       "expected": 111823042.46,
-      "tolerance": 100000.0,
+      "tolerance": 5000.0,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2021 a 02/05/2026. Painel R$ 111.863.498,10 (+R$ 40.455,64 = 0,036%). Diff residual de ~R$ 99k vem de 6 credores com reduções ocultas no Sienge (FAST SHOP -R$ 6.553, KOERICH -R$ 1.788, MAGAZINE LUIZA -R$ 6.438, MERCADOPAGO -R$ 4.835, PACOPEDRA -R$ 38.500, VOLKSWAGEN -R$ 41.000) compensados por ~R$ 59k de arredondamentos a menos. Reduções ocultas Sienge não são expostas pela API. Tolerance R$ 100k aceita o diff. Após fix de exclusão BM (transferência/saque/depósito) — caiu de R$ 3,5M para R$ 40k."
+      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2021 a 02/05/2026. Painel R$ 111.863.498,10 (+R$ 40.455,64 = 0,036%). NÃO BATE com tolerance R$ 5k. Diff de ~R$ 40k vem de credores com reduções ocultas no Sienge (FAST SHOP, KOERICH, MAGAZINE LUIZA, MERCADOPAGO, PACOPEDRA, VOLKSWAGEN somam ~R$ 99k), parcialmente compensados por ~R$ 59k de pequenos arredondamentos. Após fix de exclusão BM (transferência/saque/depósito) — caiu de R$ 3,5M para R$ 40k."
     },
     {
       "company": "ROZZA",
