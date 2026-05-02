@@ -447,16 +447,22 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (bmRes.ok) {
             const bmData = await bmRes.json();
             const bankMovements: SiengeBankMovement[] = bmData.data || [];
-            const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
+            // Excludes income (rendimento/aplicação/resgate) AND cash-management
+            // movements (transferência/saque/depósito) which Sienge doesn't
+            // count as paid bills. Validated 2026-05-02 against SILVA PACKER:
+            // a R$ 203M "Transferência" bucket inflates the total by 3x if not
+            // excluded.
+            const EXCLUDE_PATTERNS = [
+              "rendimento", "aplicação", "aplicacao", "resgate",
+              "transferência", "transferencia", "saque", "depósito", "deposito",
+            ];
             const bmAsItems: ContasItem[] = bankMovements
               .filter(bm => {
                 if (bm.bankMovementAmount === 0) return false;
                 const historic = (bm.bankMovementHistoricName || "").toLowerCase();
-                const hasIncomePattern = incomePatterns.some(p => historic.includes(p));
-                if (hasIncomePattern) return false;
-                // Also check financial categories for income patterns
+                if (EXCLUDE_PATTERNS.some(p => historic.includes(p))) return false;
                 const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
-                if (incomePatterns.some(p => catNames.includes(p))) return false;
+                if (EXCLUDE_PATTERNS.some(p => catNames.includes(p))) return false;
                 return true;
               })
               .map(bm => ({
