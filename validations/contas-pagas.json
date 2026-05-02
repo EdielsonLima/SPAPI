@@ -10,6 +10,16 @@
       "tolerance": 0.5,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (Total empresa)"
+    },
+    {
+      "company": "PALACIO ELIZABETH",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 33576192.46,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE: sistema retorna R$ 33.576.525,17 (+R$ 332,71). Causa: 3 credores no PDF mostram Líquido < Valor baixa sem o Desconto correspondente — ajuste oculto no Sienge não exposto pela API: COMPRAS ONLINE (-214,97), TAMOYO COMERCIO (-70,00), MERCADOPAGO.COM (-49,89). Investigar no Sienge admin."
     }
   ]
 }
