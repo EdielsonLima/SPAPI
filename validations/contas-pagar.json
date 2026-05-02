@@ -110,6 +110,16 @@
       "tolerance": 0.5,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
+    },
+    {
+      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 4786859.17,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
     }
   ]
 }
