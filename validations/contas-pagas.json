@@ -40,6 +40,16 @@
       "tolerance": 0.5,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026 (Total geral)"
+    },
+    {
+      "company": "RESIDENCIAL HANNOVER",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 26924856.29,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE: sistema retorna R$ 26.932.055,24 (+R$ 7.198,95). Diff maior que PALACIO/SERENITY — pode ser combinação de credores com ajuste oculto. Investigar no Sienge admin: comparar credor por credor entre PDF e sistema."
     }
   ]
 }
