@@ -20,6 +20,16 @@
       "tolerance": 1.0,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE: sistema retorna R$ 33.576.525,17 (+R$ 332,71). Causa: 3 credores no PDF mostram Líquido < Valor baixa sem o Desconto correspondente — ajuste oculto no Sienge não exposto pela API: COMPRAS ONLINE (-214,97), TAMOYO COMERCIO (-70,00), MERCADOPAGO.COM (-49,89). Investigar no Sienge admin."
+    },
+    {
+      "company": "SERENITY",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 15024074.52,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE: sistema retorna R$ 15.024.178,02 (+R$ 103,50). Provavelmente mesma causa do PALACIO — credor(es) com Líquido < Valor baixa sem Desconto correspondente no PDF, ajuste oculto não exposto pela API. Investigar no Sienge admin."
     }
   ]
 }
