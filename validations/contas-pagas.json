@@ -109,7 +109,7 @@
       "expected": 84020589.96,
       "tolerance": 1.0,
       "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: sistema R$ 84.011.826,29 (-R$ 8.763,67). Diff pequena (0,01%) e na direção OPOSTA das outras — sistema UNDER o PDF. Pode ser tarifas que nosso filtro não captura ou pagamentos específicos. PDF próprio tem R$ 7.918 de redução oculta (Valor + Acréscimo - Desconto = R$ 84.028.508,84, Líquido = R$ 84.020.589,96). Diff sistema vs Líquido = R$ 8,7k."
+      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE com fix per-company só-saved: standalone (8 op types) R$ 84.039.357,75 (+R$ 18.767,79), Painel (2 op types) R$ 84.005.075,87 (-R$ 15.514,09). Após commit 56f7df8 (Painel emula auto-default da standalone), ambos devem convergir para R$ 84.039.357,75. Diff residual de R$ 18.767,79 vs PDF é Sienge hidden reduction (0,02%)."
     },
     {
       "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
