@@ -1,5 +1,5 @@
 {
-  "_doc": "Snapshot de validações batidas contra relatórios Sienge. Cada entrada congela um total já conferido para detectar regressões em mudanças futuras de código de cálculo. Adicione novas entradas conforme validar empresa por empresa. Valor esperado em reais com 2 casas decimais.",
+  "_doc": "Snapshot de validações batidas contra relatórios Sienge. Cada entrada congela um total já conferido para detectar REGRESSÕES DE CÓDIGO. Os valores são fotografias do dia da validação — naturalmente vão mudar conforme novas notas/baixas entram no Sienge. O script (npm run check) avisa ⚠ quando o cache é mais novo (>24h) que a validação para indicar que a diferença é por evolução natural dos dados, não por bug. Para re-validar uma empresa, gere o relatório Sienge atual e atualize o `expected` + `validated_at`. Valor esperado em reais com 2 casas decimais.",
   "validations": [
     {
       "company": "DOMUS",

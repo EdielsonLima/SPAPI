@@ -113,8 +113,10 @@ function computePagas(items, bankMovements, company, year, month) {
   console.log(`Validações: ${validations.length}\n`);
 
   const cachedAtDate = new Date(cachedAt);
+  // Tolerância: cache até 24h após a validação ainda é considerado "mesmos dados"
+  const SAME_DAY_MS = 24 * 60 * 60 * 1000;
 
-  let passed = 0, failed = 0, staleSkipped = 0;
+  let passed = 0, failed = 0, staleSkipped = 0, dataChangedSkipped = 0;
   for (const v of validations) {
     const tolerance = v.tolerance ?? 0.5;
     let result;
@@ -133,16 +135,23 @@ function computePagas(items, bankMovements, company, year, month) {
     const periodLabel = `${v.year || "*"}-${v.month || "*"}`;
     const label = `${v.company} ${periodLabel} ${v.mode}`;
 
-    // Cache mais antigo que a validação? Pode ser causa do mismatch — sinaliza.
     const validatedDate = new Date(v.validated_at);
-    const staleCache = !ok && cachedAtDate < validatedDate;
+    const cacheOlderThanValidation = cachedAtDate < validatedDate;
+    // Cache muito mais novo (>24h) que a validação? Os dados podem ter
+    // mudado naturalmente (novos lançamentos, baixas) — não é regressão de
+    // código, é evolução natural. Sinaliza para o usuário re-validar.
+    const cacheMuchNewer = !ok && cachedAtDate.getTime() - validatedDate.getTime() > SAME_DAY_MS;
 
     if (ok) {
       console.log(`${flag} ${label.padEnd(40)} ${fmt(result.total).padStart(20)} (esperado ${fmt(v.expected)}, ${result.count} parcelas)`);
       passed++;
-    } else if (staleCache) {
+    } else if (cacheOlderThanValidation) {
       console.log(`⚠ ${label.padEnd(40)} ${fmt(result.total).padStart(20)} (esperado ${fmt(v.expected)}, diff ${fmt(diff)}) — cache mais antigo que a validação, refresh dos dados via app antes de avaliar`);
       staleSkipped++;
+    } else if (cacheMuchNewer) {
+      const days = Math.floor((cachedAtDate.getTime() - validatedDate.getTime()) / SAME_DAY_MS);
+      console.log(`⚠ ${label.padEnd(40)} ${fmt(result.total).padStart(20)} (esperado ${fmt(v.expected)}, diff ${fmt(diff)}) — cache ${days}d mais novo que a validação, dados podem ter mudado naturalmente; gere relatório atual no Sienge e atualize o snapshot`);
+      dataChangedSkipped++;
     } else {
       console.log(`${flag} ${label.padEnd(40)} ${fmt(result.total).padStart(20)} (esperado ${fmt(v.expected)}, diff ${fmt(diff)}, ${result.count} parcelas)`);
       console.log(`   tolerance: ${fmt(tolerance)} · validado em ${v.validated_at}`);
@@ -151,7 +160,11 @@ function computePagas(items, bankMovements, company, year, month) {
     }
   }
 
-  console.log(`\nResumo: ${passed} ✓ · ${failed} ✗${staleSkipped > 0 ? ` · ${staleSkipped} ⚠ (cache desatualizado)` : ""}`);
+  const warnParts = [];
+  if (staleSkipped > 0) warnParts.push(`${staleSkipped} cache desatualizado`);
+  if (dataChangedSkipped > 0) warnParts.push(`${dataChangedSkipped} dados evoluíram`);
+  const warnSuffix = warnParts.length > 0 ? ` · ⚠ ${warnParts.join(", ")}` : "";
+  console.log(`\nResumo: ${passed} ✓ · ${failed} ✗${warnSuffix}`);
   await pool.end();
   process.exit(failed > 0 ? 1 : 0);
 })();
