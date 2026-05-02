@@ -25,26 +25,31 @@ function isExcludedOp(name) {
   return EXCLUDED_OP.some(x => lower.includes(x));
 }
 
-// Total a Pagar para uma empresa em um mês específico.
+// Total a Pagar para uma empresa, opcionalmente filtrando por ano/mês.
+// year/month em null/undefined/"*" significam "qualquer".
 // Mesma fórmula usada na UI: effectiveAmount = corrected - discount - tax.
 function computeAPagar(items, company, year, month) {
-  const prefix = `${year}-${month}`;
+  const yearFilter = year && year !== "*" ? year : null;
+  const monthFilter = month && month !== "*" ? month : null;
   let total = 0;
   let count = 0;
   for (const i of items) {
     if (i.companyName !== company) continue;
-    if (!i.dueDate || !i.dueDate.startsWith(prefix)) continue;
     if ((i.balanceAmount || 0) <= 0) continue;
+    if (!i.dueDate) continue;
+    if (yearFilter && !i.dueDate.startsWith(yearFilter)) continue;
+    if (monthFilter && i.dueDate.substring(5, 7) !== monthFilter) continue;
     total += (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
     count++;
   }
   return { total, count };
 }
 
-// Total Pago para uma empresa em um mês específico.
-// Soma netAmount dos payments dentro do mês, excluindo op types reversíveis.
+// Total Pago para uma empresa, opcionalmente filtrando por ano/mês.
+// Soma netAmount dos payments dentro do período, excluindo op types reversíveis.
 function computePagas(items, bankMovements, company, year, month) {
-  const prefix = `${year}-${month}`;
+  const yearFilter = year && year !== "*" ? year : null;
+  const monthFilter = month && month !== "*" ? month : null;
   let total = 0;
   let count = 0;
 
@@ -54,7 +59,9 @@ function computePagas(items, bankMovements, company, year, month) {
     if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) continue;
     for (const p of (item.payments || [])) {
       if (p.netAmount === 0) continue;
-      if (!p.paymentDate || !p.paymentDate.startsWith(prefix)) continue;
+      if (!p.paymentDate) continue;
+      if (yearFilter && !p.paymentDate.startsWith(yearFilter)) continue;
+      if (monthFilter && p.paymentDate.substring(5, 7) !== monthFilter) continue;
       if (isExcludedOp(p.operationTypeName)) continue;
       total += p.netAmount;
       count++;
@@ -66,7 +73,9 @@ function computePagas(items, bankMovements, company, year, month) {
   for (const bm of bankMovements) {
     if (bm.companyName !== company) continue;
     if (bm.bankMovementAmount === 0) continue;
-    if (!bm.bankMovementDate || !bm.bankMovementDate.startsWith(prefix)) continue;
+    if (!bm.bankMovementDate) continue;
+    if (yearFilter && !bm.bankMovementDate.startsWith(yearFilter)) continue;
+    if (monthFilter && bm.bankMovementDate.substring(5, 7) !== monthFilter) continue;
     const historic = (bm.bankMovementHistoricName || "").toLowerCase();
     if (incomePatterns.some(p => historic.includes(p))) continue;
     const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
@@ -121,7 +130,8 @@ function computePagas(items, bankMovements, company, year, month) {
     const diff = result.total - v.expected;
     const ok = Math.abs(diff) <= tolerance;
     const flag = ok ? "✓" : "✗";
-    const label = `${v.company} ${v.year}-${v.month} ${v.mode}`;
+    const periodLabel = `${v.year || "*"}-${v.month || "*"}`;
+    const label = `${v.company} ${periodLabel} ${v.mode}`;
 
     // Cache mais antigo que a validação? Pode ser causa do mismatch — sinaliza.
     const validatedDate = new Date(v.validated_at);

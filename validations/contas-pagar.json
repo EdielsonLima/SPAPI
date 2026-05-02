@@ -10,6 +10,16 @@
       "tolerance": 0.5,
       "validated_at": "2026-05-02",
       "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/05/2026"
+    },
+    {
+      "company": "PALACIO ELIZABETH",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 949118.06,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-02",
+      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 04/05/2026 a 31/12/2050 (todas parcelas a vencer)"
     }
   ]
 }
