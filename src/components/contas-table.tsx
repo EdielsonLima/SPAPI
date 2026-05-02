@@ -697,6 +697,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         // Por Bens, Devolução, Abatimento ARE included by default.
         // Abatimento entries have Líquido = 0 in Sienge (accounting marker
         // only, no real cash movement) so they should be excluded too.
+        // Note: "Por Bens" is included by default because Sienge "por Data"
+        // reports include it. Companies whose source report excludes it (e.g.
+        // SILVA PACKER, ROZZA — "por Credor") should save a per-empresa filter
+        // unchecking Por Bens via the standalone Contas Pagas page.
         const DEFAULT_EXCLUDED = ["substitui", "cancelamento", "estorno", "abatimento"];
         const initial = tiposBaixa.filter(op => {
           const lower = op.toLowerCase();

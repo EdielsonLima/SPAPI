@@ -716,8 +716,11 @@ export function ExecutiveDashboard() {
   }, [activeItems, allBankMovements, section]);
 
   // Initialize selectedOpTypes once data arrives. Skips Substituição,
-  // Cancelamento and Estorno — these are reversal/replacement entries that
+  // Cancelamento, Estorno and Abatimento — reversal/replacement entries that
   // the Sienge "Contas Pagas Sintético" report does not include.
+  // "Por Bens" stays in by default because Sienge "por Data" includes it;
+  // companies whose source PDF was "por Credor" (which excludes Por Bens)
+  // should save a per-empresa filter via the standalone page.
   useEffect(() => {
     if (opTypesInitialized || allOpTypes.length === 0) return;
     if (typeof window !== "undefined" && localStorage.getItem("dashboard_default_opTypes")) {

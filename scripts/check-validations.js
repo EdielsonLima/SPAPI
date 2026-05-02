@@ -68,8 +68,20 @@ function computePagas(items, bankMovements, company, year, month) {
     }
   }
 
-  // Bank movements avulsos (tarifas bancárias) — exclui rendimentos/aplicações/resgates
-  const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
+  // Bank movements avulsos — mesmo conjunto de exclusões aplicado em
+  // executive-dashboard.tsx e contas-table.tsx (apenas historic name, sem
+  // category check — para evitar falsos positivos como "Retenção impostos"
+  // com categoria "Taxa IR da Aplicação"):
+  // - rendimento/aplicação/resgate: receitas financeiras, não despesas
+  // - transferência/saque/depósito: movimentação interna, não pagamento real
+  // - estorno: reversão
+  // - recebimento: entrada de caixa, não pagamento
+  const EXCLUDE_HISTORIC_PATTERNS = [
+    "rendimento", "aplicação", "aplicacao", "resgate",
+    "transferência", "transferencia", "saque", "depósito", "deposito",
+    "estorno",
+    "recebimento",
+  ];
   for (const bm of bankMovements) {
     if (bm.companyName !== company) continue;
     if (bm.bankMovementAmount === 0) continue;
@@ -77,9 +89,7 @@ function computePagas(items, bankMovements, company, year, month) {
     if (yearFilter && !bm.bankMovementDate.startsWith(yearFilter)) continue;
     if (monthFilter && bm.bankMovementDate.substring(5, 7) !== monthFilter) continue;
     const historic = (bm.bankMovementHistoricName || "").toLowerCase();
-    if (incomePatterns.some(p => historic.includes(p))) continue;
-    const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
-    if (incomePatterns.some(p => catNames.includes(p))) continue;
+    if (EXCLUDE_HISTORIC_PATTERNS.some(p => historic.includes(p))) continue;
     total += Math.abs(bm.bankMovementAmount);
     count++;
   }
