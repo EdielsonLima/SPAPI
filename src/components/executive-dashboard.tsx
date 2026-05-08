@@ -984,14 +984,23 @@ export function ExecutiveDashboard() {
         // "Rendimento de aplicação" e "Resgate de Aplicação" — esses são entradas
         // de volta na conta-corrente. Validado 2026-05-08 contra 135 JARDINS.
         if (historic === "aplicação" || historic === "aplicacao") return false;
-        // Excluir saídas (mesmo que Sienge marque como E em alguns casos)
+        // Excluir saídas (mesmo que Sienge marque como E em alguns casos):
+        // - Cheque emitido: empresa emitiu cheque (saída pendente). Validado
+        //   contra SUL BRASIL e TESLA (R$ 11.300 cada).
         if (historic.includes("pagamento") || historic.includes("saque") ||
-            historic.includes("depósito") || historic.includes("deposito")) return false;
+            historic.includes("depósito") || historic.includes("deposito") ||
+            historic.includes("cheque emitido")) return false;
         // Categoria de receita (financialCategoryType === "R")
         const cats = bm.financialCategories || [];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const isReceita = cats.length === 0 || cats.some((fc: any) => fc.financialCategoryType === "R");
         if (!isReceita) return false;
+        // Excluir BMs cuja categoria seja Transferência Entre Contas — Sienge
+        // marca historic="Recebimento" mas categoria revela ser transferência
+        // interna. Validado contra SILVA PACKER R$ 10.300 (2023-10-03).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const catNames = cats.map((fc: any) => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+        if (catNames.includes("transferência") || catNames.includes("transferencia")) return false;
         return true;
       })
       .map(bm => ({
