@@ -79,7 +79,7 @@
       "expected": 4828081.01,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. PDF R$ 4.828.081,01 (7 clientes, 165 parcelas). Cache 12:57 mostra R$ 4.837.350,09 (+R$ 9.269,07) por causa do pagamento ANDREIA SOUZA SANTOS R$ 9.269,07 feito após cache. Refresh resolve."
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% após refresh do cache (7 clientes, 165 parcelas)."
     },
     {
       "company": "SERENITY",
@@ -89,7 +89,7 @@
       "expected": 15997999.84,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. PDF R$ 15.997.999,84 (10 clientes, 681 parcelas). Cache 12:57: R$ 16.009.084,21 (+R$ 11.084,37) por pagamento entre cache e PDF. Refresh resolve."
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% após refresh do cache (10 clientes, 681 parcelas)."
     },
     {
       "company": "ROZZA",
@@ -99,7 +99,7 @@
       "expected": 17969868.24,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. PDF R$ 17.969.868,24 (10 clientes, 674 parcelas). Cache 12:57: R$ 18.083.047,80 (+R$ 113.179,56) por pagamento entre cache e PDF. Refresh resolve."
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% após refresh do cache (10 clientes, 674 parcelas)."
     },
     {
       "company": "PALACIO ELIZABETH",
@@ -109,7 +109,7 @@
       "expected": 51032694.09,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. PDF R$ 51.032.694,09 (31 clientes, 1937 parcelas). Cache 12:57: R$ 51.063.322,88 (+R$ 30.628,79) por pagamento entre cache e PDF. Refresh resolve."
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% após refresh do cache (31 clientes, 1937 parcelas)."
     }
   ]
 }
