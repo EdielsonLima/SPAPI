@@ -1706,7 +1706,7 @@ export function ExecutiveDashboard() {
       };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, items, incomeItems, todayStr, selectedCompanies, selectedDocTypes, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes]);
+  }, [activeTab, items, incomeItems, allBankMovements, allBankMovementsFull, todayStr, selectedCompanies, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes]);
 
   // === Loading State ===
   if (loading) {
