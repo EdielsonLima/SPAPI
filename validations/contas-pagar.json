@@ -1,5 +1,5 @@
 {
-  "_doc": "Snapshot de validações batidas contra Sienge 'Contas a Pagar (por Credor) Sintético'. mode='a-pagar' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje. PREVISÃO excluído. Valores são fotografias do dia da validação — decaem rapidamente conforme novas notas/baixas entram. Re-validar periodicamente. Cache do Painel pode estar minutos atrás do PDF — pequenos diffs são esperados.",
+  "_doc": "Snapshot de validações batidas contra Sienge 'Contas a Pagar (por Credor) Sintético'. mode='a-pagar' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje (inclui parcelas vencendo hoje). PREVISÃO excluído. Valores são fotografias do dia da validação — decaem rapidamente conforme novas notas/baixas entram. Re-validar periodicamente. IMPORTANTE: PDF Sienge gerado com período '09/05 em diante' NÃO inclui parcelas vencendo hoje, mas o painel SIM (KPI 'VENCE HOJE' faz parte do TOTAL A PAGAR). Para cravar PDF=Painel, gere PDF com período começando hoje (08/05).",
   "validations": [
     {
       "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
