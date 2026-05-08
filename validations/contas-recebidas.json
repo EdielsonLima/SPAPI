@@ -1,0 +1,25 @@
+{
+  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas Recebidas (por Cliente)' Coluna Padrão. Cada entrada congela um total já conferido para detectar regressões. mode='recebidas' soma p.netAmount onde receipt tem bankMovements (= Sienge Líquido). Por Bens/Distrato/Reparcelamento ficam zerados (receipts sem bankMovements). HOLDING/ADMINISTRADORA excluídas por padrão. Tipo Doc CONTRATO DE LOCAÇÃO (LOC/LNC) excluído por padrão. Valor esperado em reais, 2 casas decimais.",
+  "validations": [
+    {
+      "company": "DOMUS",
+      "mode": "recebidas",
+      "year": "*",
+      "month": "*",
+      "expected": 19152563.44,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% (R$ 19.152.563,44 = PDF Líquido). Sem ajustes específicos."
+    },
+    {
+      "company": "TETRA",
+      "mode": "recebidas",
+      "year": "*",
+      "month": "*",
+      "expected": 3400000.00,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% (R$ 3.400.000,00 = PDF Líquido). Por Bens R$ 4M (Março/2025) corretamente excluído (Sienge Líquido=0)."
+    }
+  ]
+}
