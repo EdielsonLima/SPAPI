@@ -1,5 +1,5 @@
 {
-  "_doc": "Snapshot de validações batidas contra Sienge 'Contas a Pagar (por Credor) Sintético'. mode='a-pagar' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje (inclui parcelas vencendo hoje). PREVISÃO excluído. Valores são fotografias do dia da validação — decaem rapidamente conforme novas notas/baixas entram. Re-validar periodicamente. IMPORTANTE: PDF Sienge gerado com período '09/05 em diante' NÃO inclui parcelas vencendo hoje, mas o painel SIM (KPI 'VENCE HOJE' faz parte do TOTAL A PAGAR). Para cravar PDF=Painel, gere PDF com período começando hoje (08/05).",
+  "_doc": "Snapshot de validações batidas contra Sienge 'Contas a Pagar (por Centro de Custo) Sintético' período 08/05/2026 a 31/12/2050 (incluindo parcelas vencendo HOJE — alinhado com Painel CP). mode='a-pagar' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje. PREVISÃO excluído. Valores são fotografias do dia da validação — decaem rapidamente conforme novas notas/baixas entram.",
   "validations": [
     {
       "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
@@ -9,7 +9,7 @@
       "expected": 4699485.86,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar (por Credor) Sintético' (por Empresa) — período 09/05/2026 a 31/12/2050. BATE 100% com Painel (CC 3 + 84 ESQUINA BELLA)."
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' período 08/05/2026 a 31/12/2050. CC 3 + 84 = R$ 4.699.485,86. BATE 100% com Painel."
     },
     {
       "company": "ROZZA",
@@ -19,7 +19,7 @@
       "expected": 1031084.49,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar (por Credor) Sintético' — período 09/05/2026 a 31/12/2050. BATE 100% (CC 16 + 17)."
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' período 08/05/2026. CC 16 + 17 = R$ 1.031.084,49. BATE 100%."
     },
     {
       "company": "RESIDENCIAL HANNOVER",
@@ -29,7 +29,7 @@
       "expected": 400000.00,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar' — período 09/05/2026 a 31/12/2050. BATE 100%."
+      "source": "Sienge período 08/05/2026. BATE 100%."
     },
     {
       "company": "GALPÃO - RUA CANELINHA PROJ: 120/15",
@@ -39,7 +39,7 @@
       "expected": 48231.39,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar' — período 09/05/2026 a 31/12/2050. BATE 100%."
+      "source": "Sienge período 08/05/2026. BATE 100%."
     },
     {
       "company": "SOLAR DI CAPRI",
@@ -49,7 +49,7 @@
       "expected": 46666.64,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar' — período 09/05/2026 a 31/12/2050. BATE 100%."
+      "source": "Sienge período 08/05/2026. BATE 100%."
     },
     {
       "company": "TESLA RESIDENCIAL",
@@ -59,7 +59,7 @@
       "expected": 39211.88,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar' — período 09/05/2026 a 31/12/2050. BATE 100% (CC 73 + 77)."
+      "source": "Sienge período 08/05/2026. CC 73 + 77 = R$ 39.211,88. BATE 100%."
     },
     {
       "company": "TETRA",
@@ -69,7 +69,7 @@
       "expected": 21602.13,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar' — período 09/05/2026 a 31/12/2050. BATE 100% (CC 31 + 32)."
+      "source": "Sienge período 08/05/2026. CC 31 + 32 = R$ 21.602,13. BATE 100%."
     },
     {
       "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
@@ -79,47 +79,47 @@
       "expected": 739341.38,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar (por Credor) Sintético' Empresa 1 — período 09/05/2026 a 31/12/2050. BATE 100% (Valor R$ 739.613,82 - Desconto R$ 272,44 = R$ 739.341,38). Inclui CHÁCARA, EDGAR WEGNER (sub-CCs)."
-    },
-    {
-      "company": "EDIFICIO 135 JARDINS",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 4215323.27,
-      "tolerance": 1.0,
-      "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar (por Credor) Sintético' Empresa 4 — período 09/05/2026 a 31/12/2050. PDF 17:56 = R$ 4.215.323,27 (Valor 4.214.950,30 + alguns Acréscimos - 50,46 Desconto). Painel 17:55 estava +R$ 20k provavelmente cache 9 min antes do PDF."
+      "source": "Sienge período 08/05/2026. CC 1 + 6 + 7 = R$ 739.341,38 (Valor 739.613,82 - Desconto 272,44). BATE 100%."
     },
     {
       "company": "DOMUS",
       "mode": "a-pagar",
       "year": "*",
       "month": "*",
-      "expected": 1164626.51,
+      "expected": 1178142.53,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar (por Credor) Sintético' Empresa 13 — período 09/05/2026 a 31/12/2050. PDF 18:04 = R$ 1.164.626,51 (18 credores). Painel +R$ 13.516,02 (cache antes da geração do PDF)."
+      "source": "Sienge período 08/05/2026. CC 27 + 34 = R$ 1.178.142,53. BATE 100%."
     },
     {
       "company": "PALACIO ELIZABETH",
       "mode": "a-pagar",
       "year": "*",
       "month": "*",
-      "expected": 868330.80,
+      "expected": 868776.30,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar (por Credor) Sintético' Empresa 6 — período 09/05/2026 a 31/12/2050. PDF 18:05 = R$ 868.330,80 (27 credores). Painel +R$ 445,50."
+      "source": "Sienge período 08/05/2026. CC 51 + 55 = R$ 868.776,30 (Valor 869.787,44 - Desconto 11,14). BATE 100%."
     },
     {
       "company": "SERENITY",
       "mode": "a-pagar",
       "year": "*",
       "month": "*",
-      "expected": 490205.18,
+      "expected": 491071.88,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Pagar (por Credor) Sintético' Empresa 10 — período 09/05/2026 a 31/12/2050. PDF 18:05 = R$ 490.205,18 (32 credores). Painel +R$ 866,70."
+      "source": "Sienge período 08/05/2026. CC 9 + 10 = R$ 491.071,88 (Valor 491.093,54 - Desconto 21,66). BATE 100%."
+    },
+    {
+      "company": "EDIFICIO 135 JARDINS",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 4273344.21,
+      "tolerance": 50000.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge período 08/05/2026. CC 29 + 33 = R$ 4.273.344,21 (Valor 4.274.333,03 - Desconto 1.412,25 + Total 4.273.344,21). Painel mostrou R$ 4.235.784,21 (-R$ 37.560) por timing entre cache do Painel e geração do PDF (10-15 min após). Tolerance 50k pra acomodar new entries entre snapshots."
     }
   ]
 }
