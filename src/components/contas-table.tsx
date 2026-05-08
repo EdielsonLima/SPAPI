@@ -372,6 +372,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tipoBaixaInitialized, setTipoBaixaInitialized] = useState(false);
+  const [tipoDocInitialized, setTipoDocInitialized] = useState(false);
+  const [empresasInitialized, setEmpresasInitialized] = useState(false);
   const [filterAnos, setFilterAnos] = useState<Set<string>>(() =>
     isOverdue ? new Set<string>() : new Set([String(currentYear)])
   );
@@ -382,10 +384,12 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   // For "pagas/recebidas" mode, fetch extra years back to capture items with old due dates
   // that were paid/received in the selected year.
   // For "a-receber/vencidas" mode, extend endDate to include future parcels.
-  // Fixed date range — same as Painel Executivo so they share the same DB cache
+  // Fixed date range — same as Painel Executivo so they share the same DB cache.
+  // Income (CR de imóveis) tem parcelamento longo até ~10+ anos, então +15 só p/ income.
   const { startDate, endDate } = useMemo(() => {
-    return { startDate: `${currentYear - 10}-01-01`, endDate: `${currentYear + 5}-12-31` };
-  }, [currentYear]);
+    const yearsAhead = isIncome ? 15 : 5;
+    return { startDate: `${currentYear - 10}-01-01`, endDate: `${currentYear + yearsAhead}-12-31` };
+  }, [currentYear, isIncome]);
   const [sortField, setSortField] = useState<SortField>(isPagas ? "paymentDate" : "dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(0);
@@ -719,6 +723,43 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tiposBaixa, isPagas, isIncome, empresaKeyForTipoBaixa]);
+
+  // Auto-init tipo documento (income only): excludes LNC e LOC.
+  // LNC = Lançamento Contábil, LOC = Locação — não fazem parte do total a
+  // receber operacional (são lançamentos auxiliares do Sienge).
+  useEffect(() => {
+    if (!isIncome || tipoDocInitialized || tiposDocumento.length === 0) return;
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_tipoDoc`);
+    if (saved) {
+      // saved já carregado pelo useState init
+    } else {
+      const DEFAULT_EXCLUDED = ["LNC", "LOC"];
+      const initial = tiposDocumento.filter(t => !DEFAULT_EXCLUDED.includes(t.toUpperCase()));
+      setFilterTipoDoc(new Set(initial));
+    }
+    setTipoDocInitialized(true);
+  }, [tiposDocumento, isIncome, tipoDocInitialized, dataSource, mode]);
+
+  // Auto-init filtro de empresas (income only): exclui HOLDING/ADMINISTRADORA.
+  // Empresa administrativa não tem operação de receita — apenas lançamentos
+  // contábeis internos. Mesmo padrão do Painel Executivo.
+  useEffect(() => {
+    if (!isIncome || empresasInitialized || empresaNames.length === 0) return;
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_empresas`);
+    if (saved) {
+      // saved já carregado pelo useState init
+    } else {
+      const isAdminCompany = (n: string) => {
+        const upper = n.toUpperCase();
+        return upper.includes("HOLDING") || upper.includes("ADMINISTRADORA");
+      };
+      const initial = empresaNames.filter(n => !isAdminCompany(n));
+      setFilterEmpresas(new Set(initial));
+    }
+    setEmpresasInitialized(true);
+  }, [empresaNames, isIncome, empresasInitialized, dataSource, mode]);
 
   const toggleDia = (dia: string) => {
     setFilterDia((prev) =>
