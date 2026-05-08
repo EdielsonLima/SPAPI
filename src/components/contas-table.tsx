@@ -532,6 +532,93 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         }
       }
 
+      // Para Contas Recebidas: também sintetiza BMs órfãos como recebimentos
+      // (mesma lógica do Painel — vide incomeBankMovementsAsItems em
+      // executive-dashboard.tsx). Esses são "Rendimento de aplicação", "Resgate"
+      // etc. que aparecem como linha sem cliente no PDF Sienge.
+      if (isPagas && isIncome) {
+        try {
+          const bmRes = await fetch(
+            `/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N` +
+            (forceRefresh ? "&forceRefresh=true" : "")
+          );
+          if (bmRes.ok) {
+            const bmData = await bmRes.json();
+            const bankMovements: SiengeBankMovement[] = bmData.data || [];
+            const incomeBmsAsItems: ContasItem[] = bankMovements
+              .filter(bm => {
+                if (bm.bankMovementAmount === 0) return false;
+                if (bm.billId) return false;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                if ((bm as any).bankMovementOperationType !== "E") return false;
+                const historic = (bm.bankMovementHistoricName || "").toLowerCase().trim();
+                if (historic.includes("transferência") || historic.includes("transferencia")) return false;
+                if (historic === "aplicação" || historic === "aplicacao") return false;
+                if (historic.includes("pagamento") || historic.includes("saque") ||
+                    historic.includes("depósito") || historic.includes("deposito") ||
+                    historic.includes("cheque emitido")) return false;
+                const cats = bm.financialCategories || [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const isReceita = cats.length === 0 || cats.some((fc: any) => fc.financialCategoryType === "R");
+                if (!isReceita) return false;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const catNames = cats.map((fc: any) => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+                if (catNames.includes("transferência") || catNames.includes("transferencia")) return false;
+                return true;
+              })
+              .map(bm => ({
+                billId: bm.bankMovementId,
+                installmentId: 1,
+                installmentCount: 1,
+                companyId: bm.companyId,
+                companyName: bm.companyName,
+                clientId: 0,
+                clientName: "(sem cliente)",
+                documentIdentificationId: bm.documentIdentificationId || "MB",
+                documentIdentificationName: bm.documentIdentificationName || "MOV. BANCÁRIO",
+                documentIdentificationNumber: "",
+                originId: "BM",
+                originalAmount: Math.abs(bm.bankMovementAmount),
+                discountAmount: 0,
+                taxAmount: 0,
+                dueDate: bm.bankMovementDate,
+                billDate: bm.billDate || bm.bankMovementDate,
+                balanceAmount: 0,
+                correctedBalanceAmount: 0,
+                receivedNetAmount: Math.abs(bm.bankMovementAmount),
+                authorizationStatus: "",
+                registeredBy: "",
+                registeredDate: "",
+                paymentsCategories: bm.financialCategories?.map(fc => ({
+                  costCenterId: fc.costCenterId,
+                  costCenterName: fc.costCenterName,
+                  financialCategoryId: Number(fc.financialCategoryId),
+                  financialCategoryName: fc.financialCategoryName,
+                  financialCategoryRate: fc.financialCategoryRate,
+                })) || [],
+                payments: [{
+                  operationTypeId: 0,
+                  operationTypeName: bm.bankMovementHistoricName || "Recebimento",
+                  netAmount: Math.abs(bm.bankMovementAmount),
+                  grossAmount: Math.abs(bm.bankMovementAmount),
+                  paymentDate: bm.bankMovementDate,
+                  taxAmount: 0,
+                  monetaryCorrectionAmount: 0,
+                  interestAmount: 0,
+                  fineAmount: 0,
+                  discountAmount: 0,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                }] as any,
+                buildingsCosts: [],
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              } as any as ContasItem));
+            allItems = [...allItems, ...incomeBmsAsItems];
+          }
+        } catch {
+          // Bank movements são complementares — não falha se não for buscado
+        }
+      }
+
       setItems(allItems);
       setPage(0);
       setBillNotes({});
