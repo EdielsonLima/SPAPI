@@ -25,6 +25,55 @@ function isExcludedOp(name) {
   return EXCLUDED_OP.some(x => lower.includes(x));
 }
 
+// Encargos (multa + juros) aplicados a parcelas vencidas.
+// Regras Sienge para encargo=0:
+// - paymentTerm.id="PE" (Permuta) — sempre 0
+// - paymentTerm.id="PM" (Parcelas Mensais) + indexerName="REAL" — sem correção
+function calcEncargos(item, todayDate) {
+  if (!item.dueDate) return 0;
+  let ptId = "";
+  try {
+    const pt = typeof item.paymentTerm === "string" ? JSON.parse(item.paymentTerm) : item.paymentTerm;
+    ptId = pt?.id || "";
+  } catch { /* ignore */ }
+  if (ptId === "PE") return 0;
+  if (ptId === "PM" && (!item.indexerName || item.indexerName === "REAL")) return 0;
+  const due = new Date(item.dueDate + "T00:00:00");
+  let dias = Math.max(0, Math.floor((todayDate.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
+  if (dias <= 0) return 0;
+  if (dias > 365) dias = dias - 1;
+  const saldo = item.correctedBalanceAmount || 0;
+  const multa = saldo * 0.02;
+  const juros = (saldo + multa) * 0.01 * (dias / 30);
+  return multa + juros;
+}
+
+// Total Inadimplência (Contas a Receber vencidas).
+function computeInadimplencia(incomeItems, company, year, month) {
+  const yearFilter = year && year !== "*" ? year : null;
+  const monthFilter = month && month !== "*" ? month : null;
+  const todayStr = new Date().toISOString().split("T")[0];
+  const todayDate = new Date(todayStr + "T00:00:00");
+  let total = 0;
+  let count = 0;
+  for (const i of incomeItems) {
+    if (i.companyName !== company) continue;
+    if ((i.correctedBalanceAmount || 0) <= 0) continue;
+    if (!i.dueDate || i.dueDate >= todayStr) continue;
+    if (yearFilter && !i.dueDate.startsWith(yearFilter)) continue;
+    if (monthFilter && i.dueDate.substring(5, 7) !== monthFilter) continue;
+    const docName = (i.documentIdentificationName || "").toUpperCase();
+    if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) continue;
+    if (docName.startsWith("CONTRATO DE LOCA")) continue;
+    const eff = (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
+    if (eff <= 0) continue;
+    const enc = calcEncargos(i, todayDate);
+    total += eff + enc;
+    count++;
+  }
+  return { total, count };
+}
+
 // Total a Receber (Contas a Receber). Mesma fórmula do Painel:
 // correctedBalanceAmount - discountAmount - taxAmount para items com
 // correctedBalanceAmount > 0 e dueDate >= hoje (futuras parcelas).
@@ -258,6 +307,8 @@ function computePagas(items, bankMovements, company, year, month) {
       result = computeRecebidas(incomeItems, bankMovements, v.company, v.year, v.month);
     } else if (v.mode === "a-receber") {
       result = computeAReceber(incomeItems, v.company, v.year, v.month);
+    } else if (v.mode === "inadimplencia") {
+      result = computeInadimplencia(incomeItems, v.company, v.year, v.month);
     } else {
       console.log(`✗ ${v.company} ${v.year}-${v.month} ${v.mode}: modo desconhecido`);
       failed++;

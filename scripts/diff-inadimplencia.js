@@ -17,7 +17,13 @@ const todayDate = new Date(todayStr + "T00:00:00");
 
 function calcEncargos(item) {
   if (!item.dueDate) return 0;
-  if (!item.indexerName || item.indexerName === "REAL") return 0;
+  let ptId = "";
+  try {
+    const pt = typeof item.paymentTerm === "string" ? JSON.parse(item.paymentTerm) : item.paymentTerm;
+    ptId = pt?.id || "";
+  } catch { /* ignore */ }
+  if (ptId === "PE") return 0;
+  if (ptId === "PM" && (!item.indexerName || item.indexerName === "REAL")) return 0;
   const due = new Date(item.dueDate + "T00:00:00");
   let dias = Math.max(0, Math.floor((todayDate.getTime() - due.getTime()) / (1000 * 60 * 60 * 24)));
   if (dias <= 0) return 0;

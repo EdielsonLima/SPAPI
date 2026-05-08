@@ -1,0 +1,95 @@
+{
+  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas a Receber (por Cliente)' período passado, conferido contra 'Posição de Inadimplência (Analítico)'. mode='inadimplencia' soma effectiveAmount + calcEncargos para items com correctedBalanceAmount > 0 e dueDate < hoje. Encargos = multa 2% + juros 1% a.m. Regras Sienge p/ encargo=0: paymentTerm.id='PE' (Permuta), ou paymentTerm.id='PM'+indexerName='REAL'. HOLDING/ADMINISTRADORA excluídas, LOC/LNC excluídos. Tolerance R$ 20 por empresa para acomodar arredondamento per-parcela do juros 1% a.m. Valor esperado em reais.",
+  "validations": [
+    {
+      "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 23959.00,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026 + 'Posição de Inadimplência (Analítico)'. BATE 100%. GELSON ANTONIO ANHAIA — paymentTerm=PM + indexer=REAL → encargo 0."
+    },
+    {
+      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 230924.97,
+      "tolerance": 20.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026 + 'Posição de Inadimplência (Analítico)'. BATE com R$ 12,81 de rounding (juros 1% a.m calculado per-parcela). RONALDO JUSTO LEAL 6 parcelas. Posição de Inadimplência inclui também 2 LOCs (R$ 11.485,97) que sistema exclui por padrão (LOC/LNC default-excluded)."
+    },
+    {
+      "company": "SOLAR DI CAPRI",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 7403.34,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026. BATE 100%. ALAOR LOBO CARNEIRO FILHO — paymentTerm=PM + indexer=Cub-SC."
+    },
+    {
+      "company": "PALACIO ELIZABETH",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 76502.62,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026. BATE -R$ 0,01 (rounding). 3 parcelas: ANA LUIZA ZAUPA, LUIZ ANTONIO ZAUPA, ROBSON COTTA."
+    },
+    {
+      "company": "RESIDENCIAL HANNOVER",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 757015.84,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026. BATE +R$ 0,01 (rounding). FERNANDA AUGUSTA RONSONI RIBEIRO 2 parcelas, paymentTerm=PA."
+    },
+    {
+      "company": "TESLA RESIDENCIAL",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 250000.00,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026. BATE 100%. HELVYS ZERMIANI — paymentTerm=PE (Permuta) + indexer=REAL → encargo 0."
+    },
+    {
+      "company": "SERENITY",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 11356.69,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026. BATE 100%. CLEITON GIORGIO HOLZ."
+    },
+    {
+      "company": "ROZZA",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 603468.26,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026 + 'Posição de Inadimplência (Analítico)'. BATE +R$ 0,02 (rounding). GUILHERME VILLELA MIGUEL 5 parcelas + LADIA DE SOUZA 2 parcelas. LADIA inst=2 paymentTerm=EN com indexer=REAL TEM encargo (regra 'EN sempre cobra')."
+    },
+    {
+      "company": "DOMUS",
+      "mode": "inadimplencia",
+      "year": "*",
+      "month": "*",
+      "expected": 54199.69,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026. BATE 100%. FERNANDA RAMOS FERRARI + VIVIANE CRISTINE BORDIN MARUSSO."
+    }
+  ]
+}
