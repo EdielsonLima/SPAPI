@@ -1,5 +1,5 @@
 {
-  "_doc": "Snapshot de validações batidas contra Sienge 'Contas a Pagar (por Centro de Custo) Sintético' período 08/05/2026 a 31/12/2050 (incluindo parcelas vencendo HOJE — alinhado com Painel CP). mode='a-pagar' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje. PREVISÃO excluído. Valores são fotografias do dia da validação — decaem rapidamente conforme novas notas/baixas entram.",
+  "_doc": "Snapshot de validações batidas contra Sienge 'Contas a Pagar (por Centro de Custo) Sintético' período 08/05/2026 a 31/12/2050 (incluindo parcelas vencendo HOJE — alinhado com Painel CP). mode='a-pagar' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje. PREVISÃO excluído. HOLDING (empresa 2 SILVA ADMINISTRADORA HOLDING LTDA) excluída por padrão no painel — inclui CC 2 ADMINISTRATIVO SILVA ADM E CC 35 CHALÉ 10. PDF Total geral = Painel Total + HOLDING (R$ 18.318,59 em 08/05/2026). Valores são fotografias do dia da validação — decaem rapidamente conforme novas notas/baixas entram.",
   "validations": [
     {
       "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
