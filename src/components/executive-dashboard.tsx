@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
+import { useTheme } from "next-themes";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 // Select removed - year filter now uses MultiSelectFilter
 import { Skeleton } from "@/components/ui/skeleton";
@@ -259,6 +260,16 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
+  // Detecta tema para ajustar cores dos charts SVG (não respondem a CSS dark:).
+  // Dark mode usa vermelho/cinza mais claros pra reduzir contraste.
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === "dark";
+  const chartColors = useMemo(() => ({
+    red: isDark ? "#fca5a5" : "#f87171",        // red-300 dark, red-400 light
+    green: isDark ? "#86efac" : "#16a34a",       // green-300 dark, green-600 light
+    valueText: isDark ? "#cbd5e1" : "#334155",   // slate-300 dark, slate-700 light
+    mutedText: isDark ? "#94a3b8" : "#475569",   // slate-400 dark, slate-600 light
+  }), [isDark]);
   const [section, setSection] = useState<Section>("cp");
   const [selectedYears, setSelectedYears] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
@@ -3018,11 +3029,11 @@ export function ExecutiveDashboard() {
                             const pct = entry?.pct;
                             return (
                               <g>
-                                <text x={x + w / 2} y={y - 16} textAnchor="middle" fontSize={10} fontWeight={700} fill="#334155">
+                                <text x={x + w / 2} y={y - 16} textAnchor="middle" fontSize={10} fontWeight={700} fill={chartColors.valueText}>
                                   {formatCompactCurrency(value)}
                                 </text>
                                 {pct !== null && pct !== undefined && (
-                                  <text x={x + w / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill={pct >= 0 ? "#16a34a" : "#f87171"}>
+                                  <text x={x + w / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill={pct >= 0 ? chartColors.green : chartColors.red}>
                                     {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
                                   </text>
                                 )}
@@ -3643,29 +3654,29 @@ export function ExecutiveDashboard() {
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
-            className={`border-0 shadow-sm overflow-hidden relative group hover:shadow-md transition-all duration-300 ${kpi.onClick ? "cursor-pointer" : ""} ${kpi.onClick && (showDelinquentTable || showOverdueTable) ? "ring-2 ring-red-400 ring-offset-1" : ""}`}
+            className={`border-0 shadow-sm overflow-hidden relative group hover:shadow-md transition-all duration-300 dark:bg-slate-900 ${kpi.onClick ? "cursor-pointer" : ""} ${kpi.onClick && (showDelinquentTable || showOverdueTable) ? "ring-2 ring-red-400 ring-offset-1" : ""}`}
             onClick={kpi.onClick}
           >
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${kpi.gradient}`} />
             <CardContent className="pt-6 pb-5 px-6">
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-400">
                     {kpi.label}
                   </p>
-                  <p className="text-lg lg:text-xl xl:text-2xl font-bold text-slate-800 mt-2 tabular-nums truncate">
+                  <p className="text-lg lg:text-xl xl:text-2xl font-bold text-slate-800 dark:text-slate-50 mt-2 tabular-nums truncate">
                     {kpi.value}
                   </p>
                   {kpi.subtitle && (
-                    <p className="text-xs text-slate-400 mt-1">{kpi.subtitle}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-400 mt-1">{kpi.subtitle}</p>
                   )}
                   {kpi.trend != null && (
                     <div className="flex items-center gap-1.5 mt-2">
                       <div
                         className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium ${
                           kpi.trend >= 0
-                            ? "text-emerald-600 bg-emerald-50"
-                            : "text-red-600 bg-red-50"
+                            ? "text-emerald-600 bg-emerald-50 dark:text-emerald-300/80 dark:bg-emerald-950/40"
+                            : "text-red-600 bg-red-50 dark:text-red-300/70 dark:bg-red-950/40"
                         }`}
                       >
                         {kpi.trend >= 0 ? (
@@ -3829,11 +3840,11 @@ export function ExecutiveDashboard() {
                       const cx = (x || 0) + (width || 0) / 2;
                       return (
                         <g>
-                          <text x={cx} y={(y || 0) - 14} textAnchor="middle" fontSize={11} fill="#475569" fontWeight={600}>
+                          <text x={cx} y={(y || 0) - 14} textAnchor="middle" fontSize={11} fill={chartColors.mutedText} fontWeight={600}>
                             {formatCompactCurrency(Number(value))}
                           </text>
                           {pct !== null && pct !== undefined && (
-                            <text x={cx} y={(y || 0) - 2} textAnchor="middle" fontSize={9} fill={pct >= 0 ? "#f87171" : "#16a34a"} fontWeight={500}>
+                            <text x={cx} y={(y || 0) - 2} textAnchor="middle" fontSize={9} fill={pct >= 0 ? chartColors.red : chartColors.green} fontWeight={500}>
                               {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
                             </text>
                           )}
