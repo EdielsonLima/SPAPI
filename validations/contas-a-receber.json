@@ -1,0 +1,15 @@
+{
+  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas a Receber (por Cliente)' Coluna Padrão. Cada entrada congela um total já conferido para detectar regressões. mode='a-receber' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje. HOLDING/ADMINISTRADORA excluídas por padrão. Tipo Doc CONTRATO DE LOCAÇÃO (LOC/LNC) excluído por padrão. Valor esperado em reais, 2 casas decimais. IMPORTANTE: snapshots de a-receber decaem rapidamente — o saldo muda dia a dia conforme parcelas são quitadas e correção monetária é aplicada (indexador REAL). Re-validar periodicamente.",
+  "validations": [
+    {
+      "company": "DOMUS",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 31943781.02,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2040, Coluna Padrão, Indexador REAL, Calcular acréscimos até 08/05/2026. BATE 100% (12 clientes, 1068 parcelas)."
+    }
+  ]
+}

@@ -25,6 +25,33 @@ function isExcludedOp(name) {
   return EXCLUDED_OP.some(x => lower.includes(x));
 }
 
+// Total a Receber (Contas a Receber). Mesma fórmula do Painel:
+// correctedBalanceAmount - discountAmount - taxAmount para items com
+// correctedBalanceAmount > 0 e dueDate >= hoje (futuras parcelas).
+// Exclui HOLDING/ADMINISTRADORA e tipo doc CONTRATO DE LOCAÇÃO.
+function computeAReceber(incomeItems, company, year, month) {
+  const yearFilter = year && year !== "*" ? year : null;
+  const monthFilter = month && month !== "*" ? month : null;
+  const todayStr = new Date().toISOString().split("T")[0];
+  let total = 0;
+  let count = 0;
+  for (const i of incomeItems) {
+    if (i.companyName !== company) continue;
+    if ((i.correctedBalanceAmount || 0) <= 0) continue;
+    if (!i.dueDate || i.dueDate < todayStr) continue;
+    if (yearFilter && !i.dueDate.startsWith(yearFilter)) continue;
+    if (monthFilter && i.dueDate.substring(5, 7) !== monthFilter) continue;
+    const docName = (i.documentIdentificationName || "").toUpperCase();
+    if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) continue;
+    if (docName.startsWith("CONTRATO DE LOCA")) continue;
+    const eff = (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
+    if (eff <= 0) continue;
+    total += eff;
+    count++;
+  }
+  return { total, count };
+}
+
 // Mesmo filtro do incomeBankMovementsAsItems do executive-dashboard.tsx.
 // Sintetiza BMs órfãos (sem bill associado) que representam recebimentos
 // diretos no banco (Rendimento de aplicação etc) — = "linha sem cliente"
@@ -229,6 +256,8 @@ function computePagas(items, bankMovements, company, year, month) {
       result = computePagas(items, bankMovements, v.company, v.year, v.month);
     } else if (v.mode === "recebidas") {
       result = computeRecebidas(incomeItems, bankMovements, v.company, v.year, v.month);
+    } else if (v.mode === "a-receber") {
+      result = computeAReceber(incomeItems, v.company, v.year, v.month);
     } else {
       console.log(`✗ ${v.company} ${v.year}-${v.month} ${v.mode}: modo desconhecido`);
       failed++;
