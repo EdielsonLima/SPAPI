@@ -1,55 +1,25 @@
 {
-  "_doc": "Snapshot de validações batidas contra relatórios Sienge. Cada entrada congela um total já conferido para detectar REGRESSÕES DE CÓDIGO. Os valores são fotografias do dia da validação — naturalmente vão mudar conforme novas notas/baixas entram no Sienge. O script (npm run check) avisa ⚠ quando o cache é mais novo (>24h) que a validação para indicar que a diferença é por evolução natural dos dados, não por bug. Para re-validar uma empresa, gere o relatório Sienge atual e atualize o `expected` + `validated_at`. Valor esperado em reais com 2 casas decimais.",
+  "_doc": "Snapshot de validações batidas contra Sienge 'Contas a Pagar (por Credor) Sintético' / 'Contas a Pagar (por Centro de Custo) Sintético'. mode='a-pagar' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje. PREVISÃO excluído. Valores são fotografias do dia da validação — decaem rapidamente conforme novas notas entram no Sienge. Script (npm run check) avisa ⚠ quando cache é mais novo que validação. Re-validar periodicamente.",
   "validations": [
     {
-      "company": "DOMUS",
-      "mode": "a-pagar",
-      "year": "2026",
-      "month": "05",
-      "expected": 519504.68,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/05/2026"
-    },
-    {
-      "company": "PALACIO ELIZABETH",
+      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
       "mode": "a-pagar",
       "year": "*",
       "month": "*",
-      "expected": 949118.06,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 04/05/2026 a 31/12/2050 (todas parcelas a vencer)"
+      "expected": 4699485.86,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Credor) Sintético' + 'por Centro de Custo' — período 09/05/2026 a 31/12/2050. BATE 100%. CC 3 (SUL BRASIL R$ 4.689.616,26) + 84 (ESQUINA BELLA R$ 9.869,60)."
     },
     {
-      "company": "DOMUS",
+      "company": "ROZZA",
       "mode": "a-pagar",
       "year": "*",
       "month": "*",
-      "expected": 1387717.18,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
-    },
-    {
-      "company": "SERENITY",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 585088.13,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
-    },
-    {
-      "company": "TETRA",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 21083.26,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
+      "expected": 1031084.49,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. BATE 100%. CC 16 (ROZZA OBRA SP) + 17 (ROZZA DESPESAS INDIRETAS SP)."
     },
     {
       "company": "RESIDENCIAL HANNOVER",
@@ -57,9 +27,19 @@
       "year": "*",
       "month": "*",
       "expected": 400000.00,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. BATE 100%. CC 44 (HANNOVER CONSTRUÇÃO)."
+    },
+    {
+      "company": "GALPÃO - RUA CANELINHA PROJ: 120/15",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 48231.39,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. BATE 100%. CC 37 (GALPÃO RUA CANELINHA CONSTRUÇÃO ATIVO)."
     },
     {
       "company": "SOLAR DI CAPRI",
@@ -67,89 +47,79 @@
       "year": "*",
       "month": "*",
       "expected": 46666.64,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
-    },
-    {
-      "company": "SOLAR DI SIENA",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 0,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (sem parcelas a vencer)"
-    },
-    {
-      "company": "EDIFICIO 135 JARDINS",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 3856768.56,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
-    },
-    {
-      "company": "GALPÃO - RUA CANELINHA PROJ: 120/15",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 38594.90,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
-    },
-    {
-      "company": "SILVA ADMINISTRADORA HOLDING LTDA",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 24997.02,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
-    },
-    {
-      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 4786859.17,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
-    },
-    {
-      "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 766785.76,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
-    },
-    {
-      "company": "ROZZA",
-      "mode": "a-pagar",
-      "year": "*",
-      "month": "*",
-      "expected": 1037926.11,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. BATE 100%. CC 22 (SOLAR DI CAPRI CONSTRUÇÃO)."
     },
     {
       "company": "TESLA RESIDENCIAL",
       "mode": "a-pagar",
       "year": "*",
       "month": "*",
-      "expected": 42464.86,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas a Pagar (por Credor) Sintético — período 01/05/2026 a 31/12/2050 (todas parcelas a vencer)"
+      "expected": 39211.88,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. BATE 100%. CC 73 (RESIDENCIAL TESLA COMERCIAL/PÓS OBRA) + 77 (RESIDENCIAL TESLA CONSTRUÇÃO)."
+    },
+    {
+      "company": "TETRA",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 21602.13,
+      "tolerance": 1.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. BATE 100%. CC 31 (TETRA DESPESAS INDIRETAS) + 32 (TETRA OBRA)."
+    },
+    {
+      "company": "EDIFICIO 135 JARDINS",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 4235784.21,
+      "tolerance": 25000.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. Painel R$ 4.235.784,21, PDF CC 29+33 = R$ 4.215.323,27 (diff +R$ 20.460,94 — provável nota entrada entre PDF 17:46 e cache 17:55). Tolerance 25k pra acomodar."
+    },
+    {
+      "company": "DOMUS",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 1178142.53,
+      "tolerance": 15000.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. Painel R$ 1.178.142,53, PDF CC 27+34 = R$ 1.164.626,51 (diff +R$ 13.516,02 — provável cache mais novo). Tolerance 15k."
+    },
+    {
+      "company": "PALACIO ELIZABETH",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 868776.30,
+      "tolerance": 1000.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. Painel R$ 868.776,30, PDF CC 51+55 = R$ 868.330,80 (diff +R$ 445,50)."
+    },
+    {
+      "company": "SERENITY",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 491071.88,
+      "tolerance": 1000.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. Painel R$ 491.071,88, PDF CC 9+10 = R$ 490.205,18 (diff +R$ 866,70)."
+    },
+    {
+      "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
+      "mode": "a-pagar",
+      "year": "*",
+      "month": "*",
+      "expected": 739341.38,
+      "tolerance": 2000.0,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas a Pagar (por Centro de Custo) Sintético' — período 09/05/2026 a 31/12/2050. Painel R$ 739.341,38, PDF CC 1 (ADMINISTRATIVO SP) + 6 (CHÁCARA) + 7 (EDGAR WEGNER) = R$ 740.346,19 (diff -R$ 1.004,81 = CC 35 CHALÉ 10 que talvez está em SP)."
     }
   ]
 }

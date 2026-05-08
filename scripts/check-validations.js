@@ -183,21 +183,26 @@ function getEstornoPairs(payments) {
   return canceled;
 }
 
-// Total a Pagar para uma empresa, opcionalmente filtrando por ano/mês.
-// year/month em null/undefined/"*" significam "qualquer".
-// Mesma fórmula usada na UI: effectiveAmount = corrected - discount - tax.
+// Total a Pagar para uma empresa. Soma effectiveAmount = corrected - discount
+// - tax para items com balance > 0 e dueDate >= hoje (futuras parcelas em
+// aberto). Exclui PREVISÃO. Mesma fórmula da UI Painel CP > Contas a Pagar.
 function computeAPagar(items, company, year, month) {
   const yearFilter = year && year !== "*" ? year : null;
   const monthFilter = month && month !== "*" ? month : null;
+  const todayStr = new Date().toISOString().split("T")[0];
   let total = 0;
   let count = 0;
   for (const i of items) {
     if (i.companyName !== company) continue;
-    if ((i.balanceAmount || 0) <= 0) continue;
-    if (!i.dueDate) continue;
+    if ((i.correctedBalanceAmount || 0) <= 0) continue;
+    if (!i.dueDate || i.dueDate < todayStr) continue;
     if (yearFilter && !i.dueDate.startsWith(yearFilter)) continue;
     if (monthFilter && i.dueDate.substring(5, 7) !== monthFilter) continue;
-    total += (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
+    const docName = (i.documentIdentificationName || "").toUpperCase();
+    if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) continue;
+    const eff = (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
+    if (eff <= 0) continue;
+    total += eff;
     count++;
   }
   return { total, count };
