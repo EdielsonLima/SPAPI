@@ -279,6 +279,8 @@ export function ExecutiveDashboard() {
   // to force re-fetch of /api/dre-supplementary (the DRE pulls from Excel/DB
   // independently of the Sienge cache, so the main fetchData doesn't reach it).
   const [refreshKey, setRefreshKey] = useState(0);
+  type StepStatus = "pending" | "running" | "done" | "error";
+  const [refreshSteps, setRefreshSteps] = useState<{ label: string; detail?: string; status: StepStatus }[]>([]);
   const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
   const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
   const [salesContracts, setSalesContracts] = useState<SiengeSalesContract[]>([]);
@@ -434,55 +436,79 @@ export function ExecutiveDashboard() {
     if (forceRefresh) {
       setRefreshing(true);
       setRefreshKey(k => k + 1);
+      setRefreshSteps([
+        { label: "Contas a Pagar", detail: `${startDate} → ${endDate}`, status: "running" },
+        { label: "Movimentos Bancários (avulsos)", detail: `${startDate} → ${endDate}`, status: "running" },
+        { label: "Contas a Receber", detail: `${startDate} → ${incomeEndDate}`, status: "running" },
+        { label: "Movimentos Bancários (todos, p/ DRE)", detail: `${startDate} → ${endDate}`, status: "running" },
+        { label: "Contratos de Venda", status: "running" },
+        { label: "Unidades", status: "running" },
+      ]);
     } else if (!dataLoadedRef.current) setLoading(true);
+
+    const setStep = (i: number, status: StepStatus, detail?: string) => {
+      if (!forceRefresh) return;
+      setRefreshSteps(s => s.map((st, idx) => idx === i ? { ...st, status, detail: detail ?? st.detail } : st));
+    };
 
     try {
       // Sales contracts fetch runs independently — never blocks main data
       fetch(`/api/sienge/sales-contracts${refreshParam ? "?forceRefresh=true" : ""}`)
         .then(res => res.ok ? res.json() : null)
-        .then(data => { if (data) setSalesContracts(data.data || []); })
-        .catch(() => {});
+        .then(data => { if (data) { setSalesContracts(data.data || []); setStep(4, "done", `${(data.data || []).length} contratos`); } else setStep(4, "error"); })
+        .catch(() => setStep(4, "error"));
 
       // Units fetch runs independently — real unit data from Sienge
       fetch(`/api/sienge/units${refreshParam ? "?forceRefresh=true" : ""}`)
         .then(res => res.ok ? res.json() : null)
-        .then(data => { if (data) setApiUnits(data.data || []); })
-        .catch(() => {});
+        .then(data => { if (data) { setApiUnits(data.data || []); setStep(5, "done", `${(data.data || []).length} unidades`); } else setStep(5, "error"); })
+        .catch(() => setStep(5, "error"));
+
+      // Fetch ALL bank movements (including linked to outcomes/incomes) for DRE Level 3 enrichment
+      fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N${refreshParam}`)
+        .then(res => res.ok ? res.json() : null)
+        .then(data => { if (data) { setAllBankMovementsFull(data.data || []); setStep(3, "done", `${(data.data || []).length} movimentos`); } else setStep(3, "error"); })
+        .catch(() => setStep(3, "error"));
 
       const [outcomeRes, bmRes, incomeRes] = await Promise.all([
-        fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
-        fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
-        fetch(`/api/sienge/income?startDate=${startDate}&endDate=${incomeEndDate}${refreshParam}`),
+        fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`)
+          .then(r => { if (!r.ok) setStep(0, "error"); return r; }),
+        fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`)
+          .then(r => { if (!r.ok) setStep(1, "error"); return r; }),
+        fetch(`/api/sienge/income?startDate=${startDate}&endDate=${incomeEndDate}${refreshParam}`)
+          .then(r => { if (!r.ok) setStep(2, "error"); return r; }),
       ]);
 
       if (!outcomeRes.ok) throw new Error("Outcome API error");
       const outcomeData = await outcomeRes.json();
       setItems(outcomeData.data || []);
       if (outcomeData.cachedAt) setLastUpdatedCp(outcomeData.cachedAt);
+      setStep(0, "done", `${(outcomeData.data || []).length} parcelas`);
 
       if (bmRes.ok) {
         const bmData = await bmRes.json();
         const allBm: SiengeBankMovement[] = bmData.data || [];
         setAllBankMovements(allBm);
+        setStep(1, "done", `${allBm.length} movimentos`);
       }
-
-      // Fetch ALL bank movements (including linked to outcomes/incomes) for DRE Level 3 enrichment
-      fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N${refreshParam}`)
-        .then(res => res.ok ? res.json() : null)
-        .then(data => { if (data) setAllBankMovementsFull(data.data || []); })
-        .catch(() => {});
 
       if (!incomeRes.ok) throw new Error("Income API error");
       const incomeData = await incomeRes.json();
       setIncomeItems(incomeData.data || []);
       if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
+      setStep(2, "done", `${(incomeData.data || []).length} parcelas`);
 
       dataLoadedRef.current = true;
     } catch {
       toast.error("Erro ao carregar dados do painel executivo");
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      // Mantém modal aberto por 1.2s pra usuário ver o resultado, depois fecha
+      if (forceRefresh) {
+        setTimeout(() => { setRefreshing(false); setRefreshSteps([]); }, 1200);
+      } else {
+        setRefreshing(false);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentYear]);
@@ -1887,6 +1913,42 @@ export function ExecutiveDashboard() {
 
   return (
     <div className="space-y-6 p-1">
+      {/* Refresh progress modal */}
+      {refreshing && refreshSteps.length > 0 && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 w-[420px] max-w-[90vw]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-blue-50 dark:bg-blue-950 rounded-lg">
+                <RefreshCw className="h-5 w-5 text-blue-600 dark:text-blue-400 animate-spin" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">Atualizando dados</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Buscando do Sienge — pode levar até 2 minutos</p>
+              </div>
+            </div>
+            <ul className="space-y-2">
+              {refreshSteps.map((s, i) => (
+                <li key={i} className="flex items-center justify-between gap-3 px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
+                  <div className="flex items-center gap-2 min-w-0">
+                    {s.status === "running" && <Loader2 className="h-4 w-4 text-blue-500 animate-spin shrink-0" />}
+                    {s.status === "done" && <CheckCircle className="h-4 w-4 text-emerald-500 shrink-0" />}
+                    {s.status === "error" && <AlertTriangle className="h-4 w-4 text-red-500 shrink-0" />}
+                    {s.status === "pending" && <div className="h-4 w-4 rounded-full border-2 border-slate-300 shrink-0" />}
+                    <span className="text-sm text-slate-700 dark:text-slate-200 truncate">{s.label}</span>
+                  </div>
+                  {s.detail && (
+                    <span className={`text-xs tabular-nums shrink-0 ${
+                      s.status === "done" ? "text-emerald-600 dark:text-emerald-400" :
+                      s.status === "error" ? "text-red-500" : "text-slate-400"
+                    }`}>{s.detail}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
