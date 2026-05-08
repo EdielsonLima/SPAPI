@@ -33,6 +33,9 @@ interface DreTabProps {
   selectedYears: Set<string>;
   selectedMonths: Set<string>;
   selectedCompanies: Set<string>;
+  // Increments on every "Atualizar" click — forces re-fetch of /api/dre-supplementary
+  // so DRE picks up the latest Excel sync without needing the user to reload.
+  refreshKey?: number;
 }
 
 const DRE_INPUT_CATEGORIES = [
@@ -135,6 +138,7 @@ export function DreTab({
   selectedYears,
   selectedMonths,
   selectedCompanies,
+  refreshKey = 0,
 }: DreTabProps) {
   const [dreMappings, setDreMappings] = useState<Record<string, DreMappingItem[]>>({});
   const [loadingMappings, setLoadingMappings] = useState(true);
@@ -159,13 +163,14 @@ export function DreTab({
   // Fetch DRE data from Excel/DB (primary source)
   // DRE shows ALL companies from Excel (no company filter) to match Power BI
   // Excludes only "holding/administradora" companies like Power BI does
+  // refreshKey nas deps faz o fetch refazer quando o user clica "Atualizar".
   useEffect(() => {
     if (selectedYears.size === 0) return;
     const years = Array.from(selectedYears);
 
     Promise.all(
       years.map(year =>
-        fetch(`/api/dre-supplementary?year=${year}&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}`)
+        fetch(`/api/dre-supplementary?year=${year}&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}`, { cache: "no-store" })
           .then(r => r.ok ? r.json() : null)
           .catch(() => null)
       )
@@ -187,7 +192,7 @@ export function DreTab({
         setExcelSupplementary(merged);
       }
     });
-  }, [selectedYears]);
+  }, [selectedYears, refreshKey]);
 
   // Fetch monthly breakdown for DRE Completa view
   // Also fetches ALL companies (no filter) to match Power BI
@@ -204,7 +209,7 @@ export function DreTab({
 
     Promise.all(
       years.map(year =>
-        fetch(`/api/dre-supplementary?year=${year}&monthly=true&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}${monthsQuery}`)
+        fetch(`/api/dre-supplementary?year=${year}&monthly=true&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}${monthsQuery}`, { cache: "no-store" })
           .then(r => {
             if (!r.ok) {
               console.error(`DRE Completa fetch error: ${r.status} for year ${year}`);
@@ -240,7 +245,7 @@ export function DreTab({
       console.error("DRE Completa processing error:", err);
       setMonthlyData(null);
     }).finally(() => setLoadingMonthly(false));
-  }, [dreMode, selectedYears, selectedMonths]);
+  }, [dreMode, selectedYears, selectedMonths, refreshKey]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpandedCategories(prev => {

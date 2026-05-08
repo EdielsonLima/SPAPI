@@ -275,6 +275,10 @@ export function ExecutiveDashboard() {
   const [incomeItems, setIncomeItems] = useState<SiengeIncome[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Increments on every "Atualizar" click — passed to DreTab as refreshKey
+  // to force re-fetch of /api/dre-supplementary (the DRE pulls from Excel/DB
+  // independently of the Sienge cache, so the main fetchData doesn't reach it).
+  const [refreshKey, setRefreshKey] = useState(0);
   const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
   const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
   const [salesContracts, setSalesContracts] = useState<SiengeSalesContract[]>([]);
@@ -419,8 +423,10 @@ export function ExecutiveDashboard() {
     const endDate = `${currentYear + 5}-12-31`;
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
 
-    if (forceRefresh) setRefreshing(true);
-    else if (!dataLoadedRef.current) setLoading(true);
+    if (forceRefresh) {
+      setRefreshing(true);
+      setRefreshKey(k => k + 1);
+    } else if (!dataLoadedRef.current) setLoading(true);
 
     try {
       // Sales contracts fetch runs independently — never blocks main data
@@ -4441,6 +4447,7 @@ export function ExecutiveDashboard() {
           selectedYears={selectedYears}
           selectedMonths={selectedMonths}
           selectedCompanies={selectedCompanies}
+          refreshKey={refreshKey}
         />
       )}
 
