@@ -25,6 +25,67 @@ function isExcludedOp(name) {
   return EXCLUDED_OP.some(x => lower.includes(x));
 }
 
+// Mesmo filtro do incomeBankMovementsAsItems do executive-dashboard.tsx.
+// Sintetiza BMs órfãos (sem bill associado) que representam recebimentos
+// diretos no banco (Rendimento de aplicação etc) — = "linha sem cliente"
+// do PDF Sienge "Contas Recebidas (por Cliente)".
+function isIncomeBankMovement(bm) {
+  if (bm.bankMovementAmount === 0) return false;
+  if (bm.billId) return false;
+  if (bm.bankMovementOperationType !== "E") return false;
+  const historic = (bm.bankMovementHistoricName || "").toLowerCase().trim();
+  if (historic.includes("transferência") || historic.includes("transferencia")) return false;
+  if (historic === "aplicação" || historic === "aplicacao") return false;
+  if (historic.includes("pagamento") || historic.includes("saque") ||
+      historic.includes("depósito") || historic.includes("deposito") ||
+      historic.includes("cheque emitido")) return false;
+  const cats = bm.financialCategories || [];
+  const isReceita = cats.length === 0 || cats.some(fc => fc.financialCategoryType === "R");
+  if (!isReceita) return false;
+  const catNames = cats.map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+  if (catNames.includes("transferência") || catNames.includes("transferencia")) return false;
+  return true;
+}
+
+// Total Recebido (Líquido). Soma:
+// - Receipts vinculados a bills (com bankMovements — exclui Por Bens)
+// - BMs órfãos sintetizados como recebimentos sem cliente
+// Filtra por paymentDate em year/month.
+function computeRecebidas(incomeItems, bankMovements, company, year, month) {
+  const yearFilter = year && year !== "*" ? year : null;
+  const monthFilter = month && month !== "*" ? month : null;
+  let total = 0;
+  let count = 0;
+
+  // Receipts vinculados
+  for (const item of incomeItems) {
+    if (item.companyName !== company) continue;
+    for (const r of (item.receipts || [])) {
+      if (!r.paymentDate) continue;
+      if (yearFilter && !r.paymentDate.startsWith(yearFilter)) continue;
+      if (monthFilter && r.paymentDate.substring(5, 7) !== monthFilter) continue;
+      // Só conta se tiver bankMovements (= Sienge Líquido > 0; Por Bens fica 0)
+      if (!r.bankMovements || r.bankMovements.length === 0) continue;
+      if ((r.netAmount || 0) <= 0) continue;
+      total += r.netAmount;
+      count++;
+    }
+  }
+
+  // BMs órfãos
+  for (const bm of bankMovements) {
+    if (bm.companyName !== company) continue;
+    if (!bm.bankMovementDate) continue;
+    if (yearFilter && !bm.bankMovementDate.startsWith(yearFilter)) continue;
+    if (monthFilter && bm.bankMovementDate.substring(5, 7) !== monthFilter) continue;
+    if (!isIncomeBankMovement(bm)) continue;
+    total += Math.abs(bm.bankMovementAmount);
+    count++;
+  }
+
+  return { total, count };
+}
+
 // Pareia Adiantamento+Estorno (mesma data, netAmount oposto) no mesmo item.
 // Sienge "Contas Pagas Sintético" cancela ambos do Líquido. Sem o pareamento,
 // EXCLUDED_OP filtra o Estorno mas deixa o Adiantamento contado.
@@ -146,7 +207,11 @@ function computePagas(items, bankMovements, company, year, month) {
   const bm = await pool.query("SELECT data FROM cached_bank_movements ORDER BY cached_at DESC LIMIT 1");
   const bankMovements = bm.rows[0]?.data?.data || bm.rows[0]?.data || [];
 
+  const incomeR = await pool.query("SELECT data FROM cached_income ORDER BY cached_at DESC LIMIT 1");
+  const incomeItems = incomeR.rows[0]?.data?.data || incomeR.rows[0]?.data || [];
+
   console.log(`Cache outcome: ${items.length} itens (cached_at ${cachedAt})`);
+  console.log(`Cache income: ${incomeItems.length} itens`);
   console.log(`Cache bank movements: ${bankMovements.length} itens`);
   console.log(`Validações: ${validations.length}\n`);
 
@@ -162,6 +227,8 @@ function computePagas(items, bankMovements, company, year, month) {
       result = computeAPagar(items, v.company, v.year, v.month);
     } else if (v.mode === "pagas") {
       result = computePagas(items, bankMovements, v.company, v.year, v.month);
+    } else if (v.mode === "recebidas") {
+      result = computeRecebidas(incomeItems, bankMovements, v.company, v.year, v.month);
     } else {
       console.log(`✗ ${v.company} ${v.year}-${v.month} ${v.mode}: modo desconhecido`);
       failed++;
