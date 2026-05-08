@@ -957,6 +957,91 @@ export function ExecutiveDashboard() {
     [consistentItems, bankMovementsAsItems]
   );
 
+  // Bank movements órfãos (sem bill associado) que representam RECEBIMENTOS
+  // diretos no banco — entram no relatório Sienge "Contas Recebidas (por
+  // Cliente)" como linha sem cliente. Validado 2026-05-08 contra HANNOVER:
+  // R$ 23.583,76 = 12 BMs "Rendimento de aplicação".
+  //
+  // Critérios:
+  // - billId === null (não vinculado a uma fatura — não está em receipts[])
+  // - bankMovementOperationType === "E" (Entrada de caixa)
+  // - financialCategoryType === "R" (Receita)
+  // - exclui Transferência (movimentação interna entre contas)
+  const incomeBankMovementsAsItems = useMemo(() => {
+    if (allBankMovementsFull.length === 0) return [] as SiengeIncome[];
+    return allBankMovementsFull
+      .filter(bm => {
+        if (bm.bankMovementAmount === 0) return false;
+        // Se tem billId, já está contado em receipts[] dos income items
+        if (bm.billId) return false;
+        // Só Entradas (não saídas)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((bm as any).bankMovementOperationType !== "E") return false;
+        const historic = (bm.bankMovementHistoricName || "").toLowerCase().trim();
+        // Excluir transferência interna entre contas
+        if (historic.includes("transferência") || historic.includes("transferencia")) return false;
+        // Excluir "Aplicação" sozinho (saída pra fundo de investimento). Mantém
+        // "Rendimento de aplicação" e "Resgate de Aplicação" — esses são entradas
+        // de volta na conta-corrente. Validado 2026-05-08 contra 135 JARDINS.
+        if (historic === "aplicação" || historic === "aplicacao") return false;
+        // Excluir saídas (mesmo que Sienge marque como E em alguns casos)
+        if (historic.includes("pagamento") || historic.includes("saque") ||
+            historic.includes("depósito") || historic.includes("deposito")) return false;
+        // Categoria de receita (financialCategoryType === "R")
+        const cats = bm.financialCategories || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const isReceita = cats.length === 0 || cats.some((fc: any) => fc.financialCategoryType === "R");
+        if (!isReceita) return false;
+        return true;
+      })
+      .map(bm => ({
+        billId: bm.bankMovementId,
+        installmentId: 1,
+        companyId: bm.companyId,
+        companyName: bm.companyName,
+        clientId: 0,
+        clientName: "(sem cliente)",
+        documentIdentificationId: bm.documentIdentificationId || "MB",
+        documentIdentificationName: bm.documentIdentificationName || "MOV. BANCÁRIO",
+        documentNumber: "",
+        originId: "BM",
+        originalAmount: Math.abs(bm.bankMovementAmount),
+        discountAmount: 0,
+        taxAmount: 0,
+        dueDate: bm.bankMovementDate,
+        billDate: bm.billDate || bm.bankMovementDate,
+        balanceAmount: 0,
+        correctedBalanceAmount: 0,
+        receivedNetAmount: Math.abs(bm.bankMovementAmount),
+        receipts: [{
+          netAmount: Math.abs(bm.bankMovementAmount),
+          paymentDate: bm.bankMovementDate,
+          operationTypeName: bm.bankMovementHistoricName || "Recebimento",
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          bankMovements: [{ amount: Math.abs(bm.bankMovementAmount) }] as any,
+        }],
+        payments: [{
+          operationTypeId: 0,
+          operationTypeName: bm.bankMovementHistoricName || "Recebimento",
+          netAmount: Math.abs(bm.bankMovementAmount),
+          grossAmount: Math.abs(bm.bankMovementAmount),
+          paymentDate: bm.bankMovementDate,
+          taxAmount: 0,
+          monetaryCorrectionAmount: 0,
+          interestAmount: 0,
+          fineAmount: 0,
+          discountAmount: 0,
+        }],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any as SiengeIncome));
+  }, [allBankMovementsFull]);
+
+  // CR Recebidas: income items + BMs órfãos sintetizados como recebimentos
+  const consistentIncomeForRecebidas = useMemo(
+    () => [...consistentIncome, ...incomeBankMovementsAsItems],
+    [consistentIncome, incomeBankMovementsAsItems]
+  );
+
   const itemsPagas = useMemo(() =>
     consistentItemsForPagas.filter(i =>
       (i.payments || []).some(p =>
@@ -974,12 +1059,12 @@ export function ExecutiveDashboard() {
     consistentIncome.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentIncome, todayStr]);
 
   const itemsRecebidas = useMemo(() =>
-    consistentIncome.filter(i =>
+    consistentIncomeForRecebidas.filter(i =>
       i.originalAmount > 0 && (i.payments || []).some(p =>
         p.netAmount > 0 &&
         p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
       )
-    ), [consistentIncome, selectedYears]);
+    ), [consistentIncomeForRecebidas, selectedYears]);
 
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);
