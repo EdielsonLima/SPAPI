@@ -378,8 +378,12 @@ export function ExecutiveDashboard() {
     const arr: string[] = [];
     if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia" || activeTab === "dre" || activeTab === "comercial" || activeTab === "resumo") {
       for (let y = currentYear - 10; y <= currentYear; y++) arr.push(String(y));
+    } else if (activeTab === "a-receber") {
+      // CR de imóveis: parcelamento longo (financiamento direto até ~10 anos);
+      // SILVA PACKER tem dueDate até 2034 — alinha com incomeEndDate do fetch.
+      for (let y = currentYear; y <= currentYear + 15; y++) arr.push(String(y));
     } else {
-      // Contas a Pagar / a Receber: mostra ano atual em diante
+      // Contas a Pagar: mostra ano atual em diante
       for (let y = currentYear; y <= currentYear + 5; y++) arr.push(String(y));
     }
     return arr;
@@ -421,6 +425,10 @@ export function ExecutiveDashboard() {
   const fetchData = useCallback(async (forceRefresh = false) => {
     const startDate = `${currentYear - 10}-01-01`;
     const endDate = `${currentYear + 5}-12-31`;
+    // CR de imóveis tem parcelas longas (financiamento direto até ~10 anos);
+    // Sienge SILVA PACKER tem dueDate até 2034. Usa range maior apenas para
+    // income — CP/BM raramente têm datas além de 5 anos.
+    const incomeEndDate = `${currentYear + 15}-12-31`;
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
 
     if (forceRefresh) {
@@ -444,7 +452,7 @@ export function ExecutiveDashboard() {
       const [outcomeRes, bmRes, incomeRes] = await Promise.all([
         fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
         fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
-        fetch(`/api/sienge/income?startDate=${startDate}&endDate=${endDate}${refreshParam}`),
+        fetch(`/api/sienge/income?startDate=${startDate}&endDate=${incomeEndDate}${refreshParam}`),
       ]);
 
       if (!outcomeRes.ok) throw new Error("Outcome API error");
