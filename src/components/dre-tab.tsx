@@ -16,9 +16,11 @@ import {
   Lightbulb,
   AlertTriangle,
   CheckCircle,
+  RefreshCw,
 } from "lucide-react";
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge";
 import { formatCurrency } from "@/lib/dashboard-utils";
+import { toast } from "sonner";
 
 interface DreMappingItem {
   financialPlanId: string;
@@ -151,6 +153,29 @@ export function DreTab({
   // Monthly data for DRE Completa view
   const [monthlyData, setMonthlyData] = useState<Record<string, { name: string; dreCategory: string; months: Record<string, number> }> | null>(null);
   const [loadingMonthly, setLoadingMonthly] = useState(false);
+  const [syncingExcel, setSyncingExcel] = useState(false);
+  const [localRefreshKey, setLocalRefreshKey] = useState(0);
+
+  const handleSyncExcel = useCallback(async () => {
+    setSyncingExcel(true);
+    try {
+      const res = await fetch("/api/sync-excel-dre", { method: "POST" });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error || "Falha no sync");
+        if (json.detail) toast.message(json.detail, { duration: 10000 });
+        return;
+      }
+      const modified = new Date(json.excelModified).toLocaleString("pt-BR");
+      toast.success(`Sync DRE concluído — ${json.totalRecords.toLocaleString("pt-BR")} registros (Excel ${modified})`);
+      setLocalRefreshKey(k => k + 1);
+    } catch (err) {
+      toast.error("Erro ao chamar /api/sync-excel-dre");
+      console.error(err);
+    } finally {
+      setSyncingExcel(false);
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/dre-mappings")
@@ -192,7 +217,7 @@ export function DreTab({
         setExcelSupplementary(merged);
       }
     });
-  }, [selectedYears, refreshKey]);
+  }, [selectedYears, refreshKey, localRefreshKey]);
 
   // Fetch monthly breakdown for DRE Completa view
   // Also fetches ALL companies (no filter) to match Power BI
@@ -245,7 +270,7 @@ export function DreTab({
       console.error("DRE Completa processing error:", err);
       setMonthlyData(null);
     }).finally(() => setLoadingMonthly(false));
-  }, [dreMode, selectedYears, selectedMonths, refreshKey]);
+  }, [dreMode, selectedYears, selectedMonths, refreshKey, localRefreshKey]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpandedCategories(prev => {
@@ -640,6 +665,19 @@ export function DreTab({
                   DRE Completa
                 </button>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-xs font-medium h-9 rounded-xl bg-white border-slate-200 hover:bg-slate-50 shadow-sm transition-all"
+                onClick={handleSyncExcel}
+                disabled={syncingExcel}
+                title="Lê o Excel local (DEMOSTRATIVO RESULTADO COMPLETO.xlsx) e atualiza o DRE no banco. Só funciona quando o servidor tem acesso ao arquivo."
+              >
+                {syncingExcel
+                  ? <Loader2 className="h-4 w-4 text-slate-500 animate-spin" />
+                  : <RefreshCw className="h-4 w-4 text-slate-500" />}
+                Sync DRE
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
