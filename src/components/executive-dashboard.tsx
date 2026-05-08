@@ -1172,6 +1172,13 @@ export function ExecutiveDashboard() {
   // Calcula encargos (multa + juros) para itens inadimplentes - mesma fórmula de contas-table.tsx
   const calcEncargos = (item: SiengeIncome) => {
     if (!item.dueDate) return 0;
+    // Parcelas com indexerName="REAL" (indexerId=0) não têm correção monetária
+    // — Sienge mostra Acréscimo=0 no PDF "Contas a Receber". Validado 2026-05-08
+    // contra TESLA HELVYS (Permuta) e SP GELSON (REAL). Apenas indexers como
+    // "Cub - SC", "IGP-M" etc. geram acréscimo.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const indexer = (item as any).indexerName;
+    if (!indexer || indexer === "REAL") return 0;
     const due = new Date(item.dueDate + "T00:00:00");
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
