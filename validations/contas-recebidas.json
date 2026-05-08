@@ -1,5 +1,5 @@
 {
-  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas Recebidas (por Cliente)' Coluna Padrão. Cada entrada congela um total já conferido para detectar regressões. mode='recebidas' soma p.netAmount onde receipt tem bankMovements (= Sienge Líquido) + BMs órfãos (billId=null, type=E, categoria R) sintetizados como recebimentos sem cliente. Por Bens/Distrato/Reparcelamento ficam zerados. HOLDING/ADMINISTRADORA excluídas por padrão. Tipo Doc CONTRATO DE LOCAÇÃO (LOC/LNC) excluído por padrão. Valor esperado em reais, 2 casas decimais.",
+  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas Recebidas (por Cliente)' Coluna Padrão. Cada entrada congela um total já conferido para detectar regressões. mode='recebidas' soma p.netAmount onde receipt tem bankMovements (= Sienge Líquido) + BMs órfãos (billId=null, type=E, categoria R) sintetizados como recebimentos sem cliente. Por Bens/Distrato/Reparcelamento ficam zerados. HOLDING/ADMINISTRADORA excluídas por padrão. Tipo Doc CONTRATO DE LOCAÇÃO (LOC/LNC) excluído por padrão. Filtro BM exclui Cheque emitido (saída) e categoria Transferência Entre Contas (interna). Valor esperado em reais, 2 casas decimais.",
   "validations": [
     {
       "company": "DOMUS",
@@ -9,7 +9,7 @@
       "expected": 19152563.44,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% (R$ 19.152.563,44 = PDF Líquido)."
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100%."
     },
     {
       "company": "TETRA",
@@ -19,7 +19,7 @@
       "expected": 3400000.00,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% (R$ 3.400.000,00 = PDF Líquido). Por Bens R$ 4M (Março/2025) corretamente excluído (Sienge Líquido=0)."
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100%. Por Bens R$ 4M (Março/2025) corretamente excluído."
     },
     {
       "company": "SOLAR DI CAPRI",
@@ -29,7 +29,7 @@
       "expected": 31171451.88,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento de aplicação R$ 18.486,67 = linha sem cliente do PDF)."
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento de aplicação R$ 18.486,67)."
     },
     {
       "company": "SOLAR DI SIENA",
@@ -39,7 +39,7 @@
       "expected": 27656906.19,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento de aplicação R$ 47.040,98 = linha sem cliente do PDF)."
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento de aplicação R$ 47.040,98)."
     },
     {
       "company": "EDIFICIO 135 JARDINS",
@@ -49,7 +49,7 @@
       "expected": 88857947.56,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento + Resgate de aplicação R$ 525.190,68 = linha sem cliente do PDF). Aplicação pura R$ 1M corretamente excluída (saída pra fundo)."
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento + Resgate R$ 525.190,68). Aplicação pura R$ 1M corretamente excluída (saída pra fundo)."
     },
     {
       "company": "PALACIO ELIZABETH",
@@ -59,7 +59,7 @@
       "expected": 61759936.67,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems."
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100%."
     },
     {
       "company": "RESIDENCIAL HANNOVER",
@@ -69,7 +69,7 @@
       "expected": 23508098.69,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento de aplicação R$ 23.583,76 = 12 BMs = linha sem cliente do PDF)."
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento de aplicação R$ 23.583,76 = 12 BMs)."
     },
     {
       "company": "ROZZA",
@@ -79,7 +79,7 @@
       "expected": 21027450.31,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix tabData deps (gráficos não atualizavam). ROZZA não tem BM órfão — diff anterior era artefato de cache stale."
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix tabData deps. ROZZA não tem BM órfão."
     },
     {
       "company": "SERENITY",
@@ -90,6 +90,36 @@
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
       "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix incomeBankMovementsAsItems (Rendimento R$ 10.088,43)."
+    },
+    {
+      "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
+      "mode": "recebidas",
+      "year": "*",
+      "month": "*",
+      "expected": 96861373.37,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix de exclusão de BM cuja categoria é 'Transferência Entre Contas' (R$ 10.300 em 2023-10-03 — historic='Recebimento' mas categoria revela ser transferência interna). Mantém BM 29288 'Prêmio BB Consórcio' R$ 1.200 (receita legítima)."
+    },
+    {
+      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "mode": "recebidas",
+      "year": "*",
+      "month": "*",
+      "expected": 101476123.09,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix de exclusão de historic 'Cheque emitido' (2 BMs R$ 11.300 — saída pendente que Sienge marca type=E por engano)."
+    },
+    {
+      "company": "TESLA RESIDENCIAL",
+      "mode": "recebidas",
+      "year": "*",
+      "month": "*",
+      "expected": 54295281.61,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas Recebidas (por Cliente) — período 01/01/2001 a 08/05/2026, Coluna Padrão. BATE 100% após fix Cheque emitido (2 BMs R$ 11.300)."
     }
   ]
 }
