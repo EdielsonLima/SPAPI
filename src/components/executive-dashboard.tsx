@@ -686,7 +686,15 @@ export function ExecutiveDashboard() {
     }
   }, [allCompanyNames, defaultCompanies]);
 
-  const isExcludedDocType = (t: string) => t.toUpperCase().startsWith("PREVISÃO") || t.toUpperCase().startsWith("PREVISAO");
+  // PREVISÃO: documentos de previsão financeira (não realizados)
+  // CONTRATO DE LOCAÇÃO / CONTRATO DE LOCACAO NAO CONTABIL (LOC/LNC):
+  // lançamentos contábeis internos da HOLDING — Sienge "Contas Recebidas"
+  // não conta no Líquido. Validado 2026-05-08 contra PDF TETRA Total geral.
+  const isExcludedDocType = (t: string) => {
+    const upper = t.toUpperCase();
+    return upper.startsWith("PREVISÃO") || upper.startsWith("PREVISAO") ||
+      upper.startsWith("CONTRATO DE LOCA");
+  };
 
   const allDocTypes = useMemo(() => {
     const types = new Set<string>();
