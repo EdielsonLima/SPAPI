@@ -11,7 +11,9 @@ const DATABASE_URL = env.match(/DATABASE_URL=(.+)/)[1].trim();
 const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorized: false } });
 const fmt = v => `R$ ${(v || 0).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const todayStr = new Date().toISOString().split("T")[0]; // 2026-05-08
+// PDF Sienge "Contas a Receber" gerado com período 09/05/2026 em diante
+// (vencimentos futuros excluindo hoje). Sistema deve filtrar dueDate >= 09/05.
+const todayStr = "2026-05-09";
 
 (async () => {
   const r = await pool.query("SELECT data, cached_at FROM cached_income ORDER BY cached_at DESC LIMIT 1");
@@ -33,7 +35,7 @@ const todayStr = new Date().toISOString().split("T")[0]; // 2026-05-08
   let total = 0;
   let count = 0;
   // Período PDF: 09/05/2026 a 31/12/2040 — vamos ignorar dueDate > 2040-12-31 também
-  const periodEnd = "2040-12-31";
+  const periodEnd = "2050-12-31";
 
   for (const i of items) {
     if (isExcludedCompany(i.companyName)) continue;
@@ -55,9 +57,19 @@ const todayStr = new Date().toISOString().split("T")[0]; // 2026-05-08
   // PDF Total da empresa por empresa — usuário compartilhou só DOMUS R$ 31.943.781,02
   // Total geral PDF: R$ 165.826.426,59
   const PDF = {
+    "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA": 606801.27,
+    "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA": 1175333.26,
+    "EDIFICIO 135 JARDINS": 33066967.40,
+    "SOLAR DI CAPRI": 3101707.13,
+    "PALACIO ELIZABETH": 51032694.09,
+    "RESIDENCIAL HANNOVER": 4828081.01,
+    "SOLAR DI SIENA": 656898.66,
+    "TESLA RESIDENCIAL": 3389611.95,
+    "SERENITY": 15997999.84,
+    "ROZZA": 17969868.24,
     "DOMUS": 31943781.02,
   };
-  const PDF_TOTAL = 165826426.59;
+  const PDF_TOTAL = 163769743.87;
 
   console.log("Empresa".padEnd(50), "Sistema".padStart(20), "PDF".padStart(20), "Diff".padStart(15), "#parcelas".padStart(10));
   console.log("-".repeat(120));

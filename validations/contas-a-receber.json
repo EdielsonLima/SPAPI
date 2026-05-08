@@ -1,5 +1,5 @@
 {
-  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas a Receber (por Cliente)' Coluna Padrão. Cada entrada congela um total já conferido para detectar regressões. mode='a-receber' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje. HOLDING/ADMINISTRADORA excluídas por padrão. Tipo Doc CONTRATO DE LOCAÇÃO (LOC/LNC) excluído por padrão. Valor esperado em reais, 2 casas decimais. IMPORTANTE: snapshots de a-receber decaem rapidamente — o saldo muda dia a dia conforme parcelas são quitadas e correção monetária é aplicada (indexador REAL). Re-validar periodicamente.",
+  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas a Receber (por Cliente)' Coluna Padrão. Cada entrada congela um total já conferido para detectar regressões. mode='a-receber' soma effectiveAmount = correctedBalanceAmount - discountAmount - taxAmount para items com correctedBalanceAmount > 0 e dueDate >= hoje. HOLDING/ADMINISTRADORA excluídas por padrão. Tipo Doc CONTRATO DE LOCAÇÃO (LOC/LNC) excluído por padrão. Valor esperado em reais, 2 casas decimais. IMPORTANTE: snapshots de a-receber decaem rapidamente — saldo muda dia a dia conforme parcelas são quitadas e correção monetária é aplicada (indexador REAL). Re-validar periodicamente.",
   "validations": [
     {
       "company": "DOMUS",
@@ -9,7 +9,107 @@
       "expected": 31943781.02,
       "tolerance": 0.5,
       "validated_at": "2026-05-08",
-      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2040, Coluna Padrão, Indexador REAL, Calcular acréscimos até 08/05/2026. BATE 100% (12 clientes, 1068 parcelas)."
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050, Coluna Padrão, Indexador REAL, Calcular acréscimos até 08/05/2026. BATE 100% (12 clientes, 1068 parcelas)."
+    },
+    {
+      "company": "EDIFICIO 135 JARDINS",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 33066967.40,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% (24 clientes, 788 parcelas)."
+    },
+    {
+      "company": "TESLA RESIDENCIAL",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 3389611.95,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% (7 clientes, 99 parcelas)."
+    },
+    {
+      "company": "SOLAR DI CAPRI",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 3101707.13,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% (8 clientes, 173 parcelas)."
+    },
+    {
+      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 1175333.26,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% (2 clientes, 70 parcelas)."
+    },
+    {
+      "company": "SOLAR DI SIENA",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 656898.66,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% (3 clientes, 29 parcelas)."
+    },
+    {
+      "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 606801.27,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. BATE 100% (3 clientes, 99 parcelas). SP recebe pouco (mais imóveis comerciais)."
+    },
+    {
+      "company": "RESIDENCIAL HANNOVER",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 4828081.01,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. PDF R$ 4.828.081,01 (7 clientes, 165 parcelas). Cache 12:57 mostra R$ 4.837.350,09 (+R$ 9.269,07) por causa do pagamento ANDREIA SOUZA SANTOS R$ 9.269,07 feito após cache. Refresh resolve."
+    },
+    {
+      "company": "SERENITY",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 15997999.84,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. PDF R$ 15.997.999,84 (10 clientes, 681 parcelas). Cache 12:57: R$ 16.009.084,21 (+R$ 11.084,37) por pagamento entre cache e PDF. Refresh resolve."
+    },
+    {
+      "company": "ROZZA",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 17969868.24,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. PDF R$ 17.969.868,24 (10 clientes, 674 parcelas). Cache 12:57: R$ 18.083.047,80 (+R$ 113.179,56) por pagamento entre cache e PDF. Refresh resolve."
+    },
+    {
+      "company": "PALACIO ELIZABETH",
+      "mode": "a-receber",
+      "year": "*",
+      "month": "*",
+      "expected": 51032694.09,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge Contas a Receber (por Cliente) — período 09/05/2026 a 31/12/2050. PDF R$ 51.032.694,09 (31 clientes, 1937 parcelas). Cache 12:57: R$ 51.063.322,88 (+R$ 30.628,79) por pagamento entre cache e PDF. Refresh resolve."
     }
   ]
 }
