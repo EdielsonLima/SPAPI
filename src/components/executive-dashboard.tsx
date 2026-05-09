@@ -1800,31 +1800,75 @@ export function ExecutiveDashboard() {
   // === Loading State ===
   if (loading) {
     return (
-      <div className="space-y-8 p-1">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-64 bg-slate-200" />
-          <div className="flex gap-3">
-            <Skeleton className="h-10 w-28 bg-slate-200" />
-            <Skeleton className="h-10 w-64 bg-slate-200" />
+      <>
+        {/* Skeletons no fundo */}
+        <div className="space-y-8 p-1">
+          <div className="flex items-center justify-between">
+            <Skeleton className="h-8 w-64 bg-slate-200 dark:bg-slate-800" />
+            <div className="flex gap-3">
+              <Skeleton className="h-10 w-28 bg-slate-200 dark:bg-slate-800" />
+              <Skeleton className="h-10 w-64 bg-slate-200 dark:bg-slate-800" />
+            </div>
+          </div>
+          <div className="grid gap-5 md:grid-cols-3 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-36 rounded-xl bg-slate-200 dark:bg-slate-800" />
+            ))}
+          </div>
+          <div className="grid gap-6 lg:grid-cols-3">
+            <Skeleton className="h-[420px] rounded-xl bg-slate-200 dark:bg-slate-800" />
+            <Skeleton className="h-[420px] rounded-xl lg:col-span-2 bg-slate-200 dark:bg-slate-800" />
           </div>
         </div>
-        {/* Loading indicator */}
-        <div className="flex items-center justify-center py-4">
-          <div className="flex items-center gap-3 px-5 py-3 bg-white rounded-xl shadow-sm border border-slate-100">
-            <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-            <span className="text-sm font-medium text-slate-600">Carregando dados do painel...</span>
+
+        {/* Modal centralizado */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+            {/* Top gradient bar */}
+            <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+
+            <div className="p-8 flex flex-col items-center text-center">
+              {/* Spinner animado em camadas */}
+              <div className="relative mb-6">
+                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/20 to-indigo-500/20 blur-xl animate-pulse" />
+                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 flex items-center justify-center border border-blue-200/60 dark:border-blue-800/40">
+                  <Loader2 className="h-10 w-10 animate-spin text-blue-500" strokeWidth={2.5} />
+                </div>
+              </div>
+
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 mb-1">
+                Carregando Painel Executivo
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                Sincronizando dados financeiros do Sienge...
+              </p>
+
+              {/* Pontos animados */}
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-blue-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-2 h-2 rounded-full bg-purple-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+
+              {/* Etapas */}
+              <div className="mt-6 w-full space-y-2 text-left">
+                <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Buscando contas a pagar e receber
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: "200ms" }} />
+                  Calculando saldos e movimentações
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse" style={{ animationDelay: "400ms" }} />
+                  Consolidando indicadores por empresa
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="grid gap-5 md:grid-cols-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-36 rounded-xl bg-slate-200" />
-          ))}
-        </div>
-        <div className="grid gap-6 lg:grid-cols-3">
-          <Skeleton className="h-[420px] rounded-xl bg-slate-200" />
-          <Skeleton className="h-[420px] rounded-xl lg:col-span-2 bg-slate-200" />
-        </div>
-      </div>
+      </>
     );
   }
 
