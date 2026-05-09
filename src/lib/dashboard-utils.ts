@@ -38,6 +38,7 @@ export const MONTH_LABELS = [
 // Função preservada como no-op pra não quebrar imports — pode ser removida
 // num refactor futuro.
 type PaymentLike = { paymentDate?: string; netAmount?: number; operationTypeName?: string | null };
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function getEstornoPairs<T extends PaymentLike>(_payments: T[]): Set<T> {
   return new Set<T>();
 }
