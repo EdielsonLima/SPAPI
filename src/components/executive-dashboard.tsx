@@ -58,7 +58,7 @@ import {
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } from "@/types/sienge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
-import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs } from "@/lib/dashboard-utils";
+import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType } from "@/lib/dashboard-utils";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
@@ -416,6 +416,7 @@ export function ExecutiveDashboard() {
   const consistentItems = useMemo(() =>
     items.filter(i =>
       i.consistencyStatus !== 'N' &&
+      !isExcludedFinancialDocType(i.documentIdentificationName, i.forecastDocument) &&
       !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
     ), [items, exclusionSet]);
 
@@ -702,9 +703,7 @@ export function ExecutiveDashboard() {
   // lançamentos contábeis internos da HOLDING — Sienge "Contas Recebidas"
   // não conta no Líquido. Validado 2026-05-08 contra PDF TETRA Total geral.
   const isExcludedDocType = (t: string) => {
-    const upper = t.toUpperCase();
-    return upper.startsWith("PREVISÃO") || upper.startsWith("PREVISAO") ||
-      upper.startsWith("CONTRATO DE LOCA");
+    return isExcludedFinancialDocType(t);
   };
 
   const allDocTypes = useMemo(() => {
@@ -1182,8 +1181,7 @@ export function ExecutiveDashboard() {
       let realized = 0;
       consistentItems.forEach(item => {
         if (item.companyName !== cs.companyName) return;
-        const docName = (item.documentIdentificationName || "").toUpperCase();
-        if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
+        if (isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return;
         (item.payments || []).forEach(p => {
           if (p.netAmount !== 0 && p.paymentDate) {
             realized += p.netAmount;
@@ -5391,8 +5389,7 @@ export function ExecutiveDashboard() {
             if (!selectedDocTypes.has(tipo)) return;
           }
           // Always exclude previsão documents
-          const docName = (item.documentIdentificationName || "").toUpperCase();
-          if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) return;
+          if (isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return;
           const payments = item.payments || [];
           const canceled = getEstornoPairs(payments);
           payments.forEach(p => {

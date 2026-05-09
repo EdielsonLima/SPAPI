@@ -25,6 +25,24 @@ export const MONTH_LABELS = [
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
 ];
 
+export function normalizeFilterText(value: string | null | undefined): string {
+  return (value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .trim();
+}
+
+export function isExcludedFinancialDocType(
+  documentName: string | null | undefined,
+  forecastDocument?: string | null
+): boolean {
+  const normalized = normalizeFilterText(documentName);
+  return forecastDocument === "S" ||
+    normalized.startsWith("PREVISAO") ||
+    normalized.startsWith("CONTRATO DE LOCA");
+}
+
 // Pareamento manual de Adiantamento+Estorno foi descontinuado em 2026-05-09.
 // Estornos têm netAmount negativo: somá-los junto com os pagamentos chega
 // no mesmo Líquido do Sienge sem precisar parear. O pareamento por data
