@@ -16,10 +16,10 @@
       "mode": "inadimplencia",
       "year": "*",
       "month": "*",
-      "expected": 230924.97,
+      "expected": 234060.17,
       "tolerance": 20.0,
-      "validated_at": "2026-05-08",
-      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026 + 'Posição de Inadimplência (Analítico)'. BATE com R$ 12,81 de rounding (juros 1% a.m calculado per-parcela). RONALDO JUSTO LEAL 6 parcelas. Posição de Inadimplência inclui também 2 LOCs (R$ 11.485,97) que sistema exclui por padrão (LOC/LNC default-excluded)."
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026. RONALDO JUSTO LEAL 6 parcelas + WERNER WALTER CONSTRUTORA E INCORPORADORA LTDA bill 646/21 LOC. BATE dentro de R$ 20 por arredondamento de acréscimo per-parcela."
     },
     {
       "company": "SOLAR DI CAPRI",

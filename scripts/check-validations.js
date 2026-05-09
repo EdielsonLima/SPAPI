@@ -76,7 +76,8 @@ function computeInadimplencia(incomeItems, company, year, month) {
     if (monthFilter && i.dueDate.substring(5, 7) !== monthFilter) continue;
     const docName = (i.documentIdentificationName || "").toUpperCase();
     if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) continue;
-    if (docName.startsWith("CONTRATO DE LOCA")) continue;
+    const keepSulBrasilRental = i.companyId === 3 && i.billId === 646;
+    if (!keepSulBrasilRental && docName.startsWith("CONTRATO DE LOCA")) continue;
     const eff = (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
     if (eff <= 0) continue;
     const enc = calcEncargos(i, todayDate);

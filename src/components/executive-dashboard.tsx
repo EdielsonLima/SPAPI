@@ -421,14 +421,15 @@ export function ExecutiveDashboard() {
     ), [items, exclusionSet]);
 
   const consistentIncome = useMemo(() =>
-    incomeItems.filter(i =>
-      !isExcludedFinancialDocType(
+    incomeItems.filter(i => {
+      const keepSulBrasilRental = i.companyId === 3 && i.billId === 646;
+      return !isExcludedFinancialDocType(
         i.documentIdentificationName,
         (i as { forecastDocument?: string | null }).forecastDocument,
-        { excludeLocacao: true }
+        { excludeLocacao: !keepSulBrasilRental }
       ) &&
-      !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
-    ), [incomeItems, exclusionSet]);
+      !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`));
+    }), [incomeItems, exclusionSet]);
 
   // Active data source based on section
   const activeItems = section === "cr" ? consistentIncome : consistentItems;
