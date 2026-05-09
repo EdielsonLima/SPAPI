@@ -429,11 +429,19 @@ export function ExecutiveDashboard() {
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
+    if (activeTab === "pagas" || activeTab === "recebidas") {
+      activeItems.forEach(i => {
+        (i.payments || []).forEach(p => {
+          if (p.paymentDate) months.add(p.paymentDate.substring(5, 7));
+        });
+      });
+      return MONTH_OPTIONS.filter(m => months.has(m));
+    }
     activeItems.forEach(i => {
       if (i.dueDate) months.add(i.dueDate.substring(5, 7));
     });
     return MONTH_OPTIONS.filter(m => months.has(m));
-  }, [activeItems]);
+  }, [activeItems, activeTab]);
 
   // Fixed date range for data fetching — never changes based on filters
   const dataLoadedRef = useRef(false);
@@ -742,6 +750,14 @@ export function ExecutiveDashboard() {
   const effectiveAmount = (i: SiengeOutcome | SiengeIncome) =>
     (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
 
+  const matchesSelectedPaymentDate = useCallback((paymentDate?: string) => {
+    if (!paymentDate) return false;
+    if (selectedYears.size > 0 && !selectedYears.has(paymentDate.substring(0, 4))) return false;
+    if (selectedMonths.size > 0 && !selectedMonths.has(paymentDate.substring(5, 7))) return false;
+    if (selectedDays.size > 0 && !selectedDays.has(paymentDate.substring(8, 10))) return false;
+    return true;
+  }, [selectedYears, selectedMonths, selectedDays]);
+
   // Soma de pagamentos filtrada por tipo de operação e ano do pagamento.
   // Pareia Adiantamento+Estorno (mesma data, valores opostos) e exclui ambos —
   // Sienge cancela esses pares do Líquido. Sem pareamento, EXCLUDED_OP filtra
@@ -753,20 +769,20 @@ export function ExecutiveDashboard() {
       .filter(p =>
         !canceled.has(p) &&
         (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
-        p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+        matchesSelectedPaymentDate(p.paymentDate)
       )
       .reduce((s, p) => s + p.netAmount, 0);
-  }, [selectedOpTypes, selectedYears]);
+  }, [selectedOpTypes, matchesSelectedPaymentDate]);
 
   // Soma de recebimentos filtrada apenas por ano (opType do CP não se aplica ao CR)
   const receivedSum = useCallback((i: SiengeIncome) =>
     (i.payments || [])
       .filter(p =>
         p.netAmount > 0 &&
-        p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+        matchesSelectedPaymentDate(p.paymentDate)
       )
       .reduce((s, p) => s + p.netAmount, 0),
-    [selectedYears]);
+    [matchesSelectedPaymentDate]);
 
   // Tipos de operação disponíveis nos dados.
   // Para CP, inclui "Movimento Bancário" como op type sintético quando existem
@@ -1080,9 +1096,9 @@ export function ExecutiveDashboard() {
       (i.payments || []).some(p =>
         p.netAmount > 0 &&
         (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
-        p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+        matchesSelectedPaymentDate(p.paymentDate)
       )
-    ), [consistentItemsForPagas, selectedOpTypes, selectedYears]);
+    ), [consistentItemsForPagas, selectedOpTypes, matchesSelectedPaymentDate]);
 
   // === CR Filtered item sets ===
   const itemsAReceber = useMemo(() =>
@@ -1095,14 +1111,26 @@ export function ExecutiveDashboard() {
     consistentIncomeForRecebidas.filter(i =>
       i.originalAmount > 0 && (i.payments || []).some(p =>
         p.netAmount > 0 &&
-        p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+        matchesSelectedPaymentDate(p.paymentDate)
       )
-    ), [consistentIncomeForRecebidas, selectedYears]);
+    ), [consistentIncomeForRecebidas, matchesSelectedPaymentDate]);
 
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);
   const filteredAtrasadas = useMemo(() => applyFilters(itemsAtrasadas), [itemsAtrasadas, applyFilters]);
-  const filteredPagas = useMemo(() => applyFilters(itemsPagas), [itemsPagas, applyFilters]);
+  // Pagas: anos/meses/dias devem filtrar pela data da baixa (paymentDate),
+  // nao pelo vencimento do titulo. Ex.: HANNOVER tem caucoes com vencimento
+  // em 2027 pagas em 2024; o Sienge soma essas baixas no periodo pago.
+  const filteredPagas = useMemo(() => {
+    let result = itemsPagas;
+    if (selectedCompanies.size > 0) {
+      result = result.filter(i => selectedCompanies.has(i.companyName));
+    }
+    if (selectedDocTypes.size > 0) {
+      result = result.filter(i => selectedDocTypes.has(i.documentIdentificationName));
+    }
+    return result;
+  }, [itemsPagas, selectedCompanies, selectedDocTypes]);
 
   const filteredAReceber = useMemo(() => {
     let result = applyFilters(itemsAReceber);
@@ -1555,7 +1583,7 @@ export function ExecutiveDashboard() {
           .filter(p =>
             !canceled.has(p) &&
             (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
-            p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+            matchesSelectedPaymentDate(p.paymentDate)
           )
           .forEach(p => {
             const m = new Date(p.paymentDate + "T00:00:00").getMonth();
@@ -1576,7 +1604,7 @@ export function ExecutiveDashboard() {
         (item.payments || [])
           .filter(p =>
             p.netAmount > 0 &&
-            p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+            matchesSelectedPaymentDate(p.paymentDate)
           )
           .forEach(p => {
             const m = new Date(p.paymentDate + "T00:00:00").getMonth();
@@ -1659,7 +1687,7 @@ export function ExecutiveDashboard() {
         (item.payments || [])
           .filter(p =>
             (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
-            p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+            matchesSelectedPaymentDate(p.paymentDate)
           )
           .forEach(p => {
             const y = new Date(p.paymentDate + "T00:00:00").getFullYear();
@@ -1677,7 +1705,7 @@ export function ExecutiveDashboard() {
         (item.payments || [])
           .filter(p =>
             p.netAmount > 0 &&
-            p.paymentDate && selectedYears.has(p.paymentDate.substring(0, 4))
+            matchesSelectedPaymentDate(p.paymentDate)
           )
           .forEach(p => {
             const y = new Date(p.paymentDate + "T00:00:00").getFullYear();
