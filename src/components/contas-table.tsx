@@ -801,29 +801,31 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   }, [filterEmpresas]);
 
   // Load tipo operação per-company or select all minus default-excluded types
+  // KEY versionada com `_v2` (2026-05-09) — invalida configurações antigas dos
+  // usuários que tinham filtros customizados desatualizados.
   useEffect(() => {
     if (isPagas && !isIncome && tiposBaixa.length > 0) {
-      const perCompanyKey = `contas_${dataSource}_${mode}_default_tipoBaixa_${empresaKeyForTipoBaixa}`;
+      const perCompanyKey = `contas_${dataSource}_${mode}_default_tipoBaixa_v2_${empresaKeyForTipoBaixa}`;
       const saved = localStorage.getItem(perCompanyKey);
       if (saved) {
         setFilterTipoBaixa(new Set(JSON.parse(saved)));
       } else {
         // No saved default: select all EXCEPT operation types that the Sienge
         // "Contas Pagas (por Credor) Sintético" report ignores no Líquido.
-        // - "substitui": Substituição é só vínculo de previsão→nota, não é caixa.
+        // Validado 2026-05-09 contra PDFs Sienge — 12 empresas cravam EXATO:
+        // - "substitui": Substituição só vincula previsão→nota, não é caixa.
         // - "cancelamento": pagamento cancelado.
-        // - "abatimento": entry contábil sem movimento real (Líquido=0 no Sienge).
-        // - "devolu": devolução de fornecedor — Sienge "(por Credor)" não soma
-        //   no Líquido (validado 2026-05-09 com HANNOVER A10 R$ 6.534,53,
-        //   N.OPCAO R$ 577,50, ZEUS R$ 264,82).
+        // - "abatimento" / "abatimento de adiantamento": entry contábil sem
+        //   movimento real (Líquido=0 no Sienge).
+        // - "devolu": devolução de fornecedor não entra no Líquido (HANNOVER
+        //   A10 R$ 6.534,53 + N.OPCAO R$ 577,50 + ZEUS R$ 264,82).
+        // - "por bens" / "permuta": permutas (R$ 13,5M ROZZA AMORIM, R$ 41k
+        //   VW SP, R$ 24k DESC TESLA) — Sienge "(por Credor)" zera Líquido.
         //
-        // "estorno" NÃO está aqui — estornos têm netAmount negativo e o Sienge
-        // soma como redução. Excluí-los daria over-count quando re-emitido em
-        // data distinta (HANNOVER bill=6109 EVELIN R$ 6.600,00 dobrado).
-        //
-        // "Por Bens" é incluído por default; empresas que precisam excluir
-        // (SP/ROZZA contra "por Credor") salvam filtro per-empresa via standalone.
-        const DEFAULT_EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu"];
+        // "Estorno" e "Movimento Bancário" NÃO estão aqui — Estorno tem
+        // netAmount negativo e cancela pagamentos refeitos; Movimento
+        // Bancário inclui tarifas/IOF/etc que o PDF soma no Líquido.
+        const DEFAULT_EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
         const initial = tiposBaixa.filter(op => {
           const lower = op.toLowerCase();
           return !DEFAULT_EXCLUDED.some(x => lower.includes(x));
@@ -1654,7 +1656,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                     onSelectAll={() => { setFilterTipoBaixa(new Set(tiposBaixa)); setPage(0); }}
                     onClear={() => { setFilterTipoBaixa(new Set()); setPage(0); }}
                     onSaveDefault={() => {
-                      const key = `contas_${dataSource}_${mode}_default_tipoBaixa_${empresaKeyForTipoBaixa}`;
+                      const key = `contas_${dataSource}_${mode}_default_tipoBaixa_v2_${empresaKeyForTipoBaixa}`;
                       localStorage.setItem(key, JSON.stringify([...filterTipoBaixa]));
                       toast.success(filterEmpresas.size > 0 ? `Padrão salvo para ${Array.from(filterEmpresas).join(", ")}` : "Padrão global de tipo operação salvo!");
                     }}

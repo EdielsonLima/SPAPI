@@ -342,12 +342,15 @@ export function ExecutiveDashboard() {
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
   const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("dashboard_default_opTypes");
+      // Key versionada com `_v2` (2026-05-09) — invalida configurações antigas
+      // de usuários com filtros desatualizados (sem por bens/permuta excluídos).
+      const saved = localStorage.getItem("dashboard_default_opTypes_v2");
       if (saved) return new Set(JSON.parse(saved));
     }
     // Empty marker — actual defaults are populated by useEffect below once
-    // allOpTypes is known (selects all minus Substituição/Cancelamento/Estorno
-    // which double-count in the Sienge reports, validated 2026-05-01).
+    // allOpTypes is known. Default exclui Substituição/Cancelamento/Abatimento/
+    // Devolução/Por Bens/Permuta — Sienge "(por Credor) Sintético" não soma
+    // essas no Líquido (validado 2026-05-09 em 12 empresas cravando exato).
     return new Set();
   });
   const [opTypesInitialized, setOpTypesInitialized] = useState(false);
@@ -788,15 +791,15 @@ export function ExecutiveDashboard() {
   // should save a per-empresa filter via the standalone page.
   useEffect(() => {
     if (opTypesInitialized || allOpTypes.length === 0) return;
-    if (typeof window !== "undefined" && localStorage.getItem("dashboard_default_opTypes")) {
-      // User has a saved default; respect it (already loaded by useState init)
+    if (typeof window !== "undefined" && localStorage.getItem("dashboard_default_opTypes_v2")) {
+      // User has a saved default (v2); respect it (already loaded by useState init)
       setOpTypesInitialized(true);
       return;
     }
-    // Mesma lista que contas-table.tsx — vide comentário lá. "estorno" foi
-    // removido em 2026-05-09 (somar net negativo dá Líquido correto sem
-    // pareamento) e "devolu" adicionado (Sienge "(por Credor)" não soma).
-    const EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu"];
+    // Mesma lista que contas-table.tsx — vide comentário lá. Default exclui
+    // op types que o Sienge "(por Credor) Sintético" não soma no Líquido
+    // (validado 2026-05-09 cravando 12 empresas exato).
+    const EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
     const initial = allOpTypes.filter(op => {
       const lower = op.toLowerCase();
       return !EXCLUDED.some(x => lower.includes(x));
@@ -818,16 +821,15 @@ export function ExecutiveDashboard() {
     if (allOpTypes.length === 0) return;
     if (selectedCompanies.size !== 1) return;
     const empresaKey = Array.from(selectedCompanies)[0];
-    const perCompanyKey = `contas_outcome_pagas_default_tipoBaixa_${empresaKey}`;
+    const perCompanyKey = `contas_outcome_pagas_default_tipoBaixa_v2_${empresaKey}`;
     const saved = localStorage.getItem(perCompanyKey);
     if (saved) {
       try { setSelectedOpTypes(new Set(JSON.parse(saved))); return; } catch { /* ignore */ }
     }
-    // No save: emulate standalone's auto-default
-    // Mesma lista que contas-table.tsx — vide comentário lá. "estorno" foi
-    // removido em 2026-05-09 (somar net negativo dá Líquido correto sem
-    // pareamento) e "devolu" adicionado (Sienge "(por Credor)" não soma).
-    const EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu"];
+    // No save: emulate standalone's auto-default. Mesma lista que
+    // contas-table.tsx — exclui Substituição/Cancelamento/Abatimento/
+    // Devolução/Por Bens/Permuta (Sienge "(por Credor)" não soma).
+    const EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
     const initial = allOpTypes.filter(op => {
       const lower = op.toLowerCase();
       return !EXCLUDED.some(x => lower.includes(x));
@@ -2314,7 +2316,7 @@ export function ExecutiveDashboard() {
               onClear={() => setSelectedOpTypes(new Set())}
               activeColor="emerald"
               onSaveDefault={() => {
-                localStorage.setItem("dashboard_default_opTypes", JSON.stringify([...selectedOpTypes]));
+                localStorage.setItem("dashboard_default_opTypes_v2", JSON.stringify([...selectedOpTypes]));
                 toast.success("Padrao de operacoes salvo!");
               }}
             />
@@ -2428,7 +2430,7 @@ export function ExecutiveDashboard() {
               onClear={() => setSelectedOpTypes(new Set())}
               activeColor="emerald"
               onSaveDefault={() => {
-                localStorage.setItem("dashboard_default_opTypes", JSON.stringify([...selectedOpTypes]));
+                localStorage.setItem("dashboard_default_opTypes_v2", JSON.stringify([...selectedOpTypes]));
                 toast.success("Padrao de operacoes salvo!");
               }}
             />
@@ -2514,7 +2516,7 @@ export function ExecutiveDashboard() {
               setSelectedDays(new Set());
               setSelectedDuePeriods(new Set());
               setSelectedDocNumbers(new Set());
-              const savedOp = localStorage.getItem("dashboard_default_opTypes");
+              const savedOp = localStorage.getItem("dashboard_default_opTypes_v2");
               setSelectedOpTypes(savedOp ? new Set(JSON.parse(savedOp)) : new Set(["Pagamento"]));
               const defaultYrs: string[] = [];
               for (let y = currentYear - 10; y <= currentYear; y++) defaultYrs.push(String(y));
