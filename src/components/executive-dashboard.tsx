@@ -5365,15 +5365,21 @@ export function ExecutiveDashboard() {
           companySummary[co].totalPago += paidSum(item);
         });
 
-        // Total a Receber — usa EXATAMENTE applyFilters(itemsAReceber) +
-        // effectiveAmount, mesma base/formula que filteredAReceber da pagina
-        // Contas a Receber. effectiveAmount(income) = correctedBalanceAmount
-        // - discountAmount (saldo corrigido), nao balanceAmount nominal.
-        // applyFilters aplica selectedDocTypes (com excecao locacoes HOLDING)
-        // + selectedYears/Months/Days sobre dueDate + duePeriodMaxDate.
-        applyFilters(itemsAReceber).forEach(item => {
+        // Total a Receber — soma effectiveAmount(item) (= correctedBalanceAmount
+        // - discountAmount) de itemsAReceber. Aplica selectedDocTypes (com
+        // excecao das locacoes HOLDING) e duePeriodMaxDate (filtro Vencimento),
+        // mas NAO aplica selectedYears/Months/Days porque esses filtros se
+        // referem ao paymentDate (Total Recebido/Pago) e cortar dueDate por
+        // ano excluiria parcelas com vencimento futuro alem do range de anos
+        // selecionado. A carteira aberta deve aparecer integral.
+        itemsAReceber.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
+          if (selectedDocTypes.size > 0 && !(
+            selectedDocTypes.has(item.documentIdentificationName) ||
+            shouldKeepIncomeExcludedDoc(item.companyId, item.billId, item.installmentId)
+          )) return;
+          if (duePeriodMaxDate && !(item.dueDate && item.dueDate <= duePeriodMaxDate)) return;
           companySummary[co].totalAReceber += effectiveAmount(item);
         });
 
