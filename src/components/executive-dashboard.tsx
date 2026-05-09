@@ -5365,13 +5365,16 @@ export function ExecutiveDashboard() {
           companySummary[co].totalPago += paidSum(item);
         });
 
-        // Total a Receber
-        consistentIncome.forEach(item => {
+        // Total a Receber — usa EXATAMENTE applyFilters(itemsAReceber) +
+        // effectiveAmount, mesma base/formula que filteredAReceber da pagina
+        // Contas a Receber. effectiveAmount(income) = correctedBalanceAmount
+        // - discountAmount (saldo corrigido), nao balanceAmount nominal.
+        // applyFilters aplica selectedDocTypes (com excecao locacoes HOLDING)
+        // + selectedYears/Months/Days sobre dueDate + duePeriodMaxDate.
+        applyFilters(itemsAReceber).forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
-          if (item.balanceAmount > 0) {
-            companySummary[co].totalAReceber += item.balanceAmount;
-          }
+          companySummary[co].totalAReceber += effectiveAmount(item);
         });
 
         // Units: Qt. Disponíveis, Res. Técnica, Valor Estoque
