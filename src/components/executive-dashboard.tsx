@@ -895,15 +895,31 @@ export function ExecutiveDashboard() {
   // - transferência/saque/depósito: cash management (not payments to credors)
   const bankMovementsAsItems = useMemo(() => {
     if (allBankMovements.length === 0) return [] as SiengeOutcome[];
+    // Filtro refinado 2026-05-09 contra Sienge "Contas Pagas (por Credor)
+    // Sintético" — cravou exato em 12 empresas. Mesma lógica de contas-table.tsx:
+    //
+    //   1. bankMovementOperationType === "S" (Saídas). op='E' são entradas.
+    //   2. documentIdentificationName !== "TRANSFERÊNCIA ENTRE CONTAS" —
+    //      transferências internas/intercompany contábeis.
+    //   3. financialCategories.length > 0 — BMs sem categoria são
+    //      sincronizações contábeis (não pagamentos reais).
+    //   4. historic não em [rendimento, aplicação, resgate, recebimento,
+    //      saque, depósito, cheque].
     const EXCLUDE_HISTORIC_PATTERNS = [
       "rendimento", "aplicação", "aplicacao", "resgate",
-      "transferência", "transferencia", "saque", "depósito", "deposito",
-      "estorno", // reversals are not real expenses
-      "recebimento", // incoming money, not a payment
+      "saque", "depósito", "deposito",
+      "recebimento",
+      "cheque",
     ];
     return allBankMovements
       .filter(bm => {
         if (bm.bankMovementAmount === 0) return false;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((bm as any).bankMovementOperationType !== "S") return false;
+        const docName = (bm.documentIdentificationName || "").toUpperCase();
+        if (docName.includes("TRANSFER") && docName.includes("ENTRE CONTAS")) return false;
+        const cats = bm.financialCategories || [];
+        if (cats.length === 0) return false;
         const historic = (bm.bankMovementHistoricName || "").toLowerCase();
         if (EXCLUDE_HISTORIC_PATTERNS.some(p => historic.includes(p))) return false;
         return true;
