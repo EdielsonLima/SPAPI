@@ -299,28 +299,18 @@ export function ExecutiveDashboard() {
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
   const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string; controlaOrcamento?: boolean }[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
-  // Per-tab company filter: save/restore when switching tabs
+  // Per-tab filters: save/restore when switching tabs. Companies tem o seu
+  // proprio Record (perTabCompanies) por questao historica; os outros filtros
+  // ficam num Record consolidado (perTabFilters) por tabGroup.
   const perTabCompanies = useRef<Record<string, Set<string>>>({});
-  const switchTab = useCallback((newTab: MainTab) => {
-    // Save current tab's companies
-    perTabCompanies.current[getTabGroup(activeTab)] = new Set(selectedCompanies);
-    // Load new tab's companies
-    const saved = perTabCompanies.current[getTabGroup(newTab)];
-    if (saved) {
-      setSelectedCompanies(saved);
-    } else {
-      // Try localStorage
-      const lsKey = companyStorageKey(newTab);
-      const ls = typeof window !== "undefined" ? localStorage.getItem(lsKey) : null;
-      if (ls) {
-        setSelectedCompanies(new Set(JSON.parse(ls)));
-      } else {
-        // Fall back to default (no filter)
-        setSelectedCompanies(new Set());
-      }
-    }
-    setActiveTab(newTab);
-  }, [activeTab, selectedCompanies]);
+  const perTabFilters = useRef<Record<string, {
+    years?: Set<string>;
+    months?: Set<string>;
+    days?: Set<string>;
+    docTypes?: Set<string>;
+    opTypes?: Set<string>;
+    docNumbers?: Set<string>;
+  }>>({});
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
@@ -354,6 +344,81 @@ export function ExecutiveDashboard() {
     return new Set();
   });
   const [opTypesInitialized, setOpTypesInitialized] = useState(false);
+
+  // === Filter persistence per tab ===
+  // Cada filtro do header (Anos/Meses/Dias/Tipo Doc/Tipo Op/N° Doc) e salvo
+  // por aba quando o usuario troca de aba. Primeira render mantem o valor
+  // global atual (sem mudar comportamento). LocalStorage keys versionadas.
+  const filterTabKey = useCallback((tab: MainTab, name: string) =>
+    `dashboard_${name}_${getTabGroup(tab)}`, []);
+
+  const switchTab = useCallback((newTab: MainTab) => {
+    const oldGroup = getTabGroup(activeTab);
+    const newGroup = getTabGroup(newTab);
+
+    // Mesma group → so atualiza activeTab (a-pagar/pagas/atrasadas dividem cp)
+    if (oldGroup === newGroup) {
+      setActiveTab(newTab);
+      return;
+    }
+
+    // 1. Salvar filtros da aba atual no Record (memoria de sessao)
+    perTabCompanies.current[oldGroup] = new Set(selectedCompanies);
+    perTabFilters.current[oldGroup] = {
+      years: new Set(selectedYears),
+      months: new Set(selectedMonths),
+      days: new Set(selectedDays),
+      docTypes: new Set(selectedDocTypes),
+      opTypes: new Set(selectedOpTypes),
+      docNumbers: new Set(selectedDocNumbers),
+    };
+
+    const loadLs = (key: string): Set<string> | null => {
+      if (typeof window === "undefined") return null;
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      try { return new Set(JSON.parse(raw)); } catch { return null; }
+    };
+
+    // 2. Carregar Companies (lógica original preservada)
+    const cachedCo = perTabCompanies.current[newGroup];
+    if (cachedCo) {
+      setSelectedCompanies(cachedCo);
+    } else {
+      const ls = loadLs(companyStorageKey(newTab));
+      setSelectedCompanies(ls || new Set());
+    }
+
+    // 3. Carregar outros filtros: Record da sessao > localStorage per-tab.
+    //    Se nao tem nada salvo, MANTEM o valor atual (nao reseta) — assim
+    //    a primeira vez que muda de aba leva o filtro como default ate que
+    //    o usuario configure especificamente nesse contexto.
+    const cached = perTabFilters.current[newGroup];
+    if (cached) {
+      if (cached.years) setSelectedYears(cached.years);
+      if (cached.months) setSelectedMonths(cached.months);
+      if (cached.days) setSelectedDays(cached.days);
+      if (cached.docTypes) setSelectedDocTypes(cached.docTypes);
+      if (cached.opTypes) setSelectedOpTypes(cached.opTypes);
+      if (cached.docNumbers) setSelectedDocNumbers(cached.docNumbers);
+    } else {
+      const lsYears = loadLs(filterTabKey(newTab, "years"));
+      if (lsYears) setSelectedYears(lsYears);
+      const lsMonths = loadLs(filterTabKey(newTab, "months"));
+      if (lsMonths) setSelectedMonths(lsMonths);
+      const lsDays = loadLs(filterTabKey(newTab, "days"));
+      if (lsDays) setSelectedDays(lsDays);
+      const lsDocTypes = loadLs(filterTabKey(newTab, "docTypes"));
+      if (lsDocTypes) setSelectedDocTypes(lsDocTypes);
+      const lsOpTypes = loadLs(filterTabKey(newTab, "opTypes"));
+      if (lsOpTypes) setSelectedOpTypes(lsOpTypes);
+      const lsDocNumbers = loadLs(filterTabKey(newTab, "docNumbers"));
+      if (lsDocNumbers) setSelectedDocNumbers(lsDocNumbers);
+    }
+
+    setActiveTab(newTab);
+  }, [activeTab, selectedCompanies, selectedYears, selectedMonths, selectedDays, selectedDocTypes, selectedOpTypes, selectedDocNumbers, filterTabKey]);
+
   // Note: bankFees state was removed — bank movements are now synthesized as
   // outcome items via bankMovementsAsItems memo and flow through filteredPagas
   const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>([]);
@@ -2414,7 +2479,7 @@ export function ExecutiveDashboard() {
               onClear={() => setSelectedOpTypes(new Set())}
               activeColor="emerald"
               onSaveDefault={() => {
-                localStorage.setItem("dashboard_default_opTypes_v2", JSON.stringify([...selectedOpTypes]));
+                localStorage.setItem(filterTabKey(activeTab, "opTypes"), JSON.stringify([...selectedOpTypes]));
                 toast.success("Padrao de operacoes salvo!");
               }}
             />
@@ -2445,7 +2510,7 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedYears(new Set())}
             activeColor="violet"
             onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_years", JSON.stringify([...selectedYears]));
+              localStorage.setItem(filterTabKey(activeTab, "years"), JSON.stringify([...selectedYears]));
               toast.success("Padrão de anos salvo!");
             }}
           />
@@ -2486,7 +2551,7 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedYears(new Set())}
             activeColor="violet"
             onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_years", JSON.stringify([...selectedYears]));
+              localStorage.setItem(filterTabKey(activeTab, "years"), JSON.stringify([...selectedYears]));
               toast.success("Padrão de anos salvo!");
             }}
           />
@@ -2528,7 +2593,7 @@ export function ExecutiveDashboard() {
               onClear={() => setSelectedOpTypes(new Set())}
               activeColor="emerald"
               onSaveDefault={() => {
-                localStorage.setItem("dashboard_default_opTypes_v2", JSON.stringify([...selectedOpTypes]));
+                localStorage.setItem(filterTabKey(activeTab, "opTypes"), JSON.stringify([...selectedOpTypes]));
                 toast.success("Padrao de operacoes salvo!");
               }}
             />
@@ -2544,7 +2609,7 @@ export function ExecutiveDashboard() {
               onClear={() => setSelectedDocNumbers(new Set())}
               activeColor="cyan"
               onSaveDefault={() => {
-                localStorage.setItem("dashboard_default_docNumbers", JSON.stringify([...selectedDocNumbers]));
+                localStorage.setItem(filterTabKey(activeTab, "docNumbers"), JSON.stringify([...selectedDocNumbers]));
                 toast.success("Padrao de numero documento salvo!");
               }}
             />
@@ -2559,7 +2624,7 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedDocTypes(new Set())}
             activeColor="violet"
             onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_docTypes", JSON.stringify([...selectedDocTypes]));
+              localStorage.setItem(filterTabKey(activeTab, "docTypes"), JSON.stringify([...selectedDocTypes]));
               toast.success("Padrao de tipo documento salvo!");
             }}
           />
@@ -2574,7 +2639,7 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedYears(new Set())}
             activeColor="blue"
             onSaveDefault={() => {
-              localStorage.setItem("dashboard_default_years", JSON.stringify([...selectedYears]));
+              localStorage.setItem(filterTabKey(activeTab, "years"), JSON.stringify([...selectedYears]));
               toast.success("Padrão de anos salvo!");
             }}
           />
@@ -2608,17 +2673,22 @@ export function ExecutiveDashboard() {
             onClick={() => {
               const savedCo = localStorage.getItem(companyStorageKey(activeTab)) || localStorage.getItem("dashboard_default_companies");
               setSelectedCompanies(savedCo ? new Set(JSON.parse(savedCo)) : defaultCompanies());
-              const savedDoc = localStorage.getItem("dashboard_default_docTypes");
+              const savedDoc = localStorage.getItem(filterTabKey(activeTab, "docTypes")) || localStorage.getItem("dashboard_default_docTypes");
               setSelectedDocTypes(savedDoc ? new Set(JSON.parse(savedDoc)) : new Set(allDocTypes.filter(t => !isExcludedDocType(t))));
               setSelectedMonths(new Set());
               setSelectedDays(new Set());
               setSelectedDuePeriods(new Set());
               setSelectedDocNumbers(new Set());
-              const savedOp = localStorage.getItem("dashboard_default_opTypes_v2");
+              const savedOp = localStorage.getItem(filterTabKey(activeTab, "opTypes")) || localStorage.getItem("dashboard_default_opTypes_v2");
               setSelectedOpTypes(savedOp ? new Set(JSON.parse(savedOp)) : new Set(["Pagamento"]));
-              const defaultYrs: string[] = [];
-              for (let y = currentYear - 10; y <= currentYear; y++) defaultYrs.push(String(y));
-              setSelectedYears(new Set(defaultYrs));
+              const savedYrs = localStorage.getItem(filterTabKey(activeTab, "years")) || localStorage.getItem("dashboard_default_years");
+              if (savedYrs) {
+                setSelectedYears(new Set(JSON.parse(savedYrs)));
+              } else {
+                const defaultYrs: string[] = [];
+                for (let y = currentYear - 10; y <= currentYear; y++) defaultYrs.push(String(y));
+                setSelectedYears(new Set(defaultYrs));
+              }
             }}
             className="text-slate-400 px-2"
           >
