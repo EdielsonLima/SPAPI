@@ -5321,24 +5321,37 @@ export function ExecutiveDashboard() {
           consistentIncome.flatMap(item => (item.payments || []).map(p => p.operationTypeName).filter(Boolean))
         )).sort() as string[];
 
-        // Initialize outcome filter on first render
+        // Initialize outcome filter on first render — default exclui op types
+        // que o Sienge "(por Credor) Sintético" não soma no Líquido (mesma
+        // lista validada em 2026-05-09 contra PDFs). Key versionada `_v2`.
         if (!resumoTipoOpInit && allOpTypes.length > 0) {
-          const saved = localStorage.getItem("resumo_default_tipoOp");
+          const saved = localStorage.getItem("resumo_default_tipoOp_v2");
           if (saved) {
             setResumoTipoOp(new Set(JSON.parse(saved)));
           } else {
-            setResumoTipoOp(new Set(allOpTypes));
+            const EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
+            const initial = allOpTypes.filter(op => {
+              const lower = op.toLowerCase();
+              return !EXCLUDED.some(x => lower.includes(x));
+            });
+            setResumoTipoOp(new Set(initial));
           }
           setResumoTipoOpInit(true);
         }
 
-        // Initialize income filter on first render
+        // Initialize income filter on first render — default exclui Estorno
+        // (recebimentos de estorno são reversões, não somam no Total Recebido)
         if (!resumoTipoOpRecInit && allOpTypesRec.length > 0) {
-          const saved = localStorage.getItem("resumo_default_tipoOpRec");
+          const saved = localStorage.getItem("resumo_default_tipoOpRec_v2");
           if (saved) {
             setResumoTipoOpRec(new Set(JSON.parse(saved)));
           } else {
-            setResumoTipoOpRec(new Set(allOpTypesRec));
+            const EXCLUDED_REC = ["estorno"];
+            const initial = allOpTypesRec.filter(op => {
+              const lower = op.toLowerCase();
+              return !EXCLUDED_REC.some(x => lower.includes(x));
+            });
+            setResumoTipoOpRec(new Set(initial));
           }
           setResumoTipoOpRecInit(true);
         }
@@ -5379,8 +5392,11 @@ export function ExecutiveDashboard() {
           };
         }
 
-        // Total Recebido (income payments) — filtered by year/month and resumoTipoOpRec
-        consistentIncome.forEach(item => {
+        // Total Recebido (income payments) — usa consistentIncomeForRecebidas
+        // que JÁ inclui BMs órfãos (Rendimento de aplicação, Resgate etc) como
+        // items sintetizados — mesma lógica conferida na página Contas Recebidas
+        // (cravando 100% contra Sienge "Contas Recebidas (por Cliente)").
+        consistentIncomeForRecebidas.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
           (item.payments || []).forEach(p => {
@@ -5393,47 +5409,26 @@ export function ExecutiveDashboard() {
           });
         });
 
-        // Total Pago — filtered by resumoTipoOp AND selectedDocTypes
-        // Excludes previsão documents (same as Contas Pagas)
-        consistentItems.forEach(item => {
+        // Total Pago — usa consistentItemsForPagas que JÁ inclui BMs avulsos
+        // sintetizados como items (operationTypeName="Movimento Bancário") com
+        // a nova lógica refinada (op='S', !TRANSFERÊNCIA ENTRE CONTAS, cats > 0,
+        // !cheque/saque/etc) — mesma lógica conferida na página Contas Pagas
+        // (cravando 100% em 12 empresas contra Sienge "Contas Pagas (por Credor)").
+        consistentItemsForPagas.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
-          // Apply doc type filter (same as Contas Pagas header filter)
           if (selectedDocTypes.size > 0) {
             const tipo = (item.documentIdentificationId || "").trim();
             if (!selectedDocTypes.has(tipo)) return;
           }
-          // Always exclude previsão documents
           if (isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return;
-          const payments = item.payments || [];
-          const canceled = getEstornoPairs(payments);
-          payments.forEach(p => {
-            if (canceled.has(p)) return;
-            if (p.netAmount !== 0 && p.paymentDate) {
-              // Apply year filter
-              if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;
-              // Apply month filter
-              if (selectedMonths.size > 0 && !selectedMonths.has(p.paymentDate.substring(5, 7))) return;
-              if (resumoTipoOp.size > 0 && !(p.operationTypeName && resumoTipoOp.has(p.operationTypeName))) return;
-              companySummary[co].totalPago += p.netAmount;
-            }
+          (item.payments || []).forEach(p => {
+            if (p.netAmount === 0 || !p.paymentDate) return;
+            if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;
+            if (selectedMonths.size > 0 && !selectedMonths.has(p.paymentDate.substring(5, 7))) return;
+            if (resumoTipoOp.size > 0 && !(p.operationTypeName && resumoTipoOp.has(p.operationTypeName))) return;
+            companySummary[co].totalPago += p.netAmount;
           });
-        });
-
-        // Add detached bank movements (tarifas bancárias) to Total Pago — filtered by year/month
-        const incomePatterns = ["rendimento", "aplicação", "aplicacao", "resgate"];
-        allBankMovements.forEach(bm => {
-          const co = bm.companyName;
-          if (!companySummary[co]) return;
-          if (bm.bankMovementAmount === 0) return;
-          if (!bm.bankMovementDate) return;
-          if (selectedYears.size > 0 && !selectedYears.has(bm.bankMovementDate.substring(0, 4))) return;
-          if (selectedMonths.size > 0 && !selectedMonths.has(bm.bankMovementDate.substring(5, 7))) return;
-          const historic = (bm.bankMovementHistoricName || "").toLowerCase();
-          if (incomePatterns.some(p => historic.includes(p))) return;
-          const catNames = (bm.financialCategories || []).map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
-          if (incomePatterns.some(p => catNames.includes(p))) return;
-          companySummary[co].totalPago += Math.abs(bm.bankMovementAmount);
         });
 
         // Total a Receber
