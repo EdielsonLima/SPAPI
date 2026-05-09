@@ -919,6 +919,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       // Exclude bills configured in Configuracoes > Exclusao de Titulos
       if (exclusionSet.size > 0 && exclusionSet.has(`${item.companyId}:${item.billId}`)) return false;
       if (!isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return false;
+      if (isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument, { excludeLocacao: true })) return false;
 
       const matchesYear = (date: string | undefined) => {
         if (filterAnos.size === 0) return true;

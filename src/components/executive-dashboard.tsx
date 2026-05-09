@@ -422,6 +422,11 @@ export function ExecutiveDashboard() {
 
   const consistentIncome = useMemo(() =>
     incomeItems.filter(i =>
+      !isExcludedFinancialDocType(
+        i.documentIdentificationName,
+        (i as { forecastDocument?: string | null }).forecastDocument,
+        { excludeLocacao: true }
+      ) &&
       !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
     ), [incomeItems, exclusionSet]);
 
@@ -1291,7 +1296,7 @@ export function ExecutiveDashboard() {
       }
 
       const client = map.get(key)!;
-      client.totalOverdue += item.correctedBalanceAmount + calcEncargos(item);
+      client.totalOverdue += effectiveAmount(item) + calcEncargos(item);
       client.installments += 1;
       client.items.push(item);
 
@@ -1548,14 +1553,20 @@ export function ExecutiveDashboard() {
   }, [filteredRecebidas]);
 
   // === Chart helpers ===
-  function buildCompanyChart(sourceItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received") {
+  type ChartValueField = "balance" | "paid" | "received" | "delinquent";
+
+  const delinquentAmount = (item: SiengeIncome) => effectiveAmount(item) + calcEncargos(item);
+
+  function buildCompanyChart(sourceItems: (SiengeOutcome | SiengeIncome)[], field: ChartValueField) {
     const map = new Map<string, number>();
     sourceItems.forEach(item => {
-      const val = field === "balance"
-        ? effectiveAmount(item)
-        : field === "received"
-          ? receivedSum(item as SiengeIncome)
-          : paidSum(item);
+      const val = field === "delinquent"
+        ? delinquentAmount(item as SiengeIncome)
+        : field === "balance"
+          ? effectiveAmount(item)
+          : field === "received"
+            ? receivedSum(item as SiengeIncome)
+            : paidSum(item);
       if (val > 0) {
         map.set(item.companyName, (map.get(item.companyName) || 0) + val);
       }
@@ -1570,7 +1581,7 @@ export function ExecutiveDashboard() {
       .sort((a, b) => b.value - a.value);
   }
 
-  function buildMonthlyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received", skipPastMonths = false) {
+  function buildMonthlyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: ChartValueField, skipPastMonths = false) {
     const currentMonth = new Date().getMonth(); // 0-indexed
     if (field === "paid") {
       // Agrupa pagamentos por paymentDate (data real do pagamento), filtrando pelo ano selecionado
@@ -1622,13 +1633,13 @@ export function ExecutiveDashboard() {
         const d = new Date(i.dueDate + "T00:00:00");
         return d.getMonth() === idx;
       });
-      const value = monthItems.reduce((s, i) => s + effectiveAmount(i), 0);
+      const value = monthItems.reduce((s, i) => s + (field === "delinquent" ? delinquentAmount(i as SiengeIncome) : effectiveAmount(i)), 0);
       return { month: label, value };
     }).filter(Boolean) as { month: string; value: number }[];
   }
 
   // Daily chart: requires exactly 1 year + 1 month selected. Groups by day-of-month (01-NN).
-  function buildDailyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received"): { month: string; value: number }[] {
+  function buildDailyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: ChartValueField): { month: string; value: number }[] {
     if (selectedYears.size !== 1 || selectedMonths.size !== 1) return [];
     const yearStr = [...selectedYears][0];
     const monthStr = [...selectedMonths][0]; // "01".."12"
@@ -1666,7 +1677,7 @@ export function ExecutiveDashboard() {
       filteredItems.forEach(i => {
         if (i.dueDate && i.dueDate.startsWith(`${yearStr}-${monthStr}`)) {
           const d = Number(i.dueDate.substring(8, 10));
-          dayTotals.set(d, (dayTotals.get(d) || 0) + effectiveAmount(i));
+          dayTotals.set(d, (dayTotals.get(d) || 0) + (field === "delinquent" ? delinquentAmount(i as SiengeIncome) : effectiveAmount(i)));
         }
       });
     }
@@ -1678,7 +1689,7 @@ export function ExecutiveDashboard() {
     return out;
   }
 
-  function buildAnnualChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: "balance" | "paid" | "received") {
+  function buildAnnualChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: ChartValueField) {
     if (field === "paid") {
       // Agrupa pagamentos por ano do paymentDate, filtrando pelo ano selecionado
       const yearMap = new Map<number, number>();
@@ -1718,7 +1729,7 @@ export function ExecutiveDashboard() {
     const yearMap = new Map<number, number>();
     filteredItems.forEach(item => {
       const y = new Date(item.dueDate + "T00:00:00").getFullYear();
-      yearMap.set(y, (yearMap.get(y) || 0) + effectiveAmount(item));
+      yearMap.set(y, (yearMap.get(y) || 0) + (field === "delinquent" ? delinquentAmount(item as SiengeIncome) : effectiveAmount(item)));
     });
     return Array.from(yearMap.entries())
       .sort((a, b) => a[0] - b[0])
@@ -1775,10 +1786,10 @@ export function ExecutiveDashboard() {
     } else {
       // inadimplencia
       return {
-        companyChart: buildCompanyChart(filteredInadimplencia, "balance"),
-        monthly: buildMonthlyChart(filteredInadimplencia, "balance"),
-        annual: buildAnnualChart(filteredInadimplencia, "balance"),
-        daily: buildDailyChart(filteredInadimplencia, "balance"),
+        companyChart: buildCompanyChart(filteredInadimplencia, "delinquent"),
+        monthly: buildMonthlyChart(filteredInadimplencia, "delinquent"),
+        annual: buildAnnualChart(filteredInadimplencia, "delinquent"),
+        daily: buildDailyChart(filteredInadimplencia, "delinquent"),
         color: "hsl(25, 95%, 53%)",
         label: "Inadimplente",
       };
@@ -4362,7 +4373,7 @@ export function ExecutiveDashboard() {
                                           <td className="py-2 text-right tabular-nums text-slate-800">{formatCurrency(item.correctedBalanceAmount)}</td>
                                           <td className="py-2 text-right tabular-nums text-red-600 dark:text-red-300/70">{formatCurrency(calcEncargos(item))}</td>
                                           <td className="py-2 text-right tabular-nums text-slate-500">{formatCurrency(item.discountAmount || 0)}</td>
-                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70">{formatCurrency(item.correctedBalanceAmount + calcEncargos(item))}</td>
+                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70">{formatCurrency(effectiveAmount(item) + calcEncargos(item))}</td>
                                           <td className="py-2 text-slate-600 text-xs">{item.companyName}</td>
                                           <td className="py-2 text-slate-600 text-xs">{item.projectName}</td>
                                         </tr>
@@ -4386,7 +4397,7 @@ export function ExecutiveDashboard() {
                 <span><strong className="text-slate-700">{filteredInadimplencia.length}</strong> parcelas</span>
               </div>
               <div className="text-sm font-bold text-red-600 dark:text-red-300/70">
-                Total: {formatCurrency(filteredInadimplencia.reduce((s, i) => s + i.correctedBalanceAmount + calcEncargos(i), 0))}
+                Total: {formatCurrency(filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i) + calcEncargos(i), 0))}
               </div>
             </div>
           </CardContent>
@@ -4412,7 +4423,7 @@ export function ExecutiveDashboard() {
         // A Receber
         const totalAReceber = filteredAReceber.reduce((s, i) => s + effectiveAmount(i), 0);
         const aReceber7d = filteredAReceber.filter(i => i.dueDate >= todayStr && i.dueDate <= in7d).reduce((s, i) => s + effectiveAmount(i), 0);
-        const totalInadimplencia = filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0);
+        const totalInadimplencia = filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i) + calcEncargos(i), 0);
         const pctInadimplencia = totalAReceber > 0 ? (totalInadimplencia / totalAReceber) * 100 : 0;
 
         // Saldos
