@@ -5311,21 +5311,24 @@ export function ExecutiveDashboard() {
 
       {/* ══════ RESUMO FINANCEIRO TAB ══════ */}
       {activeTab === "resumo" && (() => {
-        // Collect all operation types from outcome payments
+        // Collect all operation types — INCLUI op types dos BMs sintetizados
+        // (ex: "Movimento Bancário" para outcome, "Rendimento de aplicação"
+        // para income). Sem isso, BMs órfãos eram bloqueados pelo filtro,
+        // gerando diff de R$ 23.583,76 em HANNOVER (12 rendimentos).
         const allOpTypes = Array.from(new Set(
-          consistentItems.flatMap(item => (item.payments || []).map(p => p.operationTypeName).filter(Boolean))
+          consistentItemsForPagas.flatMap(item => (item.payments || []).map(p => p.operationTypeName).filter(Boolean))
         )).sort() as string[];
 
-        // Collect all operation types from income payments
         const allOpTypesRec = Array.from(new Set(
-          consistentIncome.flatMap(item => (item.payments || []).map(p => p.operationTypeName).filter(Boolean))
+          consistentIncomeForRecebidas.flatMap(item => (item.payments || []).map(p => p.operationTypeName).filter(Boolean))
         )).sort() as string[];
 
         // Initialize outcome filter on first render — default exclui op types
         // que o Sienge "(por Credor) Sintético" não soma no Líquido (mesma
-        // lista validada em 2026-05-09 contra PDFs). Key versionada `_v2`.
+        // lista validada em 2026-05-09 contra PDFs). Key versionada `_v3`
+        // pra invalidar saves antigos que não tinham "Movimento Bancário".
         if (!resumoTipoOpInit && allOpTypes.length > 0) {
-          const saved = localStorage.getItem("resumo_default_tipoOp_v2");
+          const saved = localStorage.getItem("resumo_default_tipoOp_v3");
           if (saved) {
             setResumoTipoOp(new Set(JSON.parse(saved)));
           } else {
@@ -5340,9 +5343,11 @@ export function ExecutiveDashboard() {
         }
 
         // Initialize income filter on first render — default exclui Estorno
-        // (recebimentos de estorno são reversões, não somam no Total Recebido)
+        // (recebimentos de estorno são reversões, não somam no Total Recebido).
+        // Key versionada `_v3` pra invalidar saves antigos que não incluíam
+        // op types de BMs órfãos (Rendimento de aplicação, Resgate etc).
         if (!resumoTipoOpRecInit && allOpTypesRec.length > 0) {
-          const saved = localStorage.getItem("resumo_default_tipoOpRec_v2");
+          const saved = localStorage.getItem("resumo_default_tipoOpRec_v3");
           if (saved) {
             setResumoTipoOpRec(new Set(JSON.parse(saved)));
           } else {
@@ -5516,7 +5521,7 @@ export function ExecutiveDashboard() {
                 onClear={() => setResumoTipoOp(new Set())}
                 activeColor="rose"
                 onSaveDefault={() => {
-                  localStorage.setItem("resumo_default_tipoOp", JSON.stringify([...resumoTipoOp]));
+                  localStorage.setItem("resumo_default_tipoOp_v3", JSON.stringify([...resumoTipoOp]));
                   toast.success("Padrão de tipo operação (pagar) salvo!");
                 }}
               />
@@ -5533,7 +5538,7 @@ export function ExecutiveDashboard() {
                 onClear={() => setResumoTipoOpRec(new Set())}
                 activeColor="emerald"
                 onSaveDefault={() => {
-                  localStorage.setItem("resumo_default_tipoOpRec", JSON.stringify([...resumoTipoOpRec]));
+                  localStorage.setItem("resumo_default_tipoOpRec_v3", JSON.stringify([...resumoTipoOpRec]));
                   toast.success("Padrão de tipo operação (receber) salvo!");
                 }}
               />
