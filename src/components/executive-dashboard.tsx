@@ -5343,26 +5343,25 @@ export function ExecutiveDashboard() {
           };
         }
 
-        // Total Recebido — usa receivedSum (mesma fórmula da pagina Recebidas).
-        // Aplicar selectedDocTypes (filtro Tipo Doc do header) garante mesma
-        // base de items que filteredRecebidas. consistentIncomeForRecebidas
-        // ja inclui BMs orfaos sintetizados (Rendimento, Resgate etc).
-        consistentIncomeForRecebidas.forEach(item => {
+        // Total Recebido — usa EXATAMENTE itemsRecebidas + receivedSum, mesma
+        // base que filteredRecebidas da pagina Contas Recebidas. itemsRecebidas
+        // ja exige originalAmount > 0 + payment com matchesSelectedPaymentDate.
+        // NAO aplica selectedDocTypes (filteredRecebidas tambem nao aplica —
+        // ver comentario linha 1150-1152) — senao BMs orfaos com
+        // documentIdentificationName="MOV. BANCARIO" sao cortados.
+        itemsRecebidas.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
-          if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName)) return;
           companySummary[co].totalRecebido += receivedSum(item);
         });
 
-        // Total Pago — usa paidSum (mesma fórmula da pagina Contas Pagas).
-        // paidSum aplica selectedOpTypes (do filtro CP) + matchesSelectedPaymentDate
-        // → para o Resumo bater com Contas Pagas, basta o usuario configurar
-        // selectedOpTypes e selectedDocTypes corretamente nas abas CP.
-        consistentItemsForPagas.forEach(item => {
+        // Total Pago — usa EXATAMENTE itemsPagas + paidSum, mesma base que
+        // filteredPagas da pagina Contas Pagas. selectedDocTypes aplicado pra
+        // espelhar filteredPagas (linha 1134).
+        itemsPagas.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
           if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName)) return;
-          if (isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return;
           companySummary[co].totalPago += paidSum(item);
         });
 
