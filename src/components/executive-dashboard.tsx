@@ -870,13 +870,16 @@ export function ExecutiveDashboard() {
   }, [consistentIncome]);
 
   // === Apply filters to items (works for both Outcome and Income) ===
-  const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string }>(list: T[]): T[] => {
+  const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string; companyId?: number; billId?: number; installmentId?: number }>(list: T[]): T[] => {
     let result = list;
     if (selectedCompanies.size > 0) {
       result = result.filter(i => selectedCompanies.has(i.companyName));
     }
     if (selectedDocTypes.size > 0) {
-      result = result.filter(i => selectedDocTypes.has(i.documentIdentificationName));
+      result = result.filter(i =>
+        selectedDocTypes.has(i.documentIdentificationName) ||
+        shouldKeepIncomeExcludedDoc(i.companyId, i.billId, i.installmentId)
+      );
     }
     if (selectedYears.size > 0) {
       result = result.filter(i => i.dueDate && selectedYears.has(i.dueDate.substring(0, 4)));
