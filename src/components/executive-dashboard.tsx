@@ -752,11 +752,12 @@ export function ExecutiveDashboard() {
 
   const matchesSelectedPaymentDate = useCallback((paymentDate?: string) => {
     if (!paymentDate) return false;
+    if (paymentDate > todayStr) return false;
     if (selectedYears.size > 0 && !selectedYears.has(paymentDate.substring(0, 4))) return false;
     if (selectedMonths.size > 0 && !selectedMonths.has(paymentDate.substring(5, 7))) return false;
     if (selectedDays.size > 0 && !selectedDays.has(paymentDate.substring(8, 10))) return false;
     return true;
-  }, [selectedYears, selectedMonths, selectedDays]);
+  }, [selectedYears, selectedMonths, selectedDays, todayStr]);
 
   // Soma de pagamentos filtrada por tipo de operação e ano do pagamento.
   // Pareia Adiantamento+Estorno (mesma data, valores opostos) e exclui ambos —
