@@ -47,7 +47,7 @@ import {
   Users,
 } from "lucide-react";
 import { SiengeOutcome, SiengeIncome, SiengeBankMovement } from "@/types/sienge";
-import { getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount } from "@/lib/dashboard-utils";
+import { getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { toast } from "sonner";
 
 type ContasItem = SiengeOutcome | SiengeIncome;
@@ -919,8 +919,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       // Exclude bills configured in Configuracoes > Exclusao de Titulos
       if (exclusionSet.size > 0 && exclusionSet.has(`${item.companyId}:${item.billId}`)) return false;
       if (!isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return false;
-      const keepSulBrasilRental = isIncome && item.companyId === 3 && item.billId === 646;
-      if (isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument, { excludeLocacao: !keepSulBrasilRental })) return false;
+      const keepExcludedDoc = isIncome && shouldKeepIncomeExcludedDoc(item.companyId, item.billId, item.installmentId);
+      if (isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument, { excludeLocacao: !keepExcludedDoc })) return false;
 
       const matchesYear = (date: string | undefined) => {
         if (filterAnos.size === 0) return true;

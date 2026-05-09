@@ -6,7 +6,7 @@
       "mode": "inadimplencia",
       "year": "*",
       "month": "*",
-      "expected": 23959.00,
+      "expected": 37223.93,
       "tolerance": 1.0,
       "validated_at": "2026-05-08",
       "source": "Sienge 'Contas a Receber (por Cliente)' período 01/01/2001 a 08/05/2026 + 'Posição de Inadimplência (Analítico)'. BATE 100%. GELSON ANTONIO ANHAIA — paymentTerm=PM + indexer=REAL → encargo 0."

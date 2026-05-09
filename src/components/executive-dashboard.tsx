@@ -58,7 +58,7 @@ import {
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } from "@/types/sienge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
-import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount } from "@/lib/dashboard-utils";
+import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
@@ -422,11 +422,11 @@ export function ExecutiveDashboard() {
 
   const consistentIncome = useMemo(() =>
     incomeItems.filter(i => {
-      const keepSulBrasilRental = i.companyId === 3 && i.billId === 646;
+      const keepExcludedDoc = shouldKeepIncomeExcludedDoc(i.companyId, i.billId, i.installmentId);
       return !isExcludedFinancialDocType(
         i.documentIdentificationName,
         (i as { forecastDocument?: string | null }).forecastDocument,
-        { excludeLocacao: !keepSulBrasilRental }
+        { excludeLocacao: !keepExcludedDoc }
       ) &&
       !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`));
     }), [incomeItems, exclusionSet]);

@@ -44,6 +44,23 @@ export function isExcludedFinancialDocType(
     (options.excludeLocacao === true && normalized.startsWith("CONTRATO DE LOCA"));
 }
 
+const INCOME_DOC_EXCLUSION_EXCEPTIONS = new Set([
+  "1:407:22",
+  "1:686:19",
+  "1:823:10",
+  "1:965:2",
+  "1:965:3",
+  "3:646:21",
+]);
+
+export function shouldKeepIncomeExcludedDoc(
+  companyId?: number | null,
+  billId?: number | null,
+  installmentId?: number | null
+): boolean {
+  return INCOME_DOC_EXCLUSION_EXCEPTIONS.has(`${companyId}:${billId}:${installmentId}`);
+}
+
 type OpenAmountLike = {
   correctedBalanceAmount?: number | null;
   originalAmount?: number | null;

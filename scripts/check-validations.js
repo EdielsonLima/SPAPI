@@ -60,6 +60,15 @@ function calcEncargos(item, todayDate) {
   return multa + juros;
 }
 
+const INCOME_DOC_EXCLUSION_EXCEPTIONS = new Set([
+  "1:407:22",
+  "1:686:19",
+  "1:823:10",
+  "1:965:2",
+  "1:965:3",
+  "3:646:21",
+]);
+
 // Total Inadimplência (Contas a Receber vencidas).
 function computeInadimplencia(incomeItems, company, year, month) {
   const yearFilter = year && year !== "*" ? year : null;
@@ -76,8 +85,8 @@ function computeInadimplencia(incomeItems, company, year, month) {
     if (monthFilter && i.dueDate.substring(5, 7) !== monthFilter) continue;
     const docName = (i.documentIdentificationName || "").toUpperCase();
     if (docName.startsWith("PREVISÃO") || docName.startsWith("PREVISAO")) continue;
-    const keepSulBrasilRental = i.companyId === 3 && i.billId === 646;
-    if (!keepSulBrasilRental && docName.startsWith("CONTRATO DE LOCA")) continue;
+    const keepExcludedDoc = INCOME_DOC_EXCLUSION_EXCEPTIONS.has(`${i.companyId}:${i.billId}:${i.installmentId}`);
+    if (!keepExcludedDoc && docName.startsWith("CONTRATO DE LOCA")) continue;
     const eff = (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
     if (eff <= 0) continue;
     const enc = calcEncargos(i, todayDate);
