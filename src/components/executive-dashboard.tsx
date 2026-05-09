@@ -793,7 +793,10 @@ export function ExecutiveDashboard() {
       setOpTypesInitialized(true);
       return;
     }
-    const EXCLUDED = ["substitui", "cancelamento", "estorno", "abatimento"];
+    // Mesma lista que contas-table.tsx — vide comentário lá. "estorno" foi
+    // removido em 2026-05-09 (somar net negativo dá Líquido correto sem
+    // pareamento) e "devolu" adicionado (Sienge "(por Credor)" não soma).
+    const EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu"];
     const initial = allOpTypes.filter(op => {
       const lower = op.toLowerCase();
       return !EXCLUDED.some(x => lower.includes(x));
@@ -821,7 +824,10 @@ export function ExecutiveDashboard() {
       try { setSelectedOpTypes(new Set(JSON.parse(saved))); return; } catch { /* ignore */ }
     }
     // No save: emulate standalone's auto-default
-    const EXCLUDED = ["substitui", "cancelamento", "estorno", "abatimento"];
+    // Mesma lista que contas-table.tsx — vide comentário lá. "estorno" foi
+    // removido em 2026-05-09 (somar net negativo dá Líquido correto sem
+    // pareamento) e "devolu" adicionado (Sienge "(por Credor)" não soma).
+    const EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu"];
     const initial = allOpTypes.filter(op => {
       const lower = op.toLowerCase();
       return !EXCLUDED.some(x => lower.includes(x));

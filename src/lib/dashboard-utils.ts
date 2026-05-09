@@ -25,26 +25,19 @@ export const MONTH_LABELS = [
   "Jul", "Ago", "Set", "Out", "Nov", "Dez",
 ];
 
-// Adiantamento+Estorno cancelam-se no Líquido do Sienge "Contas Pagas
-// Sintético". Sem pareamento, o filtro EXCLUDED_OP remove apenas o Estorno
-// e deixa o Adiantamento contado — gerando over-count. Validado 2026-05-02
-// contra SILVA PACKER 2024 (MERCADOPAGO 2024-09-25 R$ 1.325,92), PALACIO
-// (R$ 1.625,75), 135 JARDINS (R$ 5.921,48).
+// Pareamento manual de Adiantamento+Estorno foi descontinuado em 2026-05-09.
+// Estornos têm netAmount negativo: somá-los junto com os pagamentos chega
+// no mesmo Líquido do Sienge sem precisar parear. O pareamento por data
+// falhava em casos como HANNOVER bill=6109 (Pag 09-01, Estorno 09-05, Pag
+// 09-06) — datas distintas, valor opostos isolados — e dobrava o pagamento.
+// Para que isto funcione, "estorno" foi removido das listas EXCLUDED_OP
+// (em contas-table.tsx e executive-dashboard.tsx) e da default DEFAULT_EXCLUDED
+// do filtro Tipo Op. Estornos passam a aparecer como linhas regulares
+// (com netAmount negativo) e somam corretamente.
+//
+// Função preservada como no-op pra não quebrar imports — pode ser removida
+// num refactor futuro.
 type PaymentLike = { paymentDate?: string; netAmount?: number; operationTypeName?: string | null };
-export function getEstornoPairs<T extends PaymentLike>(payments: T[]): Set<T> {
-  const canceled = new Set<T>();
-  const estornos = payments.filter(p => (p.operationTypeName || "").toLowerCase().includes("estorno"));
-  for (const e of estornos) {
-    const orig = payments.find(p =>
-      p !== e &&
-      p.paymentDate === e.paymentDate &&
-      Math.abs((p.netAmount || 0) + (e.netAmount || 0)) < 0.01 &&
-      !canceled.has(p)
-    );
-    if (orig) {
-      canceled.add(orig);
-      canceled.add(e);
-    }
-  }
-  return canceled;
+export function getEstornoPairs<T extends PaymentLike>(_payments: T[]): Set<T> {
+  return new Set<T>();
 }

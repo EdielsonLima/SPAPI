@@ -17,9 +17,21 @@ const pool = new Pool({ connectionString: DATABASE_URL, ssl: { rejectUnauthorize
 
 const fmt = v => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-// Tipos de operação que dobram contagem ou são reversões — mesma lista
-// aplicada como default em executive-dashboard.tsx e contas-table.tsx.
-const EXCLUDED_OP = ["substitui", "cancelamento", "estorno", "abatimento"];
+// Tipos de operação excluídos do Líquido no relatório Sienge "Contas Pagas
+// (por Credor) Sintético". Mesma lista que o filtro UI Tipo Operação aplica
+// como default per-empresa.
+//
+// Nota sobre "estorno": NÃO está nesta lista. Estornos têm netAmount negativo
+// e o relatório Sienge soma o estorno como redução (pagamento + estorno = 0
+// se forem opostos). Excluir estorno + manter pagamento positivo dobraria
+// quando o pagamento foi re-emitido em data diferente (ex: Pag 09-01,
+// Estorno 09-05, Pag 09-06 = Líquido 6.600, não 13.200). Somar tudo dá o
+// resultado certo automaticamente.
+//
+// "devolu": devoluções de fornecedor não entram no Líquido "(por Credor)" do
+// Sienge — confirmado ao bater HANNOVER (3 devoluções totalizando R$ 7.376,85
+// que estavam sobrando no cache).
+const EXCLUDED_OP = ["substitui", "cancelamento", "abatimento", "devolu"];
 function isExcludedOp(name) {
   const lower = (name || "").toLowerCase();
   return EXCLUDED_OP.some(x => lower.includes(x));
@@ -162,26 +174,13 @@ function computeRecebidas(incomeItems, bankMovements, company, year, month) {
   return { total, count };
 }
 
-// Pareia Adiantamento+Estorno (mesma data, netAmount oposto) no mesmo item.
-// Sienge "Contas Pagas Sintético" cancela ambos do Líquido. Sem o pareamento,
-// EXCLUDED_OP filtra o Estorno mas deixa o Adiantamento contado.
-function getEstornoPairs(payments) {
-  const canceled = new Set();
-  const estornos = payments.filter(p => (p.operationTypeName || "").toLowerCase().includes("estorno"));
-  for (const e of estornos) {
-    const orig = payments.find(p =>
-      p !== e &&
-      p.paymentDate === e.paymentDate &&
-      Math.abs((p.netAmount || 0) + (e.netAmount || 0)) < 0.01 &&
-      !canceled.has(p)
-    );
-    if (orig) {
-      canceled.add(orig);
-      canceled.add(e);
-    }
-  }
-  return canceled;
-}
+// Pareamento explícito de estornos não é mais necessário: o estorno tem
+// netAmount negativo e simplesmente somá-lo cancela o pagamento original
+// quando opostos. Quando o estorno e o re-pagamento ficam em datas distintas
+// (caso EVELIN bill=6109 em HANNOVER), o pareamento por data falhava e
+// dobrava o pagamento. Função preservada como no-op para legibilidade do
+// histórico — pode ser removida em refactor futuro.
+function getEstornoPairs() { return new Set(); }
 
 // Total a Pagar para uma empresa. Soma effectiveAmount = corrected - discount
 // - tax para items com balance > 0 e dueDate >= hoje (futuras parcelas em
@@ -208,11 +207,14 @@ function computeAPagar(items, company, year, month) {
   return { total, count };
 }
 
-// Total Pago para uma empresa, opcionalmente filtrando por ano/mês.
-// Soma netAmount dos payments dentro do período, excluindo op types reversíveis.
-function computePagas(items, bankMovements, company, year, month) {
+// Total Pago para uma empresa, opcionalmente filtrando por ano/mês,
+// `paymentDateMax` (data de corte do PDF — pagamentos antecipados pra data
+// futura não entram), ou `excludeOps` (lista de operationTypeName extras a
+// excluir, usado por SP/ROZZA que excluem "Por Bens" via filtro UI).
+function computePagas(items, bankMovements, company, year, month, paymentDateMax, excludeOps) {
   const yearFilter = year && year !== "*" ? year : null;
   const monthFilter = month && month !== "*" ? month : null;
+  const extraExcluded = (excludeOps || []).map(s => s.toLowerCase());
   let total = 0;
   let count = 0;
 
@@ -228,25 +230,40 @@ function computePagas(items, bankMovements, company, year, month) {
       if (!p.paymentDate) continue;
       if (yearFilter && !p.paymentDate.startsWith(yearFilter)) continue;
       if (monthFilter && p.paymentDate.substring(5, 7) !== monthFilter) continue;
+      if (paymentDateMax && p.paymentDate > paymentDateMax) continue;
       if (isExcludedOp(p.operationTypeName)) continue;
+      const opLower = (p.operationTypeName || "").toLowerCase();
+      if (extraExcluded.some(x => opLower.includes(x))) continue;
       total += p.netAmount;
       count++;
     }
   }
 
-  // Bank movements avulsos — mesmo conjunto de exclusões aplicado em
-  // executive-dashboard.tsx e contas-table.tsx (apenas historic name, sem
-  // category check — para evitar falsos positivos como "Retenção impostos"
-  // com categoria "Taxa IR da Aplicação"):
-  // - rendimento/aplicação/resgate: receitas financeiras, não despesas
-  // - transferência/saque/depósito: movimentação interna, não pagamento real
-  // - estorno: reversão
-  // - recebimento: entrada de caixa, não pagamento
+  // Bank movements avulsos — lógica refinada 2026-05-09 contra Sienge
+  // "Contas Pagas (por Credor) Sintético" PDFs (cravou exato em 9 empresas):
+  //
+  // Aceitar APENAS BMs com:
+  //   1. bankMovementOperationType === "S" (Saídas). op='E' são entradas/
+  //      recebimentos — incluí-los dobraria transferências S+E pareadas.
+  //   2. documentIdentificationName !== "TRANSFERÊNCIA ENTRE CONTAS" — esses
+  //      são lançamentos contábeis internos/intercompany. Sienge "(por Credor)"
+  //      não soma no Líquido.
+  //   3. financialCategories.length > 0 — BMs sem categoria financeira são
+  //      sincronizações contábeis (ex: HOLDING recebendo aluguel registrado
+  //      como op='S' sem categoria). Pagamentos reais sempre têm categoria
+  //      ("Movimentações Administrativas", "Tarifa Bancária", etc.).
+  //   4. historic não em [rendimento, aplicação, resgate, recebimento, saque,
+  //      depósito, cheque]:
+  //      - rendimento/aplicação/resgate: receitas financeiras
+  //      - recebimento: entrada de caixa
+  //      - saque/depósito: movimentação interna
+  //      - cheque (Cheque emitido): movimentação do papel-cheque, não
+  //        pagamento real (registrado separado quando compensado)
   const EXCLUDE_HISTORIC_PATTERNS = [
     "rendimento", "aplicação", "aplicacao", "resgate",
-    "transferência", "transferencia", "saque", "depósito", "deposito",
-    "estorno",
+    "saque", "depósito", "deposito",
     "recebimento",
+    "cheque",
   ];
   for (const bm of bankMovements) {
     if (bm.companyName !== company) continue;
@@ -254,6 +271,12 @@ function computePagas(items, bankMovements, company, year, month) {
     if (!bm.bankMovementDate) continue;
     if (yearFilter && !bm.bankMovementDate.startsWith(yearFilter)) continue;
     if (monthFilter && bm.bankMovementDate.substring(5, 7) !== monthFilter) continue;
+    if (paymentDateMax && bm.bankMovementDate > paymentDateMax) continue;
+    if (bm.bankMovementOperationType !== "S") continue;
+    const docName = (bm.documentIdentificationName || "").toUpperCase();
+    if (docName.includes("TRANSFER") && docName.includes("ENTRE CONTAS")) continue;
+    const cats = bm.financialCategories || [];
+    if (cats.length === 0) continue;
     const historic = (bm.bankMovementHistoricName || "").toLowerCase();
     if (EXCLUDE_HISTORIC_PATTERNS.some(p => historic.includes(p))) continue;
     total += Math.abs(bm.bankMovementAmount);
@@ -285,7 +308,14 @@ function computePagas(items, bankMovements, company, year, month) {
   const items = r.rows[0].data?.data || r.rows[0].data || [];
   const cachedAt = r.rows[0].cached_at;
 
-  const bm = await pool.query("SELECT data FROM cached_bank_movements ORDER BY cached_at DESC LIMIT 1");
+  // Pega só o cache de BMs avulsos (sem prefixo `all:`). O painel cacheia
+  // separado: chave `all:<data>` guarda TODOS os BMs (vinculados + avulsos)
+  // e a chave sem prefixo guarda só avulsos. Como item.payments já cobre os
+  // vinculados via receipts.bankMovements, somar `all:` aqui dobraria os
+  // pagamentos vinculados.
+  const bm = await pool.query(
+    "SELECT data FROM cached_bank_movements WHERE start_date NOT LIKE 'all:%' ORDER BY cached_at DESC LIMIT 1"
+  );
   const bankMovements = bm.rows[0]?.data?.data || bm.rows[0]?.data || [];
 
   const incomeR = await pool.query("SELECT data FROM cached_income ORDER BY cached_at DESC LIMIT 1");
@@ -307,7 +337,7 @@ function computePagas(items, bankMovements, company, year, month) {
     if (v.mode === "a-pagar") {
       result = computeAPagar(items, v.company, v.year, v.month);
     } else if (v.mode === "pagas") {
-      result = computePagas(items, bankMovements, v.company, v.year, v.month);
+      result = computePagas(items, bankMovements, v.company, v.year, v.month, v.paymentDateMax, v.excludeOps);
     } else if (v.mode === "recebidas") {
       result = computeRecebidas(incomeItems, bankMovements, v.company, v.year, v.month);
     } else if (v.mode === "a-receber") {

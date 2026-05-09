@@ -458,20 +458,41 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           if (bmRes.ok) {
             const bmData = await bmRes.json();
             const bankMovements: SiengeBankMovement[] = bmData.data || [];
-            // Exclusion uses ONLY bankMovementHistoricName — earlier we also
-            // checked financialCategories but that excluded legitimate expenses
-            // for HOLDING (e.g. "Retenção impostos" with category "Taxa IR da
-            // Aplicação" was wrongly excluded by the "aplicação" pattern even
-            // though it's a real tax expense).
+            // Filtro refinado 2026-05-09 contra Sienge "Contas Pagas (por Credor)
+            // Sintético" — cravou exato em SP/TESLA/SUL BRASIL:
+            //
+            // Aceita APENAS BMs com:
+            //   1. bankMovementOperationType === "S" (saídas). op='E' (entradas)
+            //      são recebimentos, não pagamentos — incluí-los dobraria
+            //      transferências S+E pareadas.
+            //   2. documentIdentificationName !== "TRANSFERÊNCIA ENTRE CONTAS"
+            //      — lançamentos contábeis de transferência interna ou
+            //      intercompany não entram no Líquido do "(por Credor)".
+            //   3. historic não em [rendimento, aplicação, resgate, recebimento,
+            //      saque, depósito, cheque]:
+            //      - rendimento/aplicação/resgate: receitas financeiras
+            //      - recebimento: entrada de caixa
+            //      - saque/depósito: movimentação interna
+            //      - cheque: "Cheque emitido" é movimentação do cheque, não
+            //        pagamento real (este é registrado quando o cheque é compensado)
             const EXCLUDE_HISTORIC_PATTERNS = [
               "rendimento", "aplicação", "aplicacao", "resgate",
-              "transferência", "transferencia", "saque", "depósito", "deposito",
-              "estorno", // reversals are not real expenses
-              "recebimento", // incoming money, not a payment
+              "saque", "depósito", "deposito",
+              "recebimento",
+              "cheque",
             ];
             const bmAsItems: ContasItem[] = bankMovements
               .filter(bm => {
                 if (bm.bankMovementAmount === 0) return false;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                if ((bm as any).bankMovementOperationType !== "S") return false;
+                const docName = (bm.documentIdentificationName || "").toUpperCase();
+                if (docName.includes("TRANSFER") && docName.includes("ENTRE CONTAS")) return false;
+                // BMs sem categoria financeira são sincronizações contábeis
+                // (ex: HOLDING recebendo aluguel registrado como op='S' sem
+                // categoria). Pagamentos reais sempre têm categoria.
+                const cats = bm.financialCategories || [];
+                if (cats.length === 0) return false;
                 const historic = (bm.bankMovementHistoricName || "").toLowerCase();
                 if (EXCLUDE_HISTORIC_PATTERNS.some(p => historic.includes(p))) return false;
                 return true;
@@ -788,18 +809,21 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
         setFilterTipoBaixa(new Set(JSON.parse(saved)));
       } else {
         // No saved default: select all EXCEPT operation types that the Sienge
-        // "Contas Pagas (por Centro de Custo) Sintético" report ignores.
-        // Validated against PDF on 2026-05-01 — these are double-counting
-        // entries (Substituição replaces a prior payment, Cancelamento and
-        // Estorno are reversals). Real cash flows like Pagamento, Adiantamento,
-        // Por Bens, Devolução, Abatimento ARE included by default.
-        // Abatimento entries have Líquido = 0 in Sienge (accounting marker
-        // only, no real cash movement) so they should be excluded too.
-        // Note: "Por Bens" is included by default because Sienge "por Data"
-        // reports include it. Companies whose source report excludes it (e.g.
-        // SILVA PACKER, ROZZA — "por Credor") should save a per-empresa filter
-        // unchecking Por Bens via the standalone Contas Pagas page.
-        const DEFAULT_EXCLUDED = ["substitui", "cancelamento", "estorno", "abatimento"];
+        // "Contas Pagas (por Credor) Sintético" report ignores no Líquido.
+        // - "substitui": Substituição é só vínculo de previsão→nota, não é caixa.
+        // - "cancelamento": pagamento cancelado.
+        // - "abatimento": entry contábil sem movimento real (Líquido=0 no Sienge).
+        // - "devolu": devolução de fornecedor — Sienge "(por Credor)" não soma
+        //   no Líquido (validado 2026-05-09 com HANNOVER A10 R$ 6.534,53,
+        //   N.OPCAO R$ 577,50, ZEUS R$ 264,82).
+        //
+        // "estorno" NÃO está aqui — estornos têm netAmount negativo e o Sienge
+        // soma como redução. Excluí-los daria over-count quando re-emitido em
+        // data distinta (HANNOVER bill=6109 EVELIN R$ 6.600,00 dobrado).
+        //
+        // "Por Bens" é incluído por default; empresas que precisam excluir
+        // (SP/ROZZA contra "por Credor") salvam filtro per-empresa via standalone.
+        const DEFAULT_EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu"];
         const initial = tiposBaixa.filter(op => {
           const lower = op.toLowerCase();
           return !DEFAULT_EXCLUDED.some(x => lower.includes(x));

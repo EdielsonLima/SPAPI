@@ -1,45 +1,69 @@
 {
-  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas Pagas (por Data) Sintético' com Processar parcelas: Ambos (Contas a Pagar + Caixa/Bancos) e Tarifas bancárias ref. cobrança escritural marcado. Cada entrada congela um total já conferido para detectar regressões de código. mode='pagas' filtra por paymentDate, exclui Substituição/Cancelamento/Estorno/PREVISÃO, inclui bank movements detached (exceto rendimento/aplicação/resgate). Valor esperado em reais com 2 casas decimais.",
+  "_doc": "Snapshot de validações batidas contra relatório Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 08/05/2026 (PDF gerado 08/05/2026 18:36:08). Cada entrada congela o total Líquido do PDF. Cache lido SEMPRE da entrada `cached_bank_movements` SEM prefixo `all:` (BMs avulsos) — somar a entrada `all:` causa dupla contagem dos BMs vinculados a bills. mode='pagas' filtra por paymentDate, exclui Substituição/Cancelamento/Estorno/PREVISÃO, inclui bank movements detached (exceto rendimento/aplicação/resgate). Valor esperado em reais com 2 casas decimais. Tolerâncias acomodam gap natural entre cache atual e PDF (lançamentos novos entrando entre o `cached_at` e o PDF) — quando cache estiver mais antigo que validation, npm run check sinaliza ⚠.",
   "validations": [
+    {
+      "company": "SOLAR DI CAPRI",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 31443274.83,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 08/05/2026 (PDF 08/05 18:36). CRAVA EXATO R$ 0,00."
+    },
+    {
+      "company": "SOLAR DI SIENA",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "expected": 21599874.89,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-08",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 08/05/2026 (PDF 08/05 18:36). CRAVA EXATO R$ 0,00."
+    },
+    {
+      "company": "SILVA ADMINISTRADORA HOLDING LTDA",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "paymentDateMax": "2026-05-09",
+      "expected": 15184547.30,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF gerado 09/05 10:42:56). CRAVA EXATO R$ 0,00 com paymentDateMax=2026-05-09. Sem o filtro, cache mostra +R$ 879,11 = 2 pagamentos antecipados: CASSOL bill=36123 paymentDate=2026-05-11 R$ 866,81 + BANCO DO BRASIL bill=22253 paymentDate=2028-01-28 R$ 12,30 (lançamento futuro distante)."
+    },
     {
       "company": "DOMUS",
       "mode": "pagas",
       "year": "*",
       "month": "*",
-      "expected": 7405509.48,
+      "paymentDateMax": "2026-05-09",
+      "expected": 7599762.96,
       "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (Total empresa)"
-    },
-    {
-      "company": "PALACIO ELIZABETH",
-      "mode": "pagas",
-      "year": "*",
-      "month": "*",
-      "expected": 33576192.46,
-      "tolerance": 1.0,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. NÃO BATE mesmo após fix do filtro per-company. Painel: R$ 33.577.816,06 (+R$ 1.623,60). Confirma que a causa NÃO é filtro per-empresa, e sim 3+ credores com ajuste oculto na coluna Líquido do Sienge: COMPRAS ONLINE (-214,97), TAMOYO COMERCIO (-70,00), MERCADOPAGO.COM (-49,89), e outros pequenos. Investigar no Sienge admin."
-    },
-    {
-      "company": "SERENITY",
-      "mode": "pagas",
-      "year": "*",
-      "month": "*",
-      "expected": 15024074.52,
-      "tolerance": 10.0,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE com tolerance R$ 10 após fix do filtro per-company. Painel: R$ 15.024.068,55 (-R$ 5,97). Diff de R$ 6 é arredondamento puro (0,00004%)."
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF gerado 09/05 09:33:26). CRAVA EXATO R$ 0,00 com paymentDateMax=2026-05-09. Sem o filtro, cache mostra +R$ 1.384,50 = 2 pagamentos lançados antecipados pra 11/05: GAIDZINSKI bill=36124 R$ 1.260,00 + CASAS DA AGUA bill=36107 R$ 124,50."
     },
     {
       "company": "TETRA",
       "mode": "pagas",
       "year": "*",
       "month": "*",
-      "expected": 6516274.86,
+      "paymentDateMax": "2026-05-09",
+      "expected": 6517902.90,
       "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026 (Total geral)"
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF gerado 09/05 10:34:15). CRAVA EXATO R$ 0,00 com paymentDateMax=2026-05-09. Sem o filtro, cache mostra +R$ 2.519,75 = 1 pagamento antecipado GAIDZINSKI bill=34918 paymentDate=2026-05-11."
+    },
+    {
+      "company": "GALPÃO - RUA CANELINHA PROJ: 120/15",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "paymentDateMax": "2026-05-09",
+      "expected": 1127065.47,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF gerado 09/05 10:36:50). CRAVA EXATO R$ 0,00 com paymentDateMax=2026-05-09. Sem o filtro, cache mostra +R$ 2.674,18 = 2 pagamentos antecipados CASAS DA AGUA paymentDate=2026-05-11 (bill=34853 R$ 2.147,18 + bill=36147 R$ 527,00)."
     },
     {
       "company": "RESIDENCIAL HANNOVER",
@@ -47,99 +71,89 @@
       "year": "*",
       "month": "*",
       "expected": 26924856.29,
-      "tolerance": 1.0,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE após fix per-company: Painel R$ 26.929.830,31 (+R$ 4.974,02) e standalone R$ 26.940.281,22 (+R$ 15.424,93). Painel está MAIS próximo do PDF que standalone — situação inversa das outras. Standalone tem 8 op types selecionados vs Painel com 2. Diff R$ 4-15k provavelmente combinação de reduções ocultas Sienge + diferenças de filtro Tipo Op."
-    },
-    {
-      "company": "SOLAR DI CAPRI",
-      "mode": "pagas",
-      "year": "*",
-      "month": "*",
-      "expected": 31443272.79,
-      "tolerance": 5.0,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE com tolerance R$ 5 (rounding puro). Painel: R$ 31.443.270,80 (-R$ 1,99). Standalone também = R$ 31.443.272,79 (= PDF). Diff de R$ 1.99 é centavos de arredondamento (0.000006% de R$ 31M)."
-    },
-    {
-      "company": "SOLAR DI SIENA",
-      "mode": "pagas",
-      "year": "*",
-      "month": "*",
-      "expected": 21599719.89,
       "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026 (Total geral)"
-    },
-    {
-      "company": "TESLA RESIDENCIAL",
-      "mode": "pagas",
-      "year": "*",
-      "month": "*",
-      "expected": 48694258.85,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE 100% após fix do filtro per-company. Painel: R$ 48.694.258,85 (4 op types selecionados via filtro per-empresa standalone). Antes do fix: +R$ 985.174,45 (5%) por incluir op types que o relatório Sienge ignora."
-    },
-    {
-      "company": "GALPÃO - RUA CANELINHA PROJ: 120/15",
-      "mode": "pagas",
-      "year": "*",
-      "month": "*",
-      "expected": 1125981.75,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2001 a 02/05/2026. BATE 100% após fix do Painel Executivo ler filtro per-company da standalone (3 op types selecionados na standalone GALPÃO)."
-    },
-    {
-      "company": "SILVA ADMINISTRADORA HOLDING LTDA",
-      "mode": "pagas",
-      "year": "*",
-      "month": "*",
-      "expected": 14950266.42,
-      "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE 100% (R$ 14.950.266,42 = PDF). Diff caiu de R$ 1,4M para R$ 0 após série de fixes: (1) BMs sintetizados como op type 'Movimento Bancário', (2) exclusão de transferência/saque/depósito/estorno/recebimento por historic name, (3) abatimento adicionado aos op types excluídos por default."
-    },
-    {
-      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
-      "mode": "pagas",
-      "year": "*",
-      "month": "*",
-      "expected": 84020589.96,
-      "tolerance": 1.0,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). Após fix 56f7df8: Painel (7 op types) R$ 84.012.994,75 (-R$ 7.595,21), standalone (8 op types) R$ 84.039.357,75 (+R$ 18.767,79). Painel está com 1 op type a menos que standalone porque allOpTypes do Painel é global (todas empresas) e pode estar perdendo um tipo que só existe em SUL BRASIL. Diff Painel vs PDF é 0,009%."
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 08/05/2026 (PDF gerado 08/05 19:01:50). CRAVA EXATO R$ 0,00 após fix EXCLUDED_OP em 2026-05-09 (adicionou 'devolu', removeu 'estorno' e tornou getEstornoPairs no-op). 4 credores resolvidos: A10 R$ 6.534,53 (devolução), N.OPCAO R$ 577,50 (devolução), ZEUS R$ 264,82 (devolução), EVELIN bill 6109 R$ 6.600 (Pag/Estorno/Pag em datas distintas, pareamento por data falhava)."
     },
     {
       "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
       "mode": "pagas",
       "year": "*",
       "month": "*",
-      "expected": 111823042.46,
-      "tolerance": 5000.0,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Credor) Sintético — período 01/01/2021 a 02/05/2026. REQUER filtro per-empresa salvo na standalone Contas Pagas com Por Bens DESMARCADO (mesmo padrão de ROZZA). Causa: VOLKSWAGEN R$ 41.000 com op 'Por Bens' em 2024-01-30 (permuta, não saiu dinheiro) — relatório Sienge 'por Credor' não conta no Líquido. Sem o save: +R$ 40.455,64 (= R$ 41k Por Bens - R$ 545 rounding). Com o save: bate dentro de R$ 5k. Drift natural pós-validação: até R$ 1.275k em 50 dias (cache cresce com novos pagamentos)."
+      "paymentDateMax": "2026-05-09",
+      "excludeOps": ["por bens", "permuta"],
+      "expected": 112729270.93,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF 09/05 10:54:21). CRAVA EXATO R$ 0,00 com nova lógica de BMs (op='S' + exclude TRANSFERÊNCIA ENTRE CONTAS + cheque/saque/depósito) + paymentDateMax=2026-05-09 + excludeOps=['por bens','permuta']. VOLKSWAGEN bill=12638 op='Por Bens' R$ 41.000."
     },
     {
-      "company": "ROZZA",
+      "company": "PALACIO ELIZABETH",
       "mode": "pagas",
       "year": "*",
       "month": "*",
-      "expected": 12202461.90,
+      "paymentDateMax": "2026-05-09",
+      "expected": 33744388.48,
+      "tolerance": 5.0,
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF 09/05 10:38:18). Bate dentro de R$ 5 com paymentDateMax + nova lógica de BMs (op='S' + filtros). Diff residual -R$ 4,14 = variação de centavos em nomes de tarifas. 4 pagamentos antecipados 2026-05-11 filtrados (100 METAIS R$ 29.285,74 + MMK R$ 10.254,16 + CERAMICA TUPI R$ 3.041,18 + CASAS DA AGUA R$ 2.522,96)."
+    },
+    {
+      "company": "TESLA RESIDENCIAL",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "paymentDateMax": "2026-05-09",
+      "excludeOps": ["por bens", "permuta"],
+      "expected": 48707727.73,
       "tolerance": 0.5,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). BATE 100% após fix do Painel Executivo ler filtro per-company da standalone. ROZZA exclui Por Bens (R$ 13,5M de permutas AMORIM) via filtro salvo na standalone."
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF 09/05 11:04:41). CRAVA EXATO R$ 0,00 com nova lógica de BMs (op='S' + exclude TRANSFERÊNCIA ENTRE CONTAS + cheque/saque/depósito) + excludeOps=['por bens','permuta']. DESC IMOVEIS bill op='Por Bens' R$ 24.000 (PDF Líquido=R$ 36.000)."
+    },
+    {
+      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "paymentDateMax": "2026-05-09",
+      "expected": 84036994.84,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF gerado 09/05 11:14:06). CRAVA EXATO R$ 0,00 com a nova lógica de filtro de BMs (2026-05-09): apenas op='S' (Saídas), excluindo documentIdentificationName='TRANSFERÊNCIA ENTRE CONTAS' (intercompany/intercontas) e historic in [rendimento, aplicação, resgate, recebimento, saque, depósito, cheque]. 2 pagamentos antecipados paymentDate=2026-05-11 CAIXA ECONOMICA FEDERAL bills 33192 (R$ 38.177,21) e 33193 (R$ 48.759,64) filtrados por paymentDateMax."
     },
     {
       "company": "EDIFICIO 135 JARDINS",
       "mode": "pagas",
       "year": "*",
       "month": "*",
-      "expected": 83833653.91,
-      "tolerance": 1.0,
-      "validated_at": "2026-05-02",
-      "source": "Sienge Contas Pagas (por Data) Sintético — período 01/01/2001 a 02/05/2026 (com Tarifas marcadas). NÃO BATE: Painel R$ 83.839.573,31 (+R$ 5.919,40), standalone idêntico (filtro per-company funcionando). PDF próprio tem R$ 43.820 de redução oculta (V+A-D = R$ 83.877.473,86 vs Líquido R$ 83.833.653,91). Sistema está entre o esperado e o Líquido — combinação de op types e reduções ocultas. Diff de 0,007% sobre R$ 83M."
+      "paymentDateMax": "2026-05-09",
+      "expected": 84839464.79,
+      "tolerance": 5.0,
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF 09/05 11:43:32). Bate dentro de R$ 5 com paymentDateMax + nova lógica BMs. Cache filtrado = R$ 84.839.462,71 (-R$ 2,08 vs PDF, variação centavos tarifa). 29 pagamentos antecipados paymentDate=2026-05-11 totalizando R$ 108.753,99 (CIA DE CIMENTO ITAMBE 7 + RCN 8 + CASAS DA AGUA 5 + DURATEX R$ 49.962,64 + MERCADOPAGO 5 + outros)."
+    },
+    {
+      "company": "SERENITY",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "paymentDateMax": "2026-05-09",
+      "expected": 15204091.90,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF 09/05 11:41:28). CRAVA EXATO R$ 0,00 com paymentDateMax=2026-05-09 + nova lógica de BMs (op='S' + financialCategories check + filtros). 14 pagamentos antecipados paymentDate=2026-05-11 totalizando R$ 104.758,06 (CIA DE CIMENTO ITAMBE 7 entradas + CASAS DA AGUA + RCN + GAIDZINSKI + EPI 360)."
+    },
+    {
+      "company": "ROZZA",
+      "mode": "pagas",
+      "year": "*",
+      "month": "*",
+      "paymentDateMax": "2026-05-09",
+      "excludeOps": ["por bens", "permuta"],
+      "expected": 12281742.47,
+      "tolerance": 0.5,
+      "validated_at": "2026-05-09",
+      "source": "Sienge 'Contas Pagas (por Credor) Sintético' período 01/01/2001 a 09/05/2026 (PDF 09/05 11:44:21). CRAVA EXATO R$ 0,00 com paymentDateMax=2026-05-09 + excludeOps=['por bens','permuta'] + nova lógica BMs. 5 permutas AMORIM com Líquido=0 no PDF (R$ 13.500.000 total): AIRTON AMORIM, AIRTON+MARISA+DENISE, DENISE AMORIM AUZQUI, MARISA AMORIM (R$ 1.500.000 cada) + ROZZA AGRICULTURA (R$ 7.500.000). 6 pagamentos antecipados paymentDate=2026-05-11 totalizando R$ 55.153,09 (MMK + CIA CIMENTO + GAIDZINSKI + METAL LAJE + RCN)."
     }
   ]
 }
