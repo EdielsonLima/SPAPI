@@ -35,12 +35,31 @@ export function normalizeFilterText(value: string | null | undefined): string {
 
 export function isExcludedFinancialDocType(
   documentName: string | null | undefined,
-  forecastDocument?: string | null
+  forecastDocument?: string | null,
+  options: { excludeLocacao?: boolean } = {}
 ): boolean {
   const normalized = normalizeFilterText(documentName);
   return forecastDocument === "S" ||
     normalized.startsWith("PREVISAO") ||
-    normalized.startsWith("CONTRATO DE LOCA");
+    (options.excludeLocacao === true && normalized.startsWith("CONTRATO DE LOCA"));
+}
+
+type OpenAmountLike = {
+  correctedBalanceAmount?: number | null;
+  originalAmount?: number | null;
+  discountAmount?: number | null;
+  taxAmount?: number | null;
+};
+
+export function effectiveOpenAmount(item: OpenAmountLike, isIncome = false): number {
+  const corrected = item.correctedBalanceAmount || 0;
+  const discount = item.discountAmount || 0;
+  if (isIncome) return corrected - discount;
+
+  const original = item.originalAmount || 0;
+  const taxBelongsToOpenBalance = original > 0 && Math.abs(original - corrected) < 0.01;
+  const tax = taxBelongsToOpenBalance ? (item.taxAmount || 0) : 0;
+  return corrected - discount - tax;
 }
 
 // Pareamento manual de Adiantamento+Estorno foi descontinuado em 2026-05-09.

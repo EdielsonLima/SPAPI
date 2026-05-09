@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { SiengeOutcome } from "@/types/sienge";
+import { effectiveOpenAmount } from "@/lib/dashboard-utils";
 
 interface PDFData {
   items: SiengeOutcome[];
@@ -122,7 +123,7 @@ export function generateContasPagarPDF(data: PDFData) {
 
     // Data rows
     companyItems.forEach(item => {
-      const effectiveAmt = item.correctedBalanceAmount - (item.taxAmount || 0);
+      const effectiveAmt = effectiveOpenAmount(item, false);
       tableRows.push([
         fmtDate(item.dueDate),
         item.creditorName.length > 45 ? item.creditorName.substring(0, 45) + "..." : item.creditorName,
@@ -135,7 +136,7 @@ export function generateContasPagarPDF(data: PDFData) {
     });
 
     // Company subtotal
-    const companyTotal = companyItems.reduce((s, i) => s + i.correctedBalanceAmount - (i.taxAmount || 0), 0);
+    const companyTotal = companyItems.reduce((s, i) => s + effectiveOpenAmount(i, false), 0);
     tableRows.push([
       "",
       "",

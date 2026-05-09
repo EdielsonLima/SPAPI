@@ -58,7 +58,7 @@ import {
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } from "@/types/sienge";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
-import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType } from "@/lib/dashboard-utils";
+import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount } from "@/lib/dashboard-utils";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
@@ -703,7 +703,7 @@ export function ExecutiveDashboard() {
   // lançamentos contábeis internos da HOLDING — Sienge "Contas Recebidas"
   // não conta no Líquido. Validado 2026-05-08 contra PDF TETRA Total geral.
   const isExcludedDocType = (t: string) => {
-    return isExcludedFinancialDocType(t);
+    return isExcludedFinancialDocType(t, null, { excludeLocacao: section === "cr" });
   };
 
   const allDocTypes = useMemo(() => {
@@ -747,7 +747,7 @@ export function ExecutiveDashboard() {
   // Saldo efetivo a pagar = balance - desconto financeiro - imposto retido (ISS/INSS)
   // Mesma fórmula da página Contas a Pagar (validada contra Sienge "por Credor Sintético")
   const effectiveAmount = (i: SiengeOutcome | SiengeIncome) =>
-    (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0);
+    effectiveOpenAmount(i, "clientId" in i);
 
   const matchesSelectedPaymentDate = useCallback((paymentDate?: string) => {
     if (!paymentDate) return false;

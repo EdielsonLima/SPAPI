@@ -19,6 +19,13 @@
 - KPI card "Saldo Pendente" usa o mesmo cálculo via totalBalance
 - Para Income (Contas a Receber/Recebidas) NÃO subtrair taxAmount (isIncome branch)
 
+### Atualizacao 2026-05-09 - saldo parcial com imposto
+- Regra implementada em `src/lib/dashboard-utils.ts` (`effectiveOpenAmount`):
+  - Base: `correctedBalanceAmount - discountAmount`
+  - Para outcome, `taxAmount` so e subtraido quando `originalAmount == correctedBalanceAmount` (parcela integralmente aberta)
+  - Em saldo parcial, `taxAmount` pode pertencer ao titulo original e o Sienge "Contas a Pagar (por Credor) Sintetico" nao subtrai do saldo aberto
+  - Validado no EDIFICIO 135 JARDINS vencidas ate 08/05/2026: PDF R$ 248.502,25 vs sistema R$ 248.502,26. Caso critico: R M FERNANDEZ bill 34134, saldo R$ 39.990,46, taxAmount R$ 21.497,05, PDF soma R$ 39.990,46.
+
 ## Contas Pagas - Regras Criticas (Validado em 2026-04-05)
 
 ### NAO ALTERAR sem pedido explicito do usuario:

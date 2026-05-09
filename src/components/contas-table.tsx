@@ -47,7 +47,7 @@ import {
   Users,
 } from "lucide-react";
 import { SiengeOutcome, SiengeIncome, SiengeBankMovement } from "@/types/sienge";
-import { getEstornoPairs, isExcludedFinancialDocType } from "@/lib/dashboard-utils";
+import { getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount } from "@/lib/dashboard-utils";
 import { toast } from "sonner";
 
 type ContasItem = SiengeOutcome | SiengeIncome;
@@ -65,6 +65,10 @@ function getCounterpartId(item: ContasItem): number {
 function getBuildingsCosts(item: ContasItem) {
   if ("buildingsCosts" in item) return item.buildingsCosts || [];
   return [];
+}
+
+function openAmount(item: ContasItem, isIncome: boolean): number {
+  return effectiveOpenAmount(item, isIncome);
 }
 
 type SortField =
@@ -1128,11 +1132,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted]
   );
   const totalBalance = useMemo(
-    () => sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) - (item.discountAmount || 0) - (isIncome ? 0 : (item.taxAmount || 0)), 0),
+    () => sorted.reduce((sum, item) => sum + openAmount(item, isIncome), 0),
     [sorted, isIncome]
   );
   const totalDiscount = useMemo(
-    () => sorted.reduce((sum, item) => sum + (item.discountAmount || 0) + (isIncome ? 0 : (item.taxAmount || 0)), 0),
+    () => sorted.reduce((sum, item) => sum + Math.max(0, (item.correctedBalanceAmount || 0) - openAmount(item, isIncome)), 0),
     [sorted, isIncome]
   );
   const semOrcamentoStats = useMemo(() => {
@@ -1142,8 +1146,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       const costs = getBuildingsCosts(i);
       return costs.length === 0 || costs.every(bc => !bc.costEstimationSheetName);
     });
-    const valor = unlinked.reduce((s, i) =>
-      s + (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (i.taxAmount || 0), 0);
+    const valor = unlinked.reduce((s, i) => s + openAmount(i, false), 0);
     return { count: unlinked.length, valor };
   }, [sorted, isIncome, companiesControlaOrcamento]);
   const totalPaid = useMemo(
@@ -1151,7 +1154,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     [sorted, filterAnos, filterMes, filterTipoBaixa, isPagas]
   );
   const totalComEncargos = useMemo(
-    () => isOverdue ? sorted.reduce((sum, item) => sum + (item.correctedBalanceAmount || 0) + calcEncargos(item) - (item.discountAmount || 0) - (isIncome ? 0 : (item.taxAmount || 0)), 0) : 0,
+    () => isOverdue ? sorted.reduce((sum, item) => sum + openAmount(item, isIncome) + calcEncargos(item), 0) : 0,
     [sorted, isOverdue, calcEncargos, isIncome]
   );
 
@@ -1250,7 +1253,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       const d = new Date(item.dueDate + "T00:00:00");
       return isOverdue ? d >= limit && d <= yesterday : d >= tomorrow && d <= limit;
     });
-    const valor = weekItems.reduce((s, i) => s + (i.correctedBalanceAmount || 0) - (i.discountAmount || 0) - (isIncome ? 0 : (i.taxAmount || 0)), 0);
+    const valor = weekItems.reduce((s, i) => s + openAmount(i, isIncome), 0);
     const titulos = new Set(weekItems.map((i) => i.billId)).size;
     const credores = new Set(weekItems.map((i) => getCounterpartId(i))).size;
     return { valor, titulos, credores, parcelas: weekItems.length };
@@ -1879,7 +1882,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                   );
                                 })()}
                                 {!isIncome && (() => {
-                                  const desc = (item.discountAmount || 0) + (item.taxAmount || 0);
+                                  const desc = Math.max(0, (item.correctedBalanceAmount || 0) - openAmount(item, false));
                                   return (
                                     <TableCell className={`text-right font-mono text-sm ${desc > 0 ? "font-medium text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-slate-500"}`}>
                                       {formatCurrency(desc)}
@@ -1888,11 +1891,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                 })()}
                                 {isOverdue ? (
                                   <TableCell className="text-right font-mono text-sm font-medium text-red-600">
-                                    {formatCurrency(item.correctedBalanceAmount + calcEncargos(item) - (item.discountAmount || 0) - (isIncome ? 0 : (item.taxAmount || 0)))}
+                                    {formatCurrency(openAmount(item, isIncome) + calcEncargos(item))}
                                   </TableCell>
                                 ) : (
                                   <TableCell className="text-right font-mono text-sm font-medium text-slate-800">
-                                    {formatCurrency(item.correctedBalanceAmount - (item.discountAmount || 0) - (isIncome ? 0 : (item.taxAmount || 0)))}
+                                    {formatCurrency(openAmount(item, isIncome))}
                                   </TableCell>
                                 )}
                               </>
@@ -2028,7 +2031,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                                   {isPaidItem ? "-" : `${correcaoPct.toFixed(1)}%`}
                                                 </TableCell>
                                                 <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaidItem ? "text-green-600" : isOverdue ? "text-red-600 dark:text-red-300/70" : "text-slate-800 dark:text-slate-200"}`}>
-                                                  {formatCurrency(isPaidItem ? parcela.correctedBalanceAmount : parcela.correctedBalanceAmount - (parcela.discountAmount || 0) - (isIncome ? 0 : (parcela.taxAmount || 0)))}
+                                                  {formatCurrency(isPaidItem ? parcela.correctedBalanceAmount : openAmount(parcela, isIncome))}
                                                 </TableCell>
                                                 <TableCell className="text-xs py-1.5">
                                                   {isPaidItem ? (
