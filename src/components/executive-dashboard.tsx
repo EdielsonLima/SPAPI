@@ -5396,16 +5396,21 @@ export function ExecutiveDashboard() {
         // que JÁ inclui BMs órfãos (Rendimento de aplicação, Resgate etc) como
         // items sintetizados — mesma lógica conferida na página Contas Recebidas
         // (cravando 100% contra Sienge "Contas Recebidas (por Cliente)").
+        // Filtro de doc type compara contra documentIdentificationName (igual
+        // ao filtro do header). selectedDays e exclusão de paymentDate>todayStr
+        // alinham com matchesSelectedPaymentDate da página Recebidas.
         consistentIncomeForRecebidas.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
+          if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName)) return;
           (item.payments || []).forEach(p => {
-            if (p.netAmount > 0 && p.paymentDate) {
-              if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;
-              if (selectedMonths.size > 0 && !selectedMonths.has(p.paymentDate.substring(5, 7))) return;
-              if (resumoTipoOpRec.size > 0 && !(p.operationTypeName && resumoTipoOpRec.has(p.operationTypeName))) return;
-              companySummary[co].totalRecebido += p.netAmount;
-            }
+            if (p.netAmount <= 0 || !p.paymentDate) return;
+            if (p.paymentDate > todayStr) return;
+            if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;
+            if (selectedMonths.size > 0 && !selectedMonths.has(p.paymentDate.substring(5, 7))) return;
+            if (selectedDays.size > 0 && !selectedDays.has(p.paymentDate.substring(8, 10))) return;
+            if (resumoTipoOpRec.size > 0 && !(p.operationTypeName && resumoTipoOpRec.has(p.operationTypeName))) return;
+            companySummary[co].totalRecebido += p.netAmount;
           });
         });
 
@@ -5414,18 +5419,19 @@ export function ExecutiveDashboard() {
         // a nova lógica refinada (op='S', !TRANSFERÊNCIA ENTRE CONTAS, cats > 0,
         // !cheque/saque/etc) — mesma lógica conferida na página Contas Pagas
         // (cravando 100% em 12 empresas contra Sienge "Contas Pagas (por Credor)").
+        // Bug fix 2026-05-09: comparava selectedDocTypes contra
+        // documentIdentificationId, mas o filtro armazena Name — bloqueava 100%.
         consistentItemsForPagas.forEach(item => {
           const co = item.companyName;
           if (!companySummary[co]) return;
-          if (selectedDocTypes.size > 0) {
-            const tipo = (item.documentIdentificationId || "").trim();
-            if (!selectedDocTypes.has(tipo)) return;
-          }
+          if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName)) return;
           if (isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return;
           (item.payments || []).forEach(p => {
             if (p.netAmount === 0 || !p.paymentDate) return;
+            if (p.paymentDate > todayStr) return;
             if (selectedYears.size > 0 && !selectedYears.has(p.paymentDate.substring(0, 4))) return;
             if (selectedMonths.size > 0 && !selectedMonths.has(p.paymentDate.substring(5, 7))) return;
+            if (selectedDays.size > 0 && !selectedDays.has(p.paymentDate.substring(8, 10))) return;
             if (resumoTipoOp.size > 0 && !(p.operationTypeName && resumoTipoOp.has(p.operationTypeName))) return;
             companySummary[co].totalPago += p.netAmount;
           });
