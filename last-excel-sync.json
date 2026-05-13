@@ -1,7 +1,7 @@
 {
-  "lastSync": "2026-05-13T11:53:30.245Z",
+  "lastSync": "2026-05-13T14:34:21.939Z",
   "target": "https://spapi-production.up.railway.app",
-  "totalRecords": 15134,
+  "totalRecords": 15141,
   "years": [
     "2020",
     "2021",
@@ -11,5 +11,5 @@
     "2025",
     "2026"
   ],
-  "excelModified": "2026-05-12T11:08:30.882Z"
+  "excelModified": "2026-05-13T13:09:15.195Z"
 }
