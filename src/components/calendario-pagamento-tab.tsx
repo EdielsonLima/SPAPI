@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, CalendarDays, List } from "lucide-react";
 import { formatCurrency, effectiveOpenAmount } from "@/lib/dashboard-utils";
 import { Button } from "@/components/ui/button";
 import { SiengeOutcome } from "@/types/sienge";
+import { PaymentDetailModal } from "./payment-detail-modal";
 
 interface Props {
   // Items pendentes ja filtrados (correctedBalanceAmount > 0). Sao os mesmos
@@ -40,6 +41,7 @@ interface CalendarDay {
 export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selectedDocTypes }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => getCurrentMonthKey());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [selectedItem, setSelectedItem] = useState<SiengeOutcome | null>(null);
 
   // 1. Aplica filtros globais (empresa, doc type) sobre itemsAPagar
   const filteredItems = useMemo(() => {
@@ -66,6 +68,7 @@ export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selecte
         companyName: item.companyName,
         dueDate: item.dueDate,
         amount: effectiveOpenAmount(item, false),
+        raw: item,
       }))
       .filter(i => i.amount > 0)
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || b.amount - a.amount);
@@ -341,9 +344,14 @@ export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selecte
                         {group.items.map((item) => (
                           <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                             <td className="py-2 px-3 min-w-0">
-                              <p className="text-xs font-medium text-slate-800 dark:text-slate-200 break-words" title={item.supplier}>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedItem(item.raw)}
+                                className="text-xs font-medium text-blue-700 dark:text-blue-300 hover:underline hover:text-blue-900 dark:hover:text-blue-200 text-left break-words cursor-pointer"
+                                title={`Ver detalhes de ${item.supplier}`}
+                              >
                                 {item.supplier}
-                              </p>
+                              </button>
                               <p className="text-[10px] text-slate-500 dark:text-slate-400 break-words">
                                 {item.companyName} {item.documentNumber && <>· {item.documentNumber}</>}
                               </p>
@@ -362,6 +370,12 @@ export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selecte
           </div>
         </div>
       </div>
+
+      <PaymentDetailModal
+        item={selectedItem}
+        open={selectedItem !== null}
+        onClose={() => setSelectedItem(null)}
+      />
     </div>
   );
 }
