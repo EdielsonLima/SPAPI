@@ -2371,21 +2371,10 @@ export function ExecutiveDashboard() {
               <BarChart3 className="h-3.5 w-3.5" />
               DRE
             </button>
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("dre-api");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "dre-api"
-                  ? "bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 shadow-md ring-2 ring-cyan-300 dark:ring-cyan-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-              title="DRE calculada em tempo real a partir das movimentações Sienge (sem Excel)"
-            >
-              <BarChart3 className="h-3.5 w-3.5" />
-              DRE API
-            </button>
+            {/* Botao DRE API removido em 2026-05-13: decidimos manter DRE
+                via Excel (Sienge calcula 100% correto, bulk API nao expoe
+                campos necessarios pra replicar). Endpoints /api/dre-api/*
+                e tab 'dre-api' preservados no codigo pra eventual retomada. */}
             <button
               onClick={() => {
                 setSection("cp");
