@@ -61,9 +61,10 @@ import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
+import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
 
 type Section = "cp" | "cr";
-type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "dre-api" | "saldos" | "resumo";
+type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores";
 
 // Each tab group has its own saved company filter
 function getTabGroup(tab: MainTab): string {
@@ -73,6 +74,7 @@ function getTabGroup(tab: MainTab): string {
     case "visao-geral": return "visao-geral";
     case "resumo": return "resumo";
     case "dre-api": return "dre-api";
+    case "indicadores": return "indicadores";
     default: return tab;
   }
 }
@@ -2193,6 +2195,7 @@ export function ExecutiveDashboard() {
     saldos: [],
     "visao-geral": [],
     resumo: [],
+    indicadores: [],
   };
 
   const kpis = kpiConfigs[activeTab];
@@ -2411,11 +2414,26 @@ export function ExecutiveDashboard() {
               <FileText className="h-3.5 w-3.5" />
               Resumo
             </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("indicadores");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "indicadores"
+                  ? "bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md ring-2 ring-amber-300 dark:ring-amber-500/50"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+              title="CUB-SC, CDI, IPCA e IGP-M"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              Indicadores
+            </button>
           </div>
         </div>
 
         {/* Sub-tabs CP/CR - separate line */}
-        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && (
+        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && (
           <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             switchTab(tab);
@@ -2584,7 +2602,7 @@ export function ExecutiveDashboard() {
             labelFn={(m) => MONTH_NAMES[m] || m}
           />
         </div>}
-        {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && <div className="flex items-center gap-2 flex-wrap">
+        {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "indicadores" && <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
             label="Empresas"
             icon={<Building2 className="h-4 w-4" />}
@@ -3963,7 +3981,7 @@ export function ExecutiveDashboard() {
       })()}
 
       {/* KPI Cards */}
-      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
@@ -5726,6 +5744,11 @@ export function ExecutiveDashboard() {
           </div>
         );
       })()}
+
+      {/* ══════ INDICADORES DE MERCADO TAB ══════ */}
+      {activeTab === "indicadores" && (
+        <IndicadoresTab />
+      )}
 
     </div>
   );

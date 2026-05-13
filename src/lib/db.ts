@@ -780,4 +780,150 @@ export async function cacheDailyBalance(date: string, data: unknown[]) {
   );
 }
 
+// ─── Indicadores de Mercado (CUB / CDI / IPCA / IGP-M) ────────────────────
+
+export type CubIndicadorRow = {
+  ano: number;
+  mes: number;
+  valor_m2: number;
+  variacao_pct: number | null;
+  variacao_acumulada_ano_pct: number | null;
+  variacao_anual_pct: number | null;
+  atualizado_em: string;
+};
+
+export type PctIndicadorRow = {
+  ano: number;
+  mes: number;
+  variacao_pct: number;
+  acumulado_12m_pct: number | null;
+  atualizado_em: string;
+};
+
+export type DebitSlug = "cdi" | "ipca" | "igpm";
+const DEBIT_TABLE: Record<DebitSlug, string> = {
+  cdi: "indices_cdi",
+  ipca: "indices_ipca",
+  igpm: "indices_igpm",
+};
+
+function toNum(v: unknown): number {
+  return v === null || v === undefined ? 0 : Number(v);
+}
+function toNumOrNull(v: unknown): number | null {
+  return v === null || v === undefined ? null : Number(v);
+}
+
+export async function getIndicadoresCub(): Promise<CubIndicadorRow[]> {
+  const { rows } = await pool.query(
+    `SELECT ano, mes, valor_m2, variacao_pct, variacao_acumulada_ano_pct,
+            variacao_anual_pct, atualizado_em
+       FROM indices_cub
+       ORDER BY ano, mes`
+  );
+  return rows.map((r: Record<string, unknown>) => ({
+    ano: Number(r.ano),
+    mes: Number(r.mes),
+    valor_m2: toNum(r.valor_m2),
+    variacao_pct: toNumOrNull(r.variacao_pct),
+    variacao_acumulada_ano_pct: toNumOrNull(r.variacao_acumulada_ano_pct),
+    variacao_anual_pct: toNumOrNull(r.variacao_anual_pct),
+    atualizado_em: r.atualizado_em instanceof Date
+      ? r.atualizado_em.toISOString()
+      : String(r.atualizado_em ?? ""),
+  }));
+}
+
+export async function getIndicadoresDebit(slug: DebitSlug): Promise<PctIndicadorRow[]> {
+  const table = DEBIT_TABLE[slug];
+  const { rows } = await pool.query(
+    `SELECT ano, mes, variacao_pct, acumulado_12m_pct, atualizado_em
+       FROM ${table}
+       ORDER BY ano, mes`
+  );
+  return rows.map((r: Record<string, unknown>) => ({
+    ano: Number(r.ano),
+    mes: Number(r.mes),
+    variacao_pct: toNum(r.variacao_pct),
+    acumulado_12m_pct: toNumOrNull(r.acumulado_12m_pct),
+    atualizado_em: r.atualizado_em instanceof Date
+      ? r.atualizado_em.toISOString()
+      : String(r.atualizado_em ?? ""),
+  }));
+}
+
+export async function upsertIndicadoresCub(
+  rows: {
+    ano: number;
+    mes: number;
+    valor_m2: number;
+    variacao_pct: number;
+    variacao_acumulada_ano_pct: number;
+    variacao_anual_pct: number;
+  }[]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const r of rows) {
+      await client.query(
+        `INSERT INTO indices_cub
+           (ano, mes, valor_m2, variacao_pct, variacao_acumulada_ano_pct, variacao_anual_pct, atualizado_em)
+         VALUES ($1,$2,$3,$4,$5,$6,NOW())
+         ON CONFLICT (ano, mes) DO UPDATE SET
+           valor_m2 = EXCLUDED.valor_m2,
+           variacao_pct = EXCLUDED.variacao_pct,
+           variacao_acumulada_ano_pct = EXCLUDED.variacao_acumulada_ano_pct,
+           variacao_anual_pct = EXCLUDED.variacao_anual_pct,
+           atualizado_em = NOW()`,
+        [r.ano, r.mes, r.valor_m2, r.variacao_pct, r.variacao_acumulada_ano_pct, r.variacao_anual_pct]
+      );
+    }
+    await client.query("COMMIT");
+    return rows.length;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+export async function upsertIndicadoresDebit(
+  slug: DebitSlug,
+  rows: {
+    ano: number;
+    mes: number;
+    variacao_pct: number;
+    acumulado_12m_pct: number | null;
+  }[]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  const table = DEBIT_TABLE[slug];
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const r of rows) {
+      await client.query(
+        `INSERT INTO ${table}
+           (ano, mes, variacao_pct, acumulado_12m_pct, atualizado_em)
+         VALUES ($1,$2,$3,$4,NOW())
+         ON CONFLICT (ano, mes) DO UPDATE SET
+           variacao_pct = EXCLUDED.variacao_pct,
+           acumulado_12m_pct = EXCLUDED.acumulado_12m_pct,
+           atualizado_em = NOW()`,
+        [r.ano, r.mes, r.variacao_pct, r.acumulado_12m_pct]
+      );
+    }
+    await client.query("COMMIT");
+    return rows.length;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export default pool;

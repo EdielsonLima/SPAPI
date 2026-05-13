@@ -204,6 +204,8 @@ CREATE TABLE IF NOT EXISTS dre_excel_supplementary (
   cached_at           TIMESTAMP NOT NULL DEFAULT NOW(),
   PRIMARY KEY (year, month, company_id, financial_plan_id)
 );
+-- Migração defensiva: garante coluna `month` em bancos legados antes dos índices abaixo
+ALTER TABLE dre_excel_supplementary ADD COLUMN IF NOT EXISTS month VARCHAR(2) NOT NULL DEFAULT '00';
 CREATE INDEX IF NOT EXISTS idx_dre_excel_supp_year ON dre_excel_supplementary(year);
 CREATE INDEX IF NOT EXISTS idx_dre_excel_supp_year_month ON dre_excel_supplementary(year, month);
 
@@ -233,4 +235,50 @@ CREATE TABLE IF NOT EXISTS cached_daily_balances (
   data         JSONB NOT NULL,
   cached_at    TIMESTAMP NOT NULL DEFAULT NOW(),
   PRIMARY KEY (balance_date)
+);
+
+-- ── Indicadores de Mercado (CUB-SC, CDI, IPCA, IGP-M) ─────────────────────
+-- Tabelas alimentadas por scrapers manuais + auto-sync silencioso quando
+-- dados ficam > 7 dias velhos. Histórico completo no CUB; últimos 24 meses
+-- nos demais (limite das fontes).
+CREATE TABLE IF NOT EXISTS indices_cub (
+  id                          SERIAL PRIMARY KEY,
+  ano                         INT NOT NULL,
+  mes                         INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  valor_m2                    NUMERIC(18,2) NOT NULL,
+  variacao_pct                NUMERIC(8,4),
+  variacao_acumulada_ano_pct  NUMERIC(8,4),
+  variacao_anual_pct          NUMERIC(8,4),
+  atualizado_em               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(ano, mes)
+);
+
+CREATE TABLE IF NOT EXISTS indices_cdi (
+  id                SERIAL PRIMARY KEY,
+  ano               INT NOT NULL,
+  mes               INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  variacao_pct      NUMERIC(8,4) NOT NULL,
+  acumulado_12m_pct NUMERIC(8,4),
+  atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(ano, mes)
+);
+
+CREATE TABLE IF NOT EXISTS indices_ipca (
+  id                SERIAL PRIMARY KEY,
+  ano               INT NOT NULL,
+  mes               INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  variacao_pct      NUMERIC(8,4) NOT NULL,
+  acumulado_12m_pct NUMERIC(8,4),
+  atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(ano, mes)
+);
+
+CREATE TABLE IF NOT EXISTS indices_igpm (
+  id                SERIAL PRIMARY KEY,
+  ano               INT NOT NULL,
+  mes               INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  variacao_pct      NUMERIC(8,4) NOT NULL,
+  acumulado_12m_pct NUMERIC(8,4),
+  atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(ano, mes)
 );
