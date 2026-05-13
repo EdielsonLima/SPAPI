@@ -14,6 +14,20 @@ import { getCachedOutcomeContaining, getCachedIncomeContaining, getCachedBankMov
 //
 // Formato de saída idêntico ao /api/dre-supplementary pra que a DreTab
 // consuma ambos sem mudar o resto da lógica.
+//
+// IMPORTANTE — sinais: DreTab calcula lucroBruto = receita + custo_variavel
+// (soma). O Excel armazena custo_variavel como negativo. Pra DRE API bater
+// com a mesma fórmula, aplico sinal negativo nas categorias de despesa
+// listadas em NEGATIVE_CATEGORIES (espelho de dre-tab.tsx linha 56-64).
+const NEGATIVE_CATEGORIES = new Set([
+  "custo_variavel",
+  "custo_fixo",
+  "despesas_financeiras",
+  "despesas_tributarias",
+  "imobilizacoes",
+  "retiradas",
+  "saidas_nao_operacionais",
+]);
 
 type SiengePayment = {
   netAmount: number;
@@ -66,8 +80,11 @@ function isExcludedDocType(name: string | null | undefined): boolean {
 }
 
 // Filtros de BMs avulsos pra DRE — mesmos validados nas páginas CP/CR.
+// IMPORTANTE: billId DEVE ser null pra evitar duplicacao com outcome.payments[]
+// (BMs vinculados a bills sao a mesma movimentacao que ja aparece no payment).
 function bmIsRelevantOutflow(bm: SiengeBankMovementItem): boolean {
   if (!bm.bankMovementAmount || bm.bankMovementAmount === 0) return false;
+  if (bm.billId) return false; // ja contado em outcome.payments[]
   if (bm.bankMovementOperationType !== "S") return false;
   const docName = (bm.documentIdentificationName || "").toUpperCase();
   if (docName.includes("TRANSFER") && docName.includes("ENTRE CONTAS")) return false;
@@ -150,7 +167,7 @@ export async function GET(request: NextRequest) {
     // Acumulador: { financialPlanId: { name, dreCategory, months: { "01": amount } } }
     const acc: Record<string, { name: string; dreCategory: string; months: Record<string, number> }> = {};
 
-    const addToAcc = (cat: SiengePaymentsCategory, amount: number, dateStr: string | undefined, sign: 1 | -1) => {
+    const addToAcc = (cat: SiengePaymentsCategory, amount: number, dateStr: string | undefined) => {
       if (!dateStr) return;
       const yr = dateStr.substring(0, 4);
       if (yr !== year) return;
@@ -163,10 +180,13 @@ export async function GET(request: NextRequest) {
       const rate = typeof cat.financialCategoryRate === "number" && cat.financialCategoryRate > 0
         ? cat.financialCategoryRate / 100
         : 1;
+      const dreCat = fpToDre[fcId] || "";
+      // Aplica sinal negativo nas categorias de despesa pra que a fórmula
+      // lucroBruto = receita + custo_variavel da DreTab funcione corretamente.
+      const sign = NEGATIVE_CATEGORIES.has(dreCat) ? -1 : 1;
       const value = sign * amount * rate;
       if (value === 0) return;
 
-      const dreCat = fpToDre[fcId] || "";
       const name = fpNames[fcId] || cat.financialCategoryName || `Conta ${fcId}`;
 
       if (!acc[fcId]) {
@@ -186,7 +206,7 @@ export async function GET(request: NextRequest) {
       const payments = item.payments || [];
       for (const p of payments) {
         if (!p.netAmount || !p.paymentDate) continue;
-        for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate, 1);
+        for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate);
       }
     }
 
@@ -201,7 +221,7 @@ export async function GET(request: NextRequest) {
       const payments = item.payments || [];
       for (const p of payments) {
         if (!p.netAmount || p.netAmount <= 0 || !p.paymentDate) continue;
-        for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate, 1);
+        for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate);
       }
     }
 
@@ -215,10 +235,10 @@ export async function GET(request: NextRequest) {
       const date = bm.bankMovementDate;
       if (bmIsRelevantOutflow(bm)) {
         const amount = Math.abs(bm.bankMovementAmount);
-        for (const c of cats) addToAcc(c, amount, date, 1);
+        for (const c of cats) addToAcc(c, amount, date);
       } else if (bmIsRelevantInflow(bm)) {
         const amount = Math.abs(bm.bankMovementAmount);
-        for (const c of cats) addToAcc(c, amount, date, 1);
+        for (const c of cats) addToAcc(c, amount, date);
       }
     }
 

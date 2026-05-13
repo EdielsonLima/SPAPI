@@ -30,6 +30,7 @@ type SiengeIncomeItem = {
 type SiengeBankMovementItem = {
   bankMovementAmount: number;
   bankMovementDate?: string;
+  billId?: number | null;
   financialCategories?: SiengePaymentsCategory[];
 };
 
@@ -116,6 +117,8 @@ export async function GET(request: NextRequest) {
     const bms = readArray<SiengeBankMovementItem>(bmR?.data);
     for (const bm of bms) {
       if (!bm.bankMovementAmount || !bm.bankMovementDate?.startsWith(year)) continue;
+      // Pula BMs vinculados a bills — ja contam em outcome.payments[].
+      if (bm.billId) continue;
       const cats = bm.financialCategories || [];
       if (cats.length === 0) continue;
       const amount = Math.abs(bm.bankMovementAmount);
