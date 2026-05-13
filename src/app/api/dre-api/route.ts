@@ -99,8 +99,21 @@ function isExcludedDocType(name: string | null | undefined): boolean {
 }
 
 // Filtros de BMs avulsos pra DRE — mesmos validados nas páginas CP/CR.
-// IMPORTANTE: billId DEVE ser null pra evitar duplicacao com outcome.payments[]
-// (BMs vinculados a bills sao a mesma movimentacao que ja aparece no payment).
+// IMPORTANTE:
+// - billId DEVE ser null pra evitar duplicacao com outcome.payments[]
+//   (BMs vinculados a bills sao a mesma movimentacao que ja aparece no payment)
+// - "Transferência" no historic pode ser:
+//   (a) transferencia interna entre contas da mesma empresa → excluir
+//   (b) transferencia intercompany legitima classificada como receita/despesa
+//       → INCLUIR (sera filtrada por IGNORED_FINANCIAL_CATEGORIES se for 10307,
+//       ou processada normalmente se for receita/despesa real)
+//   Diferenciamos pelo `financialCategories`: se a categoria for IGNORED ou
+//   estiver vazia, e transferencia interna → excluir.
+function hasMeaningfulCategory(cats: SiengePaymentsCategory[]): boolean {
+  if (cats.length === 0) return false;
+  return cats.some(c => !IGNORED_FINANCIAL_CATEGORIES.has(String(c.financialCategoryId).trim()));
+}
+
 function bmIsRelevantOutflow(bm: SiengeBankMovementItem): boolean {
   if (!bm.bankMovementAmount || bm.bankMovementAmount === 0) return false;
   if (bm.billId) return false; // ja contado em outcome.payments[]
@@ -108,10 +121,12 @@ function bmIsRelevantOutflow(bm: SiengeBankMovementItem): boolean {
   const docName = (bm.documentIdentificationName || "").toUpperCase();
   if (docName.includes("TRANSFER") && docName.includes("ENTRE CONTAS")) return false;
   const cats = bm.financialCategories || [];
-  if (cats.length === 0) return false;
+  if (!hasMeaningfulCategory(cats)) return false;
   const historic = (bm.bankMovementHistoricName || "").toLowerCase();
-  const excl = ["rendimento", "aplicação", "aplicacao", "resgate", "saque", "depósito", "deposito", "recebimento", "cheque"];
-  if (excl.some(p => historic.includes(p))) return false;
+  // Bloqueia historic financeiros internos APENAS quando nao ha categoria
+  // mapeada como real (despesa/receita). Se tem categoria real, deixa passar.
+  const exclHistoric = ["rendimento", "aplicação", "aplicacao", "resgate", "saque", "depósito", "deposito", "recebimento", "cheque"];
+  if (exclHistoric.some(p => historic.includes(p)) && !hasMappedRealCategory(cats)) return false;
   return true;
 }
 
@@ -119,18 +134,26 @@ function bmIsRelevantInflow(bm: SiengeBankMovementItem): boolean {
   if (!bm.bankMovementAmount || bm.bankMovementAmount === 0) return false;
   if (bm.billId) return false; // já está em receipts[]
   if (bm.bankMovementOperationType !== "E") return false;
-  const historic = (bm.bankMovementHistoricName || "").toLowerCase().trim();
-  if (historic.includes("transferência") || historic.includes("transferencia")) return false;
-  if (historic === "aplicação" || historic === "aplicacao") return false;
-  if (historic.includes("pagamento") || historic.includes("saque") ||
-      historic.includes("depósito") || historic.includes("deposito") ||
-      historic.includes("cheque emitido")) return false;
   const cats = bm.financialCategories || [];
-  const isReceita = cats.length === 0 || cats.some(fc => (fc as unknown as { financialCategoryType?: string }).financialCategoryType === "R");
-  if (!isReceita) return false;
-  const catNames = cats.map(fc => (fc.financialCategoryName || "").toLowerCase()).join(" ");
-  if (catNames.includes("transferência") || catNames.includes("transferencia")) return false;
+  if (!hasMeaningfulCategory(cats)) return false;
+  const historic = (bm.bankMovementHistoricName || "").toLowerCase().trim();
+  // Bloqueia historic financeiros internos APENAS quando nao ha categoria
+  // mapeada como real. Transferencias intercompany categorizadas como receita
+  // (ex: 10302 - Receita de Locacao Outras Empresas) DEVEM passar aqui.
+  const exclHistoric = ["aplicação", "aplicacao", "saque", "depósito", "deposito", "cheque emitido"];
+  if (historic === "aplicação" || historic === "aplicacao") return false;
+  if (exclHistoric.some(p => historic.includes(p)) && !hasMappedRealCategory(cats)) return false;
+  if (historic.includes("pagamento") && !hasMappedRealCategory(cats)) return false;
   return true;
+}
+
+// Categorias mapeadas pra alguma linha real da DRE (receita/despesa) sao
+// "categorias reais"; aceitamos elas mesmo quando o historic do BM sugere
+// movimento interno. Setado dinamicamente dentro do GET (depois de carregar
+// dre_mappings).
+let mappedRealCategoryIds: Set<string> = new Set();
+function hasMappedRealCategory(cats: SiengePaymentsCategory[]): boolean {
+  return cats.some(c => mappedRealCategoryIds.has(String(c.financialCategoryId).trim()));
 }
 
 function readArray<T>(payload: unknown, key = "data"): T[] {
@@ -182,6 +205,11 @@ export async function GET(request: NextRequest) {
         fpNames[r.financialPlanId] = r.financialPlanName;
       }
     }
+    // Popula mappedRealCategoryIds usado por bmIsRelevant* pra deixar passar
+    // BMs com historic "Transferência" desde que a categoria seja mapeada
+    // (ex: 10302 - Receita de Locacao Outras Empresas e uma transferencia
+    // intercompany legitima categorizada como receita).
+    mappedRealCategoryIds = new Set(Object.keys(fpToDre));
 
     // Acumulador: { financialPlanId: { name, dreCategory, months: { "01": amount } } }
     const acc: Record<string, { name: string; dreCategory: string; months: Record<string, number> }> = {};
