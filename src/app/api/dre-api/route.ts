@@ -136,6 +136,13 @@ function bmIsRelevantOutflow(bm: SiengeBankMovementItem): boolean {
   const cats = bm.financialCategories || [];
   if (!hasMeaningfulCategory(cats)) return false;
   const historic = (bm.bankMovementHistoricName || "").toLowerCase();
+  // Bloqueia "Reapropriacao de valores no abatimento de adiantamento" —
+  // sao registros contabeis criados quando uma fatura e paga via abatimento
+  // de adiantamento previo, NAO sao despesa nova. Validado 2026-05-13 com
+  // conta 202020417 GALPAO RUA CANELINHA: R$ 715k em Reaprops duplicando
+  // outcome.payments. Tambem bloqueia se o nome indica abatimento direto.
+  if (historic.includes("reaprop")) return false;
+  if (historic.includes("abatimento") && historic.includes("adiant")) return false;
   // Bloqueia historic financeiros internos APENAS quando nao ha categoria
   // mapeada como real (despesa/receita). Se tem categoria real, deixa passar.
   const exclHistoric = ["rendimento", "aplicação", "aplicacao", "resgate", "saque", "depósito", "deposito", "recebimento", "cheque"];
