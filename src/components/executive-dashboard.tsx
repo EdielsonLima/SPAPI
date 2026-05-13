@@ -417,6 +417,8 @@ export function ExecutiveDashboard() {
   const [showDelinquentTable, setShowDelinquentTable] = useState(false);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [delinquentSort, setDelinquentSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
+  // Filtro rapido por empresa no detalhamento de inadimplencia (null = todas).
+  const [delinquentCompanyFilter, setDelinquentCompanyFilter] = useState<string | null>(null);
   const [showOverdueTable, setShowOverdueTable] = useState(false);
   const [expandedCreditors, setExpandedCreditors] = useState<Set<string>>(new Set());
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
@@ -4559,20 +4561,65 @@ export function ExecutiveDashboard() {
       )}
 
       {/* Delinquent Table */}
-      {showDelinquentTable && activeTab === "inadimplencia" && (
+      {showDelinquentTable && activeTab === "inadimplencia" && (() => {
+        // Empresas unicas com inadimplencia (pra montar os chips de filtro)
+        const companiesWithDelinquency = Array.from(
+          new Set(delinquentsByClient.flatMap(c => c.companies))
+        ).sort();
+        // Filtra a lista de clientes pelos chips selecionados
+        const visibleDelinquents = delinquentCompanyFilter
+          ? delinquentsByClient.filter(c => c.companies.includes(delinquentCompanyFilter))
+          : delinquentsByClient;
+        const visibleParcels = visibleDelinquents.reduce((s, c) => s + c.installments, 0);
+        return (
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg text-slate-800">Detalhamento de Inadimplencia</CardTitle>
                 <p className="text-sm text-slate-400 mt-1">
-                  {delinquentsByClient.length} clientes inadimplentes - {filteredInadimplencia.length} parcelas em atraso
+                  {visibleDelinquents.length} clientes inadimplentes - {visibleParcels} parcelas em atraso
+                  {delinquentCompanyFilter && <span className="ml-2 text-orange-600 font-medium">· filtrado por {delinquentCompanyFilter}</span>}
                 </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setShowDelinquentTable(false)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
+            {/* Chips de filtro rapido por empresa */}
+            {companiesWithDelinquency.length > 1 && (
+              <div className="flex flex-wrap gap-1.5 mt-3">
+                <button
+                  type="button"
+                  onClick={() => setDelinquentCompanyFilter(null)}
+                  className={`text-[11px] font-semibold px-3 py-1 rounded-full transition-colors ${
+                    delinquentCompanyFilter === null
+                      ? "bg-orange-500 text-white shadow-sm"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  Todas ({delinquentsByClient.length})
+                </button>
+                {companiesWithDelinquency.map(co => {
+                  const count = delinquentsByClient.filter(c => c.companies.includes(co)).length;
+                  const isActive = delinquentCompanyFilter === co;
+                  return (
+                    <button
+                      key={co}
+                      type="button"
+                      onClick={() => setDelinquentCompanyFilter(isActive ? null : co)}
+                      className={`text-[11px] font-semibold px-3 py-1 rounded-full transition-colors ${
+                        isActive
+                          ? "bg-orange-500 text-white shadow-sm"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {co} ({count})
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </CardHeader>
           <CardContent className="px-0">
             <div className="overflow-x-auto">
@@ -4628,7 +4675,7 @@ export function ExecutiveDashboard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {delinquentsByClient.map((client) => {
+                  {visibleDelinquents.map((client) => {
                     const isExpanded = expandedClients.has(client.clientName);
                     // Quando alguma linha esta expandida, deixa as outras
                     // foscas (opacity-40) pra reduzir ruido visual.
@@ -4735,16 +4782,17 @@ export function ExecutiveDashboard() {
             {/* Footer totals */}
             <div className="flex items-center justify-between px-6 pt-4 mt-2 border-t border-slate-100">
               <div className="flex gap-6 text-sm text-slate-500">
-                <span><strong className="text-slate-700">{delinquentsByClient.length}</strong> clientes</span>
-                <span><strong className="text-slate-700">{filteredInadimplencia.length}</strong> parcelas</span>
+                <span><strong className="text-slate-700">{visibleDelinquents.length}</strong> clientes</span>
+                <span><strong className="text-slate-700">{visibleParcels}</strong> parcelas</span>
               </div>
               <div className="text-sm font-bold text-red-600 dark:text-red-300/70">
-                Total: {formatCurrency(filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i) + calcEncargos(i), 0))}
+                Total: {formatCurrency(visibleDelinquents.reduce((s, c) => s + c.totalOverdue, 0))}
               </div>
             </div>
           </CardContent>
         </Card>
-      )}
+        );
+      })()}
       </>);
       })()}
 
