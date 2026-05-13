@@ -2977,11 +2977,11 @@ export function ExecutiveDashboard() {
           </div>
 
           {/* Budget Table */}
-          <Card className="border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden mt-2">
+          <Card className="border border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden mt-2">
             <CardContent className="p-0">
               {budgetData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
-                  <Ruler className="h-12 w-12 mb-3 text-slate-300" />
+                  <Ruler className="h-12 w-12 mb-3 text-slate-300 dark:text-slate-600" />
                   <p className="text-sm font-medium">Nenhum empreendimento configurado</p>
                   <p className="text-xs mt-1">Configure os empreendimentos em Configuracoes → Empreendimentos</p>
                 </div>
@@ -2995,8 +2995,8 @@ export function ExecutiveDashboard() {
                           { field: "factor", label: "Fator", align: "center", widthClass: "w-20" },
                           { field: "budget", label: "Orçamento", align: "right", widthClass: "" },
                           { field: "realized", label: "Realizado", align: "right", widthClass: "" },
-                          { field: "toRealize", label: "À Realizar", align: "right", widthClass: "" },
                           { field: "percentReal", label: "% Real", align: "center", widthClass: "w-28" },
+                          { field: "toRealize", label: "À Realizar", align: "right", widthClass: "" },
                           { field: "status", label: "Status", align: "center", widthClass: "w-32" },
                         ].map(col => (
                           <TableHead
@@ -3016,12 +3016,12 @@ export function ExecutiveDashboard() {
                         ))}
                       </TableRow>
                     </TableHeader>
-                    <TableBody className="divide-y divide-slate-100/80">
+                    <TableBody className="divide-y divide-slate-100/80 dark:divide-slate-800/80">
                       {sortedBudgetData.map((row) => {
                         const isFinalizada = row.status === "Finalizada";
                         return (
-                          <TableRow key={row.companyId} className={`transition-colors h-14 ${isFinalizada ? "bg-slate-50/50 hover:bg-slate-50" : "bg-white hover:bg-slate-50/80"}`}>
-                            <TableCell className={`px-6 font-semibold text-[13px] ${isFinalizada ? "text-slate-400" : "text-slate-800"}`}>{row.companyName}</TableCell>
+                          <TableRow key={row.companyId} className={`transition-colors h-14 ${isFinalizada ? "bg-slate-50/50 hover:bg-slate-50 dark:bg-slate-800/30 dark:hover:bg-slate-800/50" : "bg-white hover:bg-slate-50/80 dark:bg-transparent dark:hover:bg-slate-800/40"}`}>
+                            <TableCell className={`px-6 font-semibold text-[13px] ${isFinalizada ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100"}`}>{row.companyName}</TableCell>
                             <TableCell className="text-center text-[13px] font-medium">
                               <FactorInput
                                 companyId={row.companyId}
@@ -3037,25 +3037,25 @@ export function ExecutiveDashboard() {
                                 }}
                               />
                             </TableCell>
-                            <TableCell className={`text-right tabular-nums text-[13px] ${isFinalizada ? "text-slate-400 font-medium" : "text-slate-600 font-semibold"}`}>{formatCurrency(row.budget)}</TableCell>
-                            <TableCell className={`text-right tabular-nums text-[13px] ${isFinalizada ? "text-slate-400 font-medium" : "text-slate-600 font-semibold"}`}>{formatCurrency(row.realized)}</TableCell>
-                            <TableCell className={`text-right tabular-nums text-[13px] font-bold ${row.toRealize < 0 ? (isFinalizada ? "text-rose-400" : "text-rose-600") : (isFinalizada ? "text-slate-400" : "text-slate-800")}`}>
-                              {row.toRealize < 0 && <TrendingDown className="inline h-3.5 w-3.5 mr-1" />}
-                              {formatCurrency(row.toRealize)}
-                            </TableCell>
+                            <TableCell className={`text-right tabular-nums text-[13px] ${isFinalizada ? "text-slate-400 dark:text-slate-500 font-medium" : "text-slate-600 dark:text-slate-300 font-semibold"}`}>{formatCurrency(row.budget)}</TableCell>
+                            <TableCell className={`text-right tabular-nums text-[13px] ${isFinalizada ? "text-slate-400 dark:text-slate-500 font-medium" : "text-slate-600 dark:text-slate-300 font-semibold"}`}>{formatCurrency(row.realized)}</TableCell>
                             <TableCell className="text-center">
-                              <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[12px] font-bold tabular-nums ${row.percentReal >= 100 ? "bg-amber-100/50 text-amber-700" : row.percentReal >= 70 ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"} ${isFinalizada ? "opacity-60 grayscale-[0.5]" : ""}`}>
+                              <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded-md text-[12px] font-bold tabular-nums ${row.percentReal >= 100 ? "bg-amber-100/50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300" : row.percentReal >= 70 ? "bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"} ${isFinalizada ? "opacity-60 grayscale-[0.5]" : ""}`}>
                                 {row.percentReal.toFixed(1)}%
                               </span>
                             </TableCell>
+                            <TableCell className={`text-right tabular-nums text-[13px] font-bold ${row.toRealize < 0 ? (isFinalizada ? "text-rose-400 dark:text-red-300/70" : "text-rose-600 dark:text-red-400") : (isFinalizada ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100")}`}>
+                              {row.toRealize < 0 && <TrendingDown className="inline h-3.5 w-3.5 mr-1" />}
+                              {formatCurrency(row.toRealize)}
+                            </TableCell>
                             <TableCell className="text-center px-4">
                               {isFinalizada ? (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200/80">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200/80 dark:bg-slate-800 dark:text-slate-400 dark:ring-slate-700">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-500"></span>
                                   FINALIZADA
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-500/20">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-500/30">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                   ATIVA
                                 </span>
