@@ -49,6 +49,31 @@ export async function GET(request: NextRequest) {
     attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/receipts` });
     attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/categories` });
     attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/payment-categories` });
+  } else if (endpoint === "more") {
+    // Testa outros endpoints REST conhecidos do Sienge
+    attempts.push({ url: "/accounts-receivable/customer-extracts" });
+    attempts.push({ url: "/accounts-receivable/cobrancas" });
+    attempts.push({ url: "/accounts-receivable/checking-accounts" });
+    attempts.push({ url: "/accounts-receivable/income-payments" });
+    attempts.push({ url: "/accounts-receivable/installments-paid" });
+    attempts.push({ url: "/income-payments" });
+    attempts.push({ url: "/payment-slips" });
+    attempts.push({ url: "/customers" });
+    attempts.push({ url: "/customer-financial-statements" });
+    attempts.push({ url: "/bank-accounts" });
+    attempts.push({ url: "/financial-statements" });
+    attempts.push({ url: "/dre" });
+    attempts.push({ url: "/financial/dre" });
+    attempts.push({ url: "/reports/dre" });
+    attempts.push({ url: "/reports/contas-recebidas" });
+    attempts.push({ url: "/sales-contracts" });
+  } else if (endpoint === "params") {
+    // Testa parametros e endpoints especificos pra recebimentos
+    attempts.push({ url: "/accounts-receivable/receivable-bills?selectionType=I&startDate=2026-01-01&endDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills?detailed=true&startDate=2026-01-01&endDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills?includePayments=true&startDate=2026-01-01&endDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills?startReceiveDate=2026-01-01&endReceiveDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?startDate=2026-01-01&endDate=2026-05-13" });
   } else if (billId && installmentId) {
     attempts.push({ url: `/${endpoint}/${billId}/installments/${installmentId}` });
     attempts.push({ url: `/${endpoint}/${billId}/${installmentId}` });
@@ -79,8 +104,9 @@ export async function GET(request: NextRequest) {
         };
       }
       results.push({ url, status: "ok", sample });
-      // Se for modo 'all' ou 'details', testa todos. Senao, para no primeiro sucesso
-      if (endpoint !== "all" && endpoint !== "details") break;
+      // Se for modo de exploracao, testa todos. Senao, para no primeiro sucesso
+      const exploreModes = ["all", "details", "more", "params"];
+      if (!exploreModes.includes(endpoint)) break;
     } catch (e) {
       results.push({ url, status: "error", error: e instanceof Error ? e.message : "Unknown" });
     }
