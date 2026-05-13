@@ -1535,7 +1535,7 @@ export function ExecutiveDashboard() {
       if (field === "clientName") cmp = a.clientName.localeCompare(b.clientName);
       else if (field === "installments") cmp = a.installments - b.installments;
       else if (field === "maxDaysOverdue") cmp = a.maxDaysOverdue - b.maxDaysOverdue;
-      else if (field === "projects") cmp = (a.projects[0] || "").localeCompare(b.projects[0] || "");
+      else if (field === "companies") cmp = (a.companies[0] || "").localeCompare(b.companies[0] || "");
       else cmp = a.totalOverdue - b.totalOverdue;
       return dir === "asc" ? cmp : -cmp;
     });
@@ -4609,11 +4609,11 @@ export function ExecutiveDashboard() {
                     </TableHead>
                     <TableHead
                       className="cursor-pointer select-none hover:text-slate-700"
-                      onClick={() => setDelinquentSort(s => ({ field: "projects", dir: s.field === "projects" && s.dir === "asc" ? "desc" : "asc" }))}
+                      onClick={() => setDelinquentSort(s => ({ field: "companies", dir: s.field === "companies" && s.dir === "asc" ? "desc" : "asc" }))}
                     >
                       <div className="flex items-center gap-1">
-                        Empreendimentos
-                        {delinquentSort.field === "projects" ? (delinquentSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
+                        Empresas
+                        {delinquentSort.field === "companies" ? (delinquentSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
                       </div>
                     </TableHead>
                     <TableHead
@@ -4661,8 +4661,8 @@ export function ExecutiveDashboard() {
                           </TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
-                              {client.projects.map(p => (
-                                <span key={p} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{p}</span>
+                              {client.companies.map(c => (
+                                <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{c}</span>
                               ))}
                             </div>
                           </TableCell>
