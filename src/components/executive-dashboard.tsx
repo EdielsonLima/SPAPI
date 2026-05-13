@@ -366,6 +366,8 @@ export function ExecutiveDashboard() {
     green: isDark ? "#86efac" : "#16a34a",       // green-300 dark, green-600 light
     valueText: isDark ? "#cbd5e1" : "#334155",   // slate-300 dark, slate-700 light
     mutedText: isDark ? "#94a3b8" : "#475569",   // slate-400 dark, slate-600 light
+    // Linhas pontilhadas do grid: quase invisiveis no dark pra nao poluir
+    gridStroke: isDark ? "rgba(148,163,184,0.08)" : "#e2e8f0",
   }), [isDark]);
   const [section, setSection] = useState<Section>("cp");
   const [selectedYears, setSelectedYears] = useState<Set<string>>(() => {
@@ -3519,7 +3521,7 @@ export function ExecutiveDashboard() {
                   {comercialChart.length > 0 ? (
                     <ResponsiveContainer width="100%" height={Math.max(320, companyRows.length * 44)}>
                       <BarChart data={comercialChart} margin={{ top: 40, right: 10, left: 10, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} />
                         <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
                         <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={80} />
                         <RechartsTooltip formatter={(v: number | undefined) => [formatCurrency(v ?? 0), "Valor"]} />
@@ -4222,7 +4224,7 @@ export function ExecutiveDashboard() {
                   layout="vertical"
                   margin={{ top: 0, right: 80, left: 0, bottom: 0 }}
                 >
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} horizontal={false} />
                   <XAxis
                     type="number"
                     tick={{ fontSize: 10, fill: "#94a3b8" }}
@@ -4313,7 +4315,7 @@ export function ExecutiveDashboard() {
             ) : (
             <ResponsiveContainer width="100%" height={480}>
               <BarChart data={chartData} margin={{ top: 35, right: 30, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} vertical={false} />
                 <XAxis
                   dataKey="month"
                   tick={{ fontSize: 12, fill: "#94a3b8" }}
@@ -4867,7 +4869,7 @@ export function ExecutiveDashboard() {
                                 <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} />
                             <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                             <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 10 }} />
                             <RechartsTooltip
@@ -4945,7 +4947,7 @@ export function ExecutiveDashboard() {
                                 <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} />
                             <XAxis dataKey="label" tick={{ fontSize: 10 }} />
                             <YAxis yAxisId="bars" tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 10 }} />
                             <YAxis yAxisId="line" orientation="right" tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 10 }} />
@@ -5182,7 +5184,7 @@ export function ExecutiveDashboard() {
                       <div className="h-[400px]">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 80, top: 5, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} />
                             <XAxis type="number" tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11 }} />
                             <YAxis type="category" dataKey="name" width={160} tick={{ fontSize: 11 }} />
                             <RechartsTooltip
@@ -5555,7 +5557,7 @@ export function ExecutiveDashboard() {
                                   <stop offset="100%" stopColor="#6366f1" stopOpacity={0.01} />
                                 </linearGradient>
                               </defs>
-                              <CartesianGrid strokeDasharray="3 3" stroke="rgba(100,100,100,0.15)" />
+                              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} />
                               <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                               <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11 }} />
                               <RechartsTooltip
