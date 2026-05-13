@@ -544,6 +544,7 @@ export function ExecutiveDashboard() {
   const [loadingCompare, setLoadingCompare] = useState(false);
   const [fluxoPeriodo, setFluxoPeriodo] = useState(30);
   const [resumoSort, setResumoSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalRecebido", dir: "desc" });
+  const [budgetSort, setBudgetSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "budget", dir: "desc" });
   const [fluxoView, setFluxoView] = useState<"projetado" | "entradas-saidas">("projetado");
   const [exclusionSet, setExclusionSet] = useState<Set<string>>(new Set());
 
@@ -610,6 +611,11 @@ export function ExecutiveDashboard() {
 
   // Fixed date range for data fetching — never changes based on filters
   const dataLoadedRef = useRef(false);
+  // Auto-retry counter pra primeira carga. Se um fetch falhar (ex: 429 do
+  // Sienge, timeout temporario), retenta ate 2 vezes com backoff antes de
+  // desistir e mostrar erro. Resolve o problema de "tela zerada" ao carregar.
+  const retryCountRef = useRef(0);
+  const MAX_AUTO_RETRIES = 2;
 
   const fetchData = useCallback(async (forceRefresh = false) => {
     const startDate = `${currentYear - 10}-01-01`;
@@ -686,11 +692,24 @@ export function ExecutiveDashboard() {
       setStep(2, "done", `${(incomeData.data || []).length} parcelas`);
 
       dataLoadedRef.current = true;
-    } catch {
-      toast.error("Erro ao carregar dados do painel executivo");
+      retryCountRef.current = 0; // sucesso — reseta contador
+    } catch (err) {
+      // Retry automatico SOMENTE no carregamento inicial (nao no forceRefresh
+      // manual) e ate MAX_AUTO_RETRIES vezes. Backoff: 2s, 4s. Mantem modal de
+      // loading aberto durante retries.
+      if (!forceRefresh && retryCountRef.current < MAX_AUTO_RETRIES) {
+        retryCountRef.current++;
+        const waitMs = retryCountRef.current * 2000;
+        console.warn(`fetchData falhou (${err instanceof Error ? err.message : "?"}), retentando em ${waitMs}ms (${retryCountRef.current}/${MAX_AUTO_RETRIES})`);
+        setTimeout(() => { fetchData(false); }, waitMs);
+        return; // sai sem fechar modal de loading
+      }
+      retryCountRef.current = 0;
+      toast.error("Erro ao carregar dados. Clique em Atualizar pra tentar de novo.");
     } finally {
+      // Se retry foi agendado, retryCountRef.current > 0 e ja saimos com return.
+      // Aqui so executa se sucesso ou se desistiu de retentar.
       setLoading(false);
-      // Mantém modal aberto por 1.2s pra usuário ver o resultado, depois fecha
       if (forceRefresh) {
         setTimeout(() => { setRefreshing(false); setRefreshSteps([]); }, 1200);
       } else {
@@ -1394,6 +1413,35 @@ export function ExecutiveDashboard() {
     const totalToRealize = activeRows.reduce((s, r) => s + Math.max(0, r.toRealize), 0);
     return { totalBudget, totalRealized, totalToRealize };
   }, [budgetData]);
+
+  // Aplica ordenacao da UI mantendo Finalizadas sempre no final
+  const sortedBudgetData = useMemo(() => {
+    const { field, dir } = budgetSort;
+    const arr = [...budgetData];
+    arr.sort((a, b) => {
+      if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
+      let cmp = 0;
+      if (field === "companyName" || field === "status") {
+        cmp = String(a[field as keyof typeof a] ?? "").localeCompare(
+          String(b[field as keyof typeof b] ?? "")
+        );
+      } else {
+        const av = Number(a[field as keyof typeof a] ?? 0);
+        const bv = Number(b[field as keyof typeof b] ?? 0);
+        cmp = av - bv;
+      }
+      return dir === "desc" ? -cmp : cmp;
+    });
+    return arr;
+  }, [budgetData, budgetSort]);
+
+  const toggleBudgetSort = useCallback((field: string) => {
+    setBudgetSort(prev =>
+      prev.field === field
+        ? { field, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { field, dir: "desc" }
+    );
+  }, []);
 
   // Calcula encargos (multa + juros) para itens inadimplentes - mesma fórmula de contas-table.tsx
   const calcEncargos = (item: SiengeIncome) => {
@@ -2940,19 +2988,36 @@ export function ExecutiveDashboard() {
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
-                      <TableRow className="bg-slate-50/80 hover:bg-slate-50/80 border-b border-slate-200/60">
-                        <TableHead className="font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11 px-6">Empreendimento</TableHead>
-                        <TableHead className="text-center font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11 w-20">Fator</TableHead>
-                        <TableHead className="text-right font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11">Orçamento</TableHead>
-                        <TableHead className="text-right font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11">Realizado</TableHead>
-                        <TableHead className="text-right font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11">À Realizar</TableHead>
-                        <TableHead className="text-center font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11 w-28">% Real</TableHead>
-                        <TableHead className="text-center font-bold text-[11px] text-slate-400 uppercase tracking-widest h-11 w-32">Status</TableHead>
+                    <TableHeader className="bg-slate-800 text-slate-100 sticky top-0 z-10">
+                      <TableRow className="hover:bg-slate-800 border-b border-slate-700">
+                        {[
+                          { field: "companyName", label: "Empreendimento", align: "left", widthClass: "px-6" },
+                          { field: "factor", label: "Fator", align: "center", widthClass: "w-20" },
+                          { field: "budget", label: "Orçamento", align: "right", widthClass: "" },
+                          { field: "realized", label: "Realizado", align: "right", widthClass: "" },
+                          { field: "toRealize", label: "À Realizar", align: "right", widthClass: "" },
+                          { field: "percentReal", label: "% Real", align: "center", widthClass: "w-28" },
+                          { field: "status", label: "Status", align: "center", widthClass: "w-32" },
+                        ].map(col => (
+                          <TableHead
+                            key={col.field}
+                            onClick={() => toggleBudgetSort(col.field)}
+                            className={`font-bold text-[11px] text-slate-200 uppercase tracking-widest h-11 cursor-pointer hover:bg-slate-700 transition-colors select-none ${col.widthClass} ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"}`}
+                          >
+                            <span className={`inline-flex items-center gap-1 ${col.align === "right" ? "justify-end w-full" : col.align === "center" ? "justify-center w-full" : ""}`}>
+                              {col.label}
+                              {budgetSort.field === col.field ? (
+                                budgetSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                              ) : (
+                                <ArrowUpDown className="h-3 w-3 opacity-40" />
+                              )}
+                            </span>
+                          </TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody className="divide-y divide-slate-100/80">
-                      {budgetData.map((row) => {
+                      {sortedBudgetData.map((row) => {
                         const isFinalizada = row.status === "Finalizada";
                         return (
                           <TableRow key={row.companyId} className={`transition-colors h-14 ${isFinalizada ? "bg-slate-50/50 hover:bg-slate-50" : "bg-white hover:bg-slate-50/80"}`}>
