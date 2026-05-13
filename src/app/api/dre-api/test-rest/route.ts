@@ -3,6 +3,27 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { siengeGet } from "@/lib/sienge";
 
+// Faz fetch direto e captura o body da resposta (mesmo em 400/404) pra ver
+// a mensagem detalhada do Sienge (ex: "param 'X' is required").
+async function siengeFetchRaw(endpoint: string): Promise<{ status: number; body: unknown }> {
+  const apiUrl = process.env.SIENGE_API_URL!;
+  const username = process.env.SIENGE_USERNAME!;
+  const password = process.env.SIENGE_PASSWORD!;
+  const authHeader = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+  const url = `${apiUrl}${endpoint}`;
+  const response = await fetch(url, {
+    headers: { Authorization: authHeader, "Content-Type": "application/json" },
+    cache: "no-store",
+  });
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    body = await response.text().catch(() => null);
+  }
+  return { status: response.status, body };
+}
+
 // Debug endpoint — testa a API REST regular do Sienge (nao bulk) pra ver se
 // ela expoe campos que a bulk nao expoe (especificamente "additionAmount"
 // que bate com a coluna 'Acrescimo' do relatorio 'Contas Recebidas').
@@ -74,6 +95,25 @@ export async function GET(request: NextRequest) {
     attempts.push({ url: "/accounts-receivable/receivable-bills?includePayments=true&startDate=2026-01-01&endDate=2026-05-13" });
     attempts.push({ url: "/accounts-receivable/receivable-bills?startReceiveDate=2026-01-01&endReceiveDate=2026-05-13" });
     attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?startDate=2026-01-01&endDate=2026-05-13" });
+  } else if (endpoint === "raw") {
+    // Modo especial: faz fetch direto e captura body da resposta de erro pra
+    // ver mensagem detalhada do Sienge.
+    const targets = [
+      "/accounts-receivable/receivable-bills/income-payments",
+      "/accounts-receivable/receivable-bills/income-payments?receivableBillId=678",
+      "/accounts-receivable/receivable-bills/income-payments?receivableBillId=678&installmentId=7",
+      "/accounts-receivable/receivable-bills/income-payments?startDate=2026-01-01&endDate=2026-05-13",
+    ];
+    const rawResults = [];
+    for (const t of targets) {
+      try {
+        const r = await siengeFetchRaw(t);
+        rawResults.push({ url: t, status: r.status, body: r.body });
+      } catch (e) {
+        rawResults.push({ url: t, status: -1, error: e instanceof Error ? e.message : "Unknown" });
+      }
+    }
+    return NextResponse.json({ endpoint, raw: rawResults });
   } else if (endpoint === "income-payments") {
     // /accounts-receivable/receivable-bills/income-payments retornou 400
     // (rota existe, faltam parametros) — testa varios formatos
