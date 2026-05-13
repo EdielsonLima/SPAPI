@@ -261,6 +261,83 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
+// === Input inline pra editar Fator do empreendimento ===
+// Salva via PUT /api/company-settings quando o usuario sai do campo (onBlur)
+// ou pressiona Enter. Mostra spinner enquanto salva e toast no fim.
+function FactorInput({
+  companyId, companyName, areaM2, status, controlaOrcamento, value, onSaved,
+}: {
+  companyId: number;
+  companyName: string;
+  areaM2: number;
+  status: string;
+  controlaOrcamento: boolean;
+  value: number;
+  onSaved: (newFactor: number) => void;
+}) {
+  const [local, setLocal] = useState(String(value.toFixed(2)));
+  const [saving, setSaving] = useState(false);
+
+  React.useEffect(() => {
+    setLocal(String(value.toFixed(2)));
+  }, [value]);
+
+  const save = async () => {
+    const parsed = parseFloat(local.replace(",", "."));
+    if (isNaN(parsed) || parsed <= 0) {
+      setLocal(String(value.toFixed(2)));
+      return;
+    }
+    // Se nao mudou (round to 2 decimals), nao salva
+    if (Math.round(parsed * 100) === Math.round(value * 100)) {
+      setLocal(parsed.toFixed(2));
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await fetch("/api/company-settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyId, companyName, areaM2, factor: parsed, status, controlaOrcamento }),
+      });
+      if (r.ok) {
+        onSaved(parsed);
+        toast.success(`Fator de ${companyName} salvo`);
+      } else {
+        toast.error("Erro ao salvar fator");
+        setLocal(String(value.toFixed(2)));
+      }
+    } catch {
+      toast.error("Erro de rede ao salvar fator");
+      setLocal(String(value.toFixed(2)));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-center">
+      <input
+        type="text"
+        inputMode="decimal"
+        value={local}
+        onChange={(e) => setLocal(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          if (e.key === "Escape") {
+            setLocal(String(value.toFixed(2)));
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        disabled={saving}
+        className="w-14 text-center text-[13px] font-medium text-slate-700 bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-300 focus:bg-blue-50/30 focus:outline-none rounded transition-colors px-1 py-0.5 tabular-nums disabled:opacity-50"
+      />
+      {saving && <Loader2 className="h-3 w-3 ml-1 animate-spin text-blue-500" />}
+    </div>
+  );
+}
+
 export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
   // Detecta tema para ajustar cores dos charts SVG (não respondem a CSS dark:).
@@ -2863,7 +2940,21 @@ export function ExecutiveDashboard() {
                         return (
                           <TableRow key={row.companyId} className={`transition-colors h-14 ${isFinalizada ? "bg-slate-50/50 hover:bg-slate-50" : "bg-white hover:bg-slate-50/80"}`}>
                             <TableCell className={`px-6 font-semibold text-[13px] ${isFinalizada ? "text-slate-400" : "text-slate-800"}`}>{row.companyName}</TableCell>
-                            <TableCell className="text-center text-slate-400 text-[13px] font-medium">{row.factor.toFixed(2)}</TableCell>
+                            <TableCell className="text-center text-[13px] font-medium">
+                              <FactorInput
+                                companyId={row.companyId}
+                                companyName={row.companyName}
+                                areaM2={row.areaM2}
+                                status={companySettings.find(cs => cs.companyId === row.companyId)?.status || "ativa"}
+                                controlaOrcamento={companySettings.find(cs => cs.companyId === row.companyId)?.controlaOrcamento || false}
+                                value={row.factor}
+                                onSaved={(newFactor) => {
+                                  setCompanySettings(prev => prev.map(cs =>
+                                    cs.companyId === row.companyId ? { ...cs, factor: newFactor } : cs
+                                  ));
+                                }}
+                              />
+                            </TableCell>
                             <TableCell className={`text-right tabular-nums text-[13px] ${isFinalizada ? "text-slate-400 font-medium" : "text-slate-600 font-semibold"}`}>{formatCurrency(row.budget)}</TableCell>
                             <TableCell className={`text-right tabular-nums text-[13px] ${isFinalizada ? "text-slate-400 font-medium" : "text-slate-600 font-semibold"}`}>{formatCurrency(row.realized)}</TableCell>
                             <TableCell className={`text-right tabular-nums text-[13px] font-bold ${row.toRealize < 0 ? (isFinalizada ? "text-rose-400" : "text-rose-600") : (isFinalizada ? "text-slate-400" : "text-slate-800")}`}>
