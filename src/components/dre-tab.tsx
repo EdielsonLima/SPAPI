@@ -38,6 +38,10 @@ interface DreTabProps {
   // Increments on every "Atualizar" click — forces re-fetch of /api/dre-supplementary
   // so DRE picks up the latest Excel sync without needing the user to reload.
   refreshKey?: number;
+  // dataSource: 'excel' lê de /api/dre-supplementary (default, alimentado pelo
+  // Excel local via sync); 'api' lê de /api/dre-api (calculado em runtime das
+  // movimentações Sienge). Comportamento idêntico — só muda a origem.
+  dataSource?: "excel" | "api";
 }
 
 const DRE_INPUT_CATEGORIES = [
@@ -141,7 +145,9 @@ export function DreTab({
   selectedMonths,
   selectedCompanies,
   refreshKey = 0,
+  dataSource = "excel",
 }: DreTabProps) {
+  const dreEndpoint = dataSource === "api" ? "/api/dre-api" : "/api/dre-supplementary";
   const [dreMappings, setDreMappings] = useState<Record<string, DreMappingItem[]>>({});
   const [loadingMappings, setLoadingMappings] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -195,7 +201,7 @@ export function DreTab({
 
     Promise.all(
       years.map(year =>
-        fetch(`/api/dre-supplementary?year=${year}&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}`, { cache: "no-store" })
+        fetch(`${dreEndpoint}?year=${year}&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}`, { cache: "no-store" })
           .then(r => r.ok ? r.json() : null)
           .catch(() => null)
       )
@@ -217,7 +223,7 @@ export function DreTab({
         setExcelSupplementary(merged);
       }
     });
-  }, [selectedYears, refreshKey, localRefreshKey]);
+  }, [selectedYears, refreshKey, localRefreshKey, dreEndpoint]);
 
   // Fetch monthly breakdown for DRE Completa view
   // Also fetches ALL companies (no filter) to match Power BI
@@ -234,7 +240,7 @@ export function DreTab({
 
     Promise.all(
       years.map(year =>
-        fetch(`/api/dre-supplementary?year=${year}&monthly=true&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}${monthsQuery}`, { cache: "no-store" })
+        fetch(`${dreEndpoint}?year=${year}&monthly=true&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}${monthsQuery}`, { cache: "no-store" })
           .then(r => {
             if (!r.ok) {
               console.error(`DRE Completa fetch error: ${r.status} for year ${year}`);
@@ -270,7 +276,7 @@ export function DreTab({
       console.error("DRE Completa processing error:", err);
       setMonthlyData(null);
     }).finally(() => setLoadingMonthly(false));
-  }, [dreMode, selectedYears, selectedMonths, refreshKey, localRefreshKey]);
+  }, [dreMode, selectedYears, selectedMonths, refreshKey, localRefreshKey, dreEndpoint]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpandedCategories(prev => {
@@ -665,19 +671,21 @@ export function DreTab({
                   DRE Completa
                 </button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-xs font-medium h-9 rounded-xl bg-white border-slate-200 hover:bg-slate-50 shadow-sm transition-all"
-                onClick={handleSyncExcel}
-                disabled={syncingExcel}
-                title="Lê o Excel local (DEMOSTRATIVO RESULTADO COMPLETO.xlsx) e atualiza o DRE no banco. Só funciona quando o servidor tem acesso ao arquivo."
-              >
-                {syncingExcel
-                  ? <Loader2 className="h-4 w-4 text-slate-500 animate-spin" />
-                  : <RefreshCw className="h-4 w-4 text-slate-500" />}
-                Sync DRE
-              </Button>
+              {dataSource === "excel" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 text-xs font-medium h-9 rounded-xl bg-white border-slate-200 hover:bg-slate-50 shadow-sm transition-all"
+                  onClick={handleSyncExcel}
+                  disabled={syncingExcel}
+                  title="Lê o Excel local (DEMOSTRATIVO RESULTADO COMPLETO.xlsx) e atualiza o DRE no banco. Só funciona quando o servidor tem acesso ao arquivo."
+                >
+                  {syncingExcel
+                    ? <Loader2 className="h-4 w-4 text-slate-500 animate-spin" />
+                    : <RefreshCw className="h-4 w-4 text-slate-500" />}
+                  Sync DRE
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"

@@ -63,7 +63,7 @@ import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 
 type Section = "cp" | "cr";
-type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "saldos" | "resumo";
+type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "dre-api" | "saldos" | "resumo";
 
 // Each tab group has its own saved company filter
 function getTabGroup(tab: MainTab): string {
@@ -72,6 +72,7 @@ function getTabGroup(tab: MainTab): string {
     case "a-receber": case "recebidas": case "inadimplencia": return "cr";
     case "visao-geral": return "visao-geral";
     case "resumo": return "resumo";
+    case "dre-api": return "dre-api";
     default: return tab;
   }
 }
@@ -453,7 +454,7 @@ export function ExecutiveDashboard() {
 
   const availableYears = useMemo(() => {
     const arr: string[] = [];
-    if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia" || activeTab === "dre" || activeTab === "comercial" || activeTab === "resumo") {
+    if (activeTab === "pagas" || activeTab === "atrasadas" || activeTab === "recebidas" || activeTab === "inadimplencia" || activeTab === "dre" || activeTab === "dre-api" || activeTab === "comercial" || activeTab === "resumo") {
       for (let y = currentYear - 10; y <= currentYear; y++) arr.push(String(y));
     } else if (activeTab === "a-receber") {
       // CR de imóveis: parcelamento longo (financiamento direto até ~10 anos);
@@ -2188,6 +2189,7 @@ export function ExecutiveDashboard() {
     orcamento: [],
     comercial: [],
     dre: [],
+    "dre-api": [],
     saldos: [],
     "visao-geral": [],
     resumo: [],
@@ -2369,6 +2371,21 @@ export function ExecutiveDashboard() {
             <button
               onClick={() => {
                 setSection("cp");
+                switchTab("dre-api");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "dre-api"
+                  ? "bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 shadow-md ring-2 ring-cyan-300 dark:ring-cyan-500/50"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+              title="DRE calculada em tempo real a partir das movimentações Sienge (sem Excel)"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              DRE API
+            </button>
+            <button
+              onClick={() => {
+                setSection("cp");
                 switchTab("saldos");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
@@ -2398,7 +2415,7 @@ export function ExecutiveDashboard() {
         </div>
 
         {/* Sub-tabs CP/CR - separate line */}
-        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && activeTab !== "resumo" && (
+        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && (
           <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             switchTab(tab);
@@ -2485,7 +2502,7 @@ export function ExecutiveDashboard() {
             />
           )}
         </div>}
-        {activeTab === "dre" && <div className="flex items-center gap-2 flex-wrap">
+        {(activeTab === "dre" || activeTab === "dre-api") && <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
             label="Empresas"
             icon={<Building2 className="h-4 w-4" />}
@@ -2567,7 +2584,7 @@ export function ExecutiveDashboard() {
             labelFn={(m) => MONTH_NAMES[m] || m}
           />
         </div>}
-        {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && <div className="flex items-center gap-2 flex-wrap">
+        {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
             label="Empresas"
             icon={<Building2 className="h-4 w-4" />}
@@ -3946,7 +3963,7 @@ export function ExecutiveDashboard() {
       })()}
 
       {/* KPI Cards */}
-      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "saldos" && activeTab !== "resumo" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
@@ -4825,6 +4842,21 @@ export function ExecutiveDashboard() {
           selectedMonths={selectedMonths}
           selectedCompanies={selectedCompanies}
           refreshKey={refreshKey}
+          dataSource="excel"
+        />
+      )}
+
+      {activeTab === "dre-api" && (
+        <DreTab
+          outcomeItems={consistentItems}
+          incomeItems={consistentIncome}
+          bankFees={allBankMovements}
+          allBankMovements={allBankMovementsFull}
+          selectedYears={selectedYears}
+          selectedMonths={selectedMonths}
+          selectedCompanies={selectedCompanies}
+          refreshKey={refreshKey}
+          dataSource="api"
         />
       )}
 
