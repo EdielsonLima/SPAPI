@@ -74,6 +74,17 @@ export async function GET(request: NextRequest) {
     attempts.push({ url: "/accounts-receivable/receivable-bills?includePayments=true&startDate=2026-01-01&endDate=2026-05-13" });
     attempts.push({ url: "/accounts-receivable/receivable-bills?startReceiveDate=2026-01-01&endReceiveDate=2026-05-13" });
     attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?startDate=2026-01-01&endDate=2026-05-13" });
+  } else if (endpoint === "income-payments") {
+    // /accounts-receivable/receivable-bills/income-payments retornou 400
+    // (rota existe, faltam parametros) — testa varios formatos
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?startReceiveDate=2026-01-01&endReceiveDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?startPaymentDate=2026-01-01&endPaymentDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?paymentStartDate=2026-01-01&paymentEndDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?paidStartDate=2026-01-01&paidEndDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?dueStartDate=2026-01-01&dueEndDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?companyId=1&startDate=2026-01-01&endDate=2026-05-13" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?receivableBillId=678" });
+    attempts.push({ url: "/accounts-receivable/receivable-bills/income-payments?receivableBillId=678&installmentId=7" });
   } else if (billId && installmentId) {
     attempts.push({ url: `/${endpoint}/${billId}/installments/${installmentId}` });
     attempts.push({ url: `/${endpoint}/${billId}/${installmentId}` });
@@ -105,7 +116,7 @@ export async function GET(request: NextRequest) {
       }
       results.push({ url, status: "ok", sample });
       // Se for modo de exploracao, testa todos. Senao, para no primeiro sucesso
-      const exploreModes = ["all", "details", "more", "params"];
+      const exploreModes = ["all", "details", "more", "params", "income-payments"];
       if (!exploreModes.includes(endpoint)) break;
     } catch (e) {
       results.push({ url, status: "error", error: e instanceof Error ? e.message : "Unknown" });
