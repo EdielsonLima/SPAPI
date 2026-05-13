@@ -38,6 +38,17 @@ export async function GET(request: NextRequest) {
     attempts.push({ url: "/income" });
     attempts.push({ url: "/income/all" });
     attempts.push({ url: "/clients" });
+  } else if (endpoint === "details") {
+    // Testa rotas aninhadas em receivable-bills/{id}/...
+    const b = billId || "678"; // default Rozza 1501
+    attempts.push({ url: `/accounts-receivable/receivable-bills/${b}` });
+    attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/installments` });
+    attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/installments/1` });
+    attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/installments/1/receipts` });
+    attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/payments` });
+    attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/receipts` });
+    attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/categories` });
+    attempts.push({ url: `/accounts-receivable/receivable-bills/${b}/payment-categories` });
   } else if (billId && installmentId) {
     attempts.push({ url: `/${endpoint}/${billId}/installments/${installmentId}` });
     attempts.push({ url: `/${endpoint}/${billId}/${installmentId}` });
@@ -68,8 +79,8 @@ export async function GET(request: NextRequest) {
         };
       }
       results.push({ url, status: "ok", sample });
-      // Se for modo 'all', testa todos. Senao, para no primeiro sucesso
-      if (endpoint !== "all") break;
+      // Se for modo 'all' ou 'details', testa todos. Senao, para no primeiro sucesso
+      if (endpoint !== "all" && endpoint !== "details") break;
     } catch (e) {
       results.push({ url, status: "error", error: e instanceof Error ? e.message : "Unknown" });
     }
