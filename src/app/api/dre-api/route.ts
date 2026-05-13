@@ -72,12 +72,22 @@ type SiengeOutcomeItem = {
   payments?: SiengePayment[];
 };
 
+type SiengeReceipt = {
+  netAmount?: number;
+  paymentDate?: string;
+  additionAmount?: number;
+  interestAmount?: number;
+  fineAmount?: number;
+  monetaryCorrectionAmount?: number;
+};
+
 type SiengeIncomeItem = {
   companyName: string;
   documentIdentificationName?: string | null;
   receiptsCategories?: SiengePaymentsCategory[];
   paymentsCategories?: SiengePaymentsCategory[];
   payments?: SiengePayment[];
+  receipts?: SiengeReceipt[];
 };
 
 type SiengeBankMovementItem = {
@@ -262,11 +272,11 @@ export async function GET(request: NextRequest) {
     }
 
     // 2) Income (receitas — entrada de caixa)
-    // ALEM disso, sintetiza linha "1.05.15 - Acréscimo" com a soma de
-    // interestAmount + fineAmount + monetaryCorrectionAmount de cada pagamento
-    // de income. No Power BI essa linha vem assim (a conta existe no plano
-    // financeiro mas nao tem lancamentos diretos — sao acrescimos calculados
-    // por parcela). Validado com user em 2026-05-13.
+    // ALEM disso, sintetiza linha "1.05.15 - Acréscimo" com additionAmount
+    // de cada RECEIPT (juros + multa, equivalente a coluna "Acrescimo" do
+    // relatorio Sienge "Contas Recebidas"). Validado em 2026-05-13: campos
+    // interestAmount/fineAmount/additionAmount estao em receipts[], nao em
+    // payments[] (em payments[] sempre vem 0).
     const incomePayload = incomeCache?.data;
     const incomeItems = readArray<SiengeIncomeItem>(incomePayload);
     const ACRESCIMO_ID = "10515";
@@ -277,28 +287,27 @@ export async function GET(request: NextRequest) {
       if (isExcludedDocType(item.documentIdentificationName)) continue;
       const cats = item.receiptsCategories || item.paymentsCategories || [];
       const payments = item.payments || [];
+      // Soma normal de netAmount por paymentsCategories (Receita Operacional - Vendas etc.)
       for (const p of payments) {
         if (!p.netAmount || p.netAmount <= 0 || !p.paymentDate) continue;
         if (!p.paymentDate.startsWith(year)) continue;
         const mm = p.paymentDate.substring(5, 7);
         if (monthsFilter && !monthsFilter.has(mm)) continue;
-
-        // Soma normal por categoria (se houver)
         if (cats.length > 0) {
           for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate);
         }
-
-        // Acrescimo sintetico (juros + multa + correcao monetaria)
-        const interest = p.interestAmount || 0;
-        const fine = p.fineAmount || 0;
-        const correction = p.monetaryCorrectionAmount || 0;
-        const acrescimo = interest + fine + correction;
-        if (acrescimo !== 0) {
-          if (!acc[ACRESCIMO_ID]) {
-            acc[ACRESCIMO_ID] = { name: ACRESCIMO_NAME, dreCategory: ACRESCIMO_DRE, months: {} };
-          }
-          acc[ACRESCIMO_ID].months[mm] = (acc[ACRESCIMO_ID].months[mm] || 0) + acrescimo;
+      }
+      // Acrescimo sintetico (additionAmount de cada receipt)
+      const receipts = item.receipts || [];
+      for (const r of receipts) {
+        const acrescimo = r.additionAmount || 0;
+        if (acrescimo === 0 || !r.paymentDate?.startsWith(year)) continue;
+        const mm = r.paymentDate.substring(5, 7);
+        if (monthsFilter && !monthsFilter.has(mm)) continue;
+        if (!acc[ACRESCIMO_ID]) {
+          acc[ACRESCIMO_ID] = { name: ACRESCIMO_NAME, dreCategory: ACRESCIMO_DRE, months: {} };
         }
+        acc[ACRESCIMO_ID].months[mm] = (acc[ACRESCIMO_ID].months[mm] || 0) + acrescimo;
       }
     }
 
