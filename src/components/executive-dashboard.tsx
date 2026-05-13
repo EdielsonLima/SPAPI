@@ -4152,8 +4152,9 @@ export function ExecutiveDashboard() {
         );
       })()}
 
-      {/* KPI Cards */}
-      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && (<><div className={`grid gap-5 md:grid-cols-2 lg:grid-cols-${kpis.length}`}>
+      {/* KPI Cards. Em 'a-pagar'/'a-receber' compactamos pra caber numa
+          viewport sem barra de scroll (gap menor, padding interno menor). */}
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && (<><div className={`grid md:grid-cols-2 lg:grid-cols-${kpis.length} ${(activeTab === "a-pagar" || activeTab === "a-receber") ? "gap-3" : "gap-5"}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
@@ -4161,7 +4162,7 @@ export function ExecutiveDashboard() {
             onClick={kpi.onClick}
           >
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${kpi.gradient}`} />
-            <CardContent className="pt-6 pb-5 px-6">
+            <CardContent className={(activeTab === "a-pagar" || activeTab === "a-receber") ? "pt-4 pb-3 px-5" : "pt-6 pb-5 px-6"}>
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-400">
@@ -4202,8 +4203,17 @@ export function ExecutiveDashboard() {
         ))}
       </div>
 
-      {/* Row 2: Company + Monthly */}
-      <div className="grid gap-6 lg:grid-cols-5">
+      {/* Row 2: Company + Monthly
+          As abas 'a-pagar' e 'a-receber' nao tem tabela embaixo — compactam
+          os graficos pra caber tudo numa viewport (sem barra de scroll). */}
+      {(() => {
+        const compactCharts = activeTab === "a-pagar" || activeTab === "a-receber";
+        const chartHeight = compactCharts ? 360 : 480;
+        const companyChartHeight = compactCharts
+          ? Math.max(280, Math.min(360, companyChart.length * 24))
+          : Math.max(480, companyChart.length * 44);
+        return (
+      <div className={`grid lg:grid-cols-5 ${compactCharts ? "gap-3" : "gap-6"}`}>
         {/* Company Breakdown */}
         <Card className="border-0 shadow-sm lg:col-span-2">
           <CardHeader className="pb-2">
@@ -4218,7 +4228,7 @@ export function ExecutiveDashboard() {
           </CardHeader>
           <CardContent>
             {companyChart.length > 0 ? (
-              <ResponsiveContainer width="100%" height={Math.max(480, companyChart.length * 44)}>
+              <ResponsiveContainer width="100%" height={companyChartHeight}>
                 <BarChart
                   data={companyChart}
                   layout="vertical"
@@ -4263,7 +4273,7 @@ export function ExecutiveDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center h-[480px] text-slate-400 text-sm">
+              <div className="flex items-center justify-center text-slate-400 text-sm" style={{ height: companyChartHeight }}>
                 Sem dados para o periodo selecionado
               </div>
             )}
@@ -4298,7 +4308,7 @@ export function ExecutiveDashboard() {
           </CardHeader>
           <CardContent>
             {chartView === "diario" && (selectedYears.size !== 1 || selectedMonths.size !== 1) ? (
-              <div className="flex items-center justify-center h-[480px] text-slate-400 text-sm text-center px-6">
+              <div className="flex items-center justify-center text-slate-400 text-sm text-center px-6" style={{ height: chartHeight }}>
                 <div className="space-y-2">
                   <p className="font-medium">Para ver a visão Diária, ajuste os filtros:</p>
                   <ul className="text-xs space-y-1 inline-block text-left">
@@ -4313,7 +4323,7 @@ export function ExecutiveDashboard() {
                 </div>
               </div>
             ) : (
-            <ResponsiveContainer width="100%" height={480}>
+            <ResponsiveContainer width="100%" height={chartHeight}>
               <BarChart data={chartData} margin={{ top: 35, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} vertical={false} />
                 <XAxis
@@ -4362,6 +4372,8 @@ export function ExecutiveDashboard() {
           </CardContent>
         </Card>
       </div>
+        );
+      })()}
 
       {/* Overdue Table (CP - Contas em Atraso) */}
       {showOverdueTable && activeTab === "atrasadas" && (
