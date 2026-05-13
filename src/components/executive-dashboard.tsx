@@ -4686,7 +4686,7 @@ export function ExecutiveDashboard() {
                                       <th className="text-right py-2 font-semibold">Acréscimo</th>
                                       <th className="text-right py-2 font-semibold">Desconto</th>
                                       <th className="text-right py-2 font-semibold">Total</th>
-                                      <th className="text-left py-2 font-semibold">Empresa</th>
+                                      <th className="text-left py-2 font-semibold">Empreendimento</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -4711,7 +4711,7 @@ export function ExecutiveDashboard() {
                                           <td className="py-2 text-right tabular-nums text-red-600 dark:text-red-300/70">{formatCurrency(calcEncargos(item))}</td>
                                           <td className="py-2 text-right tabular-nums text-slate-500">{formatCurrency(item.discountAmount || 0)}</td>
                                           <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70">{formatCurrency(effectiveAmount(item) + calcEncargos(item))}</td>
-                                          <td className="py-2 text-slate-600 text-xs">{item.companyName}</td>
+                                          <td className="py-2 text-slate-600 text-xs">{item.projectName}</td>
                                         </tr>
                                       ))}
                                   </tbody>
