@@ -272,42 +272,23 @@ export async function GET(request: NextRequest) {
     }
 
     // 2) Income (receitas — entrada de caixa)
-    // ALEM disso, sintetiza linha "1.05.15 - Acréscimo" com additionAmount
-    // de cada RECEIPT (juros + multa, equivalente a coluna "Acrescimo" do
-    // relatorio Sienge "Contas Recebidas"). Validado em 2026-05-13: campos
-    // interestAmount/fineAmount/additionAmount estao em receipts[], nao em
-    // payments[] (em payments[] sempre vem 0).
+    // NOTA 2026-05-13: tentei sintetizar a linha "1.05.15 - Acrescimo" usando
+    // receipt.additionAmount, mas esse campo retorna R\$ 401k (= juros + multa
+    // de tudo) enquanto o relatorio oficial do Sienge "Contas Recebidas"
+    // mostra R\$ 40.579,17. O Sienge calcula "Acrescimo" com regra propria que
+    // nao corresponde a um campo unico da bulk API. Sem definicao oficial,
+    // aceitar a diff residual de ~R\$ 24k em R\$ 22M (0,11%).
     const incomePayload = incomeCache?.data;
     const incomeItems = readArray<SiengeIncomeItem>(incomePayload);
-    const ACRESCIMO_ID = "10515";
-    const ACRESCIMO_NAME = "Acréscimo";
-    const ACRESCIMO_DRE = fpToDre[ACRESCIMO_ID] || "receita_operacional";
     for (const item of incomeItems) {
       if (excludeCompanies.has((item.companyName || "").toUpperCase())) continue;
       if (isExcludedDocType(item.documentIdentificationName)) continue;
       const cats = item.receiptsCategories || item.paymentsCategories || [];
+      if (cats.length === 0) continue;
       const payments = item.payments || [];
-      // Soma normal de netAmount por paymentsCategories (Receita Operacional - Vendas etc.)
       for (const p of payments) {
         if (!p.netAmount || p.netAmount <= 0 || !p.paymentDate) continue;
-        if (!p.paymentDate.startsWith(year)) continue;
-        const mm = p.paymentDate.substring(5, 7);
-        if (monthsFilter && !monthsFilter.has(mm)) continue;
-        if (cats.length > 0) {
-          for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate);
-        }
-      }
-      // Acrescimo sintetico (additionAmount de cada receipt)
-      const receipts = item.receipts || [];
-      for (const r of receipts) {
-        const acrescimo = r.additionAmount || 0;
-        if (acrescimo === 0 || !r.paymentDate?.startsWith(year)) continue;
-        const mm = r.paymentDate.substring(5, 7);
-        if (monthsFilter && !monthsFilter.has(mm)) continue;
-        if (!acc[ACRESCIMO_ID]) {
-          acc[ACRESCIMO_ID] = { name: ACRESCIMO_NAME, dreCategory: ACRESCIMO_DRE, months: {} };
-        }
-        acc[ACRESCIMO_ID].months[mm] = (acc[ACRESCIMO_ID].months[mm] || 0) + acrescimo;
+        for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate);
       }
     }
 
