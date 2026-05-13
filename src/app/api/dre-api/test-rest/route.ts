@@ -25,7 +25,20 @@ export async function GET(request: NextRequest) {
   // Tenta diferentes formas de chamar o endpoint
   const attempts: Array<{ url: string }> = [];
 
-  if (billId && installmentId) {
+  if (endpoint === "all") {
+    // Testa varios endpoints conhecidos pra ver quais retornam 200
+    attempts.push({ url: "/accounts-receivable/receivable-bills" });
+    attempts.push({ url: "/accounts-receivable/receipts" });
+    attempts.push({ url: "/accounts-receivable/income" });
+    attempts.push({ url: "/accounts-receivable/installments" });
+    attempts.push({ url: "/payment-categories" });
+    attempts.push({ url: "/companies" });
+    attempts.push({ url: "/financial-categories" });
+    attempts.push({ url: "/cost-centers" });
+    attempts.push({ url: "/income" });
+    attempts.push({ url: "/income/all" });
+    attempts.push({ url: "/clients" });
+  } else if (billId && installmentId) {
     attempts.push({ url: `/${endpoint}/${billId}/installments/${installmentId}` });
     attempts.push({ url: `/${endpoint}/${billId}/${installmentId}` });
     attempts.push({ url: `/${endpoint}/${billId}` });
@@ -55,8 +68,8 @@ export async function GET(request: NextRequest) {
         };
       }
       results.push({ url, status: "ok", sample });
-      // Se deu certo, para
-      break;
+      // Se for modo 'all', testa todos. Senao, para no primeiro sucesso
+      if (endpoint !== "all") break;
     } catch (e) {
       results.push({ url, status: "error", error: e instanceof Error ? e.message : "Unknown" });
     }
