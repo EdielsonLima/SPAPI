@@ -30,6 +30,7 @@ import {
   ArrowUpRight,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -261,9 +262,13 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-// === Input inline pra editar Fator do empreendimento ===
-// Salva via PUT /api/company-settings quando o usuario sai do campo (onBlur)
-// ou pressiona Enter. Mostra spinner enquanto salva e toast no fim.
+// === Stepper inline pra editar Fator do empreendimento ===
+// Setinhas ↑ ↓ ajustam o fator em passos de 0.05. Debounce 600ms — apos parar
+// de clicar, salva via PUT /api/company-settings. Spinner enquanto salva.
+const FACTOR_STEP = 0.05;
+const FACTOR_MIN = 0.05;
+const FACTOR_MAX = 9.99;
+
 function FactorInput({
   companyId, companyName, areaM2, status, controlaOrcamento, value, onSaved,
 }: {
@@ -275,65 +280,77 @@ function FactorInput({
   value: number;
   onSaved: (newFactor: number) => void;
 }) {
-  const [local, setLocal] = useState(String(value.toFixed(2)));
+  const [local, setLocal] = useState(value);
   const [saving, setSaving] = useState(false);
+  const saveTimer = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedRef = useRef(value);
 
+  // Sincroniza com value externo se mudou (apos save remoto ou refresh)
   React.useEffect(() => {
-    setLocal(String(value.toFixed(2)));
+    setLocal(value);
+    lastSavedRef.current = value;
   }, [value]);
 
-  const save = async () => {
-    const parsed = parseFloat(local.replace(",", "."));
-    if (isNaN(parsed) || parsed <= 0) {
-      setLocal(String(value.toFixed(2)));
-      return;
-    }
-    // Se nao mudou (round to 2 decimals), nao salva
-    if (Math.round(parsed * 100) === Math.round(value * 100)) {
-      setLocal(parsed.toFixed(2));
-      return;
-    }
-    setSaving(true);
-    try {
-      const r = await fetch("/api/company-settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyId, companyName, areaM2, factor: parsed, status, controlaOrcamento }),
-      });
-      if (r.ok) {
-        onSaved(parsed);
-        toast.success(`Fator de ${companyName} salvo`);
-      } else {
-        toast.error("Erro ao salvar fator");
-        setLocal(String(value.toFixed(2)));
+  const scheduleSave = useCallback((newFactor: number) => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      if (Math.round(newFactor * 100) === Math.round(lastSavedRef.current * 100)) return;
+      setSaving(true);
+      try {
+        const r = await fetch("/api/company-settings", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyId, companyName, areaM2, factor: newFactor, status, controlaOrcamento }),
+        });
+        if (r.ok) {
+          lastSavedRef.current = newFactor;
+          onSaved(newFactor);
+          toast.success(`Fator de ${companyName} salvo`);
+        } else {
+          toast.error("Erro ao salvar fator");
+          setLocal(lastSavedRef.current);
+        }
+      } catch {
+        toast.error("Erro de rede ao salvar fator");
+        setLocal(lastSavedRef.current);
+      } finally {
+        setSaving(false);
       }
-    } catch {
-      toast.error("Erro de rede ao salvar fator");
-      setLocal(String(value.toFixed(2)));
-    } finally {
-      setSaving(false);
-    }
+    }, 600);
+  }, [companyId, companyName, areaM2, status, controlaOrcamento, onSaved]);
+
+  const adjust = (delta: number) => {
+    const next = Math.max(FACTOR_MIN, Math.min(FACTOR_MAX, Math.round((local + delta) * 100) / 100));
+    setLocal(next);
+    scheduleSave(next);
   };
 
   return (
-    <div className="flex items-center justify-center">
-      <input
-        type="text"
-        inputMode="decimal"
-        value={local}
-        onChange={(e) => setLocal(e.target.value)}
-        onBlur={save}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-          if (e.key === "Escape") {
-            setLocal(String(value.toFixed(2)));
-            (e.target as HTMLInputElement).blur();
-          }
-        }}
-        disabled={saving}
-        className="w-14 text-center text-[13px] font-medium text-slate-700 bg-transparent border border-transparent hover:border-slate-200 focus:border-blue-300 focus:bg-blue-50/30 focus:outline-none rounded transition-colors px-1 py-0.5 tabular-nums disabled:opacity-50"
-      />
-      {saving && <Loader2 className="h-3 w-3 ml-1 animate-spin text-blue-500" />}
+    <div className="flex items-center justify-center gap-1.5">
+      <span className="text-[13px] font-medium text-slate-700 tabular-nums w-10 text-right">
+        {local.toFixed(2)}
+      </span>
+      <div className="flex flex-col">
+        <button
+          type="button"
+          onClick={() => adjust(FACTOR_STEP)}
+          disabled={saving || local >= FACTOR_MAX}
+          className="text-slate-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none p-0.5"
+          aria-label="Aumentar fator"
+        >
+          <ChevronUp className="h-3 w-3" strokeWidth={3} />
+        </button>
+        <button
+          type="button"
+          onClick={() => adjust(-FACTOR_STEP)}
+          disabled={saving || local <= FACTOR_MIN}
+          className="text-slate-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none p-0.5"
+          aria-label="Diminuir fator"
+        >
+          <ChevronDown className="h-3 w-3" strokeWidth={3} />
+        </button>
+      </div>
+      {saving && <Loader2 className="h-3 w-3 animate-spin text-blue-500" />}
     </div>
   );
 }
