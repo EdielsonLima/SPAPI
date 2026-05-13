@@ -4152,9 +4152,12 @@ export function ExecutiveDashboard() {
         );
       })()}
 
-      {/* KPI Cards. Em 'a-pagar'/'a-receber' compactamos pra caber numa
+      {/* KPI Cards. Nas abas CP/CR compactamos pra caber tudo numa
           viewport sem barra de scroll (gap menor, padding interno menor). */}
-      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && (<><div className={`grid md:grid-cols-2 lg:grid-cols-${kpis.length} ${(activeTab === "a-pagar" || activeTab === "a-receber") ? "gap-3" : "gap-5"}`}>
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && (() => {
+        const cpCrTabs = ["a-pagar", "pagas", "atrasadas", "a-receber", "recebidas", "inadimplencia"];
+        const isCompact = cpCrTabs.includes(activeTab);
+        return (<><div className={`grid md:grid-cols-2 lg:grid-cols-${kpis.length} ${isCompact ? "gap-3" : "gap-5"}`}>
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
@@ -4162,7 +4165,7 @@ export function ExecutiveDashboard() {
             onClick={kpi.onClick}
           >
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${kpi.gradient}`} />
-            <CardContent className={(activeTab === "a-pagar" || activeTab === "a-receber") ? "pt-4 pb-3 px-5" : "pt-6 pb-5 px-6"}>
+            <CardContent className={isCompact ? "pt-4 pb-3 px-5" : "pt-6 pb-5 px-6"}>
               <div className="flex items-start justify-between">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-400">
@@ -4204,10 +4207,12 @@ export function ExecutiveDashboard() {
       </div>
 
       {/* Row 2: Company + Monthly
-          As abas 'a-pagar' e 'a-receber' nao tem tabela embaixo — compactam
-          os graficos pra caber tudo numa viewport (sem barra de scroll). */}
+          Todas as abas CP/CR mostram so 2 graficos por padrao (tabelas
+          de detalhe sao opt-in via clique no KPI). Compactam pra caber
+          tudo numa viewport sem barra de scroll. */}
       {(() => {
-        const compactCharts = activeTab === "a-pagar" || activeTab === "a-receber";
+        const cpCrTabs = ["a-pagar", "pagas", "atrasadas", "a-receber", "recebidas", "inadimplencia"];
+        const compactCharts = cpCrTabs.includes(activeTab);
         const chartHeight = compactCharts ? 360 : 480;
         const companyChartHeight = compactCharts
           ? Math.max(280, Math.min(360, companyChart.length * 24))
@@ -4736,7 +4741,8 @@ export function ExecutiveDashboard() {
           </CardContent>
         </Card>
       )}
-      </>)}
+      </>);
+      })()}
 
       {/* DRE Tab */}
       {/* ══════ VISÃO GERAL TAB ══════ */}
