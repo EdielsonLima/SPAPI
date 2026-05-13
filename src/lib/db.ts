@@ -305,24 +305,30 @@ export async function getCachedIncomeContaining(startDate: string, endDate: stri
 }
 
 export async function getCachedBankMovementsContaining(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
-  // Prefere cache `all:` (inclui BMs vinculados e avulsos) — mais completo.
-  const all = await pool.query(
-    `SELECT data, cached_at FROM cached_bank_movements
-     WHERE start_date <= $1 AND end_date >= $2 AND start_date LIKE 'all:%'
-     ORDER BY cached_at DESC LIMIT 1`,
-    [`all:${startDate}`, `all:${endDate}`]
-  );
-  if (all.rows.length > 0) {
-    return { data: all.rows[0].data, cachedAt: all.rows[0].cached_at };
-  }
-  // Fallback: cache de avulsos (detachedOnly=Y).
+  // Prefere cache de DETACHED (avulsos, sem billId) — pra evitar duplicacao
+  // com outcome.payments[]. O cache 'all:%' inclui BMs vinculados a bills
+  // (que ja contam em outcome.payments) e BMs de "Reapropriacao de valores
+  // no abatimento de adiantamento" que sao apenas registros contabeis —
+  // somando os dois dobra a despesa. Validado 2026-05-13 com conta
+  // 202020417 (Imobilizado) GALPAO RUA CANELINHA.
   const det = await pool.query(
     `SELECT data, cached_at FROM cached_bank_movements
      WHERE start_date <= $1 AND end_date >= $2 AND start_date NOT LIKE 'all:%'
      ORDER BY cached_at DESC LIMIT 1`,
     [startDate, endDate]
   );
-  return det.rows.length > 0 ? { data: det.rows[0].data, cachedAt: det.rows[0].cached_at } : null;
+  if (det.rows.length > 0) {
+    return { data: det.rows[0].data, cachedAt: det.rows[0].cached_at };
+  }
+  // Fallback: cache `all:%` (inclui BMs vinculados — pode causar duplicacao,
+  // mas e melhor que nada se for o unico disponivel).
+  const all = await pool.query(
+    `SELECT data, cached_at FROM cached_bank_movements
+     WHERE start_date <= $1 AND end_date >= $2 AND start_date LIKE 'all:%'
+     ORDER BY cached_at DESC LIMIT 1`,
+    [`all:${startDate}`, `all:${endDate}`]
+  );
+  return all.rows.length > 0 ? { data: all.rows[0].data, cachedAt: all.rows[0].cached_at } : null;
 }
 
 // ─── Sales Contracts (Contratos de Vendas) ──────────────────────────────────
