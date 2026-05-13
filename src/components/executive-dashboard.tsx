@@ -1251,14 +1251,22 @@ export function ExecutiveDashboard() {
       // Same logic as contas-table paidTotal: filter netAmount > 0, sum netAmount
       // Always excludes previsão documents (hardcoded, not dependent on filter state)
       // No year filter: budget represents total cost to date (matches Contas Pagas with Ano=Todos)
+      //
+      // 2026-05-13: alinhado com Contas Pagas — agora usa consistentItemsForPagas
+      // (inclui BMs avulsos sintetizados, igual a pagina) e exclui hardcoded os
+      // mesmos op types que a pagina Contas Pagas exclui por padrao
+      // (Substituicao/Cancelamento/Abatimento/Devolucao/Por Bens/Permuta).
+      // Continua SEM depender de selectedOpTypes (sem race condition).
+      const EXCLUDED_OPS = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
       let realized = 0;
-      consistentItems.forEach(item => {
+      consistentItemsForPagas.forEach(item => {
         if (item.companyName !== cs.companyName) return;
         if (isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return;
         (item.payments || []).forEach(p => {
-          if (p.netAmount !== 0 && p.paymentDate) {
-            realized += p.netAmount;
-          }
+          if (p.netAmount === 0 || !p.paymentDate) return;
+          const op = (p.operationTypeName || "").toLowerCase();
+          if (EXCLUDED_OPS.some(x => op.includes(x))) return;
+          realized += p.netAmount;
         });
       });
 
@@ -1282,7 +1290,7 @@ export function ExecutiveDashboard() {
       if (a.status !== b.status) return a.status === "Finalizada" ? 1 : -1;
       return b.budget - a.budget;
     });
-  }, [cubData, companySettings, consistentItems, selectedCompanies]);
+  }, [cubData, companySettings, consistentItemsForPagas, selectedCompanies]);
   // ▲▲▲ END VALIDATED — Budget vs Realizado ▲▲▲
 
   const budgetTotals = useMemo(() => {

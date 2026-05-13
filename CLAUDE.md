@@ -41,12 +41,14 @@
   - Processar parcelas: Ambos (Contas a Pagar + Caixa/Bancos)
   - Tarifas bancárias ref. cobrança escritural: marcado
 
-## Orçamento - Regras Criticas (Validado em 2026-04-02)
+## Orçamento - Regras Criticas (Validado em 2026-04-02, alinhado com Contas Pagas em 2026-05-13)
 
 ### NAO ALTERAR sem pedido explicito do usuario:
 - Formula do Realizado em `src/components/executive-dashboard.tsx` (budgetData useMemo):
   - Valor liquido = `netAmount` (NAO subtrair taxAmount)
+  - Usa `consistentItemsForPagas` (inclui BMs avulsos sintetizados — mesma fonte da pagina Contas Pagas)
   - Exclusao hardcoded de documentos de previsao (PREVISÃO/PREVISAO)
+  - Exclusao hardcoded de op types: Substituicao/Cancelamento/Abatimento/Devolucao/Por Bens/Permuta (mesmos defaults da pagina Contas Pagas)
   - Exclusao NAO depende de estado de filtros (sem race condition)
 - Formula do Orcado: `areaM2 * factor * cubValue`
 - Formula do A Realizar: `budget - realized`
