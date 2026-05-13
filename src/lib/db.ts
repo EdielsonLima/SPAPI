@@ -280,6 +280,51 @@ export async function cacheBankMovements(startDate: string, endDate: string, dat
   );
 }
 
+// ─── Variantes "Containing" (cache mais recente que cobre o range) ──────────
+// Sem TTL (cached_at > NOW() - INTERVAL) intencionalmente — usado por
+// endpoints DRE API que rodam sobre o cache populado pelo painel. Se nao
+// houver cache, retorna null; o endpoint trata como "sem dados".
+export async function getCachedOutcomeContaining(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
+  const result = await pool.query(
+    `SELECT data, cached_at FROM cached_outcome
+     WHERE start_date <= $1 AND end_date >= $2 AND start_date NOT LIKE 'all:%'
+     ORDER BY cached_at DESC LIMIT 1`,
+    [startDate, endDate]
+  );
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
+}
+
+export async function getCachedIncomeContaining(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
+  const result = await pool.query(
+    `SELECT data, cached_at FROM cached_income
+     WHERE start_date <= $1 AND end_date >= $2 AND start_date NOT LIKE 'all:%'
+     ORDER BY cached_at DESC LIMIT 1`,
+    [startDate, endDate]
+  );
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
+}
+
+export async function getCachedBankMovementsContaining(startDate: string, endDate: string): Promise<{ data: unknown; cachedAt: string } | null> {
+  // Prefere cache `all:` (inclui BMs vinculados e avulsos) — mais completo.
+  const all = await pool.query(
+    `SELECT data, cached_at FROM cached_bank_movements
+     WHERE start_date <= $1 AND end_date >= $2 AND start_date LIKE 'all:%'
+     ORDER BY cached_at DESC LIMIT 1`,
+    [`all:${startDate}`, `all:${endDate}`]
+  );
+  if (all.rows.length > 0) {
+    return { data: all.rows[0].data, cachedAt: all.rows[0].cached_at };
+  }
+  // Fallback: cache de avulsos (detachedOnly=Y).
+  const det = await pool.query(
+    `SELECT data, cached_at FROM cached_bank_movements
+     WHERE start_date <= $1 AND end_date >= $2 AND start_date NOT LIKE 'all:%'
+     ORDER BY cached_at DESC LIMIT 1`,
+    [startDate, endDate]
+  );
+  return det.rows.length > 0 ? { data: det.rows[0].data, cachedAt: det.rows[0].cached_at } : null;
+}
+
 // ─── Sales Contracts (Contratos de Vendas) ──────────────────────────────────
 
 let salesTableReady = false;

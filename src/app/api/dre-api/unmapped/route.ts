@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCachedOutcome, getCachedIncome, getCachedBankMovements, getDreMappings } from "@/lib/db";
+import { getCachedOutcomeContaining, getCachedIncomeContaining, getCachedBankMovementsContaining, getDreMappings } from "@/lib/db";
 
 // Lista contas do plano financeiro com movimento no ano selecionado que
 // NAO estao mapeadas em dre_mappings, ordenadas por valor absoluto.
@@ -62,9 +62,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const [outR, incR, bmR, mappingsByCategory] = await Promise.all([
-      getCachedOutcome(startDate, endDate),
-      getCachedIncome(startDate, endDate),
-      getCachedBankMovements(startDate, endDate),
+      getCachedOutcomeContaining(startDate, endDate),
+      getCachedIncomeContaining(startDate, endDate),
+      getCachedBankMovementsContaining(startDate, endDate),
       getDreMappings(),
     ]);
 

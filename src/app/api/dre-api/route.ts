@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCachedOutcome, getCachedIncome, getCachedBankMovements, getDreMappings } from "@/lib/db";
+import { getCachedOutcomeContaining, getCachedIncomeContaining, getCachedBankMovementsContaining, getDreMappings } from "@/lib/db";
 
 // DRE API — calcula DRE em runtime a partir das movimentações financeiras do
 // Sienge (outcome/income/bank-movements), sem depender do Excel.
@@ -131,9 +131,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const [outcomeCache, incomeCache, bmCache, mappingsByCategory] = await Promise.all([
-      getCachedOutcome(startDate, endDate),
-      getCachedIncome(startDate, endDate),
-      getCachedBankMovements(startDate, endDate),
+      getCachedOutcomeContaining(startDate, endDate),
+      getCachedIncomeContaining(startDate, endDate),
+      getCachedBankMovementsContaining(startDate, endDate),
       getDreMappings(),
     ]);
 
