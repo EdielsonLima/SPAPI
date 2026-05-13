@@ -778,7 +778,7 @@ export function DreTab({
               const colWidth = `${Math.max(90, Math.floor(700 / monthCols.length))}px`;
 
               return (
-                <div className="overflow-x-auto rounded-xl border border-slate-200/60 shadow-sm m-6">
+                <div className="overflow-x-auto rounded-xl border border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900 shadow-sm m-6">
                   <table className="w-full text-xs">
                     <thead>
                       <tr className="bg-slate-800 text-white">
@@ -794,7 +794,7 @@ export function DreTab({
                         <th className="text-right px-5 py-3.5 font-bold min-w-[120px] uppercase tracking-wider text-[11px] border-b border-slate-700">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100/80">
+                    <tbody className="divide-y divide-slate-100/80 dark:divide-slate-800/60">
                       {DRE_LINES.map((line) => {
                         const isCalc = line.type === "calculated";
                         const total = getLineTotal(line);
@@ -810,34 +810,34 @@ export function DreTab({
                               className={`${
                                 isCalc
                                   ? total < 0
-                                    ? "bg-red-50/40 relative font-semibold"
-                                    : "bg-emerald-50/40 relative font-semibold"
-                                  : "bg-white hover:bg-slate-50/80"
+                                    ? "bg-red-50/40 dark:bg-red-950/30 relative font-semibold"
+                                    : "bg-emerald-50/40 dark:bg-emerald-950/30 relative font-semibold"
+                                  : "bg-white dark:bg-transparent hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
                               } ${canExpand ? "cursor-pointer transition-colors" : ""}`}
                               onClick={canExpand ? () => toggleExpand(line.key) : undefined}
                             >
                               <td className={`px-5 py-3.5 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] ${
                                 isCalc
-                                  ? total < 0 ? "bg-[#fef2f2]" : "bg-[#f0fdf4]"
-                                  : "bg-white"
+                                  ? total < 0 ? "bg-red-50 dark:bg-red-950/40" : "bg-emerald-50 dark:bg-emerald-950/40"
+                                  : "bg-white dark:bg-slate-900"
                               }`}>
                                 {isCalc && (
-                                  <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${total < 0 ? "bg-red-400" : "bg-emerald-400"}`} />
+                                  <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${total < 0 ? "bg-red-400 dark:bg-red-500/70" : "bg-emerald-400 dark:bg-emerald-500/70"}`} />
                                 )}
                                 <div className="flex items-center gap-1.5 ">
                                   {canExpand && (
-                                    <div className={`p-1 rounded-md transition-colors flex-shrink-0 ${isExpanded ? "bg-slate-200/60" : "hover:bg-slate-200/60"}`}>
-                                      {isExpanded 
-                                        ? <ChevronDown className="h-3.5 w-3.5 text-slate-500" />
-                                        : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                                    <div className={`p-1 rounded-md transition-colors flex-shrink-0 ${isExpanded ? "bg-slate-200/60 dark:bg-slate-700/60" : "hover:bg-slate-200/60 dark:hover:bg-slate-700/60"}`}>
+                                      {isExpanded
+                                        ? <ChevronDown className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
+                                        : <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-400" />
                                       }
                                     </div>
                                   )}
                                   {!canExpand && !isCalc && <div className="w-[20px]" />}
                                   <span className={`text-[13px] ${
                                     isCalc
-                                      ? total < 0 ? "font-bold text-red-800" : "font-bold text-emerald-800"
-                                      : "font-semibold text-slate-700 tracking-tight"
+                                      ? total < 0 ? "font-bold text-red-800 dark:text-red-300" : "font-bold text-emerald-800 dark:text-emerald-300"
+                                      : "font-semibold text-slate-700 dark:text-slate-200 tracking-tight"
                                   }`}>
                                     {line.label}
                                   </span>
@@ -851,13 +851,13 @@ export function DreTab({
                                 return (
                                   <td key={m} className={`text-right px-4 py-3.5 text-[13px] tabular-nums ${
                                     isCalc
-                                      ? v < 0 ? "text-red-700 font-semibold" : "text-emerald-700 font-semibold"
-                                      : v < 0 ? "text-red-600 dark:text-red-300/60 font-medium" : "text-slate-700 dark:text-slate-300 font-medium"
+                                      ? v < 0 ? "text-red-700 dark:text-red-300 font-semibold" : "text-emerald-700 dark:text-emerald-300 font-semibold"
+                                      : v < 0 ? "text-red-600 dark:text-red-300/70 font-medium" : "text-slate-700 dark:text-slate-300 font-medium"
                                   }`}>
                                     {v !== 0 ? fmtVal(v) : ""}
                                     {variation !== null && v !== 0 && (
                                       <div className={`text-[10px] font-medium leading-tight mt-0.5 ${
-                                        variation > 0 ? "text-emerald-600" : variation < 0 ? "text-red-500" : "text-slate-400"
+                                        variation > 0 ? "text-emerald-600 dark:text-emerald-400" : variation < 0 ? "text-red-500 dark:text-red-400" : "text-slate-400 dark:text-slate-500"
                                       }`}>
                                         {fmtPct(variation)}
                                       </div>
@@ -867,8 +867,8 @@ export function DreTab({
                               })}
                               <td className={`text-right px-5 py-3.5 font-bold text-[14px] tabular-nums ${
                                 isCalc
-                                  ? total < 0 ? "text-red-700" : "text-emerald-700"
-                                  : total < 0 ? "text-red-600 dark:text-red-300/60" : "text-slate-800 dark:text-slate-200"
+                                  ? total < 0 ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"
+                                  : total < 0 ? "text-red-600 dark:text-red-300/70" : "text-slate-800 dark:text-slate-200"
                               }`}>
                                 {fmtVal(total)}
                               </td>
@@ -877,10 +877,10 @@ export function DreTab({
                             {isExpanded && lineAccounts.map(([fcId, acctData]) => {
                               const acctTotal = Object.values(acctData.months).reduce((s, v) => s + v, 0);
                               return (
-                                <tr key={fcId} className="bg-slate-50/80 border-t border-slate-100/80">
-                                  <td className="px-5 py-2.5 pl-11 sticky left-0 bg-[#f8fafc] shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] border-l-[3px] border-l-slate-200/80">
-                                    <div className="flex items-center text-[12px] font-medium text-slate-600">
-                                      <span className="text-slate-400 font-mono text-[11px] mr-2 bg-white py-0.5 px-1.5 rounded-md border border-slate-200/60 shadow-sm">{fcId}</span>
+                                <tr key={fcId} className="bg-slate-50/80 dark:bg-slate-800/30 border-t border-slate-100/80 dark:border-slate-700/60">
+                                  <td className="px-5 py-2.5 pl-11 sticky left-0 bg-slate-50 dark:bg-slate-800/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] border-l-[3px] border-l-slate-200/80 dark:border-l-slate-700/60">
+                                    <div className="flex items-center text-[12px] font-medium text-slate-600 dark:text-slate-300">
+                                      <span className="text-slate-400 dark:text-slate-400 font-mono text-[11px] mr-2 bg-white dark:bg-slate-800 py-0.5 px-1.5 rounded-md border border-slate-200/60 dark:border-slate-700/60 shadow-sm">{fcId}</span>
                                       {acctData.name}
                                     </div>
                                   </td>
@@ -891,12 +891,12 @@ export function DreTab({
                                     const variation = prev ? calcVariation(v, prevV) : null;
                                     return (
                                       <td key={m} className={`text-right px-4 py-2.5 text-[12px] tabular-nums ${
-                                        v < 0 ? "text-red-500 dark:text-red-300/60 font-medium" : "text-slate-600 dark:text-slate-400"
+                                        v < 0 ? "text-red-500 dark:text-red-300/70 font-medium" : "text-slate-600 dark:text-slate-300"
                                       }`}>
                                         {v !== 0 ? fmtVal(v) : ""}
                                         {variation !== null && v !== 0 && (
                                           <div className={`text-[9px] leading-tight mt-0.5 ${
-                                            variation > 0 ? "text-emerald-500" : variation < 0 ? "text-red-400" : "text-slate-300"
+                                            variation > 0 ? "text-emerald-500 dark:text-emerald-400" : variation < 0 ? "text-red-400 dark:text-red-400" : "text-slate-300 dark:text-slate-600"
                                           }`}>
                                             {fmtPct(variation)}
                                           </div>
@@ -905,7 +905,7 @@ export function DreTab({
                                     );
                                   })}
                                   <td className={`text-right px-5 py-2.5 font-semibold text-[13px] tabular-nums ${
-                                    acctTotal < 0 ? "text-red-600 dark:text-red-300/60" : "text-slate-700 dark:text-slate-300"
+                                    acctTotal < 0 ? "text-red-600 dark:text-red-300/70" : "text-slate-700 dark:text-slate-300"
                                   }`}>
                                     {fmtVal(acctTotal)}
                                   </td>
@@ -1134,14 +1134,14 @@ export function DreTab({
 
               {/* ══════ INSIGHTS CONTABEIS (Side Panel in DRE Simples) ══════ */}
               {receitaOperacional !== 0 && (
-                <div className="w-full xl:w-[420px] flex-shrink-0 self-start border border-slate-200/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden bg-white sticky top-24">
-                  <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-amber-50 to-white border-b border-amber-100/50">
-                    <div className="p-2 bg-amber-100 text-amber-600 rounded-lg shadow-sm">
+                <div className="w-full xl:w-[420px] flex-shrink-0 self-start border border-slate-200/80 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)] rounded-2xl overflow-hidden bg-white dark:bg-slate-900 sticky top-24">
+                  <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/40 dark:to-slate-900 border-b border-amber-100/50 dark:border-amber-900/40">
+                    <div className="p-2 bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300 rounded-lg shadow-sm">
                       <Lightbulb className="h-5 w-5" />
                     </div>
-                    <h3 className="text-base font-bold text-slate-800 tracking-tight">Insights da DRE <span className="text-slate-400 font-medium ml-1 block text-xs mt-0.5">Análise Automática</span></h3>
+                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight">Insights da DRE <span className="text-slate-400 dark:text-slate-500 font-medium ml-1 block text-xs mt-0.5">Análise Automática</span></h3>
                   </div>
-                  <div className="px-5 py-5 space-y-3 bg-white/50 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
+                  <div className="px-5 py-5 space-y-3 bg-white/50 dark:bg-slate-900/40 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
                     {(() => {
                       const rec = receitaOperacional;
                       const lb = calculated.lucro_bruto || 0;
@@ -1225,13 +1225,13 @@ export function DreTab({
 
                       return insights.map((insight, i) => (
                         <div key={i} className={`flex items-start gap-3.5 p-4 rounded-xl text-[13px] border shadow-sm transition-all hover:shadow-md ${
-                          insight.icon === "check" ? "bg-emerald-50/70 border-emerald-100/80 text-emerald-900" :
-                          insight.icon === "alert" ? "bg-amber-50/70 border-amber-200/50 text-amber-900" :
-                          "bg-blue-50/70 border-blue-100/80 text-blue-900"
+                          insight.icon === "check" ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-100/80 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-200" :
+                          insight.icon === "alert" ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/50 dark:border-amber-900/40 text-amber-900 dark:text-amber-200" :
+                          "bg-blue-50/70 dark:bg-blue-950/30 border-blue-100/80 dark:border-blue-900/40 text-blue-900 dark:text-blue-200"
                         }`}>
-                          {insight.icon === "check" && <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-500" />}
-                          {insight.icon === "alert" && <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-500" />}
-                          {insight.icon === "info" && <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-500" />}
+                          {insight.icon === "check" && <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-500 dark:text-emerald-400" />}
+                          {insight.icon === "alert" && <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-500 dark:text-amber-400" />}
+                          {insight.icon === "info" && <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />}
                           <span className="leading-relaxed font-medium">{insight.text}</span>
                         </div>
                       ));
