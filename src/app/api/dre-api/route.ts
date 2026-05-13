@@ -52,6 +52,9 @@ type SiengePayment = {
   netAmount: number;
   paymentDate?: string;
   operationTypeName?: string;
+  interestAmount?: number;
+  fineAmount?: number;
+  monetaryCorrectionAmount?: number;
 };
 
 type SiengePaymentsCategory = {
@@ -259,17 +262,43 @@ export async function GET(request: NextRequest) {
     }
 
     // 2) Income (receitas — entrada de caixa)
+    // ALEM disso, sintetiza linha "1.05.15 - Acréscimo" com a soma de
+    // interestAmount + fineAmount + monetaryCorrectionAmount de cada pagamento
+    // de income. No Power BI essa linha vem assim (a conta existe no plano
+    // financeiro mas nao tem lancamentos diretos — sao acrescimos calculados
+    // por parcela). Validado com user em 2026-05-13.
     const incomePayload = incomeCache?.data;
     const incomeItems = readArray<SiengeIncomeItem>(incomePayload);
+    const ACRESCIMO_ID = "10515";
+    const ACRESCIMO_NAME = "Acréscimo";
+    const ACRESCIMO_DRE = fpToDre[ACRESCIMO_ID] || "receita_operacional";
     for (const item of incomeItems) {
       if (excludeCompanies.has((item.companyName || "").toUpperCase())) continue;
       if (isExcludedDocType(item.documentIdentificationName)) continue;
       const cats = item.receiptsCategories || item.paymentsCategories || [];
-      if (cats.length === 0) continue;
       const payments = item.payments || [];
       for (const p of payments) {
         if (!p.netAmount || p.netAmount <= 0 || !p.paymentDate) continue;
-        for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate);
+        if (!p.paymentDate.startsWith(year)) continue;
+        const mm = p.paymentDate.substring(5, 7);
+        if (monthsFilter && !monthsFilter.has(mm)) continue;
+
+        // Soma normal por categoria (se houver)
+        if (cats.length > 0) {
+          for (const c of cats) addToAcc(c, p.netAmount, p.paymentDate);
+        }
+
+        // Acrescimo sintetico (juros + multa + correcao monetaria)
+        const interest = p.interestAmount || 0;
+        const fine = p.fineAmount || 0;
+        const correction = p.monetaryCorrectionAmount || 0;
+        const acrescimo = interest + fine + correction;
+        if (acrescimo !== 0) {
+          if (!acc[ACRESCIMO_ID]) {
+            acc[ACRESCIMO_ID] = { name: ACRESCIMO_NAME, dreCategory: ACRESCIMO_DRE, months: {} };
+          }
+          acc[ACRESCIMO_ID].months[mm] = (acc[ACRESCIMO_ID].months[mm] || 0) + acrescimo;
+        }
       }
     }
 
