@@ -3,6 +3,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCachedOutcomeContaining, getCachedIncomeContaining, getCachedBankMovementsContaining, getDreMappings } from "@/lib/db";
 
+// Espelho da lista em /api/dre-api/route.ts — contas internas que nao entram
+// na DRE. Aqui sao filtradas pra que o /unmapped nao confunda o usuario com
+// IDs que de qualquer jeito serao ignorados.
+const IGNORED_FINANCIAL_CATEGORIES = new Set([
+  "10307", "1070301", "1070305", "1070306", "1070309",
+  "2090117", "2090118", "2090119",
+  "10601", "201150251",
+  "202020412",
+]);
+
 // Lista contas do plano financeiro com movimento no ano selecionado que
 // NAO estao mapeadas em dre_mappings, ordenadas por valor absoluto.
 // Use pra priorizar quais contas mapear em /cadastros/dre.
@@ -79,6 +89,7 @@ export async function GET(request: NextRequest) {
       if (!fcId) return;
       const id = String(fcId).trim();
       if (!id) return;
+      if (IGNORED_FINANCIAL_CATEGORIES.has(id)) return;
       const value = amount * (typeof rate === "number" && rate > 0 ? rate / 100 : 1);
       const v = Math.abs(value);
       if (v === 0) return;

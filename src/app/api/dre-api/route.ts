@@ -29,6 +29,25 @@ const NEGATIVE_CATEGORIES = new Set([
   "saidas_nao_operacionais",
 ]);
 
+// Contas do plano financeiro que representam movimentacao bancaria/financeira
+// interna (transferencias, aplicacoes/resgates, retencoes temporarias) — nao
+// entram na DRE, sao apenas movimento de caixa entre contas. Identificadas em
+// 2026-05-13 cruzando /api/dre-api/unmapped com o plano financeiro do Sienge.
+const IGNORED_FINANCIAL_CATEGORIES = new Set([
+  "10307",      // Transferências Entre Contas
+  "1070301",    // Resgate de aplicações financeiras
+  "1070305",    // Estorno da Taxa IR da Aplicação (Banco)
+  "1070306",    // Estorno da Taxa IOF da Aplicação (Banco)
+  "1070309",    // Aplicação
+  "2090117",    // Resgate de Aplicação (Banco)
+  "2090118",    // Estorno de Resgate Automático (BANCO)
+  "2090119",    // Garantia Bloqueada / DAC (Banco)
+  "10601",      // Retenção de Caução/Sinal
+  "201150251",  // Pagamento Retenção Caução/Sinal
+  "202020412",  // Movimentações Administrativas (Escritório) — R$ 11M em BMs
+                // avulsos, suspeita de transferencia interna intercompany
+]);
+
 type SiengePayment = {
   netAmount: number;
   paymentDate?: string;
@@ -176,6 +195,7 @@ export async function GET(request: NextRequest) {
 
       const fcId = String(cat.financialCategoryId || "").trim();
       if (!fcId) return;
+      if (IGNORED_FINANCIAL_CATEGORIES.has(fcId)) return;
 
       const rate = typeof cat.financialCategoryRate === "number" && cat.financialCategoryRate > 0
         ? cat.financialCategoryRate / 100
