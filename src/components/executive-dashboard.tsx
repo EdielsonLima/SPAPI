@@ -4630,10 +4630,16 @@ export function ExecutiveDashboard() {
                 <TableBody>
                   {delinquentsByClient.map((client) => {
                     const isExpanded = expandedClients.has(client.clientName);
+                    // Quando alguma linha esta expandida, deixa as outras
+                    // foscas (opacity-40) pra reduzir ruido visual.
+                    const hasAnyExpanded = expandedClients.size > 0;
+                    const isDimmed = hasAnyExpanded && !isExpanded;
                     return (
                       <React.Fragment key={client.clientName}>
                         <TableRow
-                          className="cursor-pointer hover:bg-slate-50 transition-colors"
+                          className={`cursor-pointer hover:bg-slate-50 transition-all ${
+                            isDimmed ? "opacity-40 hover:opacity-100" : ""
+                          }`}
                           onClick={() => {
                             setExpandedClients(prev => {
                               const next = new Set(prev);
@@ -4685,8 +4691,8 @@ export function ExecutiveDashboard() {
                                       <th className="text-right py-2 font-semibold">Saldo Atual</th>
                                       <th className="text-right py-2 font-semibold">Acréscimo</th>
                                       <th className="text-right py-2 font-semibold">Desconto</th>
-                                      <th className="text-right py-2 font-semibold">Total</th>
-                                      <th className="text-left py-2 font-semibold">Empreendimento</th>
+                                      <th className="text-right py-2 font-semibold pr-8">Total</th>
+                                      <th className="text-left py-2 font-semibold pl-4">Empreendimento</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -4710,8 +4716,8 @@ export function ExecutiveDashboard() {
                                           <td className="py-2 text-right tabular-nums text-slate-800">{formatCurrency(item.correctedBalanceAmount)}</td>
                                           <td className="py-2 text-right tabular-nums text-red-600 dark:text-red-300/70">{formatCurrency(calcEncargos(item))}</td>
                                           <td className="py-2 text-right tabular-nums text-slate-500">{formatCurrency(item.discountAmount || 0)}</td>
-                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70">{formatCurrency(effectiveAmount(item) + calcEncargos(item))}</td>
-                                          <td className="py-2 text-slate-600 text-xs">{item.projectName}</td>
+                                          <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70 pr-8">{formatCurrency(effectiveAmount(item) + calcEncargos(item))}</td>
+                                          <td className="py-2 text-slate-600 text-xs pl-4">{item.projectName}</td>
                                         </tr>
                                       ))}
                                   </tbody>
