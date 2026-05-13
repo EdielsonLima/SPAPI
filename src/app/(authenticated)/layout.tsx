@@ -15,10 +15,10 @@ export default function AuthenticatedLayout({
           <Sidebar />
         </div>
 
-        {/* Main content */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Main content — scroll na coluna inteira pra o Header sticky pegar o blur do conteudo */}
+        <div className="flex-1 overflow-y-auto">
           <Header />
-          <main className="flex-1 overflow-y-auto p-4 md:p-6">
+          <main className="p-4 md:p-6">
             {children}
           </main>
         </div>

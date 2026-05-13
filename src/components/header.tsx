@@ -67,7 +67,7 @@ export function Header() {
   }, [session]);
 
   return (
-    <header className="h-16 border-b border-border bg-background flex items-center justify-between px-4 md:px-6">
+    <header className="sticky top-0 z-30 h-16 border-b border-border/40 dark:border-slate-700/40 bg-white/70 dark:bg-slate-900/50 supports-[backdrop-filter]:bg-white/60 supports-[backdrop-filter]:dark:bg-slate-900/40 backdrop-blur-xl flex items-center justify-between px-4 md:px-6">
       {/* Mobile menu */}
       <Sheet>
         <SheetTrigger asChild>
