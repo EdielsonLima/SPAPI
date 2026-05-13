@@ -16,6 +16,10 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const year = searchParams.get("year") || String(new Date().getFullYear());
+  const excludeParam = searchParams.get("excludeCompanies");
+  const excludeCompanies = excludeParam
+    ? new Set(excludeParam.split(",").map(s => s.trim().toUpperCase()))
+    : new Set<string>();
 
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
@@ -53,7 +57,8 @@ export async function GET(request: NextRequest) {
     const rStat = { withInterest: 0, withFine: 0, withMonetary: 0, withAddition: 0, totalInterest: 0, totalFine: 0, totalMonetary: 0, totalAddition: 0, count: 0 };
 
     for (const itemRaw of items) {
-      const item = itemRaw as { payments?: Record<string, unknown>[]; receipts?: Record<string, unknown>[] };
+      const item = itemRaw as { payments?: Record<string, unknown>[]; receipts?: Record<string, unknown>[]; companyName?: string };
+      if (excludeCompanies.has((item.companyName || "").toUpperCase())) continue;
       for (const p of item.payments || []) {
         const pdate = p.paymentDate as string | undefined;
         if (!pdate?.startsWith(year)) continue;
