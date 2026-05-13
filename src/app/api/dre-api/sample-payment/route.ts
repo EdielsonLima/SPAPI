@@ -45,44 +45,51 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Tambem coleta TODAS as chaves usadas em payments (pra mostrar o "schema")
+    // Stats de PAYMENTS (campo direto)
     const paymentKeys = new Set<string>();
-    let paymentsWithInterest = 0;
-    let paymentsWithFine = 0;
-    let paymentsWithMonetary = 0;
-    let totalInterest = 0;
-    let totalFine = 0;
-    let totalMonetary = 0;
-    let paymentCount = 0;
+    const pStat = { withInterest: 0, withFine: 0, withMonetary: 0, withAddition: 0, totalInterest: 0, totalFine: 0, totalMonetary: 0, totalAddition: 0, count: 0 };
+    // Stats de RECEIPTS (o que parece ter os acrescimos)
+    const receiptKeys = new Set<string>();
+    const rStat = { withInterest: 0, withFine: 0, withMonetary: 0, withAddition: 0, totalInterest: 0, totalFine: 0, totalMonetary: 0, totalAddition: 0, count: 0 };
+
     for (const itemRaw of items) {
-      const item = itemRaw as { payments?: Record<string, unknown>[] };
+      const item = itemRaw as { payments?: Record<string, unknown>[]; receipts?: Record<string, unknown>[] };
       for (const p of item.payments || []) {
         const pdate = p.paymentDate as string | undefined;
         if (!pdate?.startsWith(year)) continue;
-        paymentCount++;
+        pStat.count++;
         Object.keys(p).forEach(k => paymentKeys.add(k));
         const interest = Number(p.interestAmount) || 0;
         const fine = Number(p.fineAmount) || 0;
         const monetary = Number(p.monetaryCorrectionAmount) || 0;
-        if (interest !== 0) { paymentsWithInterest++; totalInterest += interest; }
-        if (fine !== 0) { paymentsWithFine++; totalFine += fine; }
-        if (monetary !== 0) { paymentsWithMonetary++; totalMonetary += monetary; }
+        const addition = Number(p.additionAmount) || 0;
+        if (interest !== 0) { pStat.withInterest++; pStat.totalInterest += interest; }
+        if (fine !== 0) { pStat.withFine++; pStat.totalFine += fine; }
+        if (monetary !== 0) { pStat.withMonetary++; pStat.totalMonetary += monetary; }
+        if (addition !== 0) { pStat.withAddition++; pStat.totalAddition += addition; }
+      }
+      for (const r of item.receipts || []) {
+        const pdate = r.paymentDate as string | undefined;
+        if (!pdate?.startsWith(year)) continue;
+        rStat.count++;
+        Object.keys(r).forEach(k => receiptKeys.add(k));
+        const interest = Number(r.interestAmount) || 0;
+        const fine = Number(r.fineAmount) || 0;
+        const monetary = Number(r.monetaryCorrectionAmount) || 0;
+        const addition = Number(r.additionAmount) || 0;
+        if (interest !== 0) { rStat.withInterest++; rStat.totalInterest += interest; }
+        if (fine !== 0) { rStat.withFine++; rStat.totalFine += fine; }
+        if (monetary !== 0) { rStat.withMonetary++; rStat.totalMonetary += monetary; }
+        if (addition !== 0) { rStat.withAddition++; rStat.totalAddition += addition; }
       }
     }
 
     return NextResponse.json({
       year,
-      totalPayments: paymentCount,
       paymentKeys: Array.from(paymentKeys).sort(),
-      stats: {
-        paymentsWithInterest,
-        paymentsWithFine,
-        paymentsWithMonetary,
-        totalInterest,
-        totalFine,
-        totalMonetary,
-        grandTotalAcrescimo: totalInterest + totalFine + totalMonetary,
-      },
+      receiptKeys: Array.from(receiptKeys).sort(),
+      paymentStats: { ...pStat, grandTotalAcrescimo: pStat.totalInterest + pStat.totalFine + pStat.totalMonetary + pStat.totalAddition },
+      receiptStats: { ...rStat, grandTotalAcrescimo: rStat.totalInterest + rStat.totalFine + rStat.totalMonetary + rStat.totalAddition },
       samples,
     });
   } catch (error) {
