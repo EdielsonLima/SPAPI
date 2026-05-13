@@ -762,7 +762,20 @@ export function DreTab({
                 return v < 0 ? `-${formatted}` : formatted;
               };
 
-              const colWidth = `${Math.max(100, Math.floor(700 / monthCols.length))}px`;
+              // Variacao percentual entre mes atual e anterior. Retorna null
+              // se mes anterior e 0 (divisao por zero).
+              const calcVariation = (current: number, previous: number): number | null => {
+                if (previous === 0) return null;
+                return ((current - previous) / Math.abs(previous)) * 100;
+              };
+
+              const fmtPct = (p: number) => {
+                const abs = Math.abs(p);
+                if (abs >= 1000) return `${p > 0 ? "+" : "-"}${(abs / 1000).toFixed(1)}k%`;
+                return `${p > 0 ? "+" : p < 0 ? "-" : ""}${abs.toFixed(1)}%`;
+              };
+
+              const colWidth = `${Math.max(90, Math.floor(700 / monthCols.length))}px`;
 
               return (
                 <div className="overflow-x-auto rounded-xl border border-slate-200/60 shadow-sm m-6">
@@ -770,12 +783,19 @@ export function DreTab({
                     <thead>
                       <tr className="bg-slate-800 text-white">
                         <th className="text-left px-5 py-3.5 font-semibold sticky left-0 bg-slate-800 min-w-[220px] uppercase tracking-wider text-[11px] border-b border-slate-700">CONTA</th>
-                        {monthCols.map(m => {
+                        {monthCols.map((m, i) => {
                           const [month, year] = m.split("/");
                           return (
-                            <th key={m} className="text-right px-4 py-3.5 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-700" style={{ minWidth: colWidth }}>
-                              {MONTH_NAMES[month]}-{year}
-                            </th>
+                            <React.Fragment key={m}>
+                              {i > 0 && (
+                                <th className="text-center px-2 py-3.5 font-semibold uppercase tracking-wider text-[10px] border-b border-slate-700 text-slate-300" style={{ minWidth: "70px" }}>
+                                  Δ%
+                                </th>
+                              )}
+                              <th className="text-right px-4 py-3.5 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-700" style={{ minWidth: colWidth }}>
+                                {MONTH_NAMES[month]}-{year}
+                              </th>
+                            </React.Fragment>
                           );
                         })}
                         <th className="text-right px-5 py-3.5 font-bold min-w-[120px] uppercase tracking-wider text-[11px] border-b border-slate-700">Total</th>
@@ -830,16 +850,34 @@ export function DreTab({
                                   </span>
                                 </div>
                               </td>
-                              {monthCols.map(m => {
+                              {monthCols.map((m, i) => {
                                 const v = getLineMonthVal(line, m);
+                                const prev = i > 0 ? monthCols[i - 1] : null;
+                                const prevV = prev ? getLineMonthVal(line, prev) : 0;
+                                const variation = prev ? calcVariation(v, prevV) : null;
                                 return (
-                                  <td key={m} className={`text-right px-4 py-3.5 text-[13px] tabular-nums ${
-                                    isCalc
-                                      ? v < 0 ? "text-red-700 font-semibold" : "text-emerald-700 font-semibold"
-                                      : v < 0 ? "text-red-600 dark:text-red-300/60 font-medium" : "text-slate-700 dark:text-slate-300 font-medium"
-                                  }`}>
-                                    {v !== 0 ? fmtVal(v) : ""}
-                                  </td>
+                                  <React.Fragment key={m}>
+                                    {prev && (
+                                      <td className={`text-center px-2 py-3.5 text-[11px] tabular-nums font-medium ${
+                                        variation === null
+                                          ? "text-slate-400"
+                                          : variation > 0
+                                            ? "text-emerald-600"
+                                            : variation < 0
+                                              ? "text-red-500"
+                                              : "text-slate-400"
+                                      }`}>
+                                        {variation === null ? "—" : fmtPct(variation)}
+                                      </td>
+                                    )}
+                                    <td className={`text-right px-4 py-3.5 text-[13px] tabular-nums ${
+                                      isCalc
+                                        ? v < 0 ? "text-red-700 font-semibold" : "text-emerald-700 font-semibold"
+                                        : v < 0 ? "text-red-600 dark:text-red-300/60 font-medium" : "text-slate-700 dark:text-slate-300 font-medium"
+                                    }`}>
+                                      {v !== 0 ? fmtVal(v) : ""}
+                                    </td>
+                                  </React.Fragment>
                                 );
                               })}
                               <td className={`text-right px-5 py-3.5 font-bold text-[14px] tabular-nums ${
@@ -861,14 +899,32 @@ export function DreTab({
                                       {acctData.name}
                                     </div>
                                   </td>
-                                  {monthCols.map(m => {
+                                  {monthCols.map((m, i) => {
                                     const v = acctData.months[m] || 0;
+                                    const prev = i > 0 ? monthCols[i - 1] : null;
+                                    const prevV = prev ? (acctData.months[prev] || 0) : 0;
+                                    const variation = prev ? calcVariation(v, prevV) : null;
                                     return (
-                                      <td key={m} className={`text-right px-4 py-2.5 text-[12px] tabular-nums ${
-                                        v < 0 ? "text-red-500 dark:text-red-300/60 font-medium" : "text-slate-600 dark:text-slate-400"
-                                      }`}>
-                                        {v !== 0 ? fmtVal(v) : ""}
-                                      </td>
+                                      <React.Fragment key={m}>
+                                        {prev && (
+                                          <td className={`text-center px-2 py-2.5 text-[10px] tabular-nums ${
+                                            variation === null
+                                              ? "text-slate-300"
+                                              : variation > 0
+                                                ? "text-emerald-500"
+                                                : variation < 0
+                                                  ? "text-red-400"
+                                                  : "text-slate-300"
+                                          }`}>
+                                            {variation === null ? "—" : fmtPct(variation)}
+                                          </td>
+                                        )}
+                                        <td className={`text-right px-4 py-2.5 text-[12px] tabular-nums ${
+                                          v < 0 ? "text-red-500 dark:text-red-300/60 font-medium" : "text-slate-600 dark:text-slate-400"
+                                        }`}>
+                                          {v !== 0 ? fmtVal(v) : ""}
+                                        </td>
+                                      </React.Fragment>
                                     );
                                   })}
                                   <td className={`text-right px-5 py-2.5 font-semibold text-[13px] tabular-nums ${
