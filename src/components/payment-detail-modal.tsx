@@ -38,7 +38,7 @@ function daysOverdue(dueDate: string): number {
 }
 
 const SectionHeader = ({ children }: { children: React.ReactNode }) => (
-  <h3 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400 mb-2 pb-1 border-b border-slate-200 dark:border-slate-700">
+  <h3 className="text-[11px] font-bold uppercase tracking-widest text-blue-700 dark:text-blue-300 mb-3 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 border-l-[3px] border-blue-500 dark:border-blue-400 rounded-r-md">
     {children}
   </h3>
 );
