@@ -3,9 +3,11 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { fetchCubRows } from "@/lib/indicadores/cub-scraper";
 import { fetchDebitRows, type IndicadorDebitSlug } from "@/lib/indicadores/debit-scraper";
+import { fetchValorM2Rows } from "@/lib/indicadores/valor-m2-scraper";
 import {
   upsertIndicadoresCub,
   upsertIndicadoresDebit,
+  upsertIndicadoresValorM2,
 } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -37,6 +39,13 @@ async function syncDebit(slug: IndicadorDebitSlug) {
   return { inseridos, ultimo: labelMesAno(ultimo.ano, ultimo.mes) };
 }
 
+async function syncValorM2() {
+  const { rows, referencia } = await fetchValorM2Rows();
+  if (rows.length === 0) throw new Error("Scraper Valor m² retornou 0 linhas");
+  const inseridos = await upsertIndicadoresValorM2(rows);
+  return { inseridos, ultimo: referencia ?? "—" };
+}
+
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -59,6 +68,10 @@ export async function POST(request: Request) {
     }
     if (indicador === "cdi" || indicador === "ipca" || indicador === "igpm") {
       const r = await syncDebit(indicador);
+      return NextResponse.json({ ok: true, ...r });
+    }
+    if (indicador === "valorm2") {
+      const r = await syncValorM2();
       return NextResponse.json({ ok: true, ...r });
     }
     return NextResponse.json(

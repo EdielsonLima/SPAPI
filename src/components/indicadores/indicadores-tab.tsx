@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { CubIndicadorRow, PctIndicadorRow } from "@/lib/db";
+import type { CubIndicadorRow, PctIndicadorRow, ValorM2Row } from "@/lib/db";
 import { CubContent, type CubKpis } from "./cub-content";
 import { PctIndicadorContent, type PctKpis } from "./pct-indicador-content";
+import { ValorM2Content, type ValorM2Kpis } from "./valor-m2-content";
 
 type ApiResponse = {
   cub: {
@@ -32,9 +33,15 @@ type ApiResponse = {
     atualizadoEm: string | null;
     stale: boolean;
   };
+  valorM2: {
+    rows: ValorM2Row[];
+    kpis: ValorM2Kpis;
+    atualizadoEm: string | null;
+    stale: boolean;
+  };
 };
 
-type SubTab = "cub" | "cdi" | "ipca" | "igpm";
+type SubTab = "cub" | "cdi" | "ipca" | "igpm" | "valorm2";
 
 export function IndicadoresTab() {
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -73,6 +80,7 @@ export function IndicadoresTab() {
     if (data.cdi.stale) targets.push("cdi");
     if (data.ipca.stale) targets.push("ipca");
     if (data.igpm.stale) targets.push("igpm");
+    if (data.valorM2.stale) targets.push("valorm2");
     if (targets.length === 0) return;
 
     Promise.allSettled(
@@ -93,6 +101,7 @@ export function IndicadoresTab() {
     { value: "cdi", label: "CDI", color: "border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" },
     { value: "ipca", label: "IPCA", color: "border-amber-500 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30" },
     { value: "igpm", label: "IGP-M", color: "border-violet-500 text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30" },
+    { value: "valorm2", label: "Valor m²", color: "border-rose-500 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30" },
   ];
 
   return (
@@ -184,6 +193,14 @@ export function IndicadoresTab() {
           rows={data.igpm.rows}
           kpis={data.igpm.kpis}
           atualizadoEm={data.igpm.atualizadoEm}
+          onSynced={load}
+        />
+      )}
+      {data && active === "valorm2" && (
+        <ValorM2Content
+          rows={data.valorM2.rows}
+          kpis={data.valorM2.kpis}
+          atualizadoEm={data.valorM2.atualizadoEm}
           onSynced={load}
         />
       )}

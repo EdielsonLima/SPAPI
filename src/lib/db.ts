@@ -896,6 +896,75 @@ export async function upsertIndicadoresCub(
   }
 }
 
+export type ValorM2Row = {
+  cidade: string;
+  uf: string;
+  posicao: number;
+  valor_m2: number;
+  variacao_12m_pct: number | null;
+  referencia: string | null;
+  atualizado_em: string;
+};
+
+export async function getIndicadoresValorM2(): Promise<ValorM2Row[]> {
+  const { rows } = await pool.query(
+    `SELECT cidade, uf, posicao, valor_m2, variacao_12m_pct, referencia, atualizado_em
+       FROM indices_valor_m2
+       ORDER BY posicao ASC, valor_m2 DESC`
+  );
+  return rows.map((r: Record<string, unknown>) => ({
+    cidade: String(r.cidade ?? ""),
+    uf: String(r.uf ?? ""),
+    posicao: Number(r.posicao),
+    valor_m2: toNum(r.valor_m2),
+    variacao_12m_pct: toNumOrNull(r.variacao_12m_pct),
+    referencia: r.referencia ? String(r.referencia) : null,
+    atualizado_em: r.atualizado_em instanceof Date
+      ? r.atualizado_em.toISOString()
+      : String(r.atualizado_em ?? ""),
+  }));
+}
+
+export async function upsertIndicadoresValorM2(
+  rows: {
+    cidade: string;
+    uf: string;
+    posicao: number;
+    valor_m2: number;
+    variacao_12m_pct: number | null;
+    referencia: string | null;
+  }[]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    // Apaga o snapshot anterior — cada sync substitui o conjunto.
+    await client.query(`DELETE FROM indices_valor_m2`);
+    for (const r of rows) {
+      await client.query(
+        `INSERT INTO indices_valor_m2
+           (cidade, uf, posicao, valor_m2, variacao_12m_pct, referencia, atualizado_em)
+         VALUES ($1,$2,$3,$4,$5,$6,NOW())
+         ON CONFLICT (cidade, uf) DO UPDATE SET
+           posicao = EXCLUDED.posicao,
+           valor_m2 = EXCLUDED.valor_m2,
+           variacao_12m_pct = EXCLUDED.variacao_12m_pct,
+           referencia = EXCLUDED.referencia,
+           atualizado_em = NOW()`,
+        [r.cidade, r.uf, r.posicao, r.valor_m2, r.variacao_12m_pct, r.referencia]
+      );
+    }
+    await client.query("COMMIT");
+    return rows.length;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export async function upsertIndicadoresDebit(
   slug: DebitSlug,
   rows: {

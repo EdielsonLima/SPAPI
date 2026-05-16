@@ -282,3 +282,17 @@ CREATE TABLE IF NOT EXISTS indices_igpm (
   atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(ano, mes)
 );
+
+-- Valorização m² por cidade (FipeZAP via myside.com.br)
+-- Snapshot do informe mais recente. Cada sync substitui o conjunto.
+CREATE TABLE IF NOT EXISTS indices_valor_m2 (
+  id               SERIAL PRIMARY KEY,
+  cidade           TEXT NOT NULL,
+  uf               TEXT NOT NULL,
+  posicao          INT NOT NULL,
+  valor_m2         NUMERIC(18,2) NOT NULL,
+  variacao_12m_pct NUMERIC(8,4),
+  referencia       TEXT,
+  atualizado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(cidade, uf)
+);

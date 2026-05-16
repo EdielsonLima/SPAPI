@@ -4,8 +4,10 @@ import { authOptions } from "@/lib/auth";
 import {
   getIndicadoresCub,
   getIndicadoresDebit,
+  getIndicadoresValorM2,
   type CubIndicadorRow,
   type PctIndicadorRow,
+  type ValorM2Row,
 } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -76,6 +78,36 @@ function maxAtualizadoEm(rows: { atualizado_em: string }[]): string | null {
   return max;
 }
 
+function buildValorM2Kpis(rows: ValorM2Row[]) {
+  if (rows.length === 0) {
+    return {
+      maisCaro: null,
+      maiorValorizacao: null,
+      totalCidades: 0,
+      referencia: null,
+    };
+  }
+  const ordPorValor = [...rows].sort((a, b) => b.valor_m2 - a.valor_m2);
+  const maisCaro = ordPorValor[0];
+  const comVar = rows.filter((r) => r.variacao_12m_pct !== null);
+  const ordPorVar = [...comVar].sort(
+    (a, b) => (b.variacao_12m_pct ?? 0) - (a.variacao_12m_pct ?? 0)
+  );
+  const maiorValorizacao = ordPorVar[0] ?? null;
+  return {
+    maisCaro: { cidade: maisCaro.cidade, uf: maisCaro.uf, valor: maisCaro.valor_m2 },
+    maiorValorizacao: maiorValorizacao
+      ? {
+          cidade: maiorValorizacao.cidade,
+          uf: maiorValorizacao.uf,
+          variacao: maiorValorizacao.variacao_12m_pct ?? 0,
+        }
+      : null,
+    totalCidades: rows.length,
+    referencia: rows[0].referencia,
+  };
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) {
@@ -83,17 +115,19 @@ export async function GET() {
   }
 
   try {
-    const [cubRows, cdiRows, ipcaRows, igpmRows] = await Promise.all([
+    const [cubRows, cdiRows, ipcaRows, igpmRows, valorM2Rows] = await Promise.all([
       getIndicadoresCub(),
       getIndicadoresDebit("cdi"),
       getIndicadoresDebit("ipca"),
       getIndicadoresDebit("igpm"),
+      getIndicadoresValorM2(),
     ]);
 
     const cubAtu = maxAtualizadoEm(cubRows);
     const cdiAtu = maxAtualizadoEm(cdiRows);
     const ipcaAtu = maxAtualizadoEm(ipcaRows);
     const igpmAtu = maxAtualizadoEm(igpmRows);
+    const valorM2Atu = maxAtualizadoEm(valorM2Rows);
 
     return NextResponse.json({
       cub: {
@@ -119,6 +153,12 @@ export async function GET() {
         kpis: buildPctKpis(igpmRows),
         atualizadoEm: igpmAtu,
         stale: isStale(igpmAtu ?? undefined),
+      },
+      valorM2: {
+        rows: valorM2Rows,
+        kpis: buildValorM2Kpis(valorM2Rows),
+        atualizadoEm: valorM2Atu,
+        stale: isStale(valorM2Atu ?? undefined),
       },
     });
   } catch (err) {
