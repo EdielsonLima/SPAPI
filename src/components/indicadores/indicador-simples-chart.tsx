@@ -151,9 +151,9 @@ export function IndicadorSimplesChart({
                 if (format === "pct") {
                   return `${n.toFixed(2).replace(".", ",")}%`;
                 }
-                return new Intl.NumberFormat("pt-BR", {
+                return `R$ ${new Intl.NumberFormat("pt-BR", {
                   maximumFractionDigits: 0,
-                }).format(n);
+                }).format(n)}`;
               }}
             />
           </Area>
