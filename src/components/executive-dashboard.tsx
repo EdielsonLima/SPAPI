@@ -4224,7 +4224,7 @@ export function ExecutiveDashboard() {
         const compactCharts = cpCrTabs.includes(activeTab);
         const chartHeight = compactCharts ? 360 : 480;
         const companyChartHeight = compactCharts
-          ? Math.max(280, Math.min(360, companyChart.length * 24))
+          ? Math.max(360, companyChart.length * 36)
           : Math.max(480, companyChart.length * 44);
         return (
       <div className={`grid lg:grid-cols-5 ${compactCharts ? "gap-3" : "gap-6"}`}>
@@ -4272,7 +4272,7 @@ export function ExecutiveDashboard() {
                   <Bar
                     dataKey="value"
                     radius={[0, 4, 4, 0]}
-                    maxBarSize={24}
+                    maxBarSize={32}
                   >
                     {companyChart.map((entry, idx) => (
                       <Cell key={idx} fill={barColorFn(idx)} />
