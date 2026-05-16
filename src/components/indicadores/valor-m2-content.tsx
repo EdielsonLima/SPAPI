@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, RefreshCcw, MapPin, TrendingUp, Building2 } from "lucide-react";
+import { Loader2, RefreshCcw, MapPin, TrendingUp, Building2, BarChart3, BarChartHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import {
   Bar,
@@ -77,6 +77,7 @@ export function ValorM2Content({
   onSynced: () => void;
 }) {
   const [syncing, setSyncing] = useState(false);
+  const [chartLayout, setChartLayout] = useState<"barras" | "colunas">("barras");
 
   const handleSync = async () => {
     setSyncing(true);
@@ -123,7 +124,8 @@ export function ValorM2Content({
     return mixHex("#8b5cf6", "#ec4899", k);
   };
 
-  const chartHeight = Math.max(280, rows.length * 32);
+  const chartHeight =
+    chartLayout === "barras" ? Math.max(280, rows.length * 32) : 420;
 
   return (
     <div className="space-y-5">
@@ -193,20 +195,50 @@ export function ValorM2Content({
 
       <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
         <CardContent className="p-4 space-y-4">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
-              R$/m² por cidade
-            </h3>
-            <span className="text-[11px] text-slate-500 dark:text-slate-400">
-              ({rows.length} cidades)
-            </span>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                R$/m² por cidade
+              </h3>
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                ({rows.length} cidades)
+              </span>
+            </div>
+            <div className="inline-flex items-center rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-0.5">
+              <button
+                type="button"
+                onClick={() => setChartLayout("barras")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                  chartLayout === "barras"
+                    ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                }`}
+                title="Barras horizontais"
+              >
+                <BarChartHorizontal className="h-3.5 w-3.5" />
+                Barras
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartLayout("colunas")}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                  chartLayout === "colunas"
+                    ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-sm"
+                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                }`}
+                title="Colunas verticais"
+              >
+                <BarChart3 className="h-3.5 w-3.5" />
+                Colunas
+              </button>
+            </div>
           </div>
           {chartData.length === 0 ? (
             <div className="flex items-center justify-center h-64 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500">
               Sem dados. Clique em <strong className="mx-1">Atualizar Valor m²</strong> para carregar.
             </div>
-          ) : (
+          ) : chartLayout === "barras" ? (
             <div style={{ width: "100%", height: chartHeight }}>
               <ResponsiveContainer>
                 <BarChart
@@ -253,6 +285,61 @@ export function ValorM2Content({
                         }).format(Number(v))
                       }
                       style={{ fontSize: 11, fontWeight: 600 }}
+                      className="fill-slate-700 dark:fill-slate-200"
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div style={{ width: "100%", height: chartHeight }}>
+              <ResponsiveContainer>
+                <BarChart
+                  data={chartData}
+                  margin={{ top: 24, right: 16, left: 8, bottom: 80 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" vertical={false} />
+                  <XAxis
+                    type="category"
+                    dataKey="label"
+                    interval={0}
+                    angle={-35}
+                    textAnchor="end"
+                    tick={{ fontSize: 10 }}
+                    axisLine={false}
+                    tickLine={false}
+                    className="text-slate-600 dark:text-slate-300"
+                    height={80}
+                  />
+                  <YAxis
+                    type="number"
+                    tick={{ fontSize: 10 }}
+                    tickFormatter={(v) =>
+                      new Intl.NumberFormat("pt-BR", {
+                        notation: "compact",
+                        maximumFractionDigits: 1,
+                      }).format(Number(v))
+                    }
+                    axisLine={false}
+                    tickLine={false}
+                    className="text-slate-500 dark:text-slate-400"
+                    width={50}
+                  />
+                  <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(148,163,184,0.08)" }} />
+                  <Bar dataKey="valor_m2" radius={[4, 4, 0, 0]} maxBarSize={56}>
+                    {chartData.map((_, idx) => (
+                      <Cell key={idx} fill={corBarra(idx, chartData.length)} />
+                    ))}
+                    <LabelList
+                      dataKey="valor_m2"
+                      position="top"
+                      formatter={(v: unknown) =>
+                        new Intl.NumberFormat("pt-BR", {
+                          notation: "compact",
+                          maximumFractionDigits: 1,
+                        }).format(Number(v))
+                      }
+                      style={{ fontSize: 10, fontWeight: 600 }}
                       className="fill-slate-700 dark:fill-slate-200"
                     />
                   </Bar>
