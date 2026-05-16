@@ -77,7 +77,7 @@ export function ValorM2Content({
   onSynced: () => void;
 }) {
   const [syncing, setSyncing] = useState(false);
-  const [chartLayout, setChartLayout] = useState<"barras" | "colunas">("barras");
+  const [chartLayout, setChartLayout] = useState<"barras" | "colunas">("colunas");
 
   const handleSync = async () => {
     setSyncing(true);
@@ -296,20 +296,18 @@ export function ValorM2Content({
               <ResponsiveContainer>
                 <BarChart
                   data={chartData}
-                  margin={{ top: 24, right: 16, left: 8, bottom: 80 }}
+                  margin={{ top: 28, right: 16, left: 8, bottom: 56 }}
+                  barCategoryGap="8%"
                 >
                   <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200 dark:stroke-slate-700" vertical={false} />
                   <XAxis
                     type="category"
                     dataKey="label"
                     interval={0}
-                    angle={-35}
-                    textAnchor="end"
-                    tick={{ fontSize: 10 }}
+                    tick={<TwoLineCityTick />}
                     axisLine={false}
                     tickLine={false}
-                    className="text-slate-600 dark:text-slate-300"
-                    height={80}
+                    height={56}
                   />
                   <YAxis
                     type="number"
@@ -326,7 +324,7 @@ export function ValorM2Content({
                     width={50}
                   />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(148,163,184,0.08)" }} />
-                  <Bar dataKey="valor_m2" radius={[4, 4, 0, 0]} maxBarSize={56}>
+                  <Bar dataKey="valor_m2" radius={[6, 6, 0, 0]} maxBarSize={120}>
                     {chartData.map((_, idx) => (
                       <Cell key={idx} fill={corBarra(idx, chartData.length)} />
                     ))}
@@ -339,7 +337,7 @@ export function ValorM2Content({
                           maximumFractionDigits: 1,
                         }).format(Number(v))
                       }
-                      style={{ fontSize: 10, fontWeight: 600 }}
+                      style={{ fontSize: 11, fontWeight: 700 }}
                       className="fill-slate-700 dark:fill-slate-200"
                     />
                   </Bar>
@@ -420,6 +418,33 @@ export function ValorM2Content({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+// ── Tick customizado do XAxis: cidade na primeira linha, (UF) na segunda
+function TwoLineCityTick(props: {
+  x?: number;
+  y?: number;
+  payload?: { value?: string };
+}) {
+  const { x = 0, y = 0, payload } = props;
+  const text = String(payload?.value ?? "");
+  const m = text.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+  const cidade = m ? m[1] : text;
+  const uf = m ? m[2] : "";
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text textAnchor="middle" className="fill-slate-600 dark:fill-slate-300">
+        <tspan x={0} dy={14} fontSize={11} fontWeight={600}>
+          {cidade}
+        </tspan>
+        {uf && (
+          <tspan x={0} dy={14} fontSize={10} className="fill-slate-400 dark:fill-slate-500">
+            ({uf})
+          </tspan>
+        )}
+      </text>
+    </g>
   );
 }
 
