@@ -2570,7 +2570,7 @@ export function ExecutiveDashboard() {
                   ? "bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md ring-2 ring-amber-300 dark:ring-amber-500/50"
                   : "text-slate-500 hover:text-slate-700"
               }`}
-              title="CUB-SC, CDI, IPCA e IGP-M"
+              title="CUB-SC, CDI, IPCA, IGP-M e INCC"
             >
               <TrendingUp className="h-3.5 w-3.5" />
               Indicadores

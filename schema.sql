@@ -283,6 +283,16 @@ CREATE TABLE IF NOT EXISTS indices_igpm (
   UNIQUE(ano, mes)
 );
 
+CREATE TABLE IF NOT EXISTS indices_incc (
+  id                SERIAL PRIMARY KEY,
+  ano               INT NOT NULL,
+  mes               INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  variacao_pct      NUMERIC(8,4) NOT NULL,
+  acumulado_12m_pct NUMERIC(8,4),
+  atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(ano, mes)
+);
+
 -- Valorização m² por cidade (FipeZAP via myside.com.br)
 -- Snapshot do informe mais recente. Cada sync substitui o conjunto.
 CREATE TABLE IF NOT EXISTS indices_valor_m2 (

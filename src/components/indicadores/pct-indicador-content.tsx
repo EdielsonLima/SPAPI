@@ -30,7 +30,7 @@ export function PctIndicadorContent({
   onSynced,
 }: {
   nome: string;
-  slug: "cdi" | "ipca" | "igpm";
+  slug: "cdi" | "ipca" | "igpm" | "incc";
   descricaoFonte: string;
   urlFonte: string;
   labelValor: string;

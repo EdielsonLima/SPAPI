@@ -806,11 +806,12 @@ export type PctIndicadorRow = {
   atualizado_em: string;
 };
 
-export type DebitSlug = "cdi" | "ipca" | "igpm";
+export type DebitSlug = "cdi" | "ipca" | "igpm" | "incc";
 const DEBIT_TABLE: Record<DebitSlug, string> = {
   cdi: "indices_cdi",
   ipca: "indices_ipca",
   igpm: "indices_igpm",
+  incc: "indices_incc",
 };
 
 function toNum(v: unknown): number {

@@ -33,6 +33,12 @@ type ApiResponse = {
     atualizadoEm: string | null;
     stale: boolean;
   };
+  incc: {
+    rows: PctIndicadorRow[];
+    kpis: PctKpis;
+    atualizadoEm: string | null;
+    stale: boolean;
+  };
   valorM2: {
     rows: ValorM2Row[];
     kpis: ValorM2Kpis;
@@ -41,7 +47,7 @@ type ApiResponse = {
   };
 };
 
-type SubTab = "cub" | "cdi" | "ipca" | "igpm" | "valorm2";
+type SubTab = "cub" | "cdi" | "ipca" | "igpm" | "incc" | "valorm2";
 
 export function IndicadoresTab() {
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -80,6 +86,7 @@ export function IndicadoresTab() {
     if (data.cdi.stale) targets.push("cdi");
     if (data.ipca.stale) targets.push("ipca");
     if (data.igpm.stale) targets.push("igpm");
+    if (data.incc.stale) targets.push("incc");
     if (data.valorM2.stale) targets.push("valorm2");
     if (targets.length === 0) return;
 
@@ -101,6 +108,7 @@ export function IndicadoresTab() {
     { value: "cdi", label: "CDI", color: "border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" },
     { value: "ipca", label: "IPCA", color: "border-amber-500 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30" },
     { value: "igpm", label: "IGP-M", color: "border-violet-500 text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30" },
+    { value: "incc", label: "INCC", color: "border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30" },
     { value: "valorm2", label: "Valor m²", color: "border-rose-500 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30" },
   ];
 
@@ -193,6 +201,20 @@ export function IndicadoresTab() {
           rows={data.igpm.rows}
           kpis={data.igpm.kpis}
           atualizadoEm={data.igpm.atualizadoEm}
+          onSynced={load}
+        />
+      )}
+      {data && active === "incc" && (
+        <PctIndicadorContent
+          nome="INCC"
+          slug="incc"
+          descricaoFonte="debit.com.br"
+          urlFonte="https://debit.com.br/tabelas/tabela-completa.php?indice=incc"
+          labelValor="INCC mensal"
+          color="#f97316"
+          rows={data.incc.rows}
+          kpis={data.incc.kpis}
+          atualizadoEm={data.incc.atualizadoEm}
           onSynced={load}
         />
       )}

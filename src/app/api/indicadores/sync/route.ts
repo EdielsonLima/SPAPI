@@ -66,7 +66,12 @@ export async function POST(request: Request) {
       const r = await syncCub();
       return NextResponse.json({ ok: true, ...r });
     }
-    if (indicador === "cdi" || indicador === "ipca" || indicador === "igpm") {
+    if (
+      indicador === "cdi" ||
+      indicador === "ipca" ||
+      indicador === "igpm" ||
+      indicador === "incc"
+    ) {
       const r = await syncDebit(indicador);
       return NextResponse.json({ ok: true, ...r });
     }

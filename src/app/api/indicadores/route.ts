@@ -115,11 +115,12 @@ export async function GET() {
   }
 
   try {
-    const [cubRows, cdiRows, ipcaRows, igpmRows, valorM2Rows] = await Promise.all([
+    const [cubRows, cdiRows, ipcaRows, igpmRows, inccRows, valorM2Rows] = await Promise.all([
       getIndicadoresCub(),
       getIndicadoresDebit("cdi"),
       getIndicadoresDebit("ipca"),
       getIndicadoresDebit("igpm"),
+      getIndicadoresDebit("incc"),
       getIndicadoresValorM2(),
     ]);
 
@@ -127,6 +128,7 @@ export async function GET() {
     const cdiAtu = maxAtualizadoEm(cdiRows);
     const ipcaAtu = maxAtualizadoEm(ipcaRows);
     const igpmAtu = maxAtualizadoEm(igpmRows);
+    const inccAtu = maxAtualizadoEm(inccRows);
     const valorM2Atu = maxAtualizadoEm(valorM2Rows);
 
     return NextResponse.json({
@@ -153,6 +155,12 @@ export async function GET() {
         kpis: buildPctKpis(igpmRows),
         atualizadoEm: igpmAtu,
         stale: isStale(igpmAtu ?? undefined),
+      },
+      incc: {
+        rows: inccRows,
+        kpis: buildPctKpis(inccRows),
+        atualizadoEm: inccAtu,
+        stale: isStale(inccAtu ?? undefined),
       },
       valorM2: {
         rows: valorM2Rows,

@@ -1,4 +1,4 @@
-export type IndicadorDebitSlug = "cdi" | "ipca" | "igpm";
+export type IndicadorDebitSlug = "cdi" | "ipca" | "igpm" | "incc";
 
 export type IndicadorRow = {
   ano: number;
