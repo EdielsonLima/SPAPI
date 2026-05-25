@@ -10,8 +10,16 @@
 const fs = require("fs");
 const path = require("path");
 
-const EXCEL_PATH =
-  "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/SP/DEMOSTRATIVO RESULTADO COMPLETO.xlsx";
+const EXCEL_PATHS = [
+  {
+    label: "Silva Packer",
+    path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/SP/DEMOSTRATIVO RESULTADO COMPLETO.xlsx",
+  },
+  {
+    label: "Holding",
+    path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/HOLDING/DEMOSTRATIVO RESULTADO COMPLETO.xlsx",
+  },
+];
 
 const PROD_URL = "https://spapi-production.up.railway.app";
 const LOCAL_URL = "http://localhost:3000";
@@ -37,10 +45,10 @@ function log(msg) {
   console.log(`[${ts}] ${msg}`);
 }
 
-function parseExcel(year) {
+function parseExcel(year, excelPath) {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const XLSX = require("xlsx");
-  const fileBuffer = fs.readFileSync(EXCEL_PATH);
+  const fileBuffer = fs.readFileSync(excelPath);
   const wb = XLSX.read(fileBuffer);
   const ws = wb.Sheets[wb.SheetNames[0]];
   const data = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
@@ -117,8 +125,8 @@ function parseExcel(year) {
   return companyAccounts;
 }
 
-async function syncYear(year, targetUrl) {
-  const accounts = parseExcel(year);
+async function syncYear(year, targetUrl, excelPath) {
+  const accounts = parseExcel(year, excelPath);
   if (accounts.length === 0) {
     log(`  ${year}: no data`);
     return 0;
@@ -144,15 +152,6 @@ async function syncYear(year, targetUrl) {
 async function main() {
   log("=== DRE Excel Sync Started ===");
 
-  // Check Excel file exists
-  if (!fs.existsSync(EXCEL_PATH)) {
-    log(`ERROR: Excel file not found: ${EXCEL_PATH}`);
-    process.exit(1);
-  }
-
-  const stat = fs.statSync(EXCEL_PATH);
-  log(`Excel file last modified: ${stat.mtime.toISOString()}`);
-
   // Determine target URL (production by default, local with --local flag)
   const isLocal = process.argv.includes("--local");
   const targetUrl = isLocal ? LOCAL_URL : PROD_URL;
@@ -168,17 +167,32 @@ async function main() {
     process.exit(1);
   }
 
-  // Sync current year and previous years
   const currentYear = new Date().getFullYear();
   const years = [];
   for (let y = 2020; y <= currentYear; y++) years.push(String(y));
 
-  let totalRecords = 0;
-  for (const year of years) {
-    totalRecords += await syncYear(year, targetUrl);
+  let grandTotal = 0;
+  const excelStats = [];
+
+  for (const { label, path: excelPath } of EXCEL_PATHS) {
+    if (!fs.existsSync(excelPath)) {
+      log(`WARN: Excel "${label}" not found: ${excelPath} — skipping`);
+      continue;
+    }
+
+    const stat = fs.statSync(excelPath);
+    log(`--- ${label} (modified: ${stat.mtime.toISOString()}) ---`);
+
+    let subtotal = 0;
+    for (const year of years) {
+      subtotal += await syncYear(year, targetUrl, excelPath);
+    }
+    log(`  ${label}: ${subtotal} records`);
+    grandTotal += subtotal;
+    excelStats.push({ label, modified: stat.mtime.toISOString(), records: subtotal });
   }
 
-  log(`=== Sync Complete: ${totalRecords} total records across ${years.length} years ===`);
+  log(`=== Sync Complete: ${grandTotal} total records across ${years.length} years ===`);
 
   // Write last sync timestamp for monitoring
   const logDir = path.join(__dirname, "..");
@@ -186,9 +200,9 @@ async function main() {
   fs.writeFileSync(logFile, JSON.stringify({
     lastSync: new Date().toISOString(),
     target: targetUrl,
-    totalRecords,
+    totalRecords: grandTotal,
     years,
-    excelModified: stat.mtime.toISOString(),
+    sources: excelStats,
   }, null, 2));
 }
 

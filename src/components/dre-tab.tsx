@@ -21,6 +21,7 @@ import {
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import { toast } from "sonner";
+import { useCompanyMode } from "@/lib/company-context";
 
 interface DreMappingItem {
   financialPlanId: string;
@@ -147,7 +148,12 @@ export function DreTab({
   refreshKey = 0,
   dataSource = "excel",
 }: DreTabProps) {
+  const { isHolding, holdingName } = useCompanyMode();
   const dreEndpoint = dataSource === "api" ? "/api/dre-api" : "/api/dre-supplementary";
+  // No modo Holding: filtra SÓ pela Holding. No modo SP: exclui a Holding.
+  const dreCompanyQuery = isHolding
+    ? `&companies=${encodeURIComponent(holdingName)}`
+    : `&excludeCompanies=${encodeURIComponent(holdingName)}`;
   const [dreMappings, setDreMappings] = useState<Record<string, DreMappingItem[]>>({});
   const [loadingMappings, setLoadingMappings] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -201,7 +207,7 @@ export function DreTab({
 
     Promise.all(
       years.map(year =>
-        fetch(`${dreEndpoint}?year=${year}&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}`, { cache: "no-store" })
+        fetch(`${dreEndpoint}?year=${year}${dreCompanyQuery}`, { cache: "no-store" })
           .then(r => r.ok ? r.json() : null)
           .catch(() => null)
       )
@@ -223,7 +229,7 @@ export function DreTab({
         setExcelSupplementary(merged);
       }
     });
-  }, [selectedYears, refreshKey, localRefreshKey, dreEndpoint]);
+  }, [selectedYears, refreshKey, localRefreshKey, dreEndpoint, dreCompanyQuery]);
 
   // Fetch monthly breakdown for DRE Completa view
   // Also fetches ALL companies (no filter) to match Power BI
@@ -240,7 +246,7 @@ export function DreTab({
 
     Promise.all(
       years.map(year =>
-        fetch(`${dreEndpoint}?year=${year}&monthly=true&excludeCompanies=${encodeURIComponent("SILVA ADMINISTRADORA HOLDING LTDA")}${monthsQuery}`, { cache: "no-store" })
+        fetch(`${dreEndpoint}?year=${year}&monthly=true${dreCompanyQuery}${monthsQuery}`, { cache: "no-store" })
           .then(r => {
             if (!r.ok) {
               console.error(`DRE Completa fetch error: ${r.status} for year ${year}`);
@@ -276,7 +282,7 @@ export function DreTab({
       console.error("DRE Completa processing error:", err);
       setMonthlyData(null);
     }).finally(() => setLoadingMonthly(false));
-  }, [dreMode, selectedYears, selectedMonths, refreshKey, localRefreshKey, dreEndpoint]);
+  }, [dreMode, selectedYears, selectedMonths, refreshKey, localRefreshKey, dreEndpoint, dreCompanyQuery]);
 
   const toggleExpand = useCallback((key: string) => {
     setExpandedCategories(prev => {

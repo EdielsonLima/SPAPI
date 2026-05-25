@@ -66,6 +66,7 @@ import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
 import { CalendarioPagamentoTab } from "@/components/calendario-pagamento-tab";
 import { CalendarioRecebimentoTab } from "@/components/calendario-recebimento-tab";
+import { useCompanyMode } from "@/lib/company-context";
 
 type Section = "cp" | "cr";
 type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "comercial" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores";
@@ -360,6 +361,7 @@ function FactorInput({
 
 export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
+  const { isHolding, holdingName } = useCompanyMode();
   // Detecta tema para ajustar cores dos charts SVG (não respondem a CSS dark:).
   // Dark mode usa vermelho/cinza mais claros pra reduzir contraste.
   const { resolvedTheme } = useTheme();
@@ -579,15 +581,32 @@ export function ExecutiveDashboard() {
   };
 
   // === Exclui itens inconsistentes para bater com relatório Sienge ===
+  // Filtra também pelo modo empresa (SP: exclui Holding; Holding: só Holding)
+  const companyModeFilter = useCallback((companyName: string) => {
+    if (isHolding) return companyName === holdingName;
+    return companyName !== holdingName;
+  }, [isHolding, holdingName]);
+
   const consistentItems = useMemo(() =>
     items.filter(i =>
+      companyModeFilter(i.companyName) &&
       i.consistencyStatus !== 'N' &&
       !isExcludedFinancialDocType(i.documentIdentificationName, i.forecastDocument) &&
       !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
-    ), [items, exclusionSet]);
+    ), [items, exclusionSet, companyModeFilter]);
 
   const consistentIncome = useMemo(() =>
     incomeItems.filter(i => {
+      if (!companyModeFilter(i.companyName)) return false;
+      // No modo Holding, NÃO exclui LNC/LOC (são aluguéis)
+      if (isHolding) {
+        return !isExcludedFinancialDocType(
+          i.documentIdentificationName,
+          (i as { forecastDocument?: string | null }).forecastDocument,
+          { excludeLocacao: false }
+        ) &&
+        !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`));
+      }
       const keepExcludedDoc = shouldKeepIncomeExcludedDoc(i.companyId, i.billId, i.installmentId);
       return !isExcludedFinancialDocType(
         i.documentIdentificationName,
@@ -595,7 +614,7 @@ export function ExecutiveDashboard() {
         { excludeLocacao: !keepExcludedDoc }
       ) &&
       !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`));
-    }), [incomeItems, exclusionSet]);
+    }), [incomeItems, exclusionSet, companyModeFilter, isHolding]);
 
   // Active data source based on section
   const activeItems = section === "cr" ? consistentIncome : consistentItems;
@@ -852,7 +871,9 @@ export function ExecutiveDashboard() {
   }, [activeItems]);
 
   // Empresas administrativas/holding excluídas por padrão (não são obras)
+  // No modo Holding só tem 1 empresa, nada é excluído
   const isExcludedCompany = (name: string) => {
+    if (isHolding) return false;
     const upper = name.toUpperCase();
     return upper.includes("HOLDING") || upper.includes("ADMINISTRADORA") ||
       upper.includes("CONSTRUTORA") || upper.includes("EMPREENDIMENTOS") ||
@@ -863,6 +884,20 @@ export function ExecutiveDashboard() {
     new Set(allCompanyNames.filter(n => !isExcludedCompany(n))),
     [allCompanyNames]
   );
+
+  // Reset company filter and redirect from invalid tabs when mode changes
+  const prevMode = useRef(isHolding);
+  useEffect(() => {
+    if (prevMode.current !== isHolding) {
+      prevMode.current = isHolding;
+      companiesInitialized.current = false;
+      setSelectedCompanies(new Set());
+      // Holding não tem Orçamento/Comercial — redireciona pra Geral
+      if (isHolding && (activeTab === "orcamento" || activeTab === "comercial")) {
+        setActiveTab("visao-geral");
+      }
+    }
+  }, [isHolding, activeTab]);
 
   // Auto-initialize company filter from localStorage or excluding admin/holding companies
   const companiesInitialized = useRef(false);
@@ -893,7 +928,8 @@ export function ExecutiveDashboard() {
   // lançamentos contábeis internos da HOLDING — Sienge "Contas Recebidas"
   // não conta no Líquido. Validado 2026-05-08 contra PDF TETRA Total geral.
   const isExcludedDocType = (t: string) => {
-    return isExcludedFinancialDocType(t, null, { excludeLocacao: section === "cr" });
+    // No modo Holding, LNC/LOC são aluguéis — não excluir
+    return isExcludedFinancialDocType(t, null, { excludeLocacao: section === "cr" && !isHolding });
   };
 
   const allDocTypes = useMemo(() => {
@@ -2420,7 +2456,9 @@ export function ExecutiveDashboard() {
         <div className="flex items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-800">Painel Executivo</h1>
-            <p className="text-slate-500 mt-1">Visao consolidada das contas</p>
+            <p className="text-slate-500 mt-1">
+              {isHolding ? "Visao consolidada da Holding" : "Visao consolidada do empreendimento"}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -2488,34 +2526,38 @@ export function ExecutiveDashboard() {
               <ArrowDownLeft className="h-3.5 w-3.5" />
               CR
             </button>
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("orcamento");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "orcamento"
-                  ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-md ring-2 ring-purple-300 dark:ring-purple-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <Ruler className="h-3.5 w-3.5" />
-              Orçamento
-            </button>
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("comercial");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "comercial"
-                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-md ring-2 ring-indigo-300 dark:ring-indigo-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <Handshake className="h-3.5 w-3.5" />
-              Comercial
-            </button>
+            {!isHolding && (
+              <button
+                onClick={() => {
+                  setSection("cp");
+                  switchTab("orcamento");
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  activeTab === "orcamento"
+                    ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-md ring-2 ring-purple-300 dark:ring-purple-500/50"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Ruler className="h-3.5 w-3.5" />
+                Orçamento
+              </button>
+            )}
+            {!isHolding && (
+              <button
+                onClick={() => {
+                  setSection("cp");
+                  switchTab("comercial");
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  activeTab === "comercial"
+                    ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-md ring-2 ring-indigo-300 dark:ring-indigo-500/50"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Handshake className="h-3.5 w-3.5" />
+                Comercial
+              </button>
+            )}
             <button
               onClick={() => {
                 setSection("cp");

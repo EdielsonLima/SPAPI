@@ -26,7 +26,9 @@ import {
   CircleCheck,
   UserX,
   Ban,
+  ArrowLeftRight,
 } from "lucide-react";
+import { useCompanyMode } from "@/lib/company-context";
 import Image from "next/image";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -150,6 +152,7 @@ export function Sidebar() {
   const [openSubmenus, setOpenSubmenus] = useState<string[]>(["Financeiro"]);
   const [overdueCount, setOverdueCount] = useState(0);
   const pathname = usePathname();
+  const { mode, setMode, label: companyLabel, isHolding } = useCompanyMode();
 
   useEffect(() => {
     const today = new Date();
@@ -188,21 +191,35 @@ export function Sidebar() {
           collapsed ? "w-[72px]" : "w-[260px]"
         )}
       >
-        {/* Logo + Toggle */}
+        {/* Logo + Company Switcher + Toggle */}
         <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800">
-          <div className="flex items-center gap-3 overflow-hidden">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white overflow-hidden">
-              <Image src="/logo-icon.jpg" alt="Logo" width={32} height={32} className="object-contain" />
+          <button
+            onClick={() => setMode(isHolding ? "sp" : "holding")}
+            className="flex items-center gap-3 overflow-hidden group cursor-pointer"
+            title={`Alternar para ${isHolding ? "Silva Packer" : "Holding"}`}
+          >
+            <div className={cn(
+              "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg overflow-hidden transition-colors",
+              isHolding ? "bg-violet-100" : "bg-white"
+            )}>
+              {isHolding ? (
+                <span className="text-violet-700 font-black text-sm leading-none">H</span>
+              ) : (
+                <Image src="/logo-icon.jpg" alt="Logo" width={32} height={32} className="object-contain" />
+              )}
             </div>
             {!collapsed && (
               <div className="flex flex-col min-w-0">
-                <span className="text-sm font-bold truncate">{process.env.NEXT_PUBLIC_COMPANY_NAME || "Empresa"}</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold truncate">{companyLabel}</span>
+                  <ArrowLeftRight className="h-3 w-3 text-slate-500 group-hover:text-white transition-colors flex-shrink-0" />
+                </div>
                 <span className="text-[10px] text-slate-400 truncate">
-                  {process.env.NEXT_PUBLIC_COMPANY_SUBTITLE || "Sistema de Gestao"}
+                  {isHolding ? "Administradora" : (process.env.NEXT_PUBLIC_COMPANY_SUBTITLE || "Sistema de Gestao")}
                 </span>
               </div>
             )}
-          </div>
+          </button>
           <button
             onClick={() => setCollapsed(!collapsed)}
             className="flex items-center justify-center h-8 w-8 rounded-md text-slate-400 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
