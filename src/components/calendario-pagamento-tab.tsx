@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays, List } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, List, Star } from "lucide-react";
 import { formatCurrency, effectiveOpenAmount } from "@/lib/dashboard-utils";
 import { Button } from "@/components/ui/button";
 import { SiengeOutcome } from "@/types/sienge";
@@ -42,6 +42,11 @@ export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selecte
   const [currentMonth, setCurrentMonth] = useState(() => getCurrentMonthKey());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<SiengeOutcome | null>(null);
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
 
   // 1. Aplica filtros globais (empresa, doc type) sobre itemsAPagar
   const filteredItems = useMemo(() => {
@@ -247,6 +252,7 @@ export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selecte
               <div className="grid grid-cols-7 grid-rows-6 gap-1 flex-1 min-h-0">
                 {grid.map((cell, i) => {
                   const isSelected = selectedDay === cell.date;
+                  const isToday = cell.date === todayStr;
                   const intensity = maxDayAmount > 0 && cell.amount > 0 ? cell.amount / maxDayAmount : 0;
                   const hasValue = cell.amount > 0;
                   const opacity = 0.1 + intensity * 0.45;
@@ -258,22 +264,27 @@ export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selecte
                       className={`relative min-h-0 rounded-md border p-1.5 text-left transition-all overflow-hidden ${
                         cell.isOutside
                           ? "border-transparent bg-slate-100/50 dark:bg-slate-800/40 text-slate-400/40 cursor-default"
-                          : hasValue
-                            ? isSelected
-                              ? "border-blue-500 ring-2 ring-blue-500/30 cursor-pointer"
-                              : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:shadow-md cursor-pointer"
-                            : "border-slate-200/50 dark:border-slate-700/50 text-slate-400/60 cursor-default"
+                          : isSelected
+                            ? "border-violet-500 ring-2 ring-violet-500/40 cursor-pointer"
+                            : isToday
+                              ? "border-amber-400 dark:border-amber-500 ring-1 ring-amber-300/50 dark:ring-amber-500/30 cursor-pointer"
+                              : hasValue
+                                ? "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:shadow-md cursor-pointer"
+                                : "border-slate-200/50 dark:border-slate-700/50 text-slate-400/60 cursor-default"
                       }`}
                       style={
-                        hasValue && !isSelected
-                          ? { backgroundColor: `rgba(59, 130, 246, ${opacity})` }
-                          : isSelected
-                            ? { backgroundColor: "rgba(59, 130, 246, 0.6)" }
+                        isSelected
+                          ? { backgroundColor: "rgba(139, 92, 246, 0.55)" }
+                          : hasValue
+                            ? { backgroundColor: `rgba(59, 130, 246, ${opacity})` }
                             : undefined
                       }
                     >
-                      <div className={`text-[11px] font-bold leading-none ${isSelected ? "text-white" : "text-slate-700 dark:text-slate-200"}`}>
+                      <div className={`text-[11px] font-bold leading-none flex items-center gap-0.5 ${isSelected ? "text-white" : "text-slate-700 dark:text-slate-200"}`}>
                         {cell.day}
+                        {isToday && !cell.isOutside && (
+                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 flex-shrink-0" />
+                        )}
                       </div>
                       {hasValue && (
                         <>
