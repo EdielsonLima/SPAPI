@@ -4276,9 +4276,9 @@ export function ExecutiveDashboard() {
           ? Math.max(360, companyChart.length * 36)
           : Math.max(480, companyChart.length * 44);
         return (
-      <div className={`grid lg:grid-cols-5 ${compactCharts ? "gap-3" : "gap-6"}`}>
-        {/* Company Breakdown */}
-        <Card className="border-0 shadow-sm lg:col-span-2">
+      <div className={`grid ${isHolding ? "" : "lg:grid-cols-5"} ${compactCharts ? "gap-3" : "gap-6"}`}>
+        {/* Company Breakdown — escondido no modo Holding (só 1 empresa) */}
+        {!isHolding && <Card className="border-0 shadow-sm lg:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
@@ -4341,10 +4341,10 @@ export function ExecutiveDashboard() {
               </div>
             )}
           </CardContent>
-        </Card>
+        </Card>}
 
         {/* Monthly/Annual Evolution */}
-        <Card className="border-0 shadow-sm lg:col-span-3">
+        <Card className={`border-0 shadow-sm ${isHolding ? "" : "lg:col-span-3"}`}>
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <div>
