@@ -5942,6 +5942,7 @@ export function ExecutiveDashboard() {
                       <TableRow>
                         {[
                           { field: "companyName", label: "Empresa", align: "left", minW: "180px", sticky: true },
+                          { field: "status", label: "Status", align: "center", minW: "80px" },
                           { field: "totalRecebido", label: "Total Recebido", align: "right", minW: "130px" },
                           { field: "totalPago", label: "Total Pago", align: "right", minW: "130px" },
                           { field: "lucroRealizado", label: "Lucro Realizado", align: "right", minW: "130px" },
@@ -5951,7 +5952,6 @@ export function ExecutiveDashboard() {
                           { field: "qtDisp", label: "Disp.", align: "center", minW: "60px" },
                           { field: "qtResTec", label: "Res.Téc.", align: "center", minW: "60px" },
                           { field: "lucratividade", label: "Lucratividade", align: "right", minW: "100px" },
-                          { field: "status", label: "Status", align: "center", minW: "80px" },
                         ].map(col => (
                           <TableHead
                             key={col.field}
@@ -5983,6 +5983,11 @@ export function ExecutiveDashboard() {
                             <TableCell className="text-xs font-semibold text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10">
                               {co.companyName}
                             </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant={isFinalizada ? "secondary" : "outline"} className={`text-[10px] ${isFinalizada ? "bg-slate-200 dark:bg-slate-700 text-slate-500" : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"}`}>
+                                {co.status}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-xs font-semibold text-right tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(co.totalRecebido)}</TableCell>
                             <TableCell className="text-xs font-semibold text-right tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
                             <TableCell className={`text-xs font-bold text-right tabular-nums ${lucroRealizado >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
@@ -6006,17 +6011,13 @@ export function ExecutiveDashboard() {
                                 </span>
                               </div>
                             </TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant={isFinalizada ? "secondary" : "outline"} className={`text-[10px] ${isFinalizada ? "bg-slate-200 dark:bg-slate-700 text-slate-500" : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"}`}>
-                                {co.status}
-                              </Badge>
-                            </TableCell>
                           </TableRow>
                         );
                       })}
                       {/* Total Row */}
                       <TableRow className="bg-slate-100 dark:bg-slate-800 border-t-2 border-slate-300 dark:border-slate-600 font-bold">
                         <TableCell className="text-sm font-bold text-slate-800 dark:text-slate-100 sticky left-0 bg-slate-100 dark:bg-slate-800 z-10">Total</TableCell>
+                        <TableCell />
                         <TableCell className="text-sm font-black text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(totRecebido)}</TableCell>
                         <TableCell className="text-sm font-black text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(totPago)}</TableCell>
                         <TableCell className={`text-sm font-black text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</TableCell>
@@ -6032,7 +6033,6 @@ export function ExecutiveDashboard() {
                         <TableCell className="text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDisp, 0)}</TableCell>
                         <TableCell className="text-sm font-bold text-center tabular-nums text-slate-600 dark:text-slate-400">{sorted.reduce((s, c) => s + c.qtResTec, 0)}</TableCell>
                         <TableCell className="text-sm font-black text-right tabular-nums text-violet-700 dark:text-violet-400">{totLucratividade.toFixed(2)}%</TableCell>
-                        <TableCell />
                       </TableRow>
                     </TableBody>
                   </Table>
