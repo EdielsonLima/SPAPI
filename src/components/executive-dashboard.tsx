@@ -880,9 +880,10 @@ export function ExecutiveDashboard() {
       upper.includes("GALPÃO") || upper.includes("GALPAO");
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const defaultCompanies = useCallback(() =>
     new Set(allCompanyNames.filter(n => !isExcludedCompany(n))),
-    [allCompanyNames]
+    [allCompanyNames, isHolding]
   );
 
   // Reset company filter and redirect from invalid tabs when mode changes

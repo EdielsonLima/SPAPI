@@ -152,7 +152,7 @@ export function Sidebar() {
   const [openSubmenus, setOpenSubmenus] = useState<string[]>(["Financeiro"]);
   const [overdueCount, setOverdueCount] = useState(0);
   const pathname = usePathname();
-  const { mode, setMode, label: companyLabel, isHolding } = useCompanyMode();
+  const { setMode, label: companyLabel, isHolding } = useCompanyMode();
 
   useEffect(() => {
     const today = new Date();
