@@ -65,15 +65,16 @@ import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
 import { CalendarioPagamentoTab } from "@/components/calendario-pagamento-tab";
+import { CalendarioRecebimentoTab } from "@/components/calendario-recebimento-tab";
 
 type Section = "cp" | "cr";
-type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "orcamento" | "comercial" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores";
+type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "comercial" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores";
 
 // Each tab group has its own saved company filter
 function getTabGroup(tab: MainTab): string {
   switch (tab) {
     case "a-pagar": case "pagas": case "atrasadas": case "calendario-pagamento": return "cp";
-    case "a-receber": case "recebidas": case "inadimplencia": return "cr";
+    case "a-receber": case "recebidas": case "inadimplencia": case "calendario-recebimento": return "cr";
     case "visao-geral": return "visao-geral";
     case "resumo": return "resumo";
     case "dre-api": return "dre-api";
@@ -2349,6 +2350,7 @@ export function ExecutiveDashboard() {
     dre: [],
     "dre-api": [],
     "calendario-pagamento": [],
+    "calendario-recebimento": [],
     saldos: [],
     "visao-geral": [],
     resumo: [],
@@ -2579,7 +2581,7 @@ export function ExecutiveDashboard() {
         </div>
 
         {/* Sub-tabs CP/CR - separate line */}
-        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "calendario-pagamento" && (
+        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (
           <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             switchTab(tab);
@@ -2630,6 +2632,10 @@ export function ExecutiveDashboard() {
                         {itemsInadimplencia.length}
                       </span>
                     )}
+                  </TabsTrigger>
+                  <TabsTrigger value="calendario-recebimento" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${(activeTab as string) === "calendario-recebimento" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                    <CalendarDays className="h-4 w-4" />
+                    Calendário
                   </TabsTrigger>
                 </>
               )}
@@ -4163,7 +4169,7 @@ export function ExecutiveDashboard() {
 
       {/* KPI Cards. Nas abas CP/CR compactamos pra caber tudo numa
           viewport sem barra de scroll (gap menor, padding interno menor). */}
-      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "calendario-pagamento" && (() => {
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (() => {
         const cpCrTabs = ["a-pagar", "pagas", "atrasadas", "a-receber", "recebidas", "inadimplencia"];
         const isCompact = cpCrTabs.includes(activeTab);
         return (<><div className={`grid md:grid-cols-2 lg:grid-cols-${kpis.length} ${isCompact ? "gap-3" : "gap-5"}`}>
@@ -6003,6 +6009,15 @@ export function ExecutiveDashboard() {
       {activeTab === "calendario-pagamento" && (
         <CalendarioPagamentoTab
           itemsAPagar={itemsAPagar}
+          selectedCompanies={selectedCompanies}
+          selectedDocTypes={selectedDocTypes}
+        />
+      )}
+
+      {/* ══════ CALENDÁRIO DE RECEBIMENTOS TAB ══════ */}
+      {activeTab === "calendario-recebimento" && (
+        <CalendarioRecebimentoTab
+          itemsAReceber={itemsAReceber}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
         />
