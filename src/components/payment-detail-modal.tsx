@@ -16,20 +16,7 @@ interface Props {
   creditorHistory?: SiengeOutcome[];
 }
 
-type HistSortField = "paymentDate" | "billId" | "operationTypeName" | "netAmount";
-
-// Cor da tag por tipo de operação do pagamento (outcome).
-function opBadgeClass(op: string): string {
-  const o = (op || "").toLowerCase();
-  if (o.includes("estorno")) return "border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300";
-  if (o.includes("devolu")) return "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
-  if (o.includes("adiantamento")) return "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
-  if (o.includes("por bens") || o.includes("permuta")) return "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-300";
-  if (o.includes("substitui") || o.includes("cancelamento") || o.includes("abatimento")) return "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300";
-  if (o.includes("bancár") || o.includes("bancar")) return "border-cyan-300 bg-cyan-50 text-cyan-700 dark:border-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300";
-  if (o.includes("pagamento")) return "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
-  return "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300";
-}
+type HistSortField = "paymentDate" | "billId" | "companyName" | "netAmount";
 
 // Encargos (multa 2% + juros 1% a.m. pro-rata) — fórmula validada em
 // contas-table.tsx. Copia local pra nao depender de useCallback interno
@@ -103,7 +90,7 @@ export function PaymentDetailModal({ item, open, onClose, creditorHistory }: Pro
         billId: bill.billId,
         installmentId: bill.installmentId,
         documentNumber: bill.documentNumber || "",
-        operationTypeName: p.operationTypeName || "Pagamento",
+        companyName: bill.companyName || "-",
         netAmount: p.netAmount || 0,
       }))
   );
@@ -112,7 +99,7 @@ export function PaymentDetailModal({ item, open, onClose, creditorHistory }: Pro
     switch (histSort.field) {
       case "paymentDate": cmp = (a.paymentDate || "").localeCompare(b.paymentDate || ""); break;
       case "billId": cmp = (a.billId - b.billId) || (a.installmentId - b.installmentId); break;
-      case "operationTypeName": cmp = a.operationTypeName.localeCompare(b.operationTypeName); break;
+      case "companyName": cmp = a.companyName.localeCompare(b.companyName); break;
       case "netAmount": cmp = a.netAmount - b.netAmount; break;
     }
     return histSort.dir === "asc" ? cmp : -cmp;
@@ -377,7 +364,7 @@ export function PaymentDetailModal({ item, open, onClose, creditorHistory }: Pro
                       {([
                         { key: "paymentDate" as const, label: "Data", align: "left" },
                         { key: "billId" as const, label: "Título", align: "left" },
-                        { key: "operationTypeName" as const, label: "Operação", align: "left" },
+                        { key: "companyName" as const, label: "Empresa", align: "left" },
                         { key: "netAmount" as const, label: "Líquido", align: "right" },
                       ]).map(col => {
                         const isSorted = histSort.field === col.key;
@@ -408,10 +395,10 @@ export function PaymentDetailModal({ item, open, onClose, creditorHistory }: Pro
                             #{r.billId}-{r.installmentId}
                             {r.documentNumber && <span className="ml-1 text-slate-400">· {r.documentNumber}</span>}
                           </td>
-                          <td className="py-1.5 px-2">
+                          <td className="py-1.5 px-2 max-w-[180px]">
                             {isEstorno && <span className="text-red-600 dark:text-red-300/80 font-semibold mr-1 text-[10px] uppercase">Estorno</span>}
-                            <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${opBadgeClass(r.operationTypeName)}`}>
-                              {r.operationTypeName}
+                            <span className="text-slate-700 dark:text-slate-300 break-words" title={r.companyName}>
+                              {r.companyName}
                             </span>
                           </td>
                           <td className={`py-1.5 px-2 text-right tabular-nums font-semibold ${isEstorno ? "text-red-600 dark:text-red-300/80" : "text-slate-800 dark:text-slate-200"}`}>
