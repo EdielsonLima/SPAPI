@@ -1111,6 +1111,34 @@ export function ExecutiveDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCompanies, allOpTypes.length]);
 
+  // Ao alternar entre CP (outcome) e CR (income), os tipos de Operação e Documento
+  // mudam de contexto. Os filtros selecionados são COMPARTILHADOS, então um filtro
+  // de income (vindo de CR) zerava o "Total Pago" do Resumo em CP (nenhum tipo de
+  // income existe nas contas pagas → itemsPagas vazio). Aqui, na troca de seção,
+  // removemos do filtro os tipos que não existem na nova seção; se isso esvaziar o
+  // filtro (contexto totalmente incompatível), reaplicamos o default da seção.
+  // Só ajusta a SELEÇÃO de filtro — nenhuma fórmula de valor é tocada, então não
+  // afeta nenhuma empresa.
+  const prevSectionRef = useRef(section);
+  useEffect(() => {
+    if (prevSectionRef.current === section) return;
+    prevSectionRef.current = section;
+    const OP_EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
+    setSelectedOpTypes(prev => {
+      if (prev.size === 0) return prev;
+      const valid = new Set([...prev].filter(t => allOpTypes.includes(t)));
+      if (valid.size > 0) return valid.size === prev.size ? prev : valid;
+      return new Set(allOpTypes.filter(op => !OP_EXCLUDED.some(x => op.toLowerCase().includes(x))));
+    });
+    setSelectedDocTypes(prev => {
+      if (prev.size === 0) return prev;
+      const valid = new Set([...prev].filter(t => allDocTypes.includes(t)));
+      if (valid.size > 0) return valid.size === prev.size ? prev : valid;
+      return new Set(allDocTypes.filter(t => !isExcludedDocType(t)));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section, allOpTypes, allDocTypes]);
+
   // Números de documento disponíveis nos dados de income (CR)
   const allDocNumbers = useMemo(() => {
     const nums = new Set<string>();
