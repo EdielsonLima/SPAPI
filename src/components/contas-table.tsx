@@ -52,6 +52,16 @@ import { toast } from "sonner";
 
 type ContasItem = SiengeOutcome | SiengeIncome;
 
+// Empresa administradora (Holding). Diferente das demais, suas contas a pagar
+// são majoritariamente previsões/provisões (impostos, condomínios, taxas) que o
+// Sienge "Contas a Pagar (por Credor) Sintético" INCLUI. Por isso, só para ela,
+// não aplicamos a exclusão de documentos PREVISÃO. As demais empresas seguem
+// excluindo previsão (validado contra Sienge).
+function isHoldingCompany(name: string | null | undefined): boolean {
+  const upper = (name || "").toUpperCase();
+  return upper.includes("HOLDING") || upper.includes("ADMINISTRADORA");
+}
+
 function getCounterpartName(item: ContasItem): string {
   if ("creditorName" in item) return item.creditorName || "";
   return (item as SiengeIncome).clientName || "";
@@ -918,7 +928,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return items.filter((item) => {
       // Exclude bills configured in Configuracoes > Exclusao de Titulos
       if (exclusionSet.size > 0 && exclusionSet.has(`${item.companyId}:${item.billId}`)) return false;
-      if (!isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return false;
+      // Holding: mantém previsões para bater com o Sienge "(por Credor) Sintético".
+      // Demais empresas continuam excluindo previsão.
+      if (!isIncome && !isHoldingCompany(item.companyName) && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return false;
       const keepExcludedDoc = isIncome && shouldKeepIncomeExcludedDoc(item.companyId, item.billId, item.installmentId);
       if (isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument, { excludeLocacao: !keepExcludedDoc })) return false;
 
