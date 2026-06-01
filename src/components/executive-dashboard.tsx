@@ -1278,8 +1278,8 @@ export function ExecutiveDashboard() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((bm as any).bankMovementOperationType !== "E") return false;
         const historic = (bm.bankMovementHistoricName || "").toLowerCase().trim();
-        // Excluir transferência interna entre contas
-        if (historic.includes("transferência") || historic.includes("transferencia")) return false;
+        // Transferência interna entre caixas nunca é recebimento.
+        if (historic.includes("entre caixas")) return false;
         // Excluir "Aplicação" sozinho (saída pra fundo de investimento). Mantém
         // "Rendimento de aplicação" e "Resgate de Aplicação" — esses são entradas
         // de volta na conta-corrente. Validado 2026-05-08 contra 135 JARDINS.
@@ -1290,16 +1290,27 @@ export function ExecutiveDashboard() {
         if (historic.includes("pagamento") || historic.includes("saque") ||
             historic.includes("depósito") || historic.includes("deposito") ||
             historic.includes("cheque emitido")) return false;
-        // Categoria de receita (financialCategoryType === "R")
         const cats = bm.financialCategories || [];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const catNames = cats.map((fc: any) => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+        // Histórico "Transferência": para a maioria das empresas é movimentação
+        // interna (validado — fica fora). MAS a HOLDING recebe aluguel registrado
+        // como "Transferência" com categoria "Receita de Locação" (Caixa e Bancos
+        // no Sienge). Só nesse caso (Holding + categoria de receita não-transfer)
+        // o lançamento entra. Demais empresas seguem inalteradas.
+        if (historic.includes("transfer")) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const receitaNonTransfer = cats.some((fc: any) =>
+            fc.financialCategoryType === "R" && !/transfer/i.test(fc.financialCategoryName || ""));
+          return /HOLDING|ADMINISTRADORA/i.test(bm.companyName || "") && receitaNonTransfer;
+        }
+        // Demais lançamentos: regra original (validada nas 12 empresas).
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const isReceita = cats.length === 0 || cats.some((fc: any) => fc.financialCategoryType === "R");
         if (!isReceita) return false;
         // Excluir BMs cuja categoria seja Transferência Entre Contas — Sienge
         // marca historic="Recebimento" mas categoria revela ser transferência
         // interna. Validado contra SILVA PACKER R$ 10.300 (2023-10-03).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const catNames = cats.map((fc: any) => (fc.financialCategoryName || "").toLowerCase()).join(" ");
         if (catNames.includes("transferência") || catNames.includes("transferencia")) return false;
         return true;
       })
@@ -1309,7 +1320,16 @@ export function ExecutiveDashboard() {
         companyId: bm.companyId,
         companyName: bm.companyName,
         clientId: 0,
-        clientName: "(sem cliente)",
+        // Em vez de "(sem cliente)": históricos genéricos como "Transferência"
+        // (aluguel da Holding) usam a categoria de receita (ex.: "Receita de
+        // Locação"); senão a descrição do banco.
+        clientName: (() => {
+          const h = (bm.bankMovementHistoricName || "").trim();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const recCat = (bm.financialCategories || []).find((fc: any) => fc.financialCategoryType === "R")?.financialCategoryName?.trim();
+          if (h && !/^transfer/i.test(h)) return h;
+          return recCat || h || "Rendimentos / Tarifas Bancárias";
+        })(),
         documentIdentificationId: bm.documentIdentificationId || "MB",
         documentIdentificationName: bm.documentIdentificationName || "MOV. BANCÁRIO",
         documentNumber: "",
@@ -1373,7 +1393,12 @@ export function ExecutiveDashboard() {
         p.netAmount > 0 &&
         matchesSelectedPaymentDate(p.paymentDate)
       )
-    ), [consistentIncomeForRecebidas, matchesSelectedPaymentDate]);
+      // HOLDING: exclui documentos "TRAN" (resgates/aplicações/transferências
+      // entre contas) — não são receita. O Sienge "Contas Recebidas" também os
+      // exclui. Validado mês a mês (Jan/Fev/Mar/2026). Escopado à Holding via
+      // isHolding — as 12 empresas validadas (cujos resgates ficam) não mudam.
+      && !(isHolding && (i.documentIdentificationId || "").trim().toUpperCase() === "TRAN")
+    ), [consistentIncomeForRecebidas, matchesSelectedPaymentDate, isHolding]);
 
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);
