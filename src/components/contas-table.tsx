@@ -610,7 +610,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 companyId: bm.companyId,
                 companyName: bm.companyName,
                 clientId: 0,
-                clientName: "(sem cliente)",
+                // Movimentos bancários sintetizados (rendimentos, tarifas, estornos)
+                // não têm cliente. Em vez de "(sem cliente)", usa a descrição real
+                // do banco (bankMovementHistoricName) e, na falta dela, um rótulo
+                // bancário agrupador. Assim ficam identificáveis e agrupados.
+                clientName: (bm.bankMovementHistoricName || "").trim() || "Rendimentos / Tarifas Bancárias",
                 documentIdentificationId: bm.documentIdentificationId || "MB",
                 documentIdentificationName: bm.documentIdentificationName || "MOV. BANCÁRIO",
                 documentIdentificationNumber: "",
