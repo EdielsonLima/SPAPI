@@ -360,13 +360,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     }
     return new Set<string>();
   });
-  const [filterTipoDoc, setFilterTipoDoc] = useState<Set<string>>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_tipoDoc`);
-      if (saved) return new Set(JSON.parse(saved));
-    }
-    return new Set<string>();
-  });
+  // O valor inicial é definido pelo efeito de auto-init (por modo sp/holding),
+  // que lê a chave de localStorage escopada por modo. Começa vazio (= todos).
+  const [filterTipoDoc, setFilterTipoDoc] = useState<Set<string>>(new Set());
   const [filterPlanoFinanceiro, setFilterPlanoFinanceiro] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_planoFinanceiro`);
@@ -391,7 +387,8 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tipoBaixaInitialized, setTipoBaixaInitialized] = useState(false);
-  const [tipoDocInitialized, setTipoDocInitialized] = useState(false);
+  // Escopo (sp/holding) já inicializado para o filtro de tipo documento.
+  const tipoDocInitScope = useRef<string | null>(null);
   const [empresasInitialized, setEmpresasInitialized] = useState(false);
   const [filterAnos, setFilterAnos] = useState<Set<string>>(() =>
     isOverdue ? new Set<string>() : new Set([String(currentYear)])
@@ -893,22 +890,32 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tiposBaixa, isPagas, isIncome, empresaKeyForTipoBaixa]);
 
-  // Auto-init tipo documento (income only): excludes LNC e LOC.
-  // LNC = Lançamento Contábil, LOC = Locação — não fazem parte do total a
-  // receber operacional (são lançamentos auxiliares do Sienge).
+  // Auto-init tipo documento (income only), por modo de empresa:
+  // - Silva Packer: exclui LNC e LOC (Lançamento Contábil / Locação — auxiliares,
+  //   não fazem parte do total a receber operacional).
+  // - Holding: a receita DELA é aluguel (LOC = CONTRATO DE LOCAÇÃO, LNC = idem
+  //   não contínuo), então inclui TODOS os tipos para bater com o Sienge
+  //   "Contas Recebidas (por Cliente)".
+  // Chave de localStorage separada por modo (sp/holding) — padrões independentes.
+  // Re-inicializa quando o modo muda (ref guarda o último escopo inicializado).
   useEffect(() => {
-    if (!isIncome || tipoDocInitialized || tiposDocumento.length === 0) return;
+    if (!isIncome || tiposDocumento.length === 0) return;
     if (typeof window === "undefined") return;
-    const saved = localStorage.getItem(`contas_${dataSource}_${mode}_default_tipoDoc`);
+    const scope = isHolding ? "holding" : "sp";
+    if (tipoDocInitScope.current === scope) return;
+    tipoDocInitScope.current = scope;
+    const saved = localStorage.getItem(`contas_${dataSource}_${mode}_${scope}_default_tipoDoc`);
     if (saved) {
-      // saved já carregado pelo useState init
+      setFilterTipoDoc(new Set(JSON.parse(saved)));
+      return;
+    }
+    if (isHolding) {
+      setFilterTipoDoc(new Set(tiposDocumento));
     } else {
       const DEFAULT_EXCLUDED = ["LNC", "LOC"];
-      const initial = tiposDocumento.filter(t => !DEFAULT_EXCLUDED.includes(t.toUpperCase()));
-      setFilterTipoDoc(new Set(initial));
+      setFilterTipoDoc(new Set(tiposDocumento.filter(t => !DEFAULT_EXCLUDED.includes(t.toUpperCase()))));
     }
-    setTipoDocInitialized(true);
-  }, [tiposDocumento, isIncome, tipoDocInitialized, dataSource, mode]);
+  }, [tiposDocumento, isIncome, isHolding, dataSource, mode]);
 
   // Auto-init filtro de empresas (income only): exclui HOLDING/ADMINISTRADORA.
   // Empresa administrativa não tem operação de receita — apenas lançamentos
@@ -973,7 +980,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       // Holding: mantém previsões para bater com o Sienge "(por Credor) Sintético".
       // Demais empresas continuam excluindo previsão.
       if (!isIncome && !isHoldingCompany(item.companyName) && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument)) return false;
-      const keepExcludedDoc = isIncome && shouldKeepIncomeExcludedDoc(item.companyId, item.billId, item.installmentId);
+      // Holding: a receita dela é aluguel (documentos de locação LNC/LOC). O Sienge
+      // "Contas Recebidas (por Cliente)" os inclui, então NÃO excluímos locação no
+      // modo Holding (mesmo tratamento do Painel Executivo). Demais empresas seguem
+      // excluindo locação, salvo as exceções whitelistadas.
+      const keepExcludedDoc = isIncome && (isHolding || shouldKeepIncomeExcludedDoc(item.companyId, item.billId, item.installmentId));
       if (isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument, { excludeLocacao: !keepExcludedDoc })) return false;
 
       const matchesYear = (date: string | undefined) => {
@@ -1115,7 +1126,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [scopedItems, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAnos, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
+  }, [scopedItems, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAnos, filterMes, filterDia, isOverdue, isPagas, isIncome, isHolding, today, exclusionSet]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -1654,7 +1665,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                   onToggle={(name) => { setFilterTipoDoc(prev => { const next = new Set(prev); if (next.has(name)) next.delete(name); else next.add(name); return next; }); setPage(0); }}
                   onSelectAll={() => { setFilterTipoDoc(new Set(tiposDocumento)); setPage(0); }}
                   onClear={() => { setFilterTipoDoc(new Set()); setPage(0); }}
-                  onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_default_tipoDoc`, JSON.stringify([...filterTipoDoc])); toast.success("Padrao de tipo documento salvo!"); }}
+                  onSaveDefault={() => { localStorage.setItem(`contas_${dataSource}_${mode}_${isHolding ? "holding" : "sp"}_default_tipoDoc`, JSON.stringify([...filterTipoDoc])); toast.success("Padrao de tipo documento salvo!"); }}
                 />
               </div>
 
