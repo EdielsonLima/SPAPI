@@ -180,6 +180,13 @@ export interface SiengeIncome {
   paymentsCategories: SiengeIncomePaymentCategory[];
   payments: SiengeIncomePayment[];
   receivedNetAmount?: number;
+  // Condição de parcelamento (Sienge): PM=Parcelas Mensais, PA=Parcela Anual,
+  // PS=Parcelas Semestrais, EN=Entrada, CH=Entrega das chaves, AT=Ato, etc.
+  // Obs.: a API do Sienge grafa a chave como "descrition" (typo dela).
+  paymentTerm?: { id: string; descrition?: string; description?: string };
+  // Ex.: "31/100" (parcela 31 de 100)
+  installmentNumber?: string;
+  periodicityType?: string;
 }
 
 export interface SiengeIncomeResponse {

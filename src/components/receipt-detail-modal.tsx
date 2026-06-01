@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
+import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency, formatDate, effectiveOpenAmount } from "@/lib/dashboard-utils";
 import { SiengeIncome } from "@/types/sienge";
+
+type HistSortField = "paymentDate" | "billId" | "termLabel" | "netAmount";
 
 interface Props {
   item: SiengeIncome | null;
@@ -38,6 +42,7 @@ const MoneyKV = ({ label, value, highlight = false }: { label: string; value: nu
 );
 
 export function ReceiptDetailModal({ item, open, onClose, clientHistory }: Props) {
+  const [histSort, setHistSort] = useState<{ field: HistSortField; dir: "asc" | "desc" }>({ field: "paymentDate", dir: "desc" });
   if (!item) return null;
 
   const aberto = effectiveOpenAmount(item, true);
@@ -49,6 +54,12 @@ export function ReceiptDetailModal({ item, open, onClose, clientHistory }: Props
 
   // Histórico completo de pagamentos do cliente (todos os títulos).
   const history = (clientHistory || []).filter(b => b.billId !== undefined);
+  const termLabel = (b: SiengeIncome): string => {
+    const t = b.paymentTerm;
+    const desc = (t?.descrition || t?.description || "").trim();
+    if (desc) return b.installmentNumber ? `${desc} (${b.installmentNumber})` : desc;
+    return b.installmentNumber ? `Parcela ${b.installmentNumber}` : "Recebimento";
+  };
   const clientReceipts = history
     .flatMap(bill =>
       (bill.payments || [])
@@ -58,11 +69,20 @@ export function ReceiptDetailModal({ item, open, onClose, clientHistory }: Props
           billId: bill.billId,
           installmentId: bill.installmentId,
           documentNumber: bill.documentNumber || "",
-          operationTypeName: p.operationTypeName || "-",
+          termLabel: termLabel(bill),
           netAmount: p.netAmount || 0,
         }))
-    )
-    .sort((a, b) => (b.paymentDate || "").localeCompare(a.paymentDate || ""));
+    );
+  clientReceipts.sort((a, b) => {
+    let cmp = 0;
+    switch (histSort.field) {
+      case "paymentDate": cmp = (a.paymentDate || "").localeCompare(b.paymentDate || ""); break;
+      case "billId": cmp = (a.billId - b.billId) || (a.installmentId - b.installmentId); break;
+      case "termLabel": cmp = a.termLabel.localeCompare(b.termLabel); break;
+      case "netAmount": cmp = a.netAmount - b.netAmount; break;
+    }
+    return histSort.dir === "asc" ? cmp : -cmp;
+  });
   const clientTotalRecebido = clientReceipts.reduce((s, r) => s + r.netAmount, 0);
   const clientTotalAberto = history.reduce((s, b) => s + effectiveOpenAmount(b, true), 0);
   const clientNumTitulos = new Set(history.map(b => b.billId)).size;
@@ -255,10 +275,27 @@ export function ReceiptDetailModal({ item, open, onClose, clientHistory }: Props
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/90 backdrop-blur">
                     <tr className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                      <th className="text-left font-semibold py-1.5 px-2">Data</th>
-                      <th className="text-left font-semibold py-1.5 px-2">Título</th>
-                      <th className="text-left font-semibold py-1.5 px-2">Operação</th>
-                      <th className="text-right font-semibold py-1.5 px-2">Líquido</th>
+                      {([
+                        { key: "paymentDate" as const, label: "Data", align: "left" },
+                        { key: "billId" as const, label: "Título", align: "left" },
+                        { key: "termLabel" as const, label: "Tipo de Parcela", align: "left" },
+                        { key: "netAmount" as const, label: "Líquido", align: "right" },
+                      ]).map(col => {
+                        const isSorted = histSort.field === col.key;
+                        const Icon = isSorted ? (histSort.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                        return (
+                          <th key={col.key} className={`font-semibold py-1.5 px-2 ${col.align === "right" ? "text-right" : "text-left"}`}>
+                            <button
+                              type="button"
+                              onClick={() => setHistSort(prev => ({ field: col.key, dir: prev.field === col.key && prev.dir === "desc" ? "asc" : "desc" }))}
+                              className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-slate-700 dark:hover:text-slate-200 select-none ${col.align === "right" ? "flex-row-reverse" : ""}`}
+                            >
+                              {col.label}
+                              <Icon className={`h-3 w-3 ${isSorted ? "text-emerald-500" : "text-slate-300 dark:text-slate-600"}`} />
+                            </button>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -274,7 +311,7 @@ export function ReceiptDetailModal({ item, open, onClose, clientHistory }: Props
                           </td>
                           <td className="py-1.5 px-2 text-slate-700 dark:text-slate-300">
                             {isEstorno && <span className="text-red-600 dark:text-red-300/80 font-semibold mr-1">Estorno:</span>}
-                            {r.operationTypeName}
+                            {r.termLabel}
                           </td>
                           <td className={`py-1.5 px-2 text-right tabular-nums font-semibold ${isEstorno ? "text-red-600 dark:text-red-300/80" : "text-slate-800 dark:text-slate-200"}`}>
                             {formatCurrency(r.netAmount)}
