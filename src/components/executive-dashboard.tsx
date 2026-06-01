@@ -359,6 +359,24 @@ function FactorInput({
   );
 }
 
+// Inferência do tipo de imóvel a partir do nome da unidade (pura — usada no render e no default do filtro).
+function inferUnitTypeFromName(name: string): string {
+  const n = name.toUpperCase().trim();
+  if (/\bVG\b|VAGA|GARAGEM|^G[\s-]?\d/i.test(n)) {
+    if (/DUPLA|DBL|2V/i.test(n)) return "Vaga Dupla";
+    if (/TRIPLA|TPL|3V/i.test(n)) return "Vaga Tripla";
+    if (/PNE|DEFICIENTE|ACESS/i.test(n)) return "Vaga PNE";
+    return "Vaga Simples";
+  }
+  if (/\bSL\b|\bSALA\b|COMERCIAL/i.test(n)) return "Sala Comercial";
+  if (/\bLJ\b|\bLOJA\b/i.test(n)) return "Loja";
+  if (/\bCASA\b/i.test(n)) return "Casa";
+  if (/\bCOB\b|COBERTURA/i.test(n)) return "Cobertura";
+  if (/\bGARDEN\b|\bJARDIM\b/i.test(n)) return "Garden";
+  if (/\bDEP\b|DEPOSITO|\bBOX\b/i.test(n)) return "Depósito";
+  return "Apartamento";
+}
+
 export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
   const { isHolding, holdingName } = useCompanyMode();
@@ -429,6 +447,9 @@ export function ExecutiveDashboard() {
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
   const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
   const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades" | "quadro">("vendas");
+  const [comercialChartView, setComercialChartView] = useState<"anual" | "mensal">("anual");
+  // Pre-seleciona "Apartamento" no filtro Tipo Imóvel uma única vez, quando as unidades carregam.
+  const defaultedUnitTypeRef = useRef(false);
   const [selectedUnitStatuses, setSelectedUnitStatuses] = useState<Set<string>>(new Set());
   const [selectedUnitEnterprises, setSelectedUnitEnterprises] = useState<Set<string>>(new Set());
   const [selectedUnitTypes, setSelectedUnitTypes] = useState<Set<string>>(new Set());
@@ -746,6 +767,15 @@ export function ExecutiveDashboard() {
   }, [currentYear]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Default do filtro "Tipo Imóvel": pré-seleciona "Apartamento" uma vez, quando as unidades carregam.
+  useEffect(() => {
+    if (defaultedUnitTypeRef.current || apiUnits.length === 0) return;
+    const tipos = new Set(apiUnits.map(u => u.propertyType || inferUnitTypeFromName(u.name)));
+    const apartamento = Array.from(tipos).find(t => /apartamento/i.test(t));
+    if (apartamento) setSelectedUnitTypes(new Set([apartamento]));
+    defaultedUnitTypeRef.current = true;
+  }, [apiUnits]);
 
   // Fetch bank accounts when saldos tab is active
   const bankAccountsLoaded = useRef(false);
@@ -3170,22 +3200,7 @@ export function ExecutiveDashboard() {
       {/* ══════ COMERCIAL TAB ══════ */}
       {activeTab === "comercial" && (() => {
         // ─── Unit type inference from name (must be before filtered) ───
-        const inferUnitType = (name: string): string => {
-          const n = name.toUpperCase().trim();
-          if (/\bVG\b|VAGA|GARAGEM|^G[\s-]?\d/i.test(n)) {
-            if (/DUPLA|DBL|2V/i.test(n)) return "Vaga Dupla";
-            if (/TRIPLA|TPL|3V/i.test(n)) return "Vaga Tripla";
-            if (/PNE|DEFICIENTE|ACESS/i.test(n)) return "Vaga PNE";
-            return "Vaga Simples";
-          }
-          if (/\bSL\b|\bSALA\b|COMERCIAL/i.test(n)) return "Sala Comercial";
-          if (/\bLJ\b|\bLOJA\b/i.test(n)) return "Loja";
-          if (/\bCASA\b/i.test(n)) return "Casa";
-          if (/\bCOB\b|COBERTURA/i.test(n)) return "Cobertura";
-          if (/\bGARDEN\b|\bJARDIM\b/i.test(n)) return "Garden";
-          if (/\bDEP\b|DEPOSITO|\bBOX\b/i.test(n)) return "Depósito";
-          return "Apartamento";
-        };
+        const inferUnitType = inferUnitTypeFromName;
 
         // Filter contracts by company, year, month, enterprise, customer
         const filtered = salesContracts.filter(c => {
@@ -3279,7 +3294,7 @@ export function ExecutiveDashboard() {
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([year, value]) => ({ month: year, value }));
 
-        const rawChart = chartView === "anual" ? yearlyChart : monthlyChart;
+        const rawChart = comercialChartView === "anual" ? yearlyChart : monthlyChart;
         const comercialChart = rawChart.map((item, idx) => {
           const prev = idx > 0 ? rawChart[idx - 1].value : 0;
           const pct = prev > 0 ? ((item.value - prev) / prev) * 100 : null;
@@ -3563,11 +3578,11 @@ export function ExecutiveDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="text-lg text-slate-800">
-                        {chartView === "anual" ? "Vendas por Ano" : "Vendas por Mês"}
+                        {comercialChartView === "anual" ? "Vendas por Ano" : "Vendas por Mês"}
                       </CardTitle>
                       <CardDescription className="text-slate-400">Evolução das vendas no período</CardDescription>
                     </div>
-                    <Tabs value={chartView === "diario" ? "mensal" : chartView} onValueChange={v => setChartView(v as ChartView)}>
+                    <Tabs value={comercialChartView} onValueChange={v => setComercialChartView(v as "anual" | "mensal")}>
                       <TabsList className="h-8">
                         <TabsTrigger value="anual" className="text-xs px-3 h-7">Anual</TabsTrigger>
                         <TabsTrigger value="mensal" className="text-xs px-3 h-7">Mensal</TabsTrigger>

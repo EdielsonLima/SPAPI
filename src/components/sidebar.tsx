@@ -39,11 +39,18 @@ import {
 } from "@/components/ui/tooltip";
 import { SiengeOutcome } from "@/types/sienge";
 
+interface MenuChild {
+  label: string;
+  href: string;
+  icon: React.ReactNode;
+  group?: string;
+}
+
 interface MenuItem {
   label: string;
   href?: string;
   icon: React.ReactNode;
-  children?: { label: string; href: string; icon: React.ReactNode }[];
+  children?: MenuChild[];
 }
 
 const menuItems: MenuItem[] = [
@@ -65,31 +72,37 @@ const menuItems: MenuItem[] = [
         label: "Contas a Pagar",
         href: "/financeiro/contas-pagar",
         icon: <Receipt className="h-4 w-4" />,
+        group: "Pagamentos",
       },
       {
         label: "Contas Pagas",
         href: "/financeiro/contas-pagas",
         icon: <CheckCircle className="h-4 w-4" />,
+        group: "Pagamentos",
       },
       {
         label: "Contas Vencidas",
         href: "/financeiro/contas-vencidas",
         icon: <AlertTriangle className="h-4 w-4" />,
+        group: "Pagamentos",
       },
       {
         label: "Contas a Receber",
         href: "/financeiro/contas-receber",
         icon: <ArrowDownLeft className="h-4 w-4" />,
+        group: "Recebimentos",
       },
       {
         label: "Contas Recebidas",
         href: "/financeiro/contas-recebidas",
         icon: <CircleCheck className="h-4 w-4" />,
+        group: "Recebimentos",
       },
       {
         label: "Inadimplentes",
         href: "/financeiro/inadimplentes",
         icon: <UserX className="h-4 w-4" />,
+        group: "Recebimentos",
       },
     ],
   },
@@ -321,11 +334,19 @@ export function Sidebar() {
                       )}
                     >
                       <div className="ml-4 pl-3 border-l border-slate-700 space-y-1">
-                        {item.children?.map((child) => {
+                        {item.children?.map((child, idx) => {
                           const childIsActive = isActive(child.href);
+                          const prevGroup = item.children?.[idx - 1]?.group;
+                          const showGroupHeader =
+                            child.group && child.group !== prevGroup;
                           return (
+                            <div key={child.href}>
+                              {showGroupHeader && (
+                                <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                  {child.group}
+                                </div>
+                              )}
                             <Link
-                              key={child.href}
                               href={child.href}
                               className={cn(
                                 "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm transition-all duration-200",
@@ -342,6 +363,7 @@ export function Sidebar() {
                                 </span>
                               )}
                             </Link>
+                            </div>
                           );
                         })}
                       </div>
