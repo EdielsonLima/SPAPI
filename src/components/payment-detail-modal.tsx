@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +12,23 @@ interface Props {
   item: SiengeOutcome | null;
   open: boolean;
   onClose: () => void;
+  // Todos os títulos do mesmo credor (abertos + pagos) para o histórico. Opcional.
+  creditorHistory?: SiengeOutcome[];
+}
+
+type HistSortField = "paymentDate" | "billId" | "operationTypeName" | "netAmount";
+
+// Cor da tag por tipo de operação do pagamento (outcome).
+function opBadgeClass(op: string): string {
+  const o = (op || "").toLowerCase();
+  if (o.includes("estorno")) return "border-red-300 bg-red-50 text-red-700 dark:border-red-700 dark:bg-red-950/40 dark:text-red-300";
+  if (o.includes("devolu")) return "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
+  if (o.includes("adiantamento")) return "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+  if (o.includes("por bens") || o.includes("permuta")) return "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-300";
+  if (o.includes("substitui") || o.includes("cancelamento") || o.includes("abatimento")) return "border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300";
+  if (o.includes("bancár") || o.includes("bancar")) return "border-cyan-300 bg-cyan-50 text-cyan-700 dark:border-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300";
+  if (o.includes("pagamento")) return "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+  return "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300";
 }
 
 // Encargos (multa 2% + juros 1% a.m. pro-rata) — fórmula validada em
@@ -59,7 +78,8 @@ const MoneyKV = ({ label, value, highlight = false }: { label: string; value: nu
   </div>
 );
 
-export function PaymentDetailModal({ item, open, onClose }: Props) {
+export function PaymentDetailModal({ item, open, onClose, creditorHistory }: Props) {
+  const [histSort, setHistSort] = useState<{ field: HistSortField; dir: "asc" | "desc" }>({ field: "paymentDate", dir: "desc" });
   if (!item) return null;
 
   const aberto = effectiveOpenAmount(item, false);
@@ -73,20 +93,60 @@ export function PaymentDetailModal({ item, open, onClose }: Props) {
   const totalPago = payments.reduce((s, p) => s + (p.netAmount || 0), 0);
   const paymentsSorted = [...payments].sort((a, b) => (b.paymentDate || "").localeCompare(a.paymentDate || ""));
 
+  // Histórico completo de pagamentos ao credor (todos os títulos).
+  const history = (creditorHistory || []).filter(b => b.billId !== undefined);
+  const creditorReceipts = history.flatMap(bill =>
+    (bill.payments || [])
+      .filter(p => p.paymentDate)
+      .map(p => ({
+        paymentDate: p.paymentDate as string,
+        billId: bill.billId,
+        installmentId: bill.installmentId,
+        documentNumber: bill.documentNumber || "",
+        operationTypeName: p.operationTypeName || "Pagamento",
+        netAmount: p.netAmount || 0,
+      }))
+  );
+  creditorReceipts.sort((a, b) => {
+    let cmp = 0;
+    switch (histSort.field) {
+      case "paymentDate": cmp = (a.paymentDate || "").localeCompare(b.paymentDate || ""); break;
+      case "billId": cmp = (a.billId - b.billId) || (a.installmentId - b.installmentId); break;
+      case "operationTypeName": cmp = a.operationTypeName.localeCompare(b.operationTypeName); break;
+      case "netAmount": cmp = a.netAmount - b.netAmount; break;
+    }
+    return histSort.dir === "asc" ? cmp : -cmp;
+  });
+  const creditorTotalPago = creditorReceipts.reduce((s, r) => s + r.netAmount, 0);
+  const creditorTotalAberto = history.reduce((s, b) => s + effectiveOpenAmount(b, false), 0);
+  const creditorNumTitulos = new Set(history.map(b => b.billId)).size;
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-700">
-          <DialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">
+          <DialogTitle className="text-lg font-bold text-slate-800 dark:text-slate-100">
             {item.creditorName || "(sem credor)"}
           </DialogTitle>
-          <DialogDescription className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-1.5 mt-1">
-            <span>{item.companyName}</span>
-            {item.documentIdentificationName && <><span>·</span><span>{item.documentIdentificationName}</span></>}
-            {item.documentNumber && <><span>·</span><span className="font-mono">{item.documentNumber}</span></>}
-            <Badge variant="outline" className="ml-1 text-[10px] font-mono">
-              Bill #{item.billId}-{item.installmentId}
-            </Badge>
+          <DialogDescription asChild>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <span className="inline-flex items-center rounded-md bg-blue-600 text-white px-2.5 py-1 text-sm font-bold dark:bg-blue-600">
+                {item.companyName}
+              </span>
+              {item.documentIdentificationName && (
+                <span className="inline-flex items-center rounded-md border border-slate-300 bg-slate-50 text-slate-700 px-2.5 py-1 text-sm font-semibold dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                  {item.documentIdentificationName}
+                </span>
+              )}
+              {item.documentNumber && (
+                <span className="inline-flex items-center rounded-md border border-slate-300 bg-white text-slate-700 px-2.5 py-1 text-sm font-mono font-semibold dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200">
+                  {item.documentNumber}
+                </span>
+              )}
+              <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-100 text-slate-500 px-2 py-1 text-xs font-mono dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400">
+                Bill #{item.billId}-{item.installmentId}
+              </span>
+            </div>
           </DialogDescription>
         </DialogHeader>
 
@@ -295,6 +355,77 @@ export function PaymentDetailModal({ item, open, onClose }: Props) {
                   </tfoot>
                 </table>
               </div>
+            </section>
+          )}
+
+          {/* SEÇÃO 5b: Histórico de Pagamentos ao Credor (todos os títulos) */}
+          {creditorReceipts.length > 0 && (
+            <section>
+              <SectionHeader>Histórico de Pagamentos ao Credor</SectionHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                <MoneyKV label="Total pago" value={creditorTotalPago} highlight />
+                <MoneyKV label="Total em aberto" value={creditorTotalAberto} />
+                <div className="flex items-center justify-between gap-3 py-1.5 px-2 rounded">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Títulos</span>
+                  <span className="text-xs font-medium tabular-nums text-slate-800 dark:text-slate-200">{creditorNumTitulos}</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/90 backdrop-blur">
+                    <tr className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                      {([
+                        { key: "paymentDate" as const, label: "Data", align: "left" },
+                        { key: "billId" as const, label: "Título", align: "left" },
+                        { key: "operationTypeName" as const, label: "Operação", align: "left" },
+                        { key: "netAmount" as const, label: "Líquido", align: "right" },
+                      ]).map(col => {
+                        const isSorted = histSort.field === col.key;
+                        const Icon = isSorted ? (histSort.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                        return (
+                          <th key={col.key} className={`font-semibold py-1.5 px-2 ${col.align === "right" ? "text-right" : "text-left"}`}>
+                            <button
+                              type="button"
+                              onClick={() => setHistSort(prev => ({ field: col.key, dir: prev.field === col.key && prev.dir === "desc" ? "asc" : "desc" }))}
+                              className={`inline-flex items-center gap-1 uppercase tracking-wider hover:text-slate-700 dark:hover:text-slate-200 select-none ${col.align === "right" ? "flex-row-reverse" : ""}`}
+                            >
+                              {col.label}
+                              <Icon className={`h-3 w-3 ${isSorted ? "text-blue-500" : "text-slate-300 dark:text-slate-600"}`} />
+                            </button>
+                          </th>
+                        );
+                      })}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {creditorReceipts.map((r, i) => {
+                      const isEstorno = r.netAmount < 0;
+                      const isCurrentBill = r.billId === item.billId && r.installmentId === item.installmentId;
+                      return (
+                        <tr key={i} className={`border-b border-slate-100 dark:border-slate-800 last:border-b-0 ${isCurrentBill ? "bg-blue-50/60 dark:bg-blue-950/20" : ""} ${isEstorno ? "italic" : ""}`}>
+                          <td className="py-1.5 px-2 text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatDate(r.paymentDate)}</td>
+                          <td className="py-1.5 px-2 text-slate-500 dark:text-slate-400 font-mono text-[10px] whitespace-nowrap">
+                            #{r.billId}-{r.installmentId}
+                            {r.documentNumber && <span className="ml-1 text-slate-400">· {r.documentNumber}</span>}
+                          </td>
+                          <td className="py-1.5 px-2">
+                            {isEstorno && <span className="text-red-600 dark:text-red-300/80 font-semibold mr-1 text-[10px] uppercase">Estorno</span>}
+                            <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${opBadgeClass(r.operationTypeName)}`}>
+                              {r.operationTypeName}
+                            </span>
+                          </td>
+                          <td className={`py-1.5 px-2 text-right tabular-nums font-semibold ${isEstorno ? "text-red-600 dark:text-red-300/80" : "text-slate-800 dark:text-slate-200"}`}>
+                            {formatCurrency(r.netAmount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
+                {creditorReceipts.length} pagamento(s) · linha destacada = parcela atual
+              </p>
             </section>
           )}
 

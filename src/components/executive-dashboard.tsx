@@ -6120,6 +6120,7 @@ export function ExecutiveDashboard() {
       {activeTab === "calendario-pagamento" && (
         <CalendarioPagamentoTab
           itemsAPagar={itemsAPagar}
+          allOutcomeItems={consistentItems}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
         />

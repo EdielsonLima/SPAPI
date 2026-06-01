@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays, List, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, List, Star, Search, X } from "lucide-react";
 import { formatCurrency, effectiveOpenAmount } from "@/lib/dashboard-utils";
 import { Button } from "@/components/ui/button";
 import { SiengeOutcome } from "@/types/sienge";
@@ -11,6 +11,8 @@ interface Props {
   // Items pendentes ja filtrados (correctedBalanceAmount > 0). Sao os mesmos
   // dados que alimentam a aba "Contas a Pagar".
   itemsAPagar: SiengeOutcome[];
+  // Base COMPLETA de outcome (abertos + pagos) para o histórico do credor. Opcional.
+  allOutcomeItems?: SiengeOutcome[];
   // Filtro de empresas selecionadas (mesmo state global do painel).
   selectedCompanies: Set<string>;
   // Filtro de doc types selecionados.
@@ -38,24 +40,40 @@ interface CalendarDay {
   count: number;
 }
 
-export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selectedDocTypes }: Props) {
+export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedCompanies, selectedDocTypes }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => getCurrentMonthKey());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<SiengeOutcome | null>(null);
+  const [search, setSearch] = useState("");
 
   const todayStr = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }, []);
 
-  // 1. Aplica filtros globais (empresa, doc type) sobre itemsAPagar
+  // 1. Aplica filtros globais (empresa, doc type) + busca por credor sobre itemsAPagar
   const filteredItems = useMemo(() => {
+    const q = search.trim().toLowerCase();
     return itemsAPagar.filter(item => {
       if (selectedCompanies.size > 0 && !selectedCompanies.has(item.companyName)) return false;
       if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName || "")) return false;
+      if (q) {
+        const hay = `${item.creditorName || ""} ${item.documentNumber || ""} ${item.companyName || ""}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
       return true;
     });
-  }, [itemsAPagar, selectedCompanies, selectedDocTypes]);
+  }, [itemsAPagar, selectedCompanies, selectedDocTypes, search]);
+
+  // Histórico do credor selecionado: todos os títulos (abertos + pagos).
+  const creditorHistory = useMemo(() => {
+    if (!selectedItem) return [];
+    const base = allOutcomeItems && allOutcomeItems.length > 0 ? allOutcomeItems : itemsAPagar;
+    const byId = selectedItem.creditorId != null && selectedItem.creditorId !== 0;
+    return base.filter(i =>
+      byId ? i.creditorId === selectedItem.creditorId : (i.creditorName || "") === (selectedItem.creditorName || "")
+    );
+  }, [selectedItem, allOutcomeItems, itemsAPagar]);
 
   // 2. Filtra pelo mes atual e calcula valor a pagar de cada parcela
   const monthItems = useMemo(() => {
@@ -331,6 +349,27 @@ export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selecte
               </Button>
             )}
           </div>
+          {/* Busca por credor */}
+          <div className="relative mb-2 flex-shrink-0">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar credor, documento ou empresa..."
+              className="w-full h-8 pl-8 pr-8 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500/40 focus:border-blue-400"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                title="Limpar busca"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
           <div className="flex-1 overflow-y-auto -mx-1 px-1 min-h-0">
             {visibleItems.length === 0 ? (
               <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-8">Nenhum pagamento</p>
@@ -386,6 +425,7 @@ export function CalendarioPagamentoTab({ itemsAPagar, selectedCompanies, selecte
         item={selectedItem}
         open={selectedItem !== null}
         onClose={() => setSelectedItem(null)}
+        creditorHistory={creditorHistory}
       />
     </div>
   );
