@@ -10,6 +10,31 @@ import { SiengeIncome } from "@/types/sienge";
 
 type HistSortField = "paymentDate" | "billId" | "termLabel" | "netAmount";
 
+// Cor da tag por tipo de parcela (paymentTerm.id do Sienge).
+function termBadgeClass(termId: string): string {
+  switch (termId) {
+    case "CH": // Entrega das chaves — destaque
+      return "border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300";
+    case "PA": // Parcela Anual
+    case "PS": // Parcelas Semestrais
+    case "PQ": // Parcelas Quadrimestrais
+      return "border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-300";
+    case "EN": // Entrada
+    case "AT": // Ato
+    case "PI": // Parcelas Iniciais
+      return "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-300";
+    case "PE": // Permuta
+      return "border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-700 dark:bg-rose-950/40 dark:text-rose-300";
+    case "FI": // Financiamento
+      return "border-cyan-300 bg-cyan-50 text-cyan-700 dark:border-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-300";
+    case "PM": // Parcelas Mensais
+    case "PD": // Parcelas 10 meses
+      return "border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-300";
+    default:
+      return "border-slate-300 bg-slate-50 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300";
+  }
+}
+
 interface Props {
   item: SiengeIncome | null;
   open: boolean;
@@ -70,6 +95,7 @@ export function ReceiptDetailModal({ item, open, onClose, clientHistory }: Props
           installmentId: bill.installmentId,
           documentNumber: bill.documentNumber || "",
           termLabel: termLabel(bill),
+          termId: (bill.paymentTerm?.id || "").toUpperCase(),
           netAmount: p.netAmount || 0,
         }))
     );
@@ -309,9 +335,11 @@ export function ReceiptDetailModal({ item, open, onClose, clientHistory }: Props
                             #{r.billId}-{r.installmentId}
                             {r.documentNumber && <span className="ml-1 text-slate-400">· {r.documentNumber}</span>}
                           </td>
-                          <td className="py-1.5 px-2 text-slate-700 dark:text-slate-300">
-                            {isEstorno && <span className="text-red-600 dark:text-red-300/80 font-semibold mr-1">Estorno:</span>}
-                            {r.termLabel}
+                          <td className="py-1.5 px-2">
+                            {isEstorno && <span className="text-red-600 dark:text-red-300/80 font-semibold mr-1 text-[10px] uppercase">Estorno</span>}
+                            <span className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${termBadgeClass(r.termId)}`}>
+                              {r.termLabel}
+                            </span>
                           </td>
                           <td className={`py-1.5 px-2 text-right tabular-nums font-semibold ${isEstorno ? "text-red-600 dark:text-red-300/80" : "text-slate-800 dark:text-slate-200"}`}>
                             {formatCurrency(r.netAmount)}
