@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { SiengeOutcome, SiengeIncome, SiengeBankMovement } from "@/types/sienge";
 import { getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
+import { useCompanyMode } from "@/lib/company-context";
 import { toast } from "sonner";
 
 type ContasItem = SiengeOutcome | SiengeIncome;
@@ -329,6 +330,10 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const isPagas = mode === "pagas";
 
   const currentYear = new Date().getFullYear();
+
+  // Modo empresa (seletor SP/Holding no sidebar). Holding mostra SOMENTE a
+  // administradora; Silva Packer mostra todas EXCETO a administradora.
+  const { isHolding, holdingName } = useCompanyMode();
 
   const [items, setItems] = useState<ContasItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -722,49 +727,61 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return d;
   }, []);
 
+  // Escopo por modo de empresa: filtra TODOS os dados (tabela, KPIs e listas de
+  // filtros) antes de qualquer outra coisa. Holding → só a administradora;
+  // Silva Packer → todas exceto a administradora. Garante que nenhuma outra
+  // empresa apareça em nenhum filtro quando a Holding está selecionada.
+  const scopedItems = useMemo(() => {
+    return items.filter((item) =>
+      isHolding
+        ? item.companyName === holdingName
+        : item.companyName !== holdingName
+    );
+  }, [items, isHolding, holdingName]);
+
   // Extract unique values for filters
   const empresaNames = useMemo(() => {
     const set = new Set<string>();
-    items.forEach((item) => {
+    scopedItems.forEach((item) => {
       if (item.companyName) set.add(item.companyName);
     });
     return Array.from(set).sort();
-  }, [items]);
+  }, [scopedItems]);
 
   const centroCustoNames = useMemo(() => {
     const set = new Set<string>();
-    items.forEach((item) => {
+    scopedItems.forEach((item) => {
       if (filterEmpresas.size > 0 && !filterEmpresas.has(item.companyName)) return;
       item.paymentsCategories?.forEach((cat) => {
         if (cat.costCenterName) set.add(cat.costCenterName);
       });
     });
     return Array.from(set).sort();
-  }, [items, filterEmpresas]);
+  }, [scopedItems, filterEmpresas]);
 
   const credorNames = useMemo(() => {
     const set = new Set<string>();
-    items.forEach((item) => {
+    scopedItems.forEach((item) => {
       const name = getCounterpartName(item);
       if (name) set.add(name);
     });
     return Array.from(set).sort();
-  }, [items]);
+  }, [scopedItems]);
 
   const tiposDocumento = useMemo(() => {
     const set = new Set<string>();
-    items.forEach((item) => {
+    scopedItems.forEach((item) => {
       const tipo = item.documentIdentificationId?.trim();
       if (tipo) set.add(tipo);
     });
     return Array.from(set).sort();
-  }, [items]);
+  }, [scopedItems]);
 
   const NO_ITEM_ORCAMENTO = "(Sem item)";
   const itemOrcamentoNames = useMemo(() => {
     const set = new Set<string>();
     let hasEmpty = false;
-    items.forEach((item) => {
+    scopedItems.forEach((item) => {
       const costs = getBuildingsCosts(item);
       if (costs.length === 0 || costs.every(bc => !bc.costEstimationSheetName)) {
         hasEmpty = true;
@@ -776,36 +793,61 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     const sorted = Array.from(set).sort();
     if (hasEmpty) sorted.unshift(NO_ITEM_ORCAMENTO);
     return sorted;
-  }, [items]);
+  }, [scopedItems]);
 
   const tituloIds = useMemo(() => {
     const set = new Set<string>();
-    items.forEach((item) => {
+    scopedItems.forEach((item) => {
       if (item.billId) set.add(String(item.billId));
     });
     return Array.from(set).sort((a, b) => Number(a) - Number(b));
-  }, [items]);
+  }, [scopedItems]);
 
   const planoFinanceiroNames = useMemo(() => {
     const set = new Set<string>();
-    items.forEach((item) => {
+    scopedItems.forEach((item) => {
       item.paymentsCategories?.forEach((cat) => {
         if (cat.financialCategoryName) set.add(cat.financialCategoryName);
       });
     });
     return Array.from(set).sort();
-  }, [items]);
+  }, [scopedItems]);
 
   const tiposBaixa = useMemo(() => {
     if (!isIncome && !isPagas) return [];
     const set = new Set<string>();
-    items.forEach((item) => {
+    scopedItems.forEach((item) => {
       (item.payments || []).forEach((p) => {
         if (p.operationTypeName) set.add(p.operationTypeName);
       });
     });
     return Array.from(set).sort();
-  }, [items, isIncome, isPagas]);
+  }, [scopedItems, isIncome, isPagas]);
+
+  // Mantém as seleções de filtro sempre dentro do escopo atual (modo SP/Holding).
+  // Ao alternar o modo, remove valores que não existem no novo escopo (empresa,
+  // credor, plano, etc.) para não zerar a tabela por um filtro preso da outra
+  // empresa. Só roda com dados carregados (lista vazia = ainda sem dados).
+  useEffect(() => {
+    if (scopedItems.length === 0) return;
+    const prune = (set: Set<string>, allowed: string[]): Set<string> => {
+      if (set.size === 0) return set;
+      const allowedSet = new Set(allowed);
+      let changed = false;
+      const next = new Set<string>();
+      set.forEach((v) => { if (allowedSet.has(v)) next.add(v); else changed = true; });
+      return changed ? next : set;
+    };
+    setFilterEmpresas((s) => prune(s, empresaNames));
+    setFilterCentrosCusto((s) => prune(s, centroCustoNames));
+    setFilterCredores((s) => prune(s, credorNames));
+    setFilterTipoDoc((s) => prune(s, tiposDocumento));
+    setFilterPlanoFinanceiro((s) => prune(s, planoFinanceiroNames));
+    setFilterItemOrcamento((s) => prune(s, itemOrcamentoNames));
+    setFilterTitulo((s) => prune(s, tituloIds));
+    setFilterTipoBaixa((s) => prune(s, tiposBaixa));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scopedItems.length, empresaNames, centroCustoNames, credorNames, tiposDocumento, planoFinanceiroNames, itemOrcamentoNames, tituloIds, tiposBaixa]);
 
   // Auto-initialize tipo baixa filter for pagas: select all except excluded types
   // Build empresa key for per-company tipo operação saving
@@ -902,14 +944,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     }
     // Para a-receber/vencidas: extrair anos dos dados reais
     const years = new Set<string>();
-    items.forEach(i => {
+    scopedItems.forEach(i => {
       if (i.dueDate) years.add(i.dueDate.substring(0, 4));
     });
     if (years.size === 0) {
       return Array.from({ length: 6 }, (_, i) => String(currentYear + i));
     }
     return Array.from(years).sort();
-  }, [currentYear, isPagas, items]);
+  }, [currentYear, isPagas, scopedItems]);
 
   const mesesDisponiveis = ["01","02","03","04","05","06","07","08","09","10","11","12"];
 
@@ -925,7 +967,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
   // Filter
   const filtered = useMemo(() => {
-    return items.filter((item) => {
+    return scopedItems.filter((item) => {
       // Exclude bills configured in Configuracoes > Exclusao de Titulos
       if (exclusionSet.size > 0 && exclusionSet.has(`${item.companyId}:${item.billId}`)) return false;
       // Holding: mantém previsões para bater com o Sienge "(por Credor) Sintético".
@@ -1073,7 +1115,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [items, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAnos, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
+  }, [scopedItems, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAnos, filterMes, filterDia, isOverdue, isPagas, isIncome, today, exclusionSet]);
 
   // Sort
   const handleSort = (field: SortField) => {
