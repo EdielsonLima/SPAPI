@@ -10,6 +10,9 @@ interface Props {
   item: SiengeIncome | null;
   open: boolean;
   onClose: () => void;
+  // Todos os títulos do mesmo cliente (abertos + pagos) para montar o histórico
+  // de pagamentos. Opcional — quando ausente, a seção de histórico não aparece.
+  clientHistory?: SiengeIncome[];
 }
 
 const SectionHeader = ({ children }: { children: React.ReactNode }) => (
@@ -34,7 +37,7 @@ const MoneyKV = ({ label, value, highlight = false }: { label: string; value: nu
   </div>
 );
 
-export function ReceiptDetailModal({ item, open, onClose }: Props) {
+export function ReceiptDetailModal({ item, open, onClose, clientHistory }: Props) {
   if (!item) return null;
 
   const aberto = effectiveOpenAmount(item, true);
@@ -43,6 +46,26 @@ export function ReceiptDetailModal({ item, open, onClose }: Props) {
 
   const totalRecebido = payments.reduce((s, p) => s + (p.netAmount || 0), 0);
   const paymentsSorted = [...payments].sort((a, b) => (b.paymentDate || "").localeCompare(a.paymentDate || ""));
+
+  // Histórico completo de pagamentos do cliente (todos os títulos).
+  const history = (clientHistory || []).filter(b => b.billId !== undefined);
+  const clientReceipts = history
+    .flatMap(bill =>
+      (bill.payments || [])
+        .filter(p => p.paymentDate)
+        .map(p => ({
+          paymentDate: p.paymentDate as string,
+          billId: bill.billId,
+          installmentId: bill.installmentId,
+          documentNumber: bill.documentNumber || "",
+          operationTypeName: p.operationTypeName || "-",
+          netAmount: p.netAmount || 0,
+        }))
+    )
+    .sort((a, b) => (b.paymentDate || "").localeCompare(a.paymentDate || ""));
+  const clientTotalRecebido = clientReceipts.reduce((s, r) => s + r.netAmount, 0);
+  const clientTotalAberto = history.reduce((s, b) => s + effectiveOpenAmount(b, true), 0);
+  const clientNumTitulos = new Set(history.map(b => b.billId)).size;
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
@@ -213,6 +236,58 @@ export function ReceiptDetailModal({ item, open, onClose }: Props) {
                   </tfoot>
                 </table>
               </div>
+            </section>
+          )}
+
+          {/* SEÇÃO 4b: Histórico de Pagamentos do Cliente (todos os títulos) */}
+          {clientReceipts.length > 0 && (
+            <section>
+              <SectionHeader>Histórico de Pagamentos do Cliente</SectionHeader>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                <MoneyKV label="Total recebido" value={clientTotalRecebido} highlight />
+                <MoneyKV label="Total em aberto" value={clientTotalAberto} />
+                <div className="flex items-center justify-between gap-3 py-1.5 px-2 rounded">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Títulos</span>
+                  <span className="text-xs font-medium tabular-nums text-slate-800 dark:text-slate-200">{clientNumTitulos}</span>
+                </div>
+              </div>
+              <div className="overflow-x-auto max-h-64 overflow-y-auto rounded-md border border-slate-200 dark:border-slate-700">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-slate-50 dark:bg-slate-800/90 backdrop-blur">
+                    <tr className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                      <th className="text-left font-semibold py-1.5 px-2">Data</th>
+                      <th className="text-left font-semibold py-1.5 px-2">Título</th>
+                      <th className="text-left font-semibold py-1.5 px-2">Operação</th>
+                      <th className="text-right font-semibold py-1.5 px-2">Líquido</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientReceipts.map((r, i) => {
+                      const isEstorno = r.netAmount < 0;
+                      const isCurrentBill = r.billId === item.billId && r.installmentId === item.installmentId;
+                      return (
+                        <tr key={i} className={`border-b border-slate-100 dark:border-slate-800 last:border-b-0 ${isCurrentBill ? "bg-emerald-50/60 dark:bg-emerald-950/20" : ""} ${isEstorno ? "italic" : ""}`}>
+                          <td className="py-1.5 px-2 text-slate-700 dark:text-slate-300 whitespace-nowrap">{formatDate(r.paymentDate)}</td>
+                          <td className="py-1.5 px-2 text-slate-500 dark:text-slate-400 font-mono text-[10px] whitespace-nowrap">
+                            #{r.billId}-{r.installmentId}
+                            {r.documentNumber && <span className="ml-1 text-slate-400">· {r.documentNumber}</span>}
+                          </td>
+                          <td className="py-1.5 px-2 text-slate-700 dark:text-slate-300">
+                            {isEstorno && <span className="text-red-600 dark:text-red-300/80 font-semibold mr-1">Estorno:</span>}
+                            {r.operationTypeName}
+                          </td>
+                          <td className={`py-1.5 px-2 text-right tabular-nums font-semibold ${isEstorno ? "text-red-600 dark:text-red-300/80" : "text-slate-800 dark:text-slate-200"}`}>
+                            {formatCurrency(r.netAmount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1.5">
+                {clientReceipts.length} pagamento(s) · linha destacada = parcela atual
+              </p>
             </section>
           )}
 

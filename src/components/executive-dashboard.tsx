@@ -6129,6 +6129,7 @@ export function ExecutiveDashboard() {
       {activeTab === "calendario-recebimento" && (
         <CalendarioRecebimentoTab
           itemsAReceber={itemsAReceber}
+          allIncomeItems={consistentIncome}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
         />

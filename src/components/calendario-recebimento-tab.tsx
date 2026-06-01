@@ -11,6 +11,9 @@ interface Props {
   // Items pendentes ja filtrados (correctedBalanceAmount > 0). Sao os mesmos
   // dados que alimentam a aba "Contas a Receber".
   itemsAReceber: SiengeIncome[];
+  // Base COMPLETA de income (abertos + pagos) para montar o histórico do cliente
+  // no modal. Opcional para retrocompatibilidade.
+  allIncomeItems?: SiengeIncome[];
   // Filtro de empresas selecionadas (mesmo state global do painel).
   selectedCompanies: Set<string>;
   // Filtro de doc types selecionados.
@@ -38,7 +41,7 @@ interface CalendarDay {
   count: number;
 }
 
-export function CalendarioRecebimentoTab({ itemsAReceber, selectedCompanies, selectedDocTypes }: Props) {
+export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, selectedCompanies, selectedDocTypes }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => getCurrentMonthKey());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<SiengeIncome | null>(null);
@@ -171,6 +174,18 @@ export function CalendarioRecebimentoTab({ itemsAReceber, selectedCompanies, sel
     const [y, m, d] = selectedDay.split("-").map(Number);
     return new Date(y, m - 1, d).toLocaleDateString("pt-BR");
   }, [selectedDay]);
+
+  // Histórico do cliente selecionado: todos os títulos (abertos + pagos) do mesmo
+  // cliente, identificado por clientId (fallback clientName). Usa a base completa
+  // de income quando disponível; senão cai nos itens a receber.
+  const clientHistory = useMemo(() => {
+    if (!selectedItem) return [];
+    const base = allIncomeItems && allIncomeItems.length > 0 ? allIncomeItems : itemsAReceber;
+    const byId = selectedItem.clientId != null && selectedItem.clientId !== 0;
+    return base.filter(i =>
+      byId ? i.clientId === selectedItem.clientId : (i.clientName || "") === (selectedItem.clientName || "")
+    );
+  }, [selectedItem, allIncomeItems, itemsAReceber]);
 
   const handleDayClick = (date: string, isOutside: boolean, amount: number) => {
     if (isOutside || amount === 0) return;
@@ -386,6 +401,7 @@ export function CalendarioRecebimentoTab({ itemsAReceber, selectedCompanies, sel
         item={selectedItem}
         open={selectedItem !== null}
         onClose={() => setSelectedItem(null)}
+        clientHistory={clientHistory}
       />
     </div>
   );
