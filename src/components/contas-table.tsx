@@ -385,6 +385,11 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     return new Set<string>();
   });
   const [filterTipoBaixa, setFilterTipoBaixa] = useState<Set<string>>(new Set());
+  // Contas Recebidas: "Processar lançamentos referentes a" (igual ao Sienge).
+  // "ambos" = títulos a receber + Caixa e Bancos (preserva o comportamento já
+  // validado das demais empresas, que inclui rendimentos órfãos). "receber" = só
+  // títulos; "caixa" = só movimentos de Caixa e Bancos (originId === "BM").
+  const [processMode, setProcessMode] = useState<"receber" | "caixa" | "ambos">("ambos");
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [tipoBaixaInitialized, setTipoBaixaInitialized] = useState(false);
   // Escopo (sp/holding) já inicializado para o filtro de tipo documento.
@@ -589,17 +594,32 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 if ((bm as any).bankMovementOperationType !== "E") return false;
                 const historic = (bm.bankMovementHistoricName || "").toLowerCase().trim();
-                if (historic.includes("transferência") || historic.includes("transferencia")) return false;
+                // Transferência interna entre caixas nunca é recebimento.
+                if (historic.includes("entre caixas")) return false;
                 if (historic === "aplicação" || historic === "aplicacao") return false;
                 if (historic.includes("pagamento") || historic.includes("saque") ||
                     historic.includes("depósito") || historic.includes("deposito") ||
                     historic.includes("cheque emitido")) return false;
                 const cats = bm.financialCategories || [];
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const catNames = cats.map((fc: any) => (fc.financialCategoryName || "").toLowerCase()).join(" ");
+                // Lançamentos com histórico "Transferência": para a maioria das
+                // empresas são movimentações internas (validado — ficam fora). MAS
+                // a HOLDING recebe aluguel registrado como "Transferência" com
+                // categoria "Receita de Locação" (Caixa e Bancos no Sienge). Só
+                // nesse caso (Holding + categoria de receita não-transferência) o
+                // lançamento é incluído. As demais empresas seguem inalteradas.
+                const isTransferHistoric = historic.includes("transfer");
+                if (isTransferHistoric) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const receitaNonTransfer = cats.some((fc: any) =>
+                    fc.financialCategoryType === "R" && !/transfer/i.test(fc.financialCategoryName || ""));
+                  return isHoldingCompany(bm.companyName) && receitaNonTransfer;
+                }
+                // Demais lançamentos: regra original (validada nas 12 empresas).
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const isReceita = cats.length === 0 || cats.some((fc: any) => fc.financialCategoryType === "R");
                 if (!isReceita) return false;
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const catNames = cats.map((fc: any) => (fc.financialCategoryName || "").toLowerCase()).join(" ");
                 if (catNames.includes("transferência") || catNames.includes("transferencia")) return false;
                 return true;
               })
@@ -610,11 +630,18 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                 companyId: bm.companyId,
                 companyName: bm.companyName,
                 clientId: 0,
-                // Movimentos bancários sintetizados (rendimentos, tarifas, estornos)
-                // não têm cliente. Em vez de "(sem cliente)", usa a descrição real
-                // do banco (bankMovementHistoricName) e, na falta dela, um rótulo
-                // bancário agrupador. Assim ficam identificáveis e agrupados.
-                clientName: (bm.bankMovementHistoricName || "").trim() || "Rendimentos / Tarifas Bancárias",
+                // Movimentos bancários sintetizados (rendimentos, tarifas, aluguéis
+                // recebidos via Caixa/Bancos) não têm cliente. Em vez de "(sem
+                // cliente)", usa um rótulo claro: para históricos genéricos como
+                // "Transferência" (aluguéis da Holding) usa a categoria de receita
+                // (ex.: "Receita de Locação"); senão usa a descrição do banco.
+                clientName: (() => {
+                  const hist = (bm.bankMovementHistoricName || "").trim();
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const recCat = (bm.financialCategories || []).find((fc: any) => fc.financialCategoryType === "R")?.financialCategoryName?.trim();
+                  if (hist && !/^transfer/i.test(hist)) return hist;
+                  return recCat || hist || "Rendimentos / Tarifas Bancárias";
+                })(),
                 documentIdentificationId: bm.documentIdentificationId || "MB",
                 documentIdentificationName: bm.documentIdentificationName || "MOV. BANCÁRIO",
                 documentIdentificationNumber: "",
@@ -991,6 +1018,16 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
       const keepExcludedDoc = isIncome && (isHolding || shouldKeepIncomeExcludedDoc(item.companyId, item.billId, item.installmentId));
       if (isIncome && isExcludedFinancialDocType(item.documentIdentificationName, item.forecastDocument, { excludeLocacao: !keepExcludedDoc })) return false;
 
+      // Contas Recebidas: "Processar lançamentos referentes a" (igual ao Sienge).
+      // Itens de Caixa e Bancos são os movimentos bancários sintetizados (originId
+      // === "BM"); o restante são títulos a receber (originId "CO"/"CR").
+      if (isPagas && isIncome) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const isBank = (item as any).originId === "BM";
+        if (processMode === "receber" && isBank) return false;
+        if (processMode === "caixa" && !isBank) return false;
+      }
+
       const matchesYear = (date: string | undefined) => {
         if (filterAnos.size === 0) return true;
         if (!date) return false;
@@ -1130,7 +1167,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
 
       return true;
     });
-  }, [scopedItems, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAnos, filterMes, filterDia, isOverdue, isPagas, isIncome, isHolding, today, exclusionSet]);
+  }, [scopedItems, search, filterEmpresas, filterCentrosCusto, filterCredores, filterTipoDoc, filterPlanoFinanceiro, filterItemOrcamento, filterTitulo, filterTipoBaixa, filterAnos, filterMes, filterDia, isOverdue, isPagas, isIncome, isHolding, processMode, today, exclusionSet]);
 
   // Sort
   const handleSort = (field: SortField) => {
@@ -1736,6 +1773,22 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                       toast.success(filterEmpresas.size > 0 ? `Padrão salvo para ${Array.from(filterEmpresas).join(", ")}` : "Padrão global de tipo operação salvo!");
                     }}
                   />
+                </div>
+              )}
+
+              {isPagas && isIncome && (
+                <div className="min-w-[180px]">
+                  <label className="text-xs font-medium text-slate-500 mb-1 block">Processar</label>
+                  <Select value={processMode} onValueChange={(v) => { setProcessMode(v as "receber" | "caixa" | "ambos"); setPage(0); }}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ambos">Ambos</SelectItem>
+                      <SelectItem value="receber">Contas a Receber</SelectItem>
+                      <SelectItem value="caixa">Caixa e Bancos</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               )}
 
