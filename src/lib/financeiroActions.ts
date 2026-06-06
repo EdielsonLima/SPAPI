@@ -19,6 +19,7 @@ import {
   isExcludedFinancialDocType,
   normalizeFilterText,
 } from "@/lib/dashboard-utils";
+import { BANK_NAMES, isInDimBanco } from "@/lib/dimBanco";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 function todayISO(): string {
@@ -426,18 +427,20 @@ export async function saldosBancarios(args: { empresa?: string } = {}) {
   const companyName = new Map<string, string>(companies.map((c) => [String(c.id), c.name]));
 
   type Bal = { accountId?: string; amount?: number };
-  const porEmpresa = new Map<string, { saldo: number; contas: { conta: string; saldo: number; saldo_fmt: string }[] }>();
+  const porEmpresa = new Map<string, { saldo: number; contas: { banco: string; conta: string; saldo: number; saldo_fmt: string }[] }>();
   let total = 0;
   for (const r of achou.rows as Bal[]) {
     const [cid, ...rest] = String(r.accountId || "").split(":");
     const conta = rest.join(":") || "?";
+    // Mesmo filtro da aba Saldos do Painel: so contas do DimBanco
+    if (!isInDimBanco(conta, Number(cid))) continue;
     const co = companyName.get(cid) || `Empresa ${cid || "?"}`;
     if (!matchEmpresa(co, args.empresa)) continue;
     if (!porEmpresa.has(co)) porEmpresa.set(co, { saldo: 0, contas: [] });
     const e = porEmpresa.get(co)!;
     const s = r.amount || 0;
     e.saldo += s; total += s;
-    e.contas.push({ conta, saldo: s, saldo_fmt: fmtBRL(s) });
+    e.contas.push({ banco: BANK_NAMES[conta] || conta, conta, saldo: s, saldo_fmt: fmtBRL(s) });
   }
 
   const empresas = Array.from(porEmpresa.entries())

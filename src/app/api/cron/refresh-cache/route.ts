@@ -13,8 +13,9 @@
 // O processamento de income (merge D+P, receipts->payments, receivedNetAmount)
 // e uma COPIA de src/app/api/sienge/income/route.ts — manter em sincronia.
 import { NextRequest, NextResponse } from "next/server";
-import { cacheOutcome, cacheIncome, cacheBankMovements } from "@/lib/db";
-import { siengeBulkGet } from "@/lib/sienge";
+import { cacheOutcome, cacheIncome, cacheBankMovements, cacheDailyBalance, getCachedDailyBalance, getCachedCompanies } from "@/lib/db";
+import { siengeBulkGet, siengeGet } from "@/lib/sienge";
+import { expectedDimBancoKeys } from "@/lib/dimBanco";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -160,6 +161,68 @@ export async function POST(req: NextRequest) {
 
     await cacheIncome(START, END, { data: mergedData });
     resumo.income = mergedData.length;
+
+    // ── 4. Saldos bancarios de ONTEM (cached_daily_balances) ──
+    // Mesma logica da aba Saldos: pagina /accounts-balances, completa empresas
+    // faltantes e preenche contas DimBanco ausentes com o ultimo valor conhecido.
+    try {
+      const ontemD = new Date(); ontemD.setDate(ontemD.getDate() - 1);
+      const ontem = `${ontemD.getFullYear()}-${String(ontemD.getMonth() + 1).padStart(2, "0")}-${String(ontemD.getDate()).padStart(2, "0")}`;
+
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const allAccounts: any[] = [];
+      const firstPage: any = await siengeGet("/accounts-balances", { balanceDate: ontem, offset: "0", limit: "200" });
+      const results = firstPage?.results || [];
+      const total = firstPage?.resultSetMetadata?.count || results.length;
+      allAccounts.push(...results);
+      let offset = results.length;
+      while (offset < total) {
+        const page: any = await siengeGet("/accounts-balances", { balanceDate: ontem, offset: String(offset), limit: "200" });
+        const pr = page?.results || [];
+        if (pr.length === 0) break;
+        allAccounts.push(...pr);
+        offset += pr.length;
+      }
+      // Empresas que nao vieram na paginacao geral
+      const companies = await getCachedCompanies();
+      const companyIds = companies.map((c) => c.id);
+      const seenCompanies = new Set(allAccounts.map((a: any) => a.companyId));
+      for (const compId of companyIds.filter((id) => !seenCompanies.has(id))) {
+        try {
+          const cp: any = await siengeGet("/accounts-balances", { balanceDate: ontem, companyId: String(compId), offset: "0", limit: "100" });
+          allAccounts.push(...(cp?.results || []));
+        } catch { /* segue */ }
+      }
+
+      const mapped: { accountId: string; amount: number }[] = allAccounts.map((a: any) => ({
+        accountId: `${a.companyId}:${a.accountNumber}`,
+        amount: a.amount ?? 0,
+      }));
+      /* eslint-enable @typescript-eslint/no-explicit-any */
+
+      // Preenche contas DimBanco ausentes com o ultimo valor conhecido do cache
+      const lastKnown: Record<string, number> = {};
+      for (let k = 2; k <= 8; k++) {
+        const d = new Date(); d.setDate(d.getDate() - k);
+        const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const prev = (await getCachedDailyBalance(iso)) as { accountId: string; amount: number }[] | null;
+        if (prev) {
+          for (const e of prev) if (!(e.accountId in lastKnown)) lastKnown[e.accountId] = e.amount;
+          break;
+        }
+      }
+      const seenKeys = new Set(mapped.map((m) => m.accountId));
+      for (const ek of expectedDimBancoKeys()) {
+        if (!seenKeys.has(ek)) mapped.push({ accountId: ek, amount: lastKnown[ek] ?? 0 });
+      }
+
+      await cacheDailyBalance(ontem, mapped);
+      resumo.saldosContas = mapped.length;
+      resumo.saldosData = ontem;
+    } catch (e) {
+      // Saldos sao best-effort: nao derruba o refresh principal
+      resumo.saldosErro = e instanceof Error ? e.message : String(e);
+    }
 
     resumo.duracaoSegundos = Math.round((Date.now() - t0) / 1000);
     return NextResponse.json({ ok: true, range: { START, END }, ...resumo });
