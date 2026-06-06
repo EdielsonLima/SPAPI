@@ -42,8 +42,8 @@ const TOOLS = [
     name: "resumo_contas_receber",
     fn: resumoContasReceber,
     description:
-      "Resumo de Contas a Receber: a receber (saldo aberto) e inadimplencia (aberto vencido), totais e por empresa. Params: 'empresa' (filtra por nome), 'agruparPorCliente' (top 30 clientes).",
-    inputSchema: { type: "object", properties: { empresa: { type: "string" }, agruparPorCliente: { type: "boolean" } } },
+      "Resumo de Contas a Receber: a receber (saldo aberto) e inadimplencia (aberto vencido), totais e por empresa. Params: 'empresa' (filtra por nome), 'agruparPorCliente' (top 30 clientes), 'de'/'ate' (janela de VENCIMENTO, DD/MM/YYYY ou YYYY-MM-DD — ex.: recebimentos de amanha), 'detalhar' (lista as parcelas: cliente, empresa, titulo, vencimento, valor), 'limit' (default 100).",
+    inputSchema: { type: "object", properties: { empresa: { type: "string" }, agruparPorCliente: { type: "boolean" }, de: { type: "string" }, ate: { type: "string" }, detalhar: { type: "boolean" }, limit: { type: "integer" } } },
   },
   {
     name: "inadimplencia_detalhe",

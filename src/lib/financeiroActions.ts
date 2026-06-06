@@ -163,13 +163,19 @@ export async function resumoContasPagar(
 // ── 2. Resumo Contas a Receber ──────────────────────────────────────────────
 // A receber = saldo aberto (effectiveOpenAmount isIncome=true, sem subtrair
 // taxAmount). Inadimplencia = aberto com dueDate < hoje. Exclui Holding/Admin.
-export async function resumoContasReceber(args: { empresa?: string; agruparPorCliente?: boolean } = {}) {
+export async function resumoContasReceber(
+  args: { empresa?: string; agruparPorCliente?: boolean; de?: string; ate?: string; detalhar?: boolean; limit?: number } = {}
+) {
   const hoje = todayISO();
+  const de = parseDataISO(args.de);
+  const ate = parseDataISO(args.ate);
   const cache = await getCachedIncomeContaining("2023-01-01", "2027-12-31");
-  const items = extractItems(cache) as (OutcomeItem & { clientName?: string })[];
+  const items = extractItems(cache) as (OutcomeItem & { clientName?: string; billId?: number; installmentId?: number })[];
 
   const porEmpresa = new Map<string, { aReceber: number; inadimplencia: number; qtd: number; qtdInad: number }>();
   const porCliente = new Map<string, { aReceber: number; inadimplencia: number }>();
+  type ParcelaDet = { cliente: string; empresa: string; titulo: number | null; parcela: number | null; documento: string | null; vencimento: string; valor: number; valor_fmt: string };
+  const parcelasDet: ParcelaDet[] = [];
   let totalReceber = 0, totalInad = 0, qtd = 0, qtdInad = 0;
 
   for (const i of items) {
@@ -177,8 +183,20 @@ export async function resumoContasReceber(args: { empresa?: string; agruparPorCl
     if (isExcludedFinancialDocType(i.documentIdentificationName, i.forecastDocument)) continue;
     if (isHolding(i.companyName)) continue;
     if (!matchEmpresa(i.companyName, args.empresa)) continue;
+    const venc = i.dueDate ? String(i.dueDate).split("T")[0] : "";
+    if (de && (!venc || venc < de)) continue;
+    if (ate && (!venc || venc > ate)) continue;
     const eff = effectiveOpenAmount(i, true);
     if (eff <= 0) continue;
+
+    if (args.detalhar) {
+      parcelasDet.push({
+        cliente: i.clientName || i.creditorName || "(sem cliente)", empresa: i.companyName || "(sem empresa)",
+        titulo: i.billId ?? null, parcela: i.installmentId ?? null,
+        documento: i.documentIdentificationName ?? null, vencimento: venc,
+        valor: eff, valor_fmt: fmtBRL(eff),
+      });
+    }
 
     const inad = !!i.dueDate && i.dueDate < hoje;
     const co = i.companyName || "(sem empresa)";
@@ -205,16 +223,21 @@ export async function resumoContasReceber(args: { empresa?: string; agruparPorCl
         .sort((a, b) => b.aReceber - a.aReceber).slice(0, 30)
     : undefined;
 
+  if (args.detalhar) {
+    parcelasDet.sort((a, b) => a.vencimento === b.vencimento ? b.valor - a.valor : a.vencimento.localeCompare(b.vencimento));
+  }
+
   return {
     referencia: hoje,
     cacheAtualizadoEm: cache?.cachedAt ?? null,
-    filtroEmpresa: args.empresa ?? null,
+    filtros: { empresa: args.empresa ?? null, de: de ?? null, ate: ate ?? null },
     totais: {
       aReceber: totalReceber, aReceber_fmt: fmtBRL(totalReceber), qtd,
       inadimplencia: totalInad, inadimplencia_fmt: fmtBRL(totalInad), qtdInad,
     },
     porEmpresa: empresas,
     ...(clientes ? { porCliente: clientes } : {}),
+    ...(args.detalhar ? { parcelas: parcelasDet.slice(0, args.limit ?? 100) } : {}),
     nota: "v1: 'a receber' = saldo aberto; inadimplencia = aberto vencido. 'Recebidas' (pagas) sera adicionado apos validar o shape de income.payments.",
   };
 }
