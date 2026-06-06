@@ -69,6 +69,15 @@ Adicione este servidor ao `.mcp.json` do plugin (ou crie um plugin novo):
 - **Agendado:** tarefa do Cowork (ex.: toda segunda 8h) que roda o resumo e posta
   no grupo, igual ao resumo semanal de orçado×realizado que já roda.
 
+## Cron de refresh do cache (sem depender do Painel)
+
+- **`POST /api/cron/refresh-cache`** (auth `x-cron-secret` ou `?k=` == `CRON_SECRET`/`MCP_API_TOKEN`):
+  atualiza `cached_outcome`, `cached_income` e `cached_bank_movements` direto do Sienge,
+  com o mesmo range/params do Painel (2016–2031).
+- **`.github/workflows/cron-refresh-cache.yml`**: dispara o endpoint todo dia às 06h BRT
+  (antes do relatório das 7h30 no WhatsApp). Requer o secret `CRON_SECRET` no GitHub
+  (mesmo valor do `MCP_API_TOKEN`). Pode ser disparado manualmente em Actions → Run workflow.
+
 ## Roadmap (v1 → v2)
 
 - `resumo_contas_receber` v1 cobre *a receber* (aberto) e *inadimplência*.

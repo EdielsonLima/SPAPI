@@ -1,0 +1,38 @@
+# Refresh diário do cache financeiro da spapi (outcome/income/BMs avulsos),
+# direto do Sienge — roda ANTES do relatório das 7h30 BRT no WhatsApp.
+# Mesmo padrão do cron-sync do app de metas.
+#
+# Requer o secret CRON_SECRET no GitHub (Settings > Secrets and variables >
+# Actions) com o MESMO valor do MCP_API_TOKEN (ou CRON_SECRET) do Railway.
+name: cron-refresh-cache
+
+on:
+  schedule:
+    # 09:00 UTC = 06:00 BRT — antes do relatório diário (7h30 BRT)
+    - cron: "0 9 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Chamar /api/cron/refresh-cache
+        run: |
+          set -e
+          for attempt in 1 2 3; do
+            echo "Tentativa $attempt..."
+            code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" --max-time 290 \
+              -X POST \
+              -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+              "https://spapi-production.up.railway.app/api/cron/refresh-cache") || code=000
+            echo "HTTP $code"
+            cat /tmp/resp.json || true
+            echo ""
+            if [ "$code" = "200" ]; then
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Falhou após 3 tentativas"
+          exit 1
