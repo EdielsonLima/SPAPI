@@ -183,6 +183,78 @@ export async function resumoContasReceber(args: { empresa?: string; agruparPorCl
   };
 }
 
+// ── 2b. Inadimplencia detalhada ─────────────────────────────────────────────
+// Parcelas de income VENCIDAS e em aberto, com cliente, empresa, vencimento e
+// dias de atraso. Mesmos filtros/formula do resumoContasReceber.
+export async function inadimplenciaDetalhe(
+  args: { empresa?: string; cliente?: string; minDias?: number; limit?: number } = {}
+) {
+  const hoje = todayISO();
+  const hojeMs = new Date(`${hoje}T12:00:00`).getTime();
+  const cache = await getCachedIncomeContaining("2023-01-01", "2027-12-31");
+  const items = extractItems(cache) as (OutcomeItem & {
+    clientName?: string; billId?: number; installmentId?: number;
+  })[];
+
+  type Parcela = {
+    cliente: string; empresa: string; titulo: number | null; parcela: number | null;
+    documento: string | null; vencimento: string; diasAtraso: number;
+    valor: number; valor_fmt: string;
+  };
+  const parcelas: Parcela[] = [];
+
+  for (const i of items) {
+    if ((i.correctedBalanceAmount || 0) <= 0) continue;
+    if (!i.dueDate || i.dueDate >= hoje) continue; // so vencidas
+    if (isExcludedFinancialDocType(i.documentIdentificationName, i.forecastDocument)) continue;
+    if (isHolding(i.companyName)) continue;
+    if (!matchEmpresa(i.companyName, args.empresa)) continue;
+    const cliente = i.clientName || i.creditorName || "(sem cliente)";
+    if (args.cliente && !normalizeFilterText(cliente).includes(normalizeFilterText(args.cliente))) continue;
+    const eff = effectiveOpenAmount(i, true);
+    if (eff <= 0) continue;
+    const vencMs = new Date(`${String(i.dueDate).split("T")[0]}T12:00:00`).getTime();
+    const diasAtraso = Math.max(0, Math.floor((hojeMs - vencMs) / 86400000));
+    if (args.minDias && diasAtraso < args.minDias) continue;
+    parcelas.push({
+      cliente, empresa: i.companyName || "(sem empresa)",
+      titulo: i.billId ?? null, parcela: i.installmentId ?? null,
+      documento: i.documentIdentificationName ?? null,
+      vencimento: String(i.dueDate).split("T")[0], diasAtraso,
+      valor: eff, valor_fmt: fmtBRL(eff),
+    });
+  }
+
+  parcelas.sort((a, b) => b.valor - a.valor);
+
+  const porCliente = new Map<string, { total: number; qtd: number; maxAtraso: number; empresas: Set<string> }>();
+  let total = 0;
+  for (const p of parcelas) {
+    total += p.valor;
+    if (!porCliente.has(p.cliente)) porCliente.set(p.cliente, { total: 0, qtd: 0, maxAtraso: 0, empresas: new Set() });
+    const c = porCliente.get(p.cliente)!;
+    c.total += p.valor; c.qtd++; c.maxAtraso = Math.max(c.maxAtraso, p.diasAtraso);
+    c.empresas.add(p.empresa);
+  }
+
+  const clientes = Array.from(porCliente.entries())
+    .map(([nome, v]) => ({
+      cliente: nome, total: v.total, total_fmt: fmtBRL(v.total), qtdParcelas: v.qtd,
+      maiorAtrasoDias: v.maxAtraso, empresas: Array.from(v.empresas),
+    }))
+    .sort((a, b) => b.total - a.total);
+
+  const limit = args.limit ?? 100;
+  return {
+    referencia: hoje,
+    cacheAtualizadoEm: cache?.cachedAt ?? null,
+    filtros: { empresa: args.empresa ?? null, cliente: args.cliente ?? null, minDias: args.minDias ?? null },
+    totais: { valor: total, valor_fmt: fmtBRL(total), qtdParcelas: parcelas.length, qtdClientes: clientes.length },
+    porCliente: clientes,
+    parcelas: parcelas.slice(0, limit),
+  };
+}
+
 // ── 3. Saldos Bancarios ─────────────────────────────────────────────────────
 // Le o cache de saldos diarios (cached_daily_balances). Procura o dia mais
 // recente disponivel (ate 10 dias atras). currentBalance por conta/empresa.

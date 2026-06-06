@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   resumoContasPagar,
   resumoContasReceber,
+  inadimplenciaDetalhe,
   saldosBancarios,
   dreResumo,
   indicadoresResumo,
@@ -43,6 +44,13 @@ const TOOLS = [
     description:
       "Resumo de Contas a Receber: a receber (saldo aberto) e inadimplencia (aberto vencido), totais e por empresa. Params: 'empresa' (filtra por nome), 'agruparPorCliente' (top 30 clientes).",
     inputSchema: { type: "object", properties: { empresa: { type: "string" }, agruparPorCliente: { type: "boolean" } } },
+  },
+  {
+    name: "inadimplencia_detalhe",
+    fn: inadimplenciaDetalhe,
+    description:
+      "Detalha a INADIMPLENCIA (parcelas de contas a receber vencidas e em aberto): cliente, empresa, titulo/parcela, vencimento, DIAS DE ATRASO e valor. Agrupa por cliente (total, qtd, maior atraso) e lista as parcelas (maiores primeiro). Params: 'empresa' (filtra), 'cliente' (filtra por nome), 'minDias' (so atrasos >= N dias), 'limit' (parcelas listadas, default 100).",
+    inputSchema: { type: "object", properties: { empresa: { type: "string" }, cliente: { type: "string" }, minDias: { type: "integer" }, limit: { type: "integer" } } },
   },
   {
     name: "saldos_bancarios",
@@ -81,7 +89,7 @@ async function handleMessage(msg: { id?: unknown; method?: string; params?: { na
   const params = msg?.params;
   switch (method) {
     case "initialize":
-      return rpcResult(id, { protocolVersion: PROTOCOL, capabilities: { tools: {} }, serverInfo: { name: "silvapacker-financeiro", version: "0.1.0" } });
+      return rpcResult(id, { protocolVersion: PROTOCOL, capabilities: { tools: {} }, serverInfo: { name: "silvapacker-financeiro", version: "0.2.0" } });
     case "notifications/initialized":
       return null;
     case "ping":
