@@ -314,6 +314,98 @@ export async function inadimplenciaDetalhe(
   };
 }
 
+// ── 2c. Pagas e Recebidas por dia/periodo ───────────────────────────────────
+// Regra validada do Painel ("Realizado"/Contas Pagas): soma netAmount dos
+// payments, excluindo PREVISAO e op types substituicao/cancelamento/abatimento/
+// devolucao/por bens/permuta. Recebidas: payments de income com netAmount > 0
+// (regra do Resumo Financeiro). NAO inclui BMs avulsos (v2).
+export async function pagasRecebidasDia(
+  args: { dia?: string; de?: string; ate?: string; empresa?: string; detalhar?: boolean; limit?: number } = {}
+) {
+  const ontemD = new Date(); ontemD.setDate(ontemD.getDate() - 1);
+  const ontem = `${ontemD.getFullYear()}-${String(ontemD.getMonth() + 1).padStart(2, "0")}-${String(ontemD.getDate()).padStart(2, "0")}`;
+  const de = parseDataISO(args.de) || parseDataISO(args.dia) || ontem;
+  const ate = parseDataISO(args.ate) || parseDataISO(args.dia) || ontem;
+
+  const EXCLUDED_OPS = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
+  type Pay = { paymentDate?: string; netAmount?: number; operationTypeName?: string };
+  type Receipt = { paymentDate?: string; date?: string; netAmount?: number; operationTypeName?: string; bankMovements?: unknown[] };
+  type Item = OutcomeItem & { payments?: Pay[]; receipts?: Receipt[]; clientName?: string; billId?: number; installmentId?: number };
+
+  function noPeriodo(p: { paymentDate?: string }): string | null {
+    const d = p.paymentDate ? String(p.paymentDate).split("T")[0] : "";
+    return d && d >= de && d <= ate ? d : null;
+  }
+
+  type Det = { quem: string; empresa: string; titulo: number | null; data: string; tipoOp: string | null; valor: number; valor_fmt: string };
+
+  function processa(items: Item[], isIncome: boolean) {
+    const porEmpresa = new Map<string, { total: number; qtd: number }>();
+    const det: Det[] = [];
+    let total = 0, qtd = 0;
+    for (const i of items) {
+      if (isExcludedFinancialDocType(i.documentIdentificationName, i.forecastDocument)) continue;
+      if (isHolding(i.companyName)) continue;
+      if (!matchEmpresa(i.companyName, args.empresa)) continue;
+      // income do cache pode vir com payments (rota ja mapeia) ou so receipts
+      const pays: Pay[] = i.payments && i.payments.length > 0
+        ? i.payments
+        : (i.receipts || []).map((r) => ({
+            paymentDate: r.paymentDate || r.date,
+            netAmount: (r.bankMovements && r.bankMovements.length > 0) ? (r.netAmount || 0) : 0,
+            operationTypeName: r.operationTypeName || "Recebimento",
+          }));
+      for (const p of pays) {
+        const data = noPeriodo(p);
+        if (!data) continue;
+        const v = p.netAmount || 0;
+        if (v === 0) continue;
+        if (isIncome) {
+          if (v < 0) continue; // regra Resumo Financeiro: recebidas = netAmount > 0
+        } else {
+          const op = (p.operationTypeName || "").toLowerCase();
+          if (EXCLUDED_OPS.some((x) => op.includes(x))) continue;
+        }
+        const co = i.companyName || "(sem empresa)";
+        if (!porEmpresa.has(co)) porEmpresa.set(co, { total: 0, qtd: 0 });
+        const e = porEmpresa.get(co)!;
+        e.total += v; e.qtd++; total += v; qtd++;
+        if (args.detalhar) {
+          det.push({
+            quem: (isIncome ? i.clientName : i.creditorName) || i.creditorName || "(sem nome)",
+            empresa: co, titulo: i.billId ?? null, data,
+            tipoOp: p.operationTypeName ?? null, valor: v, valor_fmt: fmtBRL(v),
+          });
+        }
+      }
+    }
+    det.sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
+    return {
+      total, total_fmt: fmtBRL(total), qtd,
+      porEmpresa: Array.from(porEmpresa.entries())
+        .map(([nome, v]) => ({ empresa: nome, total: v.total, total_fmt: fmtBRL(v.total), qtd: v.qtd }))
+        .sort((a, b) => Math.abs(b.total) - Math.abs(a.total)),
+      ...(args.detalhar ? { lancamentos: det.slice(0, args.limit ?? 60) } : {}),
+    };
+  }
+
+  const outCache = await getCachedOutcomeContaining("2023-01-01", "2027-12-31");
+  const incCache = await getCachedIncomeContaining("2023-01-01", "2027-12-31");
+  const pagas = processa(extractItems(outCache) as Item[], false);
+  const recebidas = processa(extractItems(incCache) as Item[], true);
+
+  return {
+    periodo: { de, ate },
+    cachePagasAtualizadoEm: outCache?.cachedAt ?? null,
+    cacheRecebidasAtualizadoEm: incCache?.cachedAt ?? null,
+    avisoFrescor: "Os valores refletem o cache populado pelo Painel. Se o cache for anterior ao fim do periodo consultado, pagamentos/recebimentos podem estar incompletos — abrir o Painel atualiza.",
+    pagas,
+    recebidas,
+    saldoDoDia: { liquido: pagas.total > 0 || recebidas.total > 0 ? recebidas.total - pagas.total : 0, liquido_fmt: fmtBRL(recebidas.total - pagas.total) },
+    nota: "Nao inclui movimentos bancarios avulsos (sem titulo) — entram numa v2.",
+  };
+}
+
 // ── 3. Saldos Bancarios ─────────────────────────────────────────────────────
 // Le o cache de saldos diarios (cached_daily_balances). Procura o dia mais
 // recente disponivel (ate 10 dias atras). currentBalance por conta/empresa.

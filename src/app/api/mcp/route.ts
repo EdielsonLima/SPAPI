@@ -9,6 +9,7 @@ import {
   resumoContasPagar,
   resumoContasReceber,
   inadimplenciaDetalhe,
+  pagasRecebidasDia,
   saldosBancarios,
   dreResumo,
   indicadoresResumo,
@@ -51,6 +52,13 @@ const TOOLS = [
     description:
       "Detalha a INADIMPLENCIA (parcelas de contas a receber vencidas e em aberto): cliente, empresa, titulo/parcela, vencimento, DIAS DE ATRASO e valor. Agrupa por cliente (total, qtd, maior atraso) e lista as parcelas (maiores primeiro). Params: 'empresa' (filtra), 'cliente' (filtra por nome), 'minDias' (so atrasos >= N dias), 'limit' (parcelas listadas, default 100).",
     inputSchema: { type: "object", properties: { empresa: { type: "string" }, cliente: { type: "string" }, minDias: { type: "integer" }, limit: { type: "integer" } } },
+  },
+  {
+    name: "pagas_recebidas_dia",
+    fn: pagasRecebidasDia,
+    description:
+      "Contas PAGAS e RECEBIDAS (pagamentos/recebimentos efetivados) num dia ou periodo, com total, por empresa e liquido do dia. Regras validadas do Painel (netAmount; exclui PREVISAO e op types substituicao/cancelamento/abatimento/devolucao/por bens/permuta; recebidas = netAmount > 0). Params: 'dia' (default ONTEM), ou 'de'/'ate' (DD/MM/YYYY ou YYYY-MM-DD), 'empresa', 'detalhar' (lista lancamentos credor/cliente+valor), 'limit'. Retorna cacheAtualizadoEm — se anterior ao periodo, dados podem estar incompletos.",
+    inputSchema: { type: "object", properties: { dia: { type: "string" }, de: { type: "string" }, ate: { type: "string" }, empresa: { type: "string" }, detalhar: { type: "boolean" }, limit: { type: "integer" } } },
   },
   {
     name: "saldos_bancarios",
