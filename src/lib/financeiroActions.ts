@@ -8,6 +8,7 @@ import {
   getCachedOutcomeContaining,
   getCachedIncomeContaining,
   getCachedDailyBalance,
+  getCachedCompanies,
   getDreExcelData,
   getIndicadoresCub,
   getIndicadoresValorM2,
@@ -304,24 +305,40 @@ export async function saldosBancarios(args: { empresa?: string } = {}) {
   }
   if (!achou) return { erro: "Sem cache de saldos bancarios. Abra a aba Saldos no Painel para popular o cache." };
 
-  type Bal = { companyName?: string; bankName?: string; accountNumber?: string; currentBalance?: number };
-  const porEmpresa = new Map<string, { saldo: number; contas: { banco: string; conta: string; saldo: number; saldo_fmt: string }[] }>();
+  // Cada linha do cache e { accountId: "companyId:accountNumber", amount }
+  // (shape gravado por src/app/api/sienge/bank-accounts/route.ts).
+  const companies = await getCachedCompanies();
+  const companyName = new Map<string, string>(companies.map((c) => [String(c.id), c.name]));
+
+  type Bal = { accountId?: string; amount?: number };
+  const porEmpresa = new Map<string, { saldo: number; contas: { conta: string; saldo: number; saldo_fmt: string }[] }>();
   let total = 0;
   for (const r of achou.rows as Bal[]) {
-    if (!matchEmpresa(r.companyName, args.empresa)) continue;
-    const co = r.companyName || "(sem empresa)";
+    const [cid, ...rest] = String(r.accountId || "").split(":");
+    const conta = rest.join(":") || "?";
+    const co = companyName.get(cid) || `Empresa ${cid || "?"}`;
+    if (!matchEmpresa(co, args.empresa)) continue;
     if (!porEmpresa.has(co)) porEmpresa.set(co, { saldo: 0, contas: [] });
     const e = porEmpresa.get(co)!;
-    const s = r.currentBalance || 0;
+    const s = r.amount || 0;
     e.saldo += s; total += s;
-    e.contas.push({ banco: r.bankName || "?", conta: r.accountNumber || "?", saldo: s, saldo_fmt: fmtBRL(s) });
+    e.contas.push({ conta, saldo: s, saldo_fmt: fmtBRL(s) });
   }
 
   const empresas = Array.from(porEmpresa.entries())
-    .map(([nome, v]) => ({ empresa: nome, saldo: v.saldo, saldo_fmt: fmtBRL(v.saldo), contas: v.contas }))
+    .map(([nome, v]) => ({
+      empresa: nome, saldo: v.saldo, saldo_fmt: fmtBRL(v.saldo),
+      contas: v.contas.sort((a, b) => b.saldo - a.saldo),
+    }))
     .sort((a, b) => b.saldo - a.saldo);
 
-  return { dataSaldo: achou.date, totalGeral: total, totalGeral_fmt: fmtBRL(total), filtroEmpresa: args.empresa ?? null, porEmpresa: empresas };
+  return {
+    dataSaldo: achou.date,
+    totalGeral: total, totalGeral_fmt: fmtBRL(total),
+    filtroEmpresa: args.empresa ?? null,
+    porEmpresa: empresas,
+    nota: "Saldo do ultimo dia salvo no cache (dias passados; o dia corrente so entra no cache no dia seguinte). Para atualizar, abrir a aba Saldos no Painel.",
+  };
 }
 
 // ── 4. DRE / Indicadores ────────────────────────────────────────────────────
