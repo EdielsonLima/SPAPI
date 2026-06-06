@@ -375,17 +375,76 @@ const DRE_CATEGORIA_LABEL: Record<string, string> = {
   saidas_nao_operacionais: "Saidas nao Operacionais", variacao_caixa: "Variacao de Caixa",
 };
 
-export async function dreResumo(args: { ano?: string } = {}) {
+export async function dreResumo(args: { ano?: string; categoria?: string } = {}) {
   const ano = args.ano || String(new Date().getFullYear());
   const accounts = await getDreExcelData(ano, undefined, undefined, ["SILVA ADMINISTRADORA HOLDING LTDA"]);
   const porCategoria = new Map<string, number>();
-  for (const a of accounts as { dreCategory: string; amount: number }[]) {
+  for (const a of accounts) {
     porCategoria.set(a.dreCategory, (porCategoria.get(a.dreCategory) || 0) + (a.amount || 0));
   }
+
+  // ── Drill-down de uma categoria: por conta financeira e por empresa ──
+  if (args.categoria) {
+    const alvoNorm = normalizeFilterText(args.categoria);
+    const chave = Array.from(new Set(accounts.map((a) => a.dreCategory))).find(
+      (k) => k === args.categoria ||
+        normalizeFilterText(k).includes(alvoNorm) ||
+        normalizeFilterText(DRE_CATEGORIA_LABEL[k] || "").includes(alvoNorm)
+    );
+    if (!chave) {
+      return { ano, erro: `Categoria '${args.categoria}' nao encontrada. Disponiveis: ${Array.from(porCategoria.keys()).join(", ")}` };
+    }
+    const doCat = accounts.filter((a) => a.dreCategory === chave);
+    const porConta = new Map<string, { nome: string; valor: number }>();
+    const porEmp = new Map<string, number>();
+    for (const a of doCat) {
+      const cid = a.financialPlanId || "?";
+      if (!porConta.has(cid)) porConta.set(cid, { nome: a.financialPlanName || cid, valor: 0 });
+      porConta.get(cid)!.valor += a.amount || 0;
+      porEmp.set(a.companyName || "(sem)", (porEmp.get(a.companyName || "(sem)") || 0) + (a.amount || 0));
+    }
+    return {
+      ano,
+      categoria: DRE_CATEGORIA_LABEL[chave] || chave,
+      chave,
+      total: porCategoria.get(chave) || 0,
+      total_fmt: fmtBRL(porCategoria.get(chave) || 0),
+      porContaFinanceira: Array.from(porConta.entries())
+        .map(([id, v]) => ({ contaId: id, conta: v.nome, valor: v.valor, valor_fmt: fmtBRL(v.valor) }))
+        .sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor)).slice(0, 40),
+      porEmpresa: Array.from(porEmp.entries())
+        .map(([nome, v]) => ({ empresa: nome, valor: v, valor_fmt: fmtBRL(v) }))
+        .sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor)),
+    };
+  }
+
   const linhas = Array.from(porCategoria.entries()).map(([cat, valor]) => ({
     categoria: DRE_CATEGORIA_LABEL[cat] || cat, chave: cat, valor, valor_fmt: fmtBRL(valor),
   }));
-  return { ano, observacao: "Consolidado de todas as empresas exceto Holding (igual ao Painel/Power BI).", linhas };
+
+  // Linhas calculadas (mesmas formulas do Painel/dre-tab), so quando a
+  // categoria correspondente nao veio do Excel — evita duplicar.
+  const g = (k: string) => porCategoria.get(k) || 0;
+  const calc: { categoria: string; chave: string; valor: number; valor_fmt: string; calculada: true }[] = [];
+  const addCalc = (chave: string, valor: number) => {
+    if (!porCategoria.has(chave)) calc.push({ categoria: DRE_CATEGORIA_LABEL[chave] || chave, chave, valor, valor_fmt: fmtBRL(valor), calculada: true });
+  };
+  const lucroBruto = g("receita_operacional") + g("custo_variavel");
+  const lucroOperacional = lucroBruto + g("custo_fixo");
+  const lucroLiquido = lucroOperacional + g("despesas_financeiras") + g("despesas_tributarias");
+  const saldo = lucroLiquido + g("imobilizacoes") + g("retiradas");
+  const variacaoCaixa = saldo + g("entradas_nao_operacionais") + g("saidas_nao_operacionais");
+  addCalc("lucro_bruto", lucroBruto);
+  addCalc("lucro_operacional", lucroOperacional);
+  addCalc("lucro_liquido", lucroLiquido);
+  addCalc("saldo", saldo);
+  addCalc("variacao_caixa", variacaoCaixa);
+
+  return {
+    ano,
+    observacao: "Consolidado de todas as empresas exceto Holding (igual ao Painel/Power BI). Linhas com 'calculada: true' seguem as formulas do Painel. Use 'categoria' para drill-down por conta financeira e empresa.",
+    linhas: [...linhas, ...calc],
+  };
 }
 
 export async function indicadoresResumo() {
