@@ -35,8 +35,8 @@ const TOOLS = [
     name: "resumo_contas_pagar",
     fn: resumoContasPagar,
     description:
-      "Resumo de Contas a Pagar da Silva Packer (mesma regra do Painel: a pagar = saldo aberto com vencimento >= hoje; vencidas = saldo aberto vencido). Totais gerais e por empresa. Exclui PREVISAO e Holding/Administradora. Params: 'empresa' (filtra por nome, ex.: DOMUS), 'agruparPorCredor' (top 30 credores).",
-    inputSchema: { type: "object", properties: { empresa: { type: "string" }, agruparPorCredor: { type: "boolean" } } },
+      "Resumo de Contas a Pagar da Silva Packer (mesma regra do Painel: a pagar = saldo aberto com vencimento >= hoje; vencidas = saldo aberto vencido). Totais gerais e por empresa. Exclui PREVISAO e Holding/Administradora. Params: 'empresa' (filtra por nome, ex.: DOMUS), 'agruparPorCredor' (top 30 credores), 'de'/'ate' (janela de VENCIMENTO, DD/MM/YYYY ou YYYY-MM-DD — ex.: contas de amanha = de e ate iguais a amanha), 'detalhar' (lista as parcelas: credor, empresa, titulo, vencimento, valor), 'limit' (parcelas listadas, default 100).",
+    inputSchema: { type: "object", properties: { empresa: { type: "string" }, agruparPorCredor: { type: "boolean" }, de: { type: "string" }, ate: { type: "string" }, detalhar: { type: "boolean" }, limit: { type: "integer" } } },
   },
   {
     name: "resumo_contas_receber",

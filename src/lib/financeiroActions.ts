@@ -29,6 +29,17 @@ function fmtBRL(v: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v || 0);
 }
 
+// Aceita "YYYY-MM-DD" ou "DD/MM/YYYY" e normaliza para ISO (YYYY-MM-DD).
+function parseDataISO(s: string | undefined): string | undefined {
+  if (!s) return undefined;
+  const t = s.trim();
+  const br = t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (br) return `${br[3]}-${br[2]}-${br[1]}`;
+  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  return undefined;
+}
+
 // Empresas tipo Holding/Administradora sao excluidas dos resumos operacionais,
 // igual aos fetches de DRE do Painel (excludeCompanies=SILVA ADMINISTRADORA HOLDING).
 function isHolding(name: string | null | undefined): boolean {
@@ -67,13 +78,20 @@ function matchEmpresa(name: string | null | undefined, filtro?: string): boolean
 // Formula do Painel: effectiveOpenAmount (correctedBalanceAmount - discount -
 // taxAmount quando integralmente aberta). A pagar = dueDate >= hoje; Vencidas =
 // dueDate < hoje. Exclui PREVISAO e empresas Holding/Administradora.
-export async function resumoContasPagar(args: { empresa?: string; agruparPorCredor?: boolean } = {}) {
+// 'de'/'ate' filtram por janela de VENCIMENTO; 'detalhar' lista as parcelas.
+export async function resumoContasPagar(
+  args: { empresa?: string; agruparPorCredor?: boolean; de?: string; ate?: string; detalhar?: boolean; limit?: number } = {}
+) {
   const hoje = todayISO();
+  const de = parseDataISO(args.de);
+  const ate = parseDataISO(args.ate);
   const cache = await getCachedOutcomeContaining("2023-01-01", "2027-12-31");
-  const items = extractItems(cache);
+  const items = extractItems(cache) as (OutcomeItem & { billId?: number; installmentId?: number })[];
 
   const porEmpresa = new Map<string, { aPagar: number; vencidas: number; qtdAPagar: number; qtdVencidas: number }>();
   const porCredor = new Map<string, { aPagar: number; vencidas: number }>();
+  type ParcelaDet = { credor: string; empresa: string; titulo: number | null; parcela: number | null; documento: string | null; vencimento: string; valor: number; valor_fmt: string };
+  const parcelasDet: ParcelaDet[] = [];
   let totalAPagar = 0, totalVencidas = 0, qtdAPagar = 0, qtdVencidas = 0;
 
   for (const i of items) {
@@ -81,8 +99,20 @@ export async function resumoContasPagar(args: { empresa?: string; agruparPorCred
     if (isExcludedFinancialDocType(i.documentIdentificationName, i.forecastDocument)) continue;
     if (isHolding(i.companyName)) continue;
     if (!matchEmpresa(i.companyName, args.empresa)) continue;
+    const venc = i.dueDate ? String(i.dueDate).split("T")[0] : "";
+    if (de && (!venc || venc < de)) continue;
+    if (ate && (!venc || venc > ate)) continue;
     const eff = effectiveOpenAmount(i, false);
     if (eff <= 0) continue;
+
+    if (args.detalhar) {
+      parcelasDet.push({
+        credor: i.creditorName || "(sem credor)", empresa: i.companyName || "(sem empresa)",
+        titulo: i.billId ?? null, parcela: i.installmentId ?? null,
+        documento: i.documentIdentificationName ?? null, vencimento: venc,
+        valor: eff, valor_fmt: fmtBRL(eff),
+      });
+    }
 
     const vencida = !!i.dueDate && i.dueDate < hoje;
     const co = i.companyName || "(sem empresa)";
@@ -110,10 +140,14 @@ export async function resumoContasPagar(args: { empresa?: string; agruparPorCred
         .sort((a, b) => b.total - a.total).slice(0, 30)
     : undefined;
 
+  if (args.detalhar) {
+    parcelasDet.sort((a, b) => a.vencimento === b.vencimento ? b.valor - a.valor : a.vencimento.localeCompare(b.vencimento));
+  }
+
   return {
     referencia: hoje,
     cacheAtualizadoEm: cache?.cachedAt ?? null,
-    filtroEmpresa: args.empresa ?? null,
+    filtros: { empresa: args.empresa ?? null, de: de ?? null, ate: ate ?? null },
     totais: {
       aPagar: totalAPagar, aPagar_fmt: fmtBRL(totalAPagar), qtdAPagar,
       vencidas: totalVencidas, vencidas_fmt: fmtBRL(totalVencidas), qtdVencidas,
@@ -121,6 +155,7 @@ export async function resumoContasPagar(args: { empresa?: string; agruparPorCred
     },
     porEmpresa: empresas,
     ...(credores ? { porCredor: credores } : {}),
+    ...(args.detalhar ? { parcelas: parcelasDet.slice(0, args.limit ?? 100) } : {}),
   };
 }
 
