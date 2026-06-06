@@ -64,8 +64,8 @@ const TOOLS = [
     name: "saldos_bancarios",
     fn: saldosBancarios,
     description:
-      "Saldos bancarios por empresa e conta no dia mais recente disponivel no cache (cached_daily_balances). Param: 'empresa' (filtra por nome).",
-    inputSchema: { type: "object", properties: { empresa: { type: "string" } } },
+      "Saldos bancarios por empresa e conta no dia mais recente disponivel no cache (cached_daily_balances). Por padrao espelha o filtro de contas do Painel (oculta XP/Bradesco/Aplicacao/CEF da Silva Packer e XP/CEF da Sul Brasil — total bate com a tela). Params: 'empresa' (filtra por nome), 'todasContas' (true = inclui TODAS as contas DimBanco, sem o filtro do Painel).",
+    inputSchema: { type: "object", properties: { empresa: { type: "string" }, todasContas: { type: "boolean" } } },
   },
   {
     name: "dre_resumo",

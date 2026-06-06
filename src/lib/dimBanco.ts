@@ -64,3 +64,16 @@ export function isInDimBanco(accountNumber: string, companyId: number): boolean 
 export function expectedDimBancoKeys(): string[] {
   return Object.entries(DIMBAN_ACCOUNT_COMPANY).map(([acc, compId]) => `${compId}:${acc}`);
 }
+
+// Contas OCULTADAS no filtro do Painel do Edielson (localStorage do navegador,
+// espelhadas aqui a pedido dele em 2026-06-06 para o conector/relatório bater
+// com a tela — "12 contas em 8 empresas"). Se o filtro do Painel mudar,
+// atualizar esta lista. Chave: "companyId:accountNumber".
+export const REPORT_EXCLUDED_ACCOUNTS = new Set<string>([
+  "1:570920-2",   // Banco XP — Silva Packer
+  "1:0257918-9",  // Banco Bradesco — Silva Packer
+  "1:A0257918-9", // Aplicação Bradesco — Silva Packer
+  "1:2261-8",     // Caixa Econômica — Silva Packer
+  "3:572226-0",   // Banco XP — Sul Brasil
+  "3:5026-3",     // Caixa Econômica — Sul Brasil
+]);

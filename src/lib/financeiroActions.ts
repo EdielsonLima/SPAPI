@@ -19,7 +19,7 @@ import {
   isExcludedFinancialDocType,
   normalizeFilterText,
 } from "@/lib/dashboard-utils";
-import { BANK_NAMES, isInDimBanco } from "@/lib/dimBanco";
+import { BANK_NAMES, isInDimBanco, REPORT_EXCLUDED_ACCOUNTS } from "@/lib/dimBanco";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 function todayISO(): string {
@@ -410,7 +410,7 @@ export async function pagasRecebidasDia(
 // ── 3. Saldos Bancarios ─────────────────────────────────────────────────────
 // Le o cache de saldos diarios (cached_daily_balances). Procura o dia mais
 // recente disponivel (ate 10 dias atras). currentBalance por conta/empresa.
-export async function saldosBancarios(args: { empresa?: string } = {}) {
+export async function saldosBancarios(args: { empresa?: string; todasContas?: boolean } = {}) {
   let achou: { date: string; rows: unknown[] } | null = null;
   const d0 = new Date();
   for (let k = 0; k < 10 && !achou; k++) {
@@ -434,6 +434,9 @@ export async function saldosBancarios(args: { empresa?: string } = {}) {
     const conta = rest.join(":") || "?";
     // Mesmo filtro da aba Saldos do Painel: so contas do DimBanco
     if (!isInDimBanco(conta, Number(cid))) continue;
+    // Espelha o filtro de contas salvo do Painel (REPORT_EXCLUDED_ACCOUNTS),
+    // a menos que todasContas=true
+    if (!args.todasContas && REPORT_EXCLUDED_ACCOUNTS.has(`${cid}:${conta}`)) continue;
     const co = companyName.get(cid) || `Empresa ${cid || "?"}`;
     if (!matchEmpresa(co, args.empresa)) continue;
     if (!porEmpresa.has(co)) porEmpresa.set(co, { saldo: 0, contas: [] });
