@@ -66,10 +66,11 @@ import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
 import { CalendarioPagamentoTab } from "@/components/calendario-pagamento-tab";
 import { CalendarioRecebimentoTab } from "@/components/calendario-recebimento-tab";
+import { ComparativoTab } from "@/components/comparativo-tab";
 import { useCompanyMode } from "@/lib/company-context";
 
 type Section = "cp" | "cr";
-type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "comercial" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores";
+type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "comercial" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores" | "comparativo";
 
 // Each tab group has its own saved company filter
 function getTabGroup(tab: MainTab): string {
@@ -2503,6 +2504,7 @@ export function ExecutiveDashboard() {
     "visao-geral": [],
     resumo: [],
     indicadores: [],
+    comparativo: [],
   };
 
   const kpis = kpiConfigs[activeTab];
@@ -2731,11 +2733,26 @@ export function ExecutiveDashboard() {
               <TrendingUp className="h-3.5 w-3.5" />
               Indicadores
             </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("comparativo");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "comparativo"
+                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-md ring-2 ring-indigo-300 dark:ring-indigo-500/50"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+              title="Comparar períodos (ex.: 1º sem 2026 vs 2025)"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Comparativo
+            </button>
           </div>
         </div>
 
         {/* Sub-tabs CP/CR - separate line */}
-        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (
+        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (
           <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             switchTab(tab);
@@ -4408,7 +4425,7 @@ export function ExecutiveDashboard() {
 
       {/* KPI Cards. Nas abas CP/CR compactamos pra caber tudo numa
           viewport sem barra de scroll (gap menor, padding interno menor). */}
-      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (() => {
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (() => {
         const cpCrTabs = ["a-pagar", "pagas", "atrasadas", "a-receber", "recebidas", "inadimplencia"];
         const isCompact = cpCrTabs.includes(activeTab);
         return (<><div className={`grid md:grid-cols-2 lg:grid-cols-${kpis.length} ${isCompact ? "gap-3" : "gap-5"}`}>
@@ -6242,6 +6259,18 @@ export function ExecutiveDashboard() {
       {/* ══════ INDICADORES DE MERCADO TAB ══════ */}
       {activeTab === "indicadores" && (
         <IndicadoresTab />
+      )}
+
+      {/* ══════ COMPARATIVO TAB ══════ */}
+      {activeTab === "comparativo" && (
+        <ComparativoTab
+          incomeItems={consistentIncomeForRecebidas}
+          outcomeItems={consistentItemsForPagas}
+          salesContracts={salesContracts}
+          selectedCompanies={selectedCompanies}
+          isHolding={isHolding}
+          currentYear={currentYear}
+        />
       )}
 
       {/* ══════ CALENDÁRIO DE PAGAMENTOS TAB ══════ */}
