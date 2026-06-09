@@ -377,6 +377,20 @@ function inferUnitTypeFromName(name: string): string {
   return "Apartamento";
 }
 
+// Ordena pavimentos do mais alto (topo) para o mais baixo (base). Andares
+// numéricos descendentes, depois Térreo, Mezanino, Garagens (G1..Gn) e desconhecido.
+function floorSortKey(floor: string): number {
+  const f = (floor || "").trim();
+  if (!f) return -1000;
+  const g = f.match(/^G\s*(\d+)/i);
+  if (g) return -10 - parseInt(g[1], 10); // garagens abaixo do térreo
+  if (/mezanino/i.test(f)) return -0.5;
+  if (/t[ée]rreo/i.test(f)) return 0;
+  const num = f.match(/(\d+)/);
+  if (num) return parseInt(num[1], 10);
+  return -1000;
+}
+
 export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
   const { isHolding, holdingName } = useCompanyMode();
@@ -448,6 +462,8 @@ export function ExecutiveDashboard() {
   const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
   const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades" | "quadro">("vendas");
   const [comercialChartView, setComercialChartView] = useState<"anual" | "mensal">("anual");
+  // Quadro Espelho: "grade" (lista plana) ou "espelho" (torre por pavimento)
+  const [quadroView, setQuadroView] = useState<"grade" | "espelho">("espelho");
   // Pre-seleciona "Apartamento" no filtro Tipo Imóvel uma única vez, quando as unidades carregam.
   const defaultedUnitTypeRef = useRef(false);
   const [selectedUnitStatuses, setSelectedUnitStatuses] = useState<Set<string>>(new Set());
@@ -3355,7 +3371,7 @@ export function ExecutiveDashboard() {
         });
 
         // ─── Unit analysis: API units + sales contract enrichment ───
-        type UnitRecord = { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string; area: number };
+        type UnitRecord = { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string; area: number; floor: string };
         const unitMap = new Map<string, UnitRecord>();
 
         // 1. Seed from real Sienge /units API (source of truth for status)
@@ -3373,6 +3389,7 @@ export function ExecutiveDashboard() {
               customer: "—",
               contractDate: "",
               area: u.privateArea || 0,
+              floor: u.floor || "",
             });
           });
         }
@@ -3408,6 +3425,7 @@ export function ExecutiveDashboard() {
                 customer: c.salesContractCustomers?.[0]?.name || "—",
                 contractDate: c.contractDate || "",
                 area: 0,
+                floor: "",
               });
             }
           });
@@ -4228,6 +4246,26 @@ export function ExecutiveDashboard() {
                   </Card>
                 )}
 
+                {/* Toggle de visualização: Espelho (torre) x Grade */}
+                {selectedUnitEnterprises.size > 0 && (
+                  <div className="flex items-center justify-end mt-4">
+                    <div className="inline-flex items-center p-0.5 bg-slate-100/80 rounded-lg border border-slate-200/50 shadow-inner">
+                      <button
+                        onClick={() => setQuadroView("espelho")}
+                        className={`px-3 h-7 text-xs font-bold rounded-md transition-all ${quadroView === "espelho" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
+                      >
+                        Espelho (Torre)
+                      </button>
+                      <button
+                        onClick={() => setQuadroView("grade")}
+                        className={`px-3 h-7 text-xs font-bold rounded-md transition-all ml-0.5 ${quadroView === "grade" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
+                      >
+                        Grade
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Grid of unit cards */}
                 {selectedUnitEnterprises.size === 0 ? (
                   <Card className="border-0 shadow-sm mt-4">
@@ -4237,7 +4275,85 @@ export function ExecutiveDashboard() {
                       <p className="text-xs text-slate-400 mt-1">Escolha um empreendimento no filtro acima para visualizar o quadro de unidades</p>
                     </CardContent>
                   </Card>
-                ) : (
+                ) : quadroView === "espelho" ? (() => {
+                  // ── Espelho (torre): unidades agrupadas por pavimento ──
+                  const numFloors = new Set(qUnits.map(u => (u.floor || "").trim()).filter(Boolean)).size;
+                  const areaTotal = qUnits.reduce((s, u) => s + (u.area || 0), 0);
+                  const vgvVendido = qUnits.filter(u => u.status === "Vendida").reduce((s, u) => s + (u.value || 0), 0);
+                  const pctVend = qUnits.length > 0 ? (qVendidas / qUnits.length) * 100 : 0;
+                  const fmap = new Map<string, typeof qVisible>();
+                  qVisible.forEach(u => { const f = (u.floor || "").trim() || "—"; if (!fmap.has(f)) fmap.set(f, []); fmap.get(f)!.push(u); });
+                  const floorGroups = Array.from(fmap.entries())
+                    .sort((a, b) => floorSortKey(b[0]) - floorSortKey(a[0]) || b[0].localeCompare(a[0], undefined, { numeric: true }))
+                    .map(([floor, units]) => ({ floor, units: [...units].sort((x, y) => x.unit.localeCompare(y.unit, undefined, { numeric: true })) }));
+                  const cellBg = (s: string) => s === "Vendida" ? "bg-red-100 border-red-300 text-red-800 hover:bg-red-200" : s === "Disponível" ? "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200" : s === "Reserva Técnica" ? "bg-blue-100 border-blue-300 text-blue-800 hover:bg-blue-200" : s === "Proposta" ? "bg-orange-100 border-orange-300 text-orange-800 hover:bg-orange-200" : s === "Vendido/Terceiros" ? "bg-pink-100 border-pink-300 text-pink-800 hover:bg-pink-200" : "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200";
+                  const shortLabel = (name: string) => { const p = name.split(".").pop() || name; return p.length > 10 ? p.slice(-9) : p; };
+                  return (
+                    <div className="mt-3 space-y-3">
+                      {/* Cabeçalho com infos do empreendimento */}
+                      <Card className="border-0 shadow-sm bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-900">
+                        <CardContent className="p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div className="min-w-0">
+                              <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 truncate" title={Array.from(selectedUnitEnterprises).join(", ")}>
+                                {Array.from(selectedUnitEnterprises).join(", ")}
+                              </h3>
+                              <p className="text-xs text-slate-400 dark:text-slate-400 mt-0.5">
+                                {numFloors} pavimento(s) · {qUnits.length} unidade(s) · {areaTotal.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m² priv.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-5 text-center">
+                              <div><p className="text-xl font-black text-emerald-600 tabular-nums leading-none">{qDisponiveis}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Disponíveis</p></div>
+                              <div><p className="text-xl font-black text-red-500 tabular-nums leading-none">{qVendidas}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Vendidas</p></div>
+                              <div><p className="text-xl font-black text-slate-700 dark:text-slate-200 tabular-nums leading-none">{pctVend.toFixed(0)}%</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Vendido</p></div>
+                              <div><p className="text-xl font-black text-blue-600 tabular-nums leading-none">{formatCompactCurrency(vgvVendido)}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">VGV Vendido</p></div>
+                            </div>
+                          </div>
+                          {/* Legenda */}
+                          <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-slate-200/60 dark:border-slate-700/60 text-[11px]">
+                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-300" /><span className="text-slate-500">Disponível</span></span>
+                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-200 border border-red-300" /><span className="text-slate-500">Vendida</span></span>
+                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-200 border border-blue-300" /><span className="text-slate-500">Reserva</span></span>
+                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-200 border border-orange-300" /><span className="text-slate-500">Proposta</span></span>
+                            <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-pink-200 border border-pink-300" /><span className="text-slate-500">Vend/Terceiros</span></span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      {/* Torre por pavimento */}
+                      <Card className="border-0 shadow-sm">
+                        <CardContent className="p-4 overflow-x-auto">
+                          {floorGroups.length === 0 ? (
+                            <p className="text-sm text-slate-400 text-center py-6">Nenhuma unidade para os filtros atuais</p>
+                          ) : (
+                            <div className="space-y-1.5 min-w-max">
+                              {floorGroups.map(g => (
+                                <div key={g.floor} className="flex items-stretch gap-2">
+                                  <div className="w-16 flex-shrink-0 flex items-center justify-end pr-2 border-r border-slate-100 dark:border-slate-800">
+                                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tabular-nums">{g.floor}</span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {g.units.map((u, i) => (
+                                      <div
+                                        key={`${u.unit}-${i}`}
+                                        title={`${u.unit} — ${u.status}${u.status === "Vendida" ? `\nCliente: ${u.customer}\nValor: ${formatCurrency(u.value)}` : ""}${u.area ? `\nÁrea: ${u.area} m²` : ""}`}
+                                        className={`min-w-[60px] rounded-md border px-2 py-1.5 text-center transition-colors cursor-default ${cellBg(u.status)}`}
+                                      >
+                                        <span className="block text-xs font-bold leading-none truncate max-w-[88px]">{shortLabel(u.unit)}</span>
+                                        <span className="block text-[8px] font-semibold uppercase tracking-wide mt-1 opacity-75">
+                                          {u.status === "Disponível" ? "Livre" : u.status === "Vendida" ? "Vendida" : u.status}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+                  );
+                })() : (
                   <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 mt-4">
                     {qVisible.map((u, idx) => (
                       <div
