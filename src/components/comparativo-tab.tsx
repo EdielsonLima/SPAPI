@@ -308,7 +308,10 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
                   <DeltaBadge a={c.a} b={c.b} goodWhenUp={c.goodWhenUp} />
                 </div>
                 <p className="text-xl xl:text-2xl font-bold text-slate-800 dark:text-slate-50 mt-2 tabular-nums">{formatCurrency(c.a)}</p>
-                <p className="text-[11px] text-slate-400 mt-1">{labelB}: <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-300">{formatCurrency(c.b)}</span></p>
+                <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{labelB}</p>
+                  <p className="text-base font-bold tabular-nums text-slate-600 dark:text-slate-300 mt-0.5">{formatCurrency(c.b)}</p>
+                </div>
               </CardContent>
             </Card>
           ))}
