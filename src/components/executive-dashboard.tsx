@@ -387,15 +387,16 @@ function normalizeFloor(floor: string): string {
   return f;
 }
 
-// Ordena pavimentos do mais alto (topo) para o mais baixo (base). Andares
-// numéricos descendentes, depois Térreo, Garagens (G1..Gn, abaixo do térreo) e
-// desconhecido por último.
+// Ordena pavimentos do mais alto (topo) para o mais baixo (base): andares
+// numéricos desc → Garagens (podium G4..G1, decrescente) → Mezanino → Térreo →
+// desconhecido. As garagens ficam ACIMA do térreo (G4 no topo, G1 logo acima do
+// térreo), como no espelho do empreendimento.
 function floorSortKey(floor: string): number {
   const f = normalizeFloor(floor);
   if (!f) return -1000;
   const g = f.match(/^G\s*(\d+)/i);
-  if (g) return -10 - parseInt(g[1], 10); // garagens abaixo do térreo: G1 acima de G2...
-  if (/mezanino/i.test(f)) return -0.5;
+  if (g) return parseInt(g[1], 10) / 100; // ex.: G4=0.04 (topo) ... G1=0.01, acima do térreo(0)
+  if (/mezanino/i.test(f)) return 0.005;
   if (/t[ée]rreo/i.test(f)) return 0;
   const num = f.match(/(\d+)/);
   if (num) return parseInt(num[1], 10);
@@ -4332,14 +4333,14 @@ export function ExecutiveDashboard() {
                       </Card>
                       {/* Torre por pavimento */}
                       <Card className="border-0 shadow-sm">
-                        <CardContent className="p-4 overflow-x-auto">
+                        <CardContent className="p-4">
                           {floorGroups.length === 0 ? (
                             <p className="text-sm text-slate-400 text-center py-6">Nenhuma unidade para os filtros atuais</p>
                           ) : (
-                            <div className="space-y-1.5 min-w-max">
+                            <div className="space-y-1.5">
                               {floorGroups.map(g => (
-                                <div key={g.floor} className="flex items-stretch gap-2">
-                                  <div className="w-16 flex-shrink-0 flex items-center justify-end pr-2 border-r border-slate-100 dark:border-slate-800">
+                                <div key={g.floor} className="flex items-start gap-2">
+                                  <div className="w-16 flex-shrink-0 flex items-center justify-end pr-2 pt-1.5 border-r border-slate-100 dark:border-slate-800 self-stretch">
                                     <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tabular-nums">{g.floor}</span>
                                   </div>
                                   <div className="flex flex-wrap gap-1.5">
