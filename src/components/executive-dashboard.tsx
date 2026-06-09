@@ -377,13 +377,24 @@ function inferUnitTypeFromName(name: string): string {
   return "Apartamento";
 }
 
+// Normaliza o rótulo de pavimento para juntar variações ("G 3"="G3", "15 º"="15º")
+// que vêm inconsistentes do Sienge e criariam linhas duplicadas no espelho.
+function normalizeFloor(floor: string): string {
+  let f = (floor || "").trim().replace(/\s+/g, " ");
+  if (!f) return "";
+  f = f.replace(/(\d+)\s*º/g, "$1º");   // "15 º" -> "15º"
+  f = f.replace(/^G\s*(\d+)/i, "G$1");  // "G 3" -> "G3"
+  return f;
+}
+
 // Ordena pavimentos do mais alto (topo) para o mais baixo (base). Andares
-// numéricos descendentes, depois Térreo, Mezanino, Garagens (G1..Gn) e desconhecido.
+// numéricos descendentes, depois Térreo, Garagens (G1..Gn, abaixo do térreo) e
+// desconhecido por último.
 function floorSortKey(floor: string): number {
-  const f = (floor || "").trim();
+  const f = normalizeFloor(floor);
   if (!f) return -1000;
   const g = f.match(/^G\s*(\d+)/i);
-  if (g) return -10 - parseInt(g[1], 10); // garagens abaixo do térreo
+  if (g) return -10 - parseInt(g[1], 10); // garagens abaixo do térreo: G1 acima de G2...
   if (/mezanino/i.test(f)) return -0.5;
   if (/t[ée]rreo/i.test(f)) return 0;
   const num = f.match(/(\d+)/);
@@ -4277,12 +4288,12 @@ export function ExecutiveDashboard() {
                   </Card>
                 ) : quadroView === "espelho" ? (() => {
                   // ── Espelho (torre): unidades agrupadas por pavimento ──
-                  const numFloors = new Set(qUnits.map(u => (u.floor || "").trim()).filter(Boolean)).size;
+                  const numFloors = new Set(qUnits.map(u => normalizeFloor(u.floor)).filter(Boolean)).size;
                   const areaTotal = qUnits.reduce((s, u) => s + (u.area || 0), 0);
                   const vgvVendido = qUnits.filter(u => u.status === "Vendida").reduce((s, u) => s + (u.value || 0), 0);
                   const pctVend = qUnits.length > 0 ? (qVendidas / qUnits.length) * 100 : 0;
                   const fmap = new Map<string, typeof qVisible>();
-                  qVisible.forEach(u => { const f = (u.floor || "").trim() || "—"; if (!fmap.has(f)) fmap.set(f, []); fmap.get(f)!.push(u); });
+                  qVisible.forEach(u => { const f = normalizeFloor(u.floor) || "—"; if (!fmap.has(f)) fmap.set(f, []); fmap.get(f)!.push(u); });
                   const floorGroups = Array.from(fmap.entries())
                     .sort((a, b) => floorSortKey(b[0]) - floorSortKey(a[0]) || b[0].localeCompare(a[0], undefined, { numeric: true }))
                     .map(([floor, units]) => ({ floor, units: [...units].sort((x, y) => x.unit.localeCompare(y.unit, undefined, { numeric: true })) }));
