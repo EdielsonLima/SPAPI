@@ -332,10 +332,10 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
                 <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={70} />
-                <RechartsTooltip formatter={(v: number | undefined) => formatCurrency(v ?? 0)} />
+                <RechartsTooltip cursor={{ fill: "rgba(99,102,241,0.06)" }} formatter={(v: number | undefined) => formatCurrency(v ?? 0)} />
                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey={String(yearB)} fill="#cbd5e1" radius={[3, 3, 0, 0]} />
-                <Bar dataKey={String(yearA)} fill="#6366f1" radius={[3, 3, 0, 0]} />
+                <Bar dataKey={String(yearB)} fill="#a5b4fc" radius={[3, 3, 0, 0]} />
+                <Bar dataKey={String(yearA)} fill="#4f46e5" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -366,8 +366,8 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
                   <thead>
                     <tr className="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200 dark:border-slate-700">
                       <th className="text-left font-semibold py-2 px-2">Linha</th>
-                      <th className="text-right font-semibold py-2 px-2">{labelA}</th>
                       <th className="text-right font-semibold py-2 px-2">{labelB}</th>
+                      <th className="text-right font-semibold py-2 px-2">{labelA}</th>
                       <th className="text-right font-semibold py-2 px-2 w-24">Variação</th>
                     </tr>
                   </thead>
@@ -375,8 +375,8 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
                     {dreRows.map(r => (
                       <tr key={r.label} className={`border-b border-slate-100 dark:border-slate-800 last:border-b-0 ${r.bold ? "bg-slate-50/60 dark:bg-slate-800/40" : ""}`}>
                         <td className={`py-2 px-2 ${r.bold ? "font-bold text-slate-800 dark:text-slate-100" : "text-slate-600 dark:text-slate-300"}`}>{r.label}</td>
-                        <td className={`py-2 px-2 text-right tabular-nums ${r.bold ? "font-bold" : ""} ${r.a < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-800 dark:text-slate-200"}`}>{formatCurrency(r.a)}</td>
                         <td className={`py-2 px-2 text-right tabular-nums text-slate-500 dark:text-slate-400`}>{formatCurrency(r.b)}</td>
+                        <td className={`py-2 px-2 text-right tabular-nums ${r.bold ? "font-bold" : ""} ${r.a < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-800 dark:text-slate-200"}`}>{formatCurrency(r.a)}</td>
                         <td className="py-2 px-2 text-right"><DeltaBadge a={r.a} b={r.b} goodWhenUp={r.goodWhenUp} /></td>
                       </tr>
                     ))}
