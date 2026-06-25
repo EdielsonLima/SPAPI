@@ -1,7 +1,7 @@
 {
-  "lastSync": "2026-05-13T14:34:21.939Z",
+  "lastSync": "2026-06-24T11:02:52.289Z",
   "target": "https://spapi-production.up.railway.app",
-  "totalRecords": 15141,
+  "totalRecords": 15672,
   "years": [
     "2020",
     "2021",
@@ -11,5 +11,11 @@
     "2025",
     "2026"
   ],
-  "excelModified": "2026-05-13T13:09:15.195Z"
+  "sources": [
+    {
+      "label": "Silva Packer",
+      "modified": "2026-06-22T10:32:57.858Z",
+      "records": 15672
+    }
+  ]
 }
