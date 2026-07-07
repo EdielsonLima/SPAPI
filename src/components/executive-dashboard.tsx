@@ -90,6 +90,41 @@ function companyStorageKey(tab: MainTab): string {
 type ChartView = "mensal" | "anual" | "diario";
 
 // === Reusable Multi-Select Filter ===
+const colorStyles: Record<string, { bg: string; border: string; text: string; bgActive: string; textActive: string; borderActive: string }> = {
+  amber: {
+    bg: "bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700",
+    border: "border-slate-200 dark:border-slate-700",
+    text: "text-slate-600 dark:text-slate-300",
+    bgActive: "bg-amber-50 dark:bg-amber-950/30",
+    textActive: "text-amber-700 dark:text-amber-300",
+    borderActive: "border-amber-300 dark:border-amber-800",
+  },
+  blue: {
+    bg: "bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700",
+    border: "border-slate-200 dark:border-slate-700",
+    text: "text-slate-600 dark:text-slate-300",
+    bgActive: "bg-blue-50 dark:bg-blue-950/30",
+    textActive: "text-blue-700 dark:text-blue-300",
+    borderActive: "border-blue-300 dark:border-blue-800",
+  },
+  violet: {
+    bg: "bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700",
+    border: "border-slate-200 dark:border-slate-700",
+    text: "text-slate-600 dark:text-slate-300",
+    bgActive: "bg-violet-50 dark:bg-violet-950/30",
+    textActive: "text-violet-700 dark:text-violet-300",
+    borderActive: "border-violet-300 dark:border-violet-800",
+  },
+  indigo: {
+    bg: "bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-700",
+    border: "border-slate-200 dark:border-slate-700",
+    text: "text-slate-600 dark:text-slate-300",
+    bgActive: "bg-indigo-50 dark:bg-indigo-950/30",
+    textActive: "text-indigo-700 dark:text-indigo-300",
+    borderActive: "border-indigo-300 dark:border-indigo-800",
+  },
+};
+
 function MultiSelectFilter({
   label,
   icon,
@@ -102,6 +137,8 @@ function MultiSelectFilter({
   labelFn,
   subtitleFn,
   onSaveDefault,
+  quickFilters,
+  onSelectValues,
 }: {
   label: string;
   icon: React.ReactNode;
@@ -114,6 +151,8 @@ function MultiSelectFilter({
   labelFn?: (value: string) => string;
   subtitleFn?: (value: string) => string;
   onSaveDefault?: () => void;
+  quickFilters?: { label: string; values: string[] }[];
+  onSelectValues?: (values: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -169,6 +208,37 @@ function MultiSelectFilter({
             />
           </div>
         </div>
+        {/* Quick Filters */}
+        {!search && quickFilters && quickFilters.length > 0 && (
+          <div className="px-3 py-2 border-b flex flex-wrap gap-1 bg-slate-50/50 dark:bg-slate-900/10 justify-center">
+            {quickFilters.map((qf) => {
+              const isSelected = qf.values.every((v) => selected.has(v)) && qf.values.length > 0;
+              const activeColorStyle = colorStyles[activeColor] || colorStyles.blue;
+              return (
+                <button
+                  key={qf.label}
+                  type="button"
+                  onClick={() => {
+                    if (onSelectValues) {
+                      if (isSelected) {
+                        onClear();
+                      } else {
+                        onSelectValues(qf.values);
+                      }
+                    }
+                  }}
+                  className={`text-[10px] px-2 py-1 rounded font-semibold border transition-all ${
+                    isSelected
+                      ? `${activeColorStyle.bgActive} ${activeColorStyle.borderActive} ${activeColorStyle.textActive}`
+                      : `${activeColorStyle.bg} ${activeColorStyle.border} ${activeColorStyle.text}`
+                  }`}
+                >
+                  {qf.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {/* Select All / Deselect All */}
         {!search && (
           <div className="px-1 pt-1">
@@ -2886,6 +2956,15 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedMonths(new Set())}
             activeColor="amber"
             labelFn={(m) => MONTH_NAMES[m] || m}
+            quickFilters={[
+              { label: "1º Trim", values: ["01", "02", "03"] },
+              { label: "2º Trim", values: ["04", "05", "06"] },
+              { label: "3º Trim", values: ["07", "08", "09"] },
+              { label: "4º Trim", values: ["10", "11", "12"] },
+              { label: "1º Sem", values: ["01", "02", "03", "04", "05", "06"] },
+              { label: "2º Sem", values: ["07", "08", "09", "10", "11", "12"] },
+            ]}
+            onSelectValues={(vals) => setSelectedMonths(new Set(vals))}
           />
         </div>}
         {activeTab === "comercial" && <div className="flex items-center gap-2 flex-wrap">
@@ -2927,6 +3006,15 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedMonths(new Set())}
             activeColor="amber"
             labelFn={(m) => MONTH_NAMES[m] || m}
+            quickFilters={[
+              { label: "1º Trim", values: ["01", "02", "03"] },
+              { label: "2º Trim", values: ["04", "05", "06"] },
+              { label: "3º Trim", values: ["07", "08", "09"] },
+              { label: "4º Trim", values: ["10", "11", "12"] },
+              { label: "1º Sem", values: ["01", "02", "03", "04", "05", "06"] },
+              { label: "2º Sem", values: ["07", "08", "09", "10", "11", "12"] },
+            ]}
+            onSelectValues={(vals) => setSelectedMonths(new Set(vals))}
           />
         </div>}
         {activeTab !== "orcamento" && activeTab !== "comercial" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "indicadores" && <div className="flex items-center gap-2 flex-wrap">
@@ -3015,6 +3103,15 @@ export function ExecutiveDashboard() {
             onClear={() => setSelectedMonths(new Set())}
             activeColor="blue"
             labelFn={(v) => MONTH_NAMES[v] || v}
+            quickFilters={[
+              { label: "1º Trim", values: ["01", "02", "03"].filter(m => availableMonths.includes(m)) },
+              { label: "2º Trim", values: ["04", "05", "06"].filter(m => availableMonths.includes(m)) },
+              { label: "3º Trim", values: ["07", "08", "09"].filter(m => availableMonths.includes(m)) },
+              { label: "4º Trim", values: ["10", "11", "12"].filter(m => availableMonths.includes(m)) },
+              { label: "1º Sem", values: ["01", "02", "03", "04", "05", "06"].filter(m => availableMonths.includes(m)) },
+              { label: "2º Sem", values: ["07", "08", "09", "10", "11", "12"].filter(m => availableMonths.includes(m)) },
+            ].filter(qf => qf.values.length > 0)}
+            onSelectValues={(vals) => setSelectedMonths(new Set(vals))}
           />
           {(activeTab === "a-pagar" || activeTab === "a-receber") && (
             <MultiSelectFilter
