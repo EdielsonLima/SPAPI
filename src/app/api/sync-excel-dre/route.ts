@@ -141,7 +141,7 @@ export async function POST() {
     let totalRecords = 0;
     let latestModifiedTime = new Date(0);
 
-    for (const { label, path: excelPath } of activePaths) {
+    for (const { path: excelPath } of activePaths) {
       const stat = fs.statSync(excelPath);
       if (stat.mtime > latestModifiedTime) {
         latestModifiedTime = stat.mtime;
