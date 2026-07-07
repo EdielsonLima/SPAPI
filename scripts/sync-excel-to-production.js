@@ -17,7 +17,7 @@ const EXCEL_PATHS = [
   },
   {
     label: "Holding",
-    path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/HOLDING/DEMOSTRATIVO RESULTADO COMPLETO.xlsx",
+    path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/HOLDING/DEMOSTRATIVO RESULTADO HOLDING.xlsx",
   },
 ];
 

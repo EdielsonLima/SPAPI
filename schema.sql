@@ -185,8 +185,9 @@ CREATE TABLE IF NOT EXISTS dre_mappings (
   dre_category        VARCHAR(50)  NOT NULL,
   financial_plan_id   VARCHAR(50)  NOT NULL,
   financial_plan_name VARCHAR(255) NOT NULL,
+  company_mode        VARCHAR(20)  NOT NULL DEFAULT 'sp',
   created_at          TIMESTAMP NOT NULL DEFAULT NOW(),
-  UNIQUE(dre_category, financial_plan_id)
+  UNIQUE(dre_category, financial_plan_id, company_mode)
 );
 
 -- ── Dados DRE do Excel (fonte principal, por empresa, por mês) ──────────────────

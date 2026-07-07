@@ -190,12 +190,14 @@ export function DreTab({
   }, []);
 
   useEffect(() => {
-    fetch("/api/dre-mappings")
+    const mode = isHolding ? "holding" : "sp";
+    setLoadingMappings(true);
+    fetch(`/api/dre-mappings?companyMode=${mode}`)
       .then(r => r.json())
       .then(j => setDreMappings(j.data || {}))
       .catch(() => {})
       .finally(() => setLoadingMappings(false));
-  }, []);
+  }, [isHolding]);
 
   // Fetch DRE data from Excel/DB (primary source)
   // DRE shows ALL companies from Excel (no company filter) to match Power BI

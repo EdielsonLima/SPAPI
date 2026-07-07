@@ -195,15 +195,22 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const year = searchParams.get("year") || String(new Date().getFullYear());
   const excludeParam = searchParams.get("excludeCompanies");
+  const companiesParam = searchParams.get("companies");
   const monthsParam = searchParams.get("months");
   const monthly = searchParams.get("monthly") === "true";
 
   const excludeCompanies = excludeParam
     ? new Set(excludeParam.split(",").map(s => s.trim().toUpperCase()))
     : new Set<string>();
+  const companiesFilter = companiesParam
+    ? new Set(companiesParam.split(",").map(s => s.trim().toUpperCase()))
+    : null;
   const monthsFilter = monthsParam
     ? new Set(monthsParam.split(",").map(s => s.trim().padStart(2, "0")))
     : null;
+
+  const isHoldingMode = companiesFilter && companiesFilter.has("SILVA ADMINISTRADORA HOLDING LTDA");
+  const companyMode = isHoldingMode ? "holding" : "sp";
 
   const startDate = `${year}-01-01`;
   const endDate = `${year}-12-31`;
@@ -213,7 +220,7 @@ export async function GET(request: NextRequest) {
       getCachedOutcomeContaining(startDate, endDate),
       getCachedIncomeContaining(startDate, endDate),
       getCachedBankMovementsContaining(startDate, endDate),
-      getDreMappings(),
+      getDreMappings(companyMode),
     ]);
 
     // Inverte dre_mappings: financialPlanId → dreCategory
@@ -267,6 +274,7 @@ export async function GET(request: NextRequest) {
     const outcomePayload = outcomeCache?.data;
     const outcomeItems = readArray<SiengeOutcomeItem>(outcomePayload);
     for (const item of outcomeItems) {
+      if (companiesFilter && !companiesFilter.has((item.companyName || "").toUpperCase())) continue;
       if (excludeCompanies.has((item.companyName || "").toUpperCase())) continue;
       if (isExcludedDocType(item.documentIdentificationName) || item.forecastDocument === "S") continue;
       const cats = item.paymentsCategories || [];
@@ -288,6 +296,7 @@ export async function GET(request: NextRequest) {
     const incomePayload = incomeCache?.data;
     const incomeItems = readArray<SiengeIncomeItem>(incomePayload);
     for (const item of incomeItems) {
+      if (companiesFilter && !companiesFilter.has((item.companyName || "").toUpperCase())) continue;
       if (excludeCompanies.has((item.companyName || "").toUpperCase())) continue;
       if (isExcludedDocType(item.documentIdentificationName)) continue;
       const cats = item.receiptsCategories || item.paymentsCategories || [];
@@ -303,6 +312,7 @@ export async function GET(request: NextRequest) {
     const bmPayload = bmCache?.data;
     const bmItems = readArray<SiengeBankMovementItem>(bmPayload);
     for (const bm of bmItems) {
+      if (companiesFilter && !companiesFilter.has((bm.companyName || "").toUpperCase())) continue;
       if (excludeCompanies.has((bm.companyName || "").toUpperCase())) continue;
       const cats = bm.financialCategories || [];
       if (cats.length === 0) continue;

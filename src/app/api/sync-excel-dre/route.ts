@@ -10,8 +10,16 @@ export const maxDuration = 300;
 // não existe e o endpoint retorna 404 com instrução pra rodar o script no
 // terminal local.
 
-const EXCEL_PATH =
-  "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/SP/DEMOSTRATIVO RESULTADO COMPLETO.xlsx";
+const EXCEL_PATHS = [
+  {
+    label: "Silva Packer",
+    path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/SP/DEMOSTRATIVO RESULTADO COMPLETO.xlsx",
+  },
+  {
+    label: "Holding",
+    path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/HOLDING/DEMOSTRATIVO RESULTADO HOLDING.xlsx",
+  },
+];
 
 const DATA_COLS = [6, 8, 9, 11, 12, 14, 15, 16, 17];
 
@@ -112,50 +120,56 @@ function parseExcelForYear(data: unknown[][], year: string): CompanyAccount[] {
 
 export async function POST() {
   try {
-    if (!fs.existsSync(EXCEL_PATH)) {
+    const activePaths = EXCEL_PATHS.filter(ep => fs.existsSync(ep.path));
+    if (activePaths.length === 0) {
       return NextResponse.json(
         {
-          error: "Excel file not found on server",
-          detail: `Esperado em: ${EXCEL_PATH}. O servidor de produção não tem acesso ao arquivo local — rode 'node scripts/sync-excel-to-production.js' no terminal da máquina onde o Excel está.`,
+          error: "Nenhum arquivo Excel encontrado no servidor",
+          detail: `Procurado em:\n- Silva Packer: ${EXCEL_PATHS[0].path}\n- Holding: ${EXCEL_PATHS[1].path}\n\nO servidor de produção não tem acesso ao arquivo local — rode 'node scripts/sync-excel-to-production.js' no terminal da máquina onde o Excel está.`,
         },
         { status: 404 }
       );
     }
 
-    const stat = fs.statSync(EXCEL_PATH);
-    const excelModified = stat.mtime.toISOString();
-
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const XLSX = require("xlsx");
-    const fileBuffer = fs.readFileSync(EXCEL_PATH);
-    const wb = XLSX.read(fileBuffer);
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-
     const currentYear = new Date().getFullYear();
     const years: string[] = [];
     for (let y = 2020; y <= currentYear; y++) years.push(String(y));
 
     const perYear: Record<string, number> = {};
     let totalRecords = 0;
-    for (const year of years) {
-      const accounts = parseExcelForYear(data, year);
-      if (accounts.length === 0) {
-        perYear[year] = 0;
-        continue;
+    let latestModifiedTime = new Date(0);
+
+    for (const { label, path: excelPath } of activePaths) {
+      const stat = fs.statSync(excelPath);
+      if (stat.mtime > latestModifiedTime) {
+        latestModifiedTime = stat.mtime;
       }
-      await saveDreExcelData(year, accounts);
-      perYear[year] = accounts.length;
-      totalRecords += accounts.length;
+
+      const fileBuffer = fs.readFileSync(excelPath);
+      const wb = XLSX.read(fileBuffer);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+      for (const year of years) {
+        const accounts = parseExcelForYear(data, year);
+        if (accounts.length === 0) continue;
+
+        await saveDreExcelData(year, accounts);
+        perYear[year] = (perYear[year] || 0) + accounts.length;
+        totalRecords += accounts.length;
+      }
     }
 
     return NextResponse.json({
       success: true,
-      excelModified,
+      excelModified: latestModifiedTime.toISOString(),
       syncedAt: new Date().toISOString(),
       totalRecords,
       perYear,
       years,
+      syncedSources: activePaths.map(ap => ap.label),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

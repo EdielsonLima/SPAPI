@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, useMemo } from "react";
+import { useCompanyMode } from "@/lib/company-context";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +48,9 @@ const DRE_CATEGORIES = [
 ];
 
 export default function DrePage() {
+  const { isHolding, label: companyLabel } = useCompanyMode();
+  const companyMode = isHolding ? "holding" : "sp";
+
   const [mappings, setMappings] = useState<Record<string, DreMapping[]>>({});
   const [financialPlans, setFinancialPlans] = useState<FinancialPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +62,7 @@ export default function DrePage() {
     setLoading(true);
     try {
       const [mappingsRes, plansRes] = await Promise.all([
-        fetch("/api/dre-mappings"),
+        fetch(`/api/dre-mappings?companyMode=${companyMode}`),
         fetch("/api/sienge/financial-plans"),
       ]);
       const mappingsData = await mappingsRes.json();
@@ -70,7 +74,7 @@ export default function DrePage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [companyMode]);
 
   useEffect(() => {
     fetchData();
@@ -109,6 +113,7 @@ export default function DrePage() {
           dreCategory,
           financialPlanId: plan.id,
           financialPlanName: plan.name,
+          companyMode,
         }),
       });
       if (!res.ok) throw new Error("API error");
@@ -133,7 +138,7 @@ export default function DrePage() {
   const handleDelete = async (dreCategory: string, financialPlanId: string) => {
     try {
       const res = await fetch(
-        `/api/dre-mappings?dreCategory=${dreCategory}&financialPlanId=${encodeURIComponent(financialPlanId)}`,
+        `/api/dre-mappings?dreCategory=${dreCategory}&financialPlanId=${encodeURIComponent(financialPlanId)}&companyMode=${companyMode}`,
         { method: "DELETE" }
       );
       if (!res.ok) throw new Error("API error");
@@ -153,10 +158,15 @@ export default function DrePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-800">Configuracao DRE</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-slate-800">Configuração DRE</h1>
+          <Badge className="bg-purple-600 hover:bg-purple-700 text-white font-semibold">
+            {companyLabel}
+          </Badge>
+        </div>
         <p className="text-sm text-slate-500 mt-1">
-          Associe as contas do plano financeiro a cada categoria do DRE (Demonstracao do Resultado do Exercicio).
-          As linhas calculadas (Lucro Bruto, Lucro Operacional, etc.) sao geradas automaticamente.
+          Associe as contas do plano financeiro a cada categoria do DRE (Demonstração do Resultado do Exercício).
+          As linhas calculadas (Lucro Bruto, Lucro Operacional, etc.) são geradas automaticamente.
         </p>
         <Badge variant="secondary" className="mt-2">
           {totalMapped} {totalMapped === 1 ? "conta mapeada" : "contas mapeadas"}

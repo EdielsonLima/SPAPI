@@ -534,11 +534,14 @@ export interface DreMappingRow {
   financialPlanName: string;
 }
 
-export async function getDreMappings(): Promise<Record<string, DreMappingRow[]>> {
+export async function getDreMappings(companyMode: string = "sp"): Promise<Record<string, DreMappingRow[]>> {
   const { rows } = await pool.query(
     `SELECT dre_category AS "dreCategory", financial_plan_id AS "financialPlanId",
             financial_plan_name AS "financialPlanName"
-     FROM dre_mappings ORDER BY dre_category, financial_plan_name`
+     FROM dre_mappings 
+     WHERE company_mode = $1
+     ORDER BY dre_category, financial_plan_name`,
+    [companyMode]
   );
   const map: Record<string, DreMappingRow[]> = {};
   for (const row of rows) {
@@ -548,19 +551,19 @@ export async function getDreMappings(): Promise<Record<string, DreMappingRow[]>>
   return map;
 }
 
-export async function addDreMapping(dreCategory: string, financialPlanId: string, financialPlanName: string) {
+export async function addDreMapping(dreCategory: string, financialPlanId: string, financialPlanName: string, companyMode: string = "sp") {
   await pool.query(
-    `INSERT INTO dre_mappings (dre_category, financial_plan_id, financial_plan_name)
-     VALUES ($1, $2, $3)
-     ON CONFLICT (dre_category, financial_plan_id) DO NOTHING`,
-    [dreCategory, financialPlanId, financialPlanName]
+    `INSERT INTO dre_mappings (dre_category, financial_plan_id, financial_plan_name, company_mode)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (dre_category, financial_plan_id, company_mode) DO NOTHING`,
+    [dreCategory, financialPlanId, financialPlanName, companyMode]
   );
 }
 
-export async function deleteDreMapping(dreCategory: string, financialPlanId: string) {
+export async function deleteDreMapping(dreCategory: string, financialPlanId: string, companyMode: string = "sp") {
   await pool.query(
-    `DELETE FROM dre_mappings WHERE dre_category = $1 AND financial_plan_id = $2`,
-    [dreCategory, financialPlanId]
+    `DELETE FROM dre_mappings WHERE dre_category = $1 AND financial_plan_id = $2 AND company_mode = $3`,
+    [dreCategory, financialPlanId, companyMode]
   );
 }
 
@@ -626,7 +629,13 @@ export async function saveDreExcelData(year: string, accounts: {
     }
   }
 
-  await pool.query(`DELETE FROM dre_excel_supplementary WHERE year = $1`, [year]);
+  const companyIds = Array.from(new Set(accounts.map((a) => a.companyId)));
+  if (companyIds.length > 0) {
+    await pool.query(
+      `DELETE FROM dre_excel_supplementary WHERE year = $1 AND company_id = ANY($2)`,
+      [year, companyIds]
+    );
+  }
   for (const acc of agg.values()) {
     await pool.query(
       `INSERT INTO dre_excel_supplementary (year, month, company_id, company_name, financial_plan_id, financial_plan_name, dre_category, amount)

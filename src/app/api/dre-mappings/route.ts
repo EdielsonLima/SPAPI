@@ -3,14 +3,16 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getDreMappings, addDreMapping, deleteDreMapping } from "@/lib/db";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const mappings = await getDreMappings();
+    const { searchParams } = new URL(request.url);
+    const companyMode = searchParams.get("companyMode") || "sp";
+    const mappings = await getDreMappings(companyMode);
     return NextResponse.json({ data: mappings });
   } catch (error) {
     console.error("Error fetching DRE mappings:", error);
@@ -26,13 +28,13 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { dreCategory, financialPlanId, financialPlanName } = body;
+    const { dreCategory, financialPlanId, financialPlanName, companyMode } = body;
 
     if (!dreCategory || !financialPlanId || !financialPlanName) {
       return NextResponse.json({ error: "dreCategory, financialPlanId and financialPlanName are required" }, { status: 400 });
     }
 
-    await addDreMapping(dreCategory, financialPlanId, financialPlanName);
+    await addDreMapping(dreCategory, financialPlanId, financialPlanName, companyMode || "sp");
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error adding DRE mapping:", error);
@@ -50,12 +52,13 @@ export async function DELETE(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const dreCategory = searchParams.get("dreCategory");
     const financialPlanId = searchParams.get("financialPlanId");
+    const companyMode = searchParams.get("companyMode") || "sp";
 
     if (!dreCategory || !financialPlanId) {
       return NextResponse.json({ error: "dreCategory and financialPlanId are required" }, { status: 400 });
     }
 
-    await deleteDreMapping(dreCategory, financialPlanId);
+    await deleteDreMapping(dreCategory, financialPlanId, companyMode);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error deleting DRE mapping:", error);
