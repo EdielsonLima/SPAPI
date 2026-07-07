@@ -94,6 +94,26 @@ async function migrate() {
     } catch (coErr) {
       console.log("[migrate] controla_orcamento migration note:", coErr.message);
     }
+    // Migration: ensure dre_mappings has company_mode column and composite unique constraint
+    try {
+      const { rows } = await pool.query(`
+        SELECT column_name FROM information_schema.columns
+        WHERE table_name = 'dre_mappings' AND column_name = 'company_mode'
+      `);
+      if (rows.length === 0) {
+        console.log("[migrate] Adding company_mode column to dre_mappings...");
+        await pool.query(`ALTER TABLE dre_mappings ADD COLUMN company_mode VARCHAR(20) NOT NULL DEFAULT 'sp'`);
+        
+        console.log("[migrate] Dropping old constraint on dre_mappings...");
+        await pool.query(`ALTER TABLE dre_mappings DROP CONSTRAINT IF EXISTS dre_mappings_dre_category_financial_plan_id_key`);
+        
+        console.log("[migrate] Adding new unique constraint on dre_mappings...");
+        await pool.query(`ALTER TABLE dre_mappings ADD CONSTRAINT dre_mappings_dre_category_financial_plan_id_company_mode_key UNIQUE (dre_category, financial_plan_id, company_mode)`);
+        console.log("[migrate] dre_mappings table updated successfully.");
+      }
+    } catch (dmErr) {
+      console.log("[migrate] dre_mappings migration note:", dmErr.message);
+    }
     // Seed default users (only if not already present)
     try {
       const bcrypt = require("bcryptjs");
