@@ -114,6 +114,28 @@ async function migrate() {
     } catch (dmErr) {
       console.log("[migrate] dre_mappings migration note:", dmErr.message);
     }
+    // Migration (2026-07-07): restaura os mapeamentos do Silva Packer ("sp").
+    // Ao separar a DRE da Holding, os mapeamentos originais (operacionais/SP)
+    // acabaram todos com company_mode='holding' e o 'sp' zerou, quebrando o
+    // drill-down e a aba "DRE API" no modo Silva Packer. Se 'sp' está vazio e
+    // 'holding' tem mapeamentos, copia holding->sp (aditivo, não altera 'holding'
+    // nem valores exibidos — que vêm do Excel). Idempotente: uma vez populado, pula.
+    try {
+      const sp = await pool.query(`SELECT COUNT(*)::int AS n FROM dre_mappings WHERE company_mode = 'sp'`);
+      const hol = await pool.query(`SELECT COUNT(*)::int AS n FROM dre_mappings WHERE company_mode = 'holding'`);
+      if (sp.rows[0].n === 0 && hol.rows[0].n > 0) {
+        console.log("[migrate] dre_mappings 'sp' vazio — copiando de 'holding' p/ restaurar DRE Silva Packer...");
+        const res = await pool.query(`
+          INSERT INTO dre_mappings (dre_category, financial_plan_id, financial_plan_name, company_mode)
+          SELECT dre_category, financial_plan_id, financial_plan_name, 'sp'
+          FROM dre_mappings WHERE company_mode = 'holding'
+          ON CONFLICT (dre_category, financial_plan_id, company_mode) DO NOTHING
+        `);
+        console.log(`[migrate] dre_mappings 'sp' restaurado: ${res.rowCount} mapeamentos copiados.`);
+      }
+    } catch (spErr) {
+      console.log("[migrate] dre_mappings sp restore note:", spErr.message);
+    }
     // Seed default users (only if not already present)
     try {
       const bcrypt = require("bcryptjs");
