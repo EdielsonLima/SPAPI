@@ -50,3 +50,6 @@ analyze-*.js
 check-*.js
 !scripts/check-validations.js
 switch-company.sh
+
+# Gerado pelo sync do DRE (muda a cada execução) — não versionar
+last-excel-sync.json
