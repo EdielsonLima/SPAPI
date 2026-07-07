@@ -473,9 +473,17 @@ const DRE_CATEGORIA_LABEL: Record<string, string> = {
   saidas_nao_operacionais: "Saidas nao Operacionais", variacao_caixa: "Variacao de Caixa",
 };
 
-export async function dreResumo(args: { ano?: string; categoria?: string } = {}) {
+export async function dreResumo(args: { ano?: string; categoria?: string; meses?: string[] | string } = {}) {
   const ano = args.ano || String(new Date().getFullYear());
-  const accounts = await getDreExcelData(ano, undefined, undefined, ["SILVA ADMINISTRADORA HOLDING LTDA"]);
+  // Corte por periodo (opcional): 'meses' aceita array ou CSV ("01".."12" ou "1".."12"). Sem isso = ano inteiro.
+  let meses: string[] | undefined;
+  if (args.meses !== undefined && args.meses !== null && (Array.isArray(args.meses) ? args.meses.length : String(args.meses).trim())) {
+    const arr = Array.isArray(args.meses) ? args.meses : String(args.meses).split(",");
+    meses = arr.map((m) => String(m).trim().padStart(2, "0")).filter((m) => /^(0[1-9]|1[0-2])$/.test(m));
+    if (meses.length === 0) meses = undefined;
+  }
+  const periodo = meses && meses.length ? `${ano} (meses ${meses.join(", ")})` : `${ano} (ano inteiro)`;
+  const accounts = await getDreExcelData(ano, undefined, meses, ["SILVA ADMINISTRADORA HOLDING LTDA"]);
   const porCategoria = new Map<string, number>();
   for (const a of accounts) {
     porCategoria.set(a.dreCategory, (porCategoria.get(a.dreCategory) || 0) + (a.amount || 0));
@@ -503,6 +511,8 @@ export async function dreResumo(args: { ano?: string; categoria?: string } = {})
     }
     return {
       ano,
+      periodo,
+      meses: meses ?? null,
       categoria: DRE_CATEGORIA_LABEL[chave] || chave,
       chave,
       total: porCategoria.get(chave) || 0,
@@ -540,6 +550,8 @@ export async function dreResumo(args: { ano?: string; categoria?: string } = {})
 
   return {
     ano,
+    periodo,
+    meses: meses ?? null,
     observacao: "Consolidado de todas as empresas exceto Holding (igual ao Painel/Power BI). Linhas com 'calculada: true' seguem as formulas do Painel. Use 'categoria' para drill-down por conta financeira e empresa.",
     linhas: [...linhas, ...calc],
   };

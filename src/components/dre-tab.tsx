@@ -204,10 +204,13 @@ export function DreTab({
   useEffect(() => {
     if (selectedYears.size === 0) return;
     const years = Array.from(selectedYears);
+    const monthsQuery = selectedMonths.size > 0
+      ? `&months=${encodeURIComponent(Array.from(selectedMonths).join(","))}`
+      : "";
 
     Promise.all(
       years.map(year =>
-        fetch(`${dreEndpoint}?year=${year}${dreCompanyQuery}`, { cache: "no-store" })
+        fetch(`${dreEndpoint}?year=${year}${dreCompanyQuery}${monthsQuery}`, { cache: "no-store" })
           .then(r => r.ok ? r.json() : null)
           .catch(() => null)
       )
@@ -229,7 +232,7 @@ export function DreTab({
         setExcelSupplementary(merged);
       }
     });
-  }, [selectedYears, refreshKey, localRefreshKey, dreEndpoint, dreCompanyQuery]);
+  }, [selectedYears, selectedMonths, refreshKey, localRefreshKey, dreEndpoint, dreCompanyQuery]);
 
   // Fetch monthly breakdown for DRE Completa view
   // Also fetches ALL companies (no filter) to match Power BI

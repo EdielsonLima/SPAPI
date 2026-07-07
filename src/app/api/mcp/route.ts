@@ -71,8 +71,8 @@ const TOOLS = [
     name: "dre_resumo",
     fn: dreResumo,
     description:
-      "DRE consolidada por categoria (receita, custo, lucro bruto/operacional/liquido etc.) de um ano. Todas as empresas exceto Holding (igual ao Painel/Power BI). Params: 'ano' (ex.: 2026; default ano atual); 'categoria' (drill-down: detalha a categoria por CONTA FINANCEIRA e por EMPRESA — aceita chave ou nome, ex.: 'despesas_tributarias', 'custo variavel', 'tributarias').",
-    inputSchema: { type: "object", properties: { ano: { type: "string" }, categoria: { type: "string" } } },
+      "DRE consolidada por categoria (receita, custo, lucro bruto/operacional/liquido etc.). Todas as empresas exceto Holding (igual ao Painel/Power BI). Params: 'ano' (ex.: 2026; default ano atual); 'meses' (array '01'..'12' p/ recortar o periodo, ex.: ['01','02','03','04','05','06'] = 1o semestre; sem isso = ano inteiro); 'categoria' (drill-down por CONTA FINANCEIRA e por EMPRESA — aceita chave ou nome, ex.: 'despesas_tributarias', 'custo variavel').",
+    inputSchema: { type: "object", properties: { ano: { type: "string" }, meses: { type: "array", items: { type: "string" } }, categoria: { type: "string" } } },
   },
   {
     name: "indicadores",
