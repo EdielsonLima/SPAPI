@@ -10,14 +10,22 @@
 const fs = require("fs");
 const path = require("path");
 
+// Cada Excel é autoritativo para o SEU escopo de empresas. Ambos os arquivos
+// contêm TODAS as empresas, mas com valores diferentes: o "COMPLETO" (SP) tem os
+// valores corretos das operacionais; o "HOLDING" tem os valores corretos da
+// Holding. Por isso filtramos por empresa em cada um — senão o segundo a
+// sincronizar sobrescreve o primeiro (bug 2026-07-07: Holding zerava o SP).
+const isHoldingCompany = (name) => /HOLDING|ADMINISTRADORA/i.test(name || "");
 const EXCEL_PATHS = [
   {
     label: "Silva Packer",
     path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/SP/DEMOSTRATIVO RESULTADO COMPLETO.xlsx",
+    keep: (name) => !isHoldingCompany(name), // só operacionais
   },
   {
     label: "Holding",
     path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/HOLDING/DEMOSTRATIVO RESULTADO HOLDING.xlsx",
+    keep: (name) => isHoldingCompany(name), // só a Holding
   },
 ];
 
@@ -125,8 +133,9 @@ function parseExcel(year, excelPath) {
   return companyAccounts;
 }
 
-async function syncYear(year, targetUrl, excelPath) {
-  const accounts = parseExcel(year, excelPath);
+async function syncYear(year, targetUrl, excelPath, keep) {
+  let accounts = parseExcel(year, excelPath);
+  if (keep) accounts = accounts.filter((a) => keep(a.companyName));
   if (accounts.length === 0) {
     log(`  ${year}: no data`);
     return 0;
@@ -174,7 +183,7 @@ async function main() {
   let grandTotal = 0;
   const excelStats = [];
 
-  for (const { label, path: excelPath } of EXCEL_PATHS) {
+  for (const { label, path: excelPath, keep } of EXCEL_PATHS) {
     if (!fs.existsSync(excelPath)) {
       log(`WARN: Excel "${label}" not found: ${excelPath} — skipping`);
       continue;
@@ -185,7 +194,7 @@ async function main() {
 
     let subtotal = 0;
     for (const year of years) {
-      subtotal += await syncYear(year, targetUrl, excelPath);
+      subtotal += await syncYear(year, targetUrl, excelPath, keep);
     }
     log(`  ${label}: ${subtotal} records`);
     grandTotal += subtotal;

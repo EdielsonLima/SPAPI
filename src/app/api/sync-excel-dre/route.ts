@@ -10,14 +10,20 @@ export const maxDuration = 300;
 // não existe e o endpoint retorna 404 com instrução pra rodar o script no
 // terminal local.
 
+// Cada Excel é autoritativo só para o seu escopo. Ambos contêm todas as empresas,
+// mas com valores diferentes — sem o filtro, o segundo a sincronizar sobrescreve o
+// primeiro (bug 2026-07-07: Holding zerava o SP).
+const isHoldingCompany = (name: string) => /HOLDING|ADMINISTRADORA/i.test(name || "");
 const EXCEL_PATHS = [
   {
     label: "Silva Packer",
     path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/SP/DEMOSTRATIVO RESULTADO COMPLETO.xlsx",
+    keep: (name: string) => !isHoldingCompany(name),
   },
   {
     label: "Holding",
     path: "C:/Users/Usuario/OneDrive - DTCONSULTORIAS/SILVA PACKER/DRE/HOLDING/DEMOSTRATIVO RESULTADO HOLDING.xlsx",
+    keep: (name: string) => isHoldingCompany(name),
   },
 ];
 
@@ -141,7 +147,7 @@ export async function POST() {
     let totalRecords = 0;
     let latestModifiedTime = new Date(0);
 
-    for (const { path: excelPath } of activePaths) {
+    for (const { path: excelPath, keep } of activePaths) {
       const stat = fs.statSync(excelPath);
       if (stat.mtime > latestModifiedTime) {
         latestModifiedTime = stat.mtime;
@@ -153,7 +159,8 @@ export async function POST() {
       const data: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
 
       for (const year of years) {
-        const accounts = parseExcelForYear(data, year);
+        let accounts = parseExcelForYear(data, year);
+        if (keep) accounts = accounts.filter(a => keep(a.companyName));
         if (accounts.length === 0) continue;
 
         await saveDreExcelData(year, accounts);
