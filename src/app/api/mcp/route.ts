@@ -15,10 +15,11 @@ import {
   indicadoresResumo,
   listarEmpresas,
 } from "@/lib/financeiroActions";
+import { refreshFinanceiroCache } from "@/lib/refreshCache";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const PROTOCOL = "2024-11-05";
 
@@ -86,6 +87,16 @@ const TOOLS = [
     description: "Lista as empresas/empreendimentos cadastrados (id, nome, status). Use para descobrir o nome correto a passar no filtro 'empresa'.",
     inputSchema: { type: "object", properties: {} },
   },
+  {
+    name: "atualizar_cache",
+    fn: async () => {
+      const resumo = await refreshFinanceiroCache();
+      return { ok: true, atualizadoEm: new Date().toISOString(), ...resumo };
+    },
+    description:
+      "Atualiza AGORA o cache financeiro (pagas/recebidas/BMs/saldos) direto do Sienge, sem depender de abrir o Painel nem do cron do GitHub. Use ANTES de ler pagas_recebidas_dia/saldos_bancarios quando precisar do dado do dia garantido (ex.: Fechamento de Caixa da manha). Sincrono: pode levar ~30-120s. Retorna resumo com contagens e duracaoSegundos.",
+    inputSchema: { type: "object", properties: {} },
+  },
 ];
 
 function rpcResult(id: unknown, result: unknown) { return { jsonrpc: "2.0", id, result }; }
@@ -97,7 +108,7 @@ async function handleMessage(msg: { id?: unknown; method?: string; params?: { na
   const params = msg?.params;
   switch (method) {
     case "initialize":
-      return rpcResult(id, { protocolVersion: PROTOCOL, capabilities: { tools: {} }, serverInfo: { name: "silvapacker-financeiro", version: "0.2.0" } });
+      return rpcResult(id, { protocolVersion: PROTOCOL, capabilities: { tools: {} }, serverInfo: { name: "silvapacker-financeiro", version: "0.3.0" } });
     case "notifications/initialized":
       return null;
     case "ping":
