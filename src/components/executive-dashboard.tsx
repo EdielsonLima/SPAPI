@@ -67,6 +67,7 @@ import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
 import { CalendarioPagamentoTab } from "@/components/calendario-pagamento-tab";
 import { CalendarioRecebimentoTab } from "@/components/calendario-recebimento-tab";
 import { ComparativoTab } from "@/components/comparativo-tab";
+import { DetalhamentoTable } from "@/components/detalhamento-table";
 import { useCompanyMode } from "@/lib/company-context";
 
 type Section = "cp" | "cr";
@@ -541,6 +542,9 @@ export function ExecutiveDashboard() {
   const [delinquentCompanyFilter, setDelinquentCompanyFilter] = useState<string | null>(null);
   const [showOverdueTable, setShowOverdueTable] = useState(false);
   const [expandedCreditors, setExpandedCreditors] = useState<Set<string>>(new Set());
+  // Card "Credores"/"Clientes" clicável → tabela de detalhamento em a-pagar/pagas/
+  // a-receber/recebidas (mesma UX de Contas em Atraso / Inadimplentes).
+  const [showCounterpartDetail, setShowCounterpartDetail] = useState(false);
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
   const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
   const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades" | "quadro">("vendas");
@@ -1237,6 +1241,9 @@ export function ExecutiveDashboard() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, allOpTypes, allDocTypes]);
+
+  // Fecha a tabela de detalhamento por credor/cliente ao trocar de aba.
+  useEffect(() => { setShowCounterpartDetail(false); }, [activeTab]);
 
   // Números de documento disponíveis nos dados de income (CR)
   const allDocNumbers = useMemo(() => {
@@ -2371,6 +2378,15 @@ export function ExecutiveDashboard() {
         iconBg: "bg-violet-50",
         gradient: "from-violet-500 to-violet-600",
       },
+      {
+        label: "Credores",
+        value: String(new Set(filteredAPagar.map(i => i.creditorName)).size),
+        subtitle: showCounterpartDetail ? "clique para fechar" : "clique para detalhar",
+        icon: <FileText className="h-7 w-7 text-blue-500" />,
+        iconBg: "bg-blue-50",
+        gradient: "from-blue-500 to-blue-600",
+        onClick: () => setShowCounterpartDetail(v => !v),
+      },
     ],
     "pagas": [
       {
@@ -2412,10 +2428,11 @@ export function ExecutiveDashboard() {
       {
         label: "Credores",
         value: String(new Set(filteredPagas.map(i => i.creditorName)).size),
-        subtitle: "distintos",
+        subtitle: showCounterpartDetail ? "clique para fechar" : "clique para detalhar",
         icon: <FileText className="h-7 w-7 text-blue-500" />,
         iconBg: "bg-blue-50",
         gradient: "from-blue-500 to-blue-600",
+        onClick: () => setShowCounterpartDetail(v => !v),
       },
     ],
     "atrasadas": [
@@ -2486,6 +2503,15 @@ export function ExecutiveDashboard() {
         iconBg: "bg-green-50",
         gradient: "from-green-500 to-green-600",
       },
+      {
+        label: "Clientes",
+        value: String(new Set(filteredAReceber.map(i => i.clientName)).size),
+        subtitle: showCounterpartDetail ? "clique para fechar" : "clique para detalhar",
+        icon: <Users className="h-7 w-7 text-emerald-500" />,
+        iconBg: "bg-emerald-50",
+        gradient: "from-emerald-500 to-emerald-600",
+        onClick: () => setShowCounterpartDetail(v => !v),
+      },
     ],
     "recebidas": [
       {
@@ -2521,10 +2547,11 @@ export function ExecutiveDashboard() {
       {
         label: "Clientes",
         value: String(new Set(filteredRecebidas.map(i => i.clientName)).size),
-        subtitle: "distintos",
+        subtitle: showCounterpartDetail ? "clique para fechar" : "clique para detalhar",
         icon: <Users className="h-7 w-7 text-sky-500" />,
         iconBg: "bg-sky-50",
         gradient: "from-sky-500 to-sky-600",
+        onClick: () => setShowCounterpartDetail(v => !v),
       },
     ],
     "inadimplencia": [
@@ -4529,7 +4556,7 @@ export function ExecutiveDashboard() {
         {kpis.map((kpi) => (
           <Card
             key={kpi.label}
-            className={`border-0 shadow-sm overflow-hidden relative group hover:shadow-md transition-all duration-300 dark:bg-slate-900 ${kpi.onClick ? "cursor-pointer" : ""} ${kpi.onClick && (showDelinquentTable || showOverdueTable) ? "ring-2 ring-red-400 ring-offset-1" : ""}`}
+            className={`border-0 shadow-sm overflow-hidden relative group hover:shadow-md transition-all duration-300 dark:bg-slate-900 ${kpi.onClick ? "cursor-pointer" : ""} ${kpi.onClick && (showDelinquentTable || showOverdueTable || showCounterpartDetail) ? "ring-2 ring-red-400 ring-offset-1" : ""}`}
             onClick={kpi.onClick}
           >
             <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${kpi.gradient}`} />
@@ -4749,6 +4776,94 @@ export function ExecutiveDashboard() {
       })()}
 
       {/* Overdue Table (CP - Contas em Atraso) */}
+      {/* Detalhamento por Credor/Cliente (a-pagar, pagas, a-receber, recebidas) */}
+      {showCounterpartDetail && activeTab === "a-pagar" && (
+        <DetalhamentoTable
+          title="Detalhamento de Contas a Pagar por Credor"
+          items={filteredAPagar}
+          getCounterpart={i => (i as SiengeOutcome).creditorName || `Credor ${(i as SiengeOutcome).creditorId}`}
+          amountFn={i => effectiveAmount(i)}
+          counterpartLabel="Credor"
+          countLabel="Parcelas"
+          totalLabel="Total a Pagar"
+          accent="blue"
+          sortItems={(a, b) => (a.dueDate || "").localeCompare(b.dueDate || "")}
+          detailColumns={[
+            { label: "Título", render: i => `${i.billId}/${i.installmentId}` },
+            { label: "Documento", render: i => i.documentNumber || "-" },
+            { label: "Vencimento", render: i => formatDate(i.dueDate) },
+            { label: "Valor Original", align: "right", render: i => formatCurrency(i.originalAmount) },
+            { label: "Saldo", align: "right", render: i => formatCurrency(effectiveAmount(i)) },
+            { label: "Empresa", render: i => i.companyName },
+          ]}
+          onClose={() => setShowCounterpartDetail(false)}
+        />
+      )}
+      {showCounterpartDetail && activeTab === "pagas" && (
+        <DetalhamentoTable
+          title="Detalhamento de Contas Pagas por Credor"
+          items={filteredPagas}
+          getCounterpart={i => (i as SiengeOutcome).creditorName || `Credor ${(i as SiengeOutcome).creditorId}`}
+          amountFn={i => paidSum(i)}
+          counterpartLabel="Credor"
+          countLabel="Pagamentos"
+          totalLabel="Total Pago"
+          accent="blue"
+          sortItems={(a, b) => (a.dueDate || "").localeCompare(b.dueDate || "")}
+          detailColumns={[
+            { label: "Título", render: i => `${i.billId}/${i.installmentId}` },
+            { label: "Documento", render: i => i.documentNumber || "-" },
+            { label: "Última baixa", render: i => { const d = (i.payments || []).map(p => p.paymentDate).filter(Boolean).sort().pop(); return d ? formatDate(d) : "-"; } },
+            { label: "Empresa", render: i => i.companyName },
+            { label: "Valor Pago", align: "right", render: i => formatCurrency(paidSum(i)) },
+          ]}
+          onClose={() => setShowCounterpartDetail(false)}
+        />
+      )}
+      {showCounterpartDetail && activeTab === "a-receber" && (
+        <DetalhamentoTable
+          title="Detalhamento de Contas a Receber por Cliente"
+          items={filteredAReceber}
+          getCounterpart={i => (i as SiengeIncome).clientName || `Cliente ${(i as SiengeIncome).clientId}`}
+          amountFn={i => effectiveAmount(i)}
+          counterpartLabel="Cliente"
+          countLabel="Parcelas"
+          totalLabel="Total a Receber"
+          accent="emerald"
+          sortItems={(a, b) => (a.dueDate || "").localeCompare(b.dueDate || "")}
+          detailColumns={[
+            { label: "Título", render: i => `${i.billId}/${i.installmentId}` },
+            { label: "Documento", render: i => i.documentNumber || "-" },
+            { label: "Vencimento", render: i => formatDate(i.dueDate) },
+            { label: "Valor Original", align: "right", render: i => formatCurrency(i.originalAmount) },
+            { label: "Saldo", align: "right", render: i => formatCurrency(effectiveAmount(i)) },
+            { label: "Empresa", render: i => i.companyName },
+          ]}
+          onClose={() => setShowCounterpartDetail(false)}
+        />
+      )}
+      {showCounterpartDetail && activeTab === "recebidas" && (
+        <DetalhamentoTable
+          title="Detalhamento de Contas Recebidas por Cliente"
+          items={filteredRecebidas}
+          getCounterpart={i => (i as SiengeIncome).clientName || `Cliente ${(i as SiengeIncome).clientId}`}
+          amountFn={i => receivedSum(i as SiengeIncome)}
+          counterpartLabel="Cliente"
+          countLabel="Recebimentos"
+          totalLabel="Total Recebido"
+          accent="emerald"
+          sortItems={(a, b) => (a.dueDate || "").localeCompare(b.dueDate || "")}
+          detailColumns={[
+            { label: "Título", render: i => `${i.billId}/${i.installmentId}` },
+            { label: "Documento", render: i => i.documentNumber || "-" },
+            { label: "Última baixa", render: i => { const d = (i.payments || []).map(p => p.paymentDate).filter(Boolean).sort().pop(); return d ? formatDate(d) : "-"; } },
+            { label: "Empresa", render: i => i.companyName },
+            { label: "Valor Recebido", align: "right", render: i => formatCurrency(receivedSum(i as SiengeIncome)) },
+          ]}
+          onClose={() => setShowCounterpartDetail(false)}
+        />
+      )}
+
       {showOverdueTable && activeTab === "atrasadas" && (
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-3">
