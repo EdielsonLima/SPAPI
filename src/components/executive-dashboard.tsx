@@ -454,8 +454,12 @@ function inferUnitTypeFromName(name: string): string {
 // depois do " - " ("PALACIO ELIZABETH - DESPESAS INDIRETAS" → "PALACIO ELIZABETH").
 // Só para display — filtros e chaves internas continuam com o nome completo do Sienge.
 function shortEnterpriseName(name: string): string {
-  const idx = name.indexOf(" - ");
-  return idx > 0 ? name.slice(0, idx).trim() : name;
+  // Corta no primeiro hífen/traço que tenha espaço de PELO MENOS um lado
+  // ("X - Y", "X -Y", "X- Y", "X – Y"). Hífen colado dos dois lados ("X-1")
+  // é considerado parte do nome e não corta.
+  const m = name.match(/\s+[-–—]|[-–—]\s+/);
+  if (m && m.index && m.index > 0) return name.slice(0, m.index).trim();
+  return name;
 }
 
 // Normaliza o rótulo de pavimento para juntar variações ("G 3"="G3", "15 º"="15º")
@@ -4143,7 +4147,9 @@ export function ExecutiveDashboard() {
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0 flex-1">
                             <p className="text-[13px] font-bold text-slate-800 dark:text-slate-100 truncate" title={row.name}>{shortEnterpriseName(row.name)}</p>
-                            <p className="text-[11px] text-slate-400 mt-0.5">{row.contracts.length} contratos · {formatCurrency(row.totalValue)}</p>
+                            <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
+                              <strong className="font-extrabold text-slate-700 dark:text-slate-200 tabular-nums">{row.contracts.length}</strong> contratos · <strong className="font-extrabold text-slate-700 dark:text-slate-200 tabular-nums">{formatCurrency(row.totalValue)}</strong>
+                            </p>
                           </div>
                           <span className={`flex-shrink-0 text-sm font-black tabular-nums px-2.5 py-1 rounded-lg ${pctVendido >= 80 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300" : pctVendido >= 50 ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"}`}>
                             {pctVendido.toFixed(0)}% <span className="text-[10px] font-bold opacity-70">vendido</span>
