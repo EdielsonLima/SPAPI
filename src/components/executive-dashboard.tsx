@@ -882,8 +882,11 @@ export function ExecutiveDashboard() {
   // Default do filtro "Tipo Imóvel": pré-seleciona "Apartamento" uma vez, quando as unidades carregam.
   useEffect(() => {
     if (defaultedUnitTypeRef.current || apiUnits.length === 0) return;
-    const tipos = new Set(apiUnits.map(u => u.propertyType || inferUnitTypeFromName(u.name)));
-    const apartamento = Array.from(tipos).find(t => /apartamento/i.test(t));
+    const tipos = Array.from(new Set(apiUnits.map(u => u.propertyType || inferUnitTypeFromName(u.name))));
+    // "Apartamento" exato primeiro — /apartamento/i sozinho podia casar
+    // "Apartamento (Permuta)" dependendo da ordem dos dados.
+    const apartamento = tipos.find(t => /^apartamento$/i.test(t.trim()))
+      || tipos.find(t => /apartamento/i.test(t) && !/permuta/i.test(t));
     if (apartamento) setSelectedUnitTypes(new Set([apartamento]));
     defaultedUnitTypeRef.current = true;
   }, [apiUnits]);
