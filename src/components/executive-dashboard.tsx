@@ -41,6 +41,7 @@ import {
   Handshake,
   LayoutGrid,
   Landmark,
+  Crown,
 } from "lucide-react";
 import {
   BarChart,
@@ -547,7 +548,10 @@ export function ExecutiveDashboard() {
   const [showCounterpartDetail, setShowCounterpartDetail] = useState(false);
   const [expandedComercial, setExpandedComercial] = useState<Set<string>>(new Set());
   const [comercialSort, setComercialSort] = useState<{ field: "name" | "contracts" | "totalValue" | "ticket" | "pct"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
-  const [comercialSubTab, setComercialSubTab] = useState<"vendas" | "unidades" | "quadro">("vendas");
+  const [comercialSubTab, setComercialSubTab] = useState<"visao" | "vendas" | "clientes" | "unidades" | "quadro">("visao");
+  // Aba Clientes (Comercial): busca textual e ordenação da tabela de clientes
+  const [clienteSearch, setClienteSearch] = useState("");
+  const [clientesSort, setClientesSort] = useState<{ field: "name" | "contracts" | "units" | "lastDate" | "totalValue"; dir: "asc" | "desc" }>({ field: "totalValue", dir: "desc" });
   const [comercialChartView, setComercialChartView] = useState<"anual" | "mensal">("anual");
   // Quadro Espelho: "grade" (lista plana) ou "espelho" (torre por pavimento)
   const [quadroView, setQuadroView] = useState<"grade" | "espelho">("espelho");
@@ -3593,35 +3597,383 @@ export function ExecutiveDashboard() {
         return (
           <>
             {/* Modern Segmented Sub-tabs */}
-            <div className="inline-flex items-center p-1 mb-6 bg-slate-100/80 rounded-xl border border-slate-200/50 w-full md:w-auto overflow-x-auto shadow-inner">
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`h-9 px-5 text-[13px] font-bold rounded-lg transition-all duration-200 ${comercialSubTab === "vendas" ? "bg-white text-indigo-700 shadow-[0_2px_8px_rgb(0,0,0,0.06)] border border-slate-200/50" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"}`}
-                onClick={() => setComercialSubTab("vendas")}
-              >
-                <Handshake className={`h-4 w-4 mr-2 ${comercialSubTab === "vendas" ? "text-indigo-500" : "text-slate-400"}`} />
-                Vendas
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`h-9 px-5 text-[13px] font-bold rounded-lg transition-all duration-200 ml-1 ${comercialSubTab === "unidades" ? "bg-white text-emerald-700 shadow-[0_2px_8px_rgb(0,0,0,0.06)] border border-slate-200/50" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"}`}
-                onClick={() => setComercialSubTab("unidades")}
-              >
-                <Building2 className={`h-4 w-4 mr-2 ${comercialSubTab === "unidades" ? "text-emerald-500" : "text-slate-400"}`} />
-                Unidades
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`h-9 px-5 text-[13px] font-bold rounded-lg transition-all duration-200 ml-1 ${comercialSubTab === "quadro" ? "bg-white text-blue-700 shadow-[0_2px_8px_rgb(0,0,0,0.06)] border border-slate-200/50" : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"}`}
-                onClick={() => setComercialSubTab("quadro")}
-              >
-                <LayoutGrid className={`h-4 w-4 mr-2 ${comercialSubTab === "quadro" ? "text-blue-500" : "text-slate-400"}`} />
-                Quadro Espelho
-              </Button>
+            <div className="inline-flex items-center p-1 mb-6 bg-slate-100/80 dark:bg-slate-800/80 rounded-xl border border-slate-200/50 dark:border-slate-700/50 w-full md:w-auto overflow-x-auto shadow-inner">
+              {([
+                { key: "visao" as const, label: "Visão Geral", icon: BarChart3, textActive: "text-violet-700 dark:text-violet-300", iconActive: "text-violet-500" },
+                { key: "vendas" as const, label: "Vendas", icon: Handshake, textActive: "text-indigo-700 dark:text-indigo-300", iconActive: "text-indigo-500" },
+                { key: "clientes" as const, label: "Clientes", icon: Users, textActive: "text-rose-700 dark:text-rose-300", iconActive: "text-rose-500" },
+                { key: "unidades" as const, label: "Unidades", icon: Building2, textActive: "text-emerald-700 dark:text-emerald-300", iconActive: "text-emerald-500" },
+                { key: "quadro" as const, label: "Quadro Espelho", icon: LayoutGrid, textActive: "text-blue-700 dark:text-blue-300", iconActive: "text-blue-500" },
+              ]).map((t, i) => {
+                const isActive = comercialSubTab === t.key;
+                const Icon = t.icon;
+                return (
+                  <Button
+                    key={t.key}
+                    variant="ghost"
+                    size="sm"
+                    className={`h-9 px-4 text-[13px] font-bold rounded-lg transition-all duration-200 whitespace-nowrap ${i > 0 ? "ml-1" : ""} ${isActive ? `bg-white dark:bg-slate-900 ${t.textActive} shadow-[0_2px_8px_rgb(0,0,0,0.06)] border border-slate-200/50 dark:border-slate-700` : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 dark:hover:bg-slate-700/50 dark:hover:text-slate-300"}`}
+                    onClick={() => setComercialSubTab(t.key)}
+                  >
+                    <Icon className={`h-4 w-4 mr-2 ${isActive ? t.iconActive : "text-slate-400"}`} />
+                    {t.label}
+                  </Button>
+                );
+              })}
             </div>
+
+            {/* ─── VISÃO GERAL SUB-TAB ─── */}
+            {comercialSubTab === "visao" && (() => {
+              // A visão geral respeita só os filtros globais (empresa/ano/mês).
+              // Os filtros finos (empreendimento/tipo/status/cliente) pertencem às demais sub-abas.
+              const isCancelled = (c: SiengeSalesContract) => Boolean(c.cancellationDate) || c.situation === "Cancelado" || c.situation === "Distratado";
+              const ovContracts = salesContracts.filter(c => {
+                if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
+                if (selectedYears.size > 0 && c.contractDate && !selectedYears.has(c.contractDate.substring(0, 4))) return false;
+                if (selectedMonths.size > 0 && c.contractDate && !selectedMonths.has(c.contractDate.substring(5, 7))) return false;
+                return true;
+              });
+              const ovAtivos = ovContracts.filter(c => !isCancelled(c));
+              const ovCancelados = ovContracts.length - ovAtivos.length;
+              const ovVgv = ovAtivos.reduce((s, c) => s + (c.value || 0), 0);
+              const ovTicket = ovAtivos.length > 0 ? ovVgv / ovAtivos.length : 0;
+
+              // Estoque real (sem permuta/veículo), a partir das unidades da API
+              const isRealUnit = (tipo: string) => !(/permuta|veículo|veiculos/i.test(tipo));
+              const ovUnits = allUnits.filter(u => isRealUnit(u.tipo));
+              const ovTotalUn = ovUnits.length;
+              const ovVendidasUn = ovUnits.filter(u => u.status === "Vendida" || u.status === "Vendido/Terceiros").length;
+              const ovDispUn = ovUnits.filter(u => u.status === "Disponível").length;
+              const ovPctVend = ovTotalUn > 0 ? (ovVendidasUn / ovTotalUn) * 100 : 0;
+
+              // VGV potencial do estoque disponível: área privativa × fator × CUB
+              // (mesma regra do Resumo Financeiro — considera só unidades tipo apartamento)
+              const ovIsAptoLike = (name: string) => {
+                const n = name.toUpperCase();
+                return !(/VAGA|GARAGEM|ESTACION/.test(n) || /\bSL\b|\bSALA\b|COMERCIAL/.test(n) || /\bLJ\b|\bLOJA\b/.test(n) || /\bDEP\b|DEPOSITO|\bBOX\b/.test(n));
+              };
+              let ovEstoqueArea = 0;
+              let ovEstoqueVgv = 0;
+              apiUnits.forEach(u => {
+                if (u.commercialStock !== "Disponível") return;
+                if (selectedCompanies.size > 0 && u.companyName && !selectedCompanies.has(u.companyName)) return;
+                if (!ovIsAptoLike(u.name)) return;
+                ovEstoqueArea += u.privateArea || 0;
+                const factor = companySettings.find(cs => cs.companyName === u.companyName)?.factor || 0;
+                ovEstoqueVgv += (u.privateArea || 0) * factor * (cubData?.currentValue || 0);
+              });
+
+              // Evolução anual (só contratos ativos)
+              const ovYearMap = new Map<string, { value: number; count: number }>();
+              ovAtivos.forEach(c => {
+                if (!c.contractDate) return;
+                const y = c.contractDate.substring(0, 4);
+                const e = ovYearMap.get(y) || { value: 0, count: 0 };
+                e.value += c.value || 0; e.count += 1;
+                ovYearMap.set(y, e);
+              });
+              const ovYearlyRaw = Array.from(ovYearMap.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([year, d]) => ({ month: year, ...d }));
+              const ovChart = ovYearlyRaw.map((item, idx) => {
+                const prev = idx > 0 ? ovYearlyRaw[idx - 1].value : 0;
+                const pct = prev > 0 ? ((item.value - prev) / prev) * 100 : null;
+                return { ...item, pct };
+              });
+
+              // Top empreendimentos por VGV
+              const ovEntMap = new Map<string, { value: number; count: number }>();
+              ovAtivos.forEach(c => {
+                const k = c.enterpriseName || c.companyName;
+                const e = ovEntMap.get(k) || { value: 0, count: 0 };
+                e.value += c.value || 0; e.count += 1;
+                ovEntMap.set(k, e);
+              });
+              const ovTopEnts = Array.from(ovEntMap.entries())
+                .map(([name, d]) => {
+                  const entUnits = ovUnits.filter(u => u.enterprise === name);
+                  const entVend = entUnits.filter(u => u.status === "Vendida" || u.status === "Vendido/Terceiros").length;
+                  return { name, ...d, totalUn: entUnits.length, pctVend: entUnits.length > 0 ? (entVend / entUnits.length) * 100 : 0 };
+                })
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 6);
+              const ovMaxEntValue = ovTopEnts.length > 0 ? ovTopEnts[0].value : 0;
+
+              // Top clientes por valor comprado
+              const ovCliMap = new Map<string, { value: number; count: number }>();
+              ovAtivos.forEach(c => {
+                const k = c.salesContractCustomers?.[0]?.name || "Não informado";
+                const e = ovCliMap.get(k) || { value: 0, count: 0 };
+                e.value += c.value || 0; e.count += 1;
+                ovCliMap.set(k, e);
+              });
+              const ovTopClientes = Array.from(ovCliMap.entries())
+                .map(([name, d]) => ({ name, ...d }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 6);
+              const ovTotalClientes = ovCliMap.size;
+
+              // Últimas vendas (mais recentes primeiro)
+              const ovRecentes = ovAtivos
+                .filter(c => c.contractDate)
+                .sort((a, b) => b.contractDate.localeCompare(a.contractDate))
+                .slice(0, 8);
+
+              const kpiCard = "border border-slate-200/50 dark:border-slate-700/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group";
+
+              return <>
+                {/* KPI hero row */}
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                  <Card className={kpiCard}>
+                    <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-400 group-hover:h-2 transition-all duration-300" />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">VGV Vendido</p>
+                          <p className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-1 tabular-nums tracking-tight">{formatCurrency(ovVgv)}</p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">{ovAtivos.length} contratos ativos</p>
+                        </div>
+                        <div className="p-3 bg-emerald-50/80 dark:bg-emerald-950/30 rounded-2xl ring-1 ring-emerald-100/50 dark:ring-emerald-900/50 shadow-sm"><Banknote className="h-5 w-5 text-emerald-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className={kpiCard}>
+                    <div className="h-1.5 bg-gradient-to-r from-indigo-500 to-indigo-400 group-hover:h-2 transition-all duration-300" />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-indigo-600/80 uppercase tracking-widest">Contratos</p>
+                          <p className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-1 tabular-nums tracking-tight">{ovContracts.length}</p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">{ovAtivos.length} ativos · {ovCancelados} cancelados · {ovTotalClientes} clientes</p>
+                        </div>
+                        <div className="p-3 bg-indigo-50/80 dark:bg-indigo-950/30 rounded-2xl ring-1 ring-indigo-100/50 dark:ring-indigo-900/50 shadow-sm"><FileText className="h-5 w-5 text-indigo-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className={kpiCard}>
+                    <div className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-400 group-hover:h-2 transition-all duration-300" />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-blue-600/80 uppercase tracking-widest">Ticket Médio</p>
+                          <p className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-1 tabular-nums tracking-tight">{formatCurrency(ovTicket)}</p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">por contrato ativo</p>
+                        </div>
+                        <div className="p-3 bg-blue-50/80 dark:bg-blue-950/30 rounded-2xl ring-1 ring-blue-100/50 dark:ring-blue-900/50 shadow-sm"><TrendingUp className="h-5 w-5 text-blue-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card
+                    className={`${kpiCard} cursor-pointer`}
+                    onClick={() => { setSelectedUnitStatuses(new Set(["Disponível"])); setComercialSubTab("unidades"); }}
+                    title="Ver unidades disponíveis"
+                  >
+                    <div className={`h-1.5 bg-gradient-to-r ${ovPctVend >= 80 ? "from-emerald-500 to-emerald-400" : ovPctVend >= 50 ? "from-blue-500 to-blue-400" : "from-amber-500 to-amber-400"} group-hover:h-2 transition-all duration-300`} />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-violet-600/80 uppercase tracking-widest">Estoque</p>
+                          <p className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-1 tabular-nums tracking-tight">{ovPctVend.toFixed(0)}% <span className="text-lg font-bold text-slate-400">vendido</span></p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">{ovVendidasUn} vendidas · {ovDispUn} disponíveis · {ovTotalUn} total</p>
+                        </div>
+                        <div className="p-3 bg-violet-50/80 dark:bg-violet-950/30 rounded-2xl ring-1 ring-violet-100/50 dark:ring-violet-900/50 shadow-sm"><Building2 className="h-5 w-5 text-violet-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Evolução anual + Estoque à venda */}
+                <div className="grid gap-6 lg:grid-cols-3 mt-6">
+                  <Card className="border-0 shadow-sm lg:col-span-2">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-lg text-slate-800 dark:text-slate-100">Evolução das Vendas</CardTitle>
+                          <CardDescription className="text-slate-400">VGV por ano (contratos ativos)</CardDescription>
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs text-slate-500 hover:text-indigo-600" onClick={() => setComercialSubTab("vendas")}>
+                          Ver detalhes <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 pt-0">
+                      {ovChart.length > 0 ? (
+                        <ResponsiveContainer width="100%" height={300}>
+                          <BarChart data={ovChart} margin={{ top: 40, right: 10, left: 10, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} />
+                            <XAxis dataKey="month" tick={{ fontSize: 11, fill: "#94a3b8" }} />
+                            <YAxis tickFormatter={(v: number) => formatCompactCurrency(v)} tick={{ fontSize: 11, fill: "#94a3b8" }} width={80} />
+                            <RechartsTooltip formatter={(v: number | undefined) => [formatCurrency(v ?? 0), "Valor"]} />
+                            <Bar dataKey="value" radius={[4, 4, 0, 0]}
+                              label={((props: Record<string, unknown>) => {
+                                const x = Number(props.x ?? 0), y = Number(props.y ?? 0), w = Number(props.width ?? 0), value = Number(props.value ?? 0), index = Number(props.index ?? 0);
+                                const entry = ovChart[index];
+                                const pct = entry?.pct;
+                                return (
+                                  <g>
+                                    <text x={x + w / 2} y={y - 16} textAnchor="middle" fontSize={10} fontWeight={700} fill={chartColors.valueText}>
+                                      {formatCompactCurrency(value)}
+                                    </text>
+                                    {pct !== null && pct !== undefined && (
+                                      <text x={x + w / 2} y={y - 4} textAnchor="middle" fontSize={9} fontWeight={600} fill={pct >= 0 ? chartColors.green : chartColors.red}>
+                                        {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
+                                      </text>
+                                    )}
+                                  </g>
+                                );
+                              }) as unknown as undefined}
+                            >
+                              {(() => {
+                                const values = ovChart.map(d => d.value);
+                                const maxVal = Math.max(...values);
+                                return ovChart.map((entry, idx) => (
+                                  <Cell key={idx} fill={entry.value === maxVal ? "#22c55e" : "#6366f1"} />
+                                ));
+                              })()}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-[300px] text-slate-400 text-sm">Sem dados para o período</div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Estoque à venda */}
+                  <Card
+                    className="border-0 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => { setSelectedUnitStatuses(new Set(["Disponível"])); setComercialSubTab("unidades"); }}
+                    title="Ver unidades disponíveis"
+                  >
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-lg text-slate-800 dark:text-slate-100">Estoque à Venda</CardTitle>
+                      <CardDescription className="text-slate-400">Unidades disponíveis e potencial de venda</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-baseline gap-2">
+                        <p className="text-4xl font-black text-emerald-600 tabular-nums leading-none">{ovDispUn}</p>
+                        <p className="text-sm font-semibold text-slate-500">unidades disponíveis</p>
+                      </div>
+                      <div className="w-full h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden flex">
+                        {ovTotalUn > 0 && <>
+                          <div className="h-full bg-red-400 dark:bg-red-300/60" style={{ width: `${(ovVendidasUn / ovTotalUn) * 100}%` }} title={`Vendidas: ${ovVendidasUn}`} />
+                          <div className="h-full bg-emerald-400" style={{ width: `${(ovDispUn / ovTotalUn) * 100}%` }} title={`Disponíveis: ${ovDispUn}`} />
+                        </>}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/50">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">VGV Potencial</p>
+                          <p className="text-lg font-black text-slate-800 dark:text-slate-100 tabular-nums mt-0.5">{ovEstoqueVgv > 0 ? formatCompactCurrency(ovEstoqueVgv) : "—"}</p>
+                        </div>
+                        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/50">
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Área Privativa</p>
+                          <p className="text-lg font-black text-slate-800 dark:text-slate-100 tabular-nums mt-0.5">{ovEstoqueArea > 0 ? `${ovEstoqueArea.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m²` : "—"}</p>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-400 leading-snug">
+                        VGV potencial estimado: área privativa × fator da empresa × CUB atual{cubData?.currentMonth ? ` (${cubData.currentMonth})` : ""}. Considera só unidades tipo apartamento.
+                      </p>
+                      <div className="flex items-center text-xs font-semibold text-emerald-600">
+                        Ver unidades disponíveis <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Rankings: empreendimentos, clientes e últimas vendas */}
+                <div className="grid gap-6 lg:grid-cols-3 mt-6">
+                  {/* Top empreendimentos */}
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Top Empreendimentos</CardTitle>
+                      <CardDescription className="text-xs text-slate-400">Por VGV vendido — clique para detalhar</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {ovTopEnts.length > 0 ? ovTopEnts.map((ent, i) => (
+                        <div
+                          key={ent.name}
+                          className="p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-indigo-200 dark:hover:border-indigo-800 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 cursor-pointer transition-colors"
+                          onClick={() => { setSelectedUnitEnterprises(new Set([ent.name])); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); setComercialSubTab("vendas"); }}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={`flex-shrink-0 w-5 h-5 rounded-md text-[10px] font-black flex items-center justify-center ${i === 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>{i + 1}</span>
+                              <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 truncate" title={ent.name}>{ent.name}</span>
+                            </div>
+                            <span className="text-[12px] font-black text-slate-800 dark:text-slate-100 tabular-nums flex-shrink-0">{formatCompactCurrency(ent.value)}</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-400 rounded-full" style={{ width: `${ovMaxEntValue > 0 ? (ent.value / ovMaxEntValue) * 100 : 0}%` }} />
+                            </div>
+                            <span className="text-[10px] text-slate-400 tabular-nums flex-shrink-0">{ent.count} contr. · {ent.pctVend.toFixed(0)}% vend.</span>
+                          </div>
+                        </div>
+                      )) : <p className="text-sm text-slate-400 text-center py-6">Sem dados</p>}
+                    </CardContent>
+                  </Card>
+
+                  {/* Top clientes */}
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Top Clientes</CardTitle>
+                          <CardDescription className="text-xs text-slate-400">Por valor comprado — clique para detalhar</CardDescription>
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-slate-500 hover:text-rose-600" onClick={() => { setClienteSearch(""); setComercialSubTab("clientes"); }}>
+                          Todos <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {ovTopClientes.length > 0 ? ovTopClientes.map((cli, i) => (
+                        <div
+                          key={cli.name}
+                          className="flex items-center justify-between gap-2 p-2.5 rounded-lg border border-slate-100 dark:border-slate-800 hover:border-rose-200 dark:hover:border-rose-800 hover:bg-rose-50/40 dark:hover:bg-rose-950/20 cursor-pointer transition-colors"
+                          onClick={() => { setClienteSearch(cli.name); setComercialSubTab("clientes"); }}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {i === 0 ? (
+                              <span className="flex-shrink-0 w-5 h-5 rounded-md bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center"><Crown className="h-3 w-3 text-amber-600 dark:text-amber-400" /></span>
+                            ) : (
+                              <span className="flex-shrink-0 w-5 h-5 rounded-md text-[10px] font-black flex items-center justify-center bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">{i + 1}</span>
+                            )}
+                            <div className="min-w-0">
+                              <p className="text-[12px] font-bold text-slate-700 dark:text-slate-200 truncate" title={cli.name}>{cli.name}</p>
+                              <p className="text-[10px] text-slate-400">{cli.count} contrato{cli.count > 1 ? "s" : ""}</p>
+                            </div>
+                          </div>
+                          <span className="text-[12px] font-black text-slate-800 dark:text-slate-100 tabular-nums flex-shrink-0">{formatCompactCurrency(cli.value)}</span>
+                        </div>
+                      )) : <p className="text-sm text-slate-400 text-center py-6">Sem dados</p>}
+                    </CardContent>
+                  </Card>
+
+                  {/* Últimas vendas */}
+                  <Card className="border-0 shadow-sm">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Últimas Vendas</CardTitle>
+                      <CardDescription className="text-xs text-slate-400">Contratos mais recentes do período</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {ovRecentes.length > 0 ? ovRecentes.map(c => (
+                        <div key={c.id} className="flex items-center justify-between gap-2 p-2 rounded-lg border border-slate-100 dark:border-slate-800">
+                          <div className="min-w-0">
+                            <p className="text-[12px] font-semibold text-slate-700 dark:text-slate-200 truncate" title={c.salesContractCustomers?.[0]?.name || "—"}>
+                              {c.salesContractCustomers?.[0]?.name || "—"}
+                            </p>
+                            <p className="text-[10px] text-slate-400 truncate">
+                              {formatDate(c.contractDate)} · {c.enterpriseName || c.companyName}
+                              {(() => { const un = c.salesContractUnits?.filter(u => u.main)?.map(u => u.name).join(", "); return un ? ` · ${un}` : ""; })()}
+                            </p>
+                          </div>
+                          <span className="text-[12px] font-bold text-slate-800 dark:text-slate-100 tabular-nums flex-shrink-0">{formatCompactCurrency(c.value || 0)}</span>
+                        </div>
+                      )) : <p className="text-sm text-slate-400 text-center py-6">Sem dados</p>}
+                    </CardContent>
+                  </Card>
+                </div>
+              </>;
+            })()}
 
             {/* ─── VENDAS SUB-TAB ─── */}
             {comercialSubTab === "vendas" && <>
@@ -3974,6 +4326,278 @@ export function ExecutiveDashboard() {
             </CardContent>
             </Card>
             </>}
+
+            {/* ─── CLIENTES SUB-TAB ─── */}
+            {comercialSubTab === "clientes" && (() => {
+              // Agrupa os contratos filtrados por cliente (1º titular do contrato).
+              // Usa `filtered` — respeita os mesmos filtros da aba Vendas
+              // (empresa/ano/mês + empreendimento/tipo/status/cliente).
+              type CliRow = { name: string; contracts: typeof filtered; totalValue: number; units: number; enterprises: Set<string>; lastDate: string };
+              const cliMap = new Map<string, CliRow>();
+              filtered.forEach(c => {
+                const name = c.salesContractCustomers?.[0]?.name || "Não informado";
+                if (!cliMap.has(name)) cliMap.set(name, { name, contracts: [], totalValue: 0, units: 0, enterprises: new Set(), lastDate: "" });
+                const row = cliMap.get(name)!;
+                row.contracts.push(c);
+                row.totalValue += c.value || 0;
+                const mainUnits = c.salesContractUnits?.filter(u => u.main);
+                row.units += (mainUnits && mainUnits.length > 0) ? mainUnits.length : (c.salesContractUnits?.length || 0);
+                row.enterprises.add(c.enterpriseName || c.companyName);
+                if (c.contractDate && c.contractDate > row.lastDate) row.lastDate = c.contractDate;
+              });
+
+              const search = clienteSearch.trim().toLowerCase();
+              const cliRows = Array.from(cliMap.values())
+                .filter(r => !search || r.name.toLowerCase().includes(search))
+                .sort((a, b) => {
+                  const { field, dir } = clientesSort;
+                  let cmp = 0;
+                  switch (field) {
+                    case "name": cmp = a.name.localeCompare(b.name); break;
+                    case "contracts": cmp = a.contracts.length - b.contracts.length; break;
+                    case "units": cmp = a.units - b.units; break;
+                    case "lastDate": cmp = a.lastDate.localeCompare(b.lastDate); break;
+                    case "totalValue": cmp = a.totalValue - b.totalValue; break;
+                  }
+                  return dir === "asc" ? cmp : -cmp;
+                });
+
+              const cliTotalValue = cliRows.reduce((s, r) => s + r.totalValue, 0);
+              const cliTotalContracts = cliRows.reduce((s, r) => s + r.contracts.length, 0);
+              const cliTicket = cliRows.length > 0 ? cliTotalValue / cliRows.length : 0;
+              const cliRecorrentes = cliRows.filter(r => r.contracts.length > 1).length;
+              const cliTop = cliRows.length > 0 ? [...cliRows].sort((a, b) => b.totalValue - a.totalValue)[0] : null;
+
+              const kpiCard = "border border-slate-200/50 dark:border-slate-700/50 shadow-[0_4px_24px_rgba(0,0,0,0.02)] overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:-translate-y-0.5 group";
+
+              return <>
+                {/* KPI cards */}
+                <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+                  <Card className={kpiCard}>
+                    <div className="h-1.5 bg-gradient-to-r from-rose-500 to-rose-400 group-hover:h-2 transition-all duration-300" />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-rose-600/80 uppercase tracking-widest">Clientes</p>
+                          <p className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-1 tabular-nums tracking-tight">{cliRows.length}</p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">{cliTotalContracts} contratos no período</p>
+                        </div>
+                        <div className="p-3 bg-rose-50/80 dark:bg-rose-950/30 rounded-2xl ring-1 ring-rose-100/50 dark:ring-rose-900/50 shadow-sm"><Users className="h-5 w-5 text-rose-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className={kpiCard}>
+                    <div className="h-1.5 bg-gradient-to-r from-emerald-500 to-emerald-400 group-hover:h-2 transition-all duration-300" />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Valor Comprado</p>
+                          <p className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-1 tabular-nums tracking-tight">{formatCurrency(cliTotalValue)}</p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">média de {formatCompactCurrency(cliTicket)} por cliente</p>
+                        </div>
+                        <div className="p-3 bg-emerald-50/80 dark:bg-emerald-950/30 rounded-2xl ring-1 ring-emerald-100/50 dark:ring-emerald-900/50 shadow-sm"><Banknote className="h-5 w-5 text-emerald-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className={kpiCard}>
+                    <div className="h-1.5 bg-gradient-to-r from-amber-500 to-amber-400 group-hover:h-2 transition-all duration-300" />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-amber-600/80 uppercase tracking-widest">Maior Cliente</p>
+                          <p className="text-lg font-black text-slate-800 dark:text-slate-100 mt-1 truncate" title={cliTop?.name || "—"}>{cliTop?.name || "—"}</p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">{cliTop ? `${formatCurrency(cliTop.totalValue)} · ${cliTop.contracts.length} contrato${cliTop.contracts.length > 1 ? "s" : ""}` : "sem dados"}</p>
+                        </div>
+                        <div className="p-3 bg-amber-50/80 dark:bg-amber-950/30 rounded-2xl ring-1 ring-amber-100/50 dark:ring-amber-900/50 shadow-sm flex-shrink-0"><Crown className="h-5 w-5 text-amber-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className={kpiCard}>
+                    <div className="h-1.5 bg-gradient-to-r from-violet-500 to-violet-400 group-hover:h-2 transition-all duration-300" />
+                    <CardContent className="p-5">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <p className="text-xs font-bold text-violet-600/80 uppercase tracking-widest">Recompra</p>
+                          <p className="text-3xl font-black text-slate-800 dark:text-slate-100 mt-1 tabular-nums tracking-tight">{cliRecorrentes}</p>
+                          <p className="text-[11px] font-medium text-slate-400 mt-1">clientes com mais de 1 contrato</p>
+                        </div>
+                        <div className="p-3 bg-violet-50/80 dark:bg-violet-950/30 rounded-2xl ring-1 ring-violet-100/50 dark:ring-violet-900/50 shadow-sm"><Handshake className="h-5 w-5 text-violet-500" /></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Busca + filtros */}
+                <div className="flex items-center gap-2 flex-wrap mt-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={clienteSearch}
+                      onChange={e => setClienteSearch(e.target.value)}
+                      placeholder="Buscar cliente..."
+                      className="h-9 w-64 pl-9 pr-8 text-[13px] rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-200 dark:focus:ring-rose-900 focus:border-rose-300 transition-all"
+                    />
+                    {clienteSearch && (
+                      <button onClick={() => setClienteSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" title="Limpar busca">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <MultiSelectFilter
+                    label="Empreendimento"
+                    icon={<Building2 className="h-4 w-4" />}
+                    allOptions={allVendasEnterprises}
+                    selected={selectedUnitEnterprises}
+                    onToggle={(name) => { setSelectedUnitEnterprises(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                    onSelectAll={() => { setSelectedUnitEnterprises(new Set(allVendasEnterprises)); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                    onClear={() => { setSelectedUnitEnterprises(new Set()); setSelectedUnitTypes(new Set()); setSelectedUnits(new Set()); }}
+                    activeColor="indigo"
+                  />
+                  <MultiSelectFilter
+                    label="Status"
+                    icon={<CheckCircle className="h-4 w-4" />}
+                    allOptions={allVendasStatuses}
+                    selected={selectedUnitStatuses}
+                    onToggle={(name) => { setSelectedUnitStatuses(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
+                    onSelectAll={() => setSelectedUnitStatuses(new Set(allVendasStatuses))}
+                    onClear={() => setSelectedUnitStatuses(new Set())}
+                    activeColor="emerald"
+                  />
+                </div>
+
+                {/* Tabela de clientes */}
+                <Card className="border-0 shadow-sm mt-4">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Clientes e Contratos</CardTitle>
+                    <CardDescription className="text-xs text-slate-400">
+                      {cliRows.length} cliente{cliRows.length !== 1 ? "s" : ""} · {cliTotalContracts} contratos · {formatCurrency(cliTotalValue)}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-auto max-h-[600px] border-t border-slate-100 dark:border-slate-800">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm sticky top-0 z-10 shadow-sm border-b border-slate-200 dark:border-slate-700">
+                            {([
+                              { key: "name" as const, label: "Cliente", align: "left" },
+                              { key: "contracts" as const, label: "Contratos", align: "right" },
+                              { key: "units" as const, label: "Unidades", align: "right" },
+                              { key: "lastDate" as const, label: "Última Compra", align: "right" },
+                              { key: "totalValue" as const, label: "Valor Total", align: "right" },
+                            ] as const).map((col, i) => {
+                              const isSorted = clientesSort.field === col.key;
+                              const SortIcon = isSorted ? (clientesSort.dir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                              return (
+                                <TableHead
+                                  key={col.key}
+                                  className={`font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 cursor-pointer hover:text-slate-700 select-none ${col.align === "right" ? "text-right" : ""} ${i === 0 ? "pl-5" : ""}`}
+                                  onClick={() => setClientesSort(prev => ({
+                                    field: col.key,
+                                    dir: prev.field === col.key && prev.dir === "desc" ? "asc" : "desc",
+                                  }))}
+                                >
+                                  <span className="inline-flex items-center gap-1">
+                                    {col.label}
+                                    <SortIcon className={`h-3 w-3 ${isSorted ? "text-rose-500" : "text-slate-300"}`} />
+                                  </span>
+                                </TableHead>
+                              );
+                            })}
+                            <TableHead className="font-bold text-[11px] text-slate-500 uppercase tracking-widest h-11 text-right pr-5">% do Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {cliRows.map(row => {
+                            const pct = cliTotalValue > 0 ? (row.totalValue / cliTotalValue) * 100 : 0;
+                            const key = `cliente-${row.name}`;
+                            const isExpanded = expandedComercial.has(key);
+                            return (
+                              <React.Fragment key={row.name}>
+                                <TableRow
+                                  className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 cursor-pointer transition-colors border-b border-slate-100 dark:border-slate-800"
+                                  onClick={() => {
+                                    setExpandedComercial(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(key)) next.delete(key); else next.add(key);
+                                      return next;
+                                    });
+                                  }}
+                                >
+                                  <TableCell className="pl-5 py-3">
+                                    <div className="flex items-center gap-2">
+                                      <div className={`p-0.5 rounded transition-colors ${isExpanded ? "bg-rose-100 dark:bg-rose-950/50" : ""}`}>
+                                        {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-rose-500" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
+                                      </div>
+                                      <span className="font-semibold text-[13px] text-slate-700 dark:text-slate-200">{row.name}</span>
+                                      {row.contracts.length > 1 && (
+                                        <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-violet-200 text-violet-600 bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:bg-violet-950/30 uppercase font-bold tracking-wider">Recompra</Badge>
+                                      )}
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-0.5 ml-6 truncate" title={Array.from(row.enterprises).join(", ")}>{Array.from(row.enterprises).join(", ")}</p>
+                                  </TableCell>
+                                  <TableCell className="text-right font-bold text-[13px] text-slate-700 dark:text-slate-200 tabular-nums">{row.contracts.length}</TableCell>
+                                  <TableCell className="text-right text-[13px] text-slate-600 dark:text-slate-300 tabular-nums">{row.units}</TableCell>
+                                  <TableCell className="text-right text-[13px] text-slate-500 tabular-nums">{row.lastDate ? formatDate(row.lastDate) : "—"}</TableCell>
+                                  <TableCell className="text-right font-bold text-[13px] text-slate-700 dark:text-slate-200 tabular-nums">{formatCurrency(row.totalValue)}</TableCell>
+                                  <TableCell className="text-right pr-5">
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold tabular-nums bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300">
+                                      {pct.toFixed(1)}%
+                                    </span>
+                                  </TableCell>
+                                </TableRow>
+                                {isExpanded && row.contracts
+                                  .sort((a, b) => (b.contractDate || "").localeCompare(a.contractDate || ""))
+                                  .map(c => (
+                                    <TableRow key={c.id} className="bg-slate-50/50 dark:bg-slate-900/40 border-b border-slate-100/50 dark:border-slate-800/50">
+                                      <TableCell className="pl-12 py-2.5">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <span className="text-slate-400 font-mono text-[10px] bg-white dark:bg-slate-800 py-0.5 px-1.5 rounded border border-slate-200 dark:border-slate-700 shadow-sm">{c.number}</span>
+                                          <span className="text-[12px] text-slate-600 dark:text-slate-300">{c.enterpriseName || c.companyName}</span>
+                                          <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
+                                            c.situation === "Emitido" ? "border-emerald-200 text-emerald-600 bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/30" :
+                                            c.situation === "Cancelado" || c.cancellationDate ? "border-red-200 text-red-600 bg-red-50 dark:border-red-800 dark:text-red-300/70 dark:bg-red-950/30" :
+                                            "border-slate-200 text-slate-500"
+                                          }`}>{c.cancellationDate ? "Cancelado" : c.situation}</Badge>
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="text-right text-[12px] text-slate-500 tabular-nums">{formatDate(c.contractDate)}</TableCell>
+                                      <TableCell className="text-right text-[12px] text-slate-500 tabular-nums">
+                                        {c.salesContractUnits?.filter(u => u.main)?.map(u => u.name).join(", ") || c.salesContractUnits?.map(u => u.name).join(", ") || "—"}
+                                      </TableCell>
+                                      <TableCell />
+                                      <TableCell className="text-right text-[12px] text-slate-600 dark:text-slate-300 font-medium tabular-nums">{formatCurrency(c.value)}</TableCell>
+                                      <TableCell className="text-right pr-5 text-[12px] text-slate-400 tabular-nums">{c.paymentConditions?.length || 0} cond.</TableCell>
+                                    </TableRow>
+                                  ))}
+                              </React.Fragment>
+                            );
+                          })}
+                          {cliRows.length === 0 && (
+                            <TableRow>
+                              <TableCell colSpan={6} className="text-center py-10 text-sm text-slate-400">
+                                {clienteSearch ? `Nenhum cliente encontrado para "${clienteSearch}"` : "Sem clientes para os filtros atuais"}
+                              </TableCell>
+                            </TableRow>
+                          )}
+                          {/* Total row */}
+                          {cliRows.length > 0 && (
+                            <TableRow className="bg-rose-50/50 dark:bg-rose-950/20 border-t-2 border-rose-200 dark:border-rose-900">
+                              <TableCell className="pl-5 py-3 font-bold text-[13px] text-rose-800 dark:text-rose-300">TOTAL — {cliRows.length} clientes</TableCell>
+                              <TableCell className="text-right font-bold text-[13px] text-rose-800 dark:text-rose-300 tabular-nums">{cliTotalContracts}</TableCell>
+                              <TableCell className="text-right font-bold text-[13px] text-rose-800 dark:text-rose-300 tabular-nums">{cliRows.reduce((s, r) => s + r.units, 0)}</TableCell>
+                              <TableCell />
+                              <TableCell className="text-right font-bold text-[14px] text-rose-800 dark:text-rose-300 tabular-nums">{formatCurrency(cliTotalValue)}</TableCell>
+                              <TableCell className="text-right pr-5 font-bold text-[13px] text-rose-700 dark:text-rose-300">100%</TableCell>
+                            </TableRow>
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </>;
+            })()}
 
             {/* ─── UNIDADES SUB-TAB ─── */}
             {comercialSubTab === "unidades" && (() => {
