@@ -450,6 +450,14 @@ function inferUnitTypeFromName(name: string): string {
   return "Apartamento";
 }
 
+// Nome curto do empreendimento pra exibição: corta o sufixo de centro de custo
+// depois do " - " ("PALACIO ELIZABETH - DESPESAS INDIRETAS" → "PALACIO ELIZABETH").
+// Só para display — filtros e chaves internas continuam com o nome completo do Sienge.
+function shortEnterpriseName(name: string): string {
+  const idx = name.indexOf(" - ");
+  return idx > 0 ? name.slice(0, idx).trim() : name;
+}
+
 // Normaliza o rótulo de pavimento para juntar variações ("G 3"="G3", "15 º"="15º")
 // que vêm inconsistentes do Sienge e criariam linhas duplicadas no espelho.
 function normalizeFloor(floor: string): string {
@@ -3916,7 +3924,7 @@ export function ExecutiveDashboard() {
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0">
                               <span className={`flex-shrink-0 w-5 h-5 rounded-md text-[10px] font-black flex items-center justify-center ${i === 0 ? "bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300" : "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400"}`}>{i + 1}</span>
-                              <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 truncate" title={ent.name}>{ent.name}</span>
+                              <span className="text-[12px] font-bold text-slate-700 dark:text-slate-200 truncate" title={ent.name}>{shortEnterpriseName(ent.name)}</span>
                             </div>
                             <span className="text-[12px] font-black text-slate-800 dark:text-slate-100 tabular-nums flex-shrink-0">{formatCompactCurrency(ent.value)}</span>
                           </div>
@@ -3982,7 +3990,7 @@ export function ExecutiveDashboard() {
                               {c.salesContractCustomers?.[0]?.name || "—"}
                             </p>
                             <p className="text-[10px] text-slate-400 truncate">
-                              {formatDate(c.contractDate)} · {c.enterpriseName || c.companyName}
+                              {formatDate(c.contractDate)} · {shortEnterpriseName(c.enterpriseName || c.companyName)}
                               {(() => { const un = c.salesContractUnits?.filter(u => u.main)?.map(u => u.name).join(", "); return un ? ` · ${un}` : ""; })()}
                             </p>
                           </div>
@@ -4134,7 +4142,7 @@ export function ExecutiveDashboard() {
                       <div key={row.name} className="p-4 rounded-xl border border-slate-200/80 dark:border-slate-700/60 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-sm transition-all bg-white dark:bg-slate-900">
                         <div className="flex items-start justify-between gap-2 mb-2">
                           <div className="min-w-0 flex-1">
-                            <p className="text-[13px] font-bold text-slate-800 dark:text-slate-100 truncate" title={row.name}>{row.name}</p>
+                            <p className="text-[13px] font-bold text-slate-800 dark:text-slate-100 truncate" title={row.name}>{shortEnterpriseName(row.name)}</p>
                             <p className="text-[11px] text-slate-400 mt-0.5">{row.contracts.length} contratos · {formatCurrency(row.totalValue)}</p>
                           </div>
                           <span className={`flex-shrink-0 text-sm font-black tabular-nums px-2.5 py-1 rounded-lg ${pctVendido >= 80 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300" : pctVendido >= 50 ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"}`}>
@@ -4311,7 +4319,7 @@ export function ExecutiveDashboard() {
                                 <div className={`p-0.5 rounded transition-colors ${isExpanded ? "bg-indigo-100" : ""}`}>
                                   {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-indigo-500" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
                                 </div>
-                                <span className="font-semibold text-[13px] text-slate-700">{row.name}</span>
+                                <span className="font-semibold text-[13px] text-slate-700" title={row.name}>{shortEnterpriseName(row.name)}</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{row.contracts.length}</TableCell>
@@ -4573,7 +4581,7 @@ export function ExecutiveDashboard() {
                                         <Badge variant="outline" className="text-[9px] px-1.5 py-0 border-violet-200 text-violet-600 bg-violet-50 dark:border-violet-800 dark:text-violet-300 dark:bg-violet-950/30 uppercase font-bold tracking-wider">Recompra</Badge>
                                       )}
                                     </div>
-                                    <p className="text-[10px] text-slate-400 mt-0.5 ml-6 truncate" title={Array.from(row.enterprises).join(", ")}>{Array.from(row.enterprises).join(", ")}</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5 ml-6 truncate" title={Array.from(row.enterprises).join(", ")}>{Array.from(row.enterprises).map(shortEnterpriseName).join(", ")}</p>
                                   </TableCell>
                                   <TableCell className="text-right font-bold text-[13px] text-slate-700 dark:text-slate-200 tabular-nums">{row.contracts.length}</TableCell>
                                   <TableCell className="text-right text-[13px] text-slate-600 dark:text-slate-300 tabular-nums">{row.units}</TableCell>
@@ -4592,7 +4600,7 @@ export function ExecutiveDashboard() {
                                       <TableCell className="pl-12 py-2.5">
                                         <div className="flex items-center gap-2 flex-wrap">
                                           <span className="text-slate-400 font-mono text-[10px] bg-white dark:bg-slate-800 py-0.5 px-1.5 rounded border border-slate-200 dark:border-slate-700 shadow-sm">{c.number}</span>
-                                          <span className="text-[12px] text-slate-600 dark:text-slate-300">{c.enterpriseName || c.companyName}</span>
+                                          <span className="text-[12px] text-slate-600 dark:text-slate-300">{shortEnterpriseName(c.enterpriseName || c.companyName)}</span>
                                           <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${
                                             c.situation === "Emitido" ? "border-emerald-200 text-emerald-600 bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:bg-emerald-950/30" :
                                             c.situation === "Cancelado" || c.cancellationDate ? "border-red-200 text-red-600 bg-red-50 dark:border-red-800 dark:text-red-300/70 dark:bg-red-950/30" :
@@ -4808,7 +4816,7 @@ export function ExecutiveDashboard() {
                     {selectedUnitStatuses.size === 0 ? "Todas as Unidades" : `Unidades — ${Array.from(selectedUnitStatuses).join(", ")}`}
                   </CardTitle>
                   <CardDescription className="text-xs text-slate-400">
-                    {filteredUnits.length} unidades {selectedUnitEnterprises.size > 0 ? `em ${Array.from(selectedUnitEnterprises).join(", ")}` : `em ${enterpriseGroupRows.length} empreendimentos`}
+                    {filteredUnits.length} unidades {selectedUnitEnterprises.size > 0 && selectedUnitEnterprises.size <= 3 ? `em ${Array.from(selectedUnitEnterprises).map(shortEnterpriseName).join(", ")}` : `em ${enterpriseGroupRows.length} empreendimentos`}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -4849,7 +4857,7 @@ export function ExecutiveDashboard() {
                                   <div className={`p-0.5 rounded transition-colors ${isExpanded ? "bg-indigo-100" : ""}`}>
                                     {isExpanded ? <ChevronDown className="h-3.5 w-3.5 text-indigo-500" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
                                   </div>
-                                  <span className="font-bold text-[13px] text-slate-700">{group.name}</span>
+                                  <span className="font-bold text-[13px] text-slate-700" title={group.name}>{shortEnterpriseName(group.name)}</span>
                                   <span className="text-[11px] text-slate-400 ml-2">{group.units.length} un.</span>
                                   {vendidas > 0 && <span className="text-[10px] font-semibold text-red-500 dark:text-red-300/70 bg-red-50 dark:bg-red-950/30 px-1.5 py-0.5 rounded">{vendidas} vendidas</span>}
                                   {disponiveis > 0 && <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-50 px-1.5 py-0.5 rounded">{disponiveis} disp.</span>}
@@ -4880,7 +4888,7 @@ export function ExecutiveDashboard() {
                                       `${sc.border} ${sc.text} ${sc.bg}`
                                     }`}>{u.status}</Badge>
                                   </TableCell>
-                                  <TableCell className="text-[12px] text-slate-500">{u.enterprise}</TableCell>
+                                  <TableCell className="text-[12px] text-slate-500" title={u.enterprise}>{shortEnterpriseName(u.enterprise)}</TableCell>
                                   <TableCell>
                                     <span className="font-mono text-[12px] font-bold text-slate-700 bg-white py-0.5 px-2 rounded border border-slate-200 shadow-sm">{u.unit}</span>
                                   </TableCell>
@@ -5136,7 +5144,7 @@ export function ExecutiveDashboard() {
                               {/* Cabeçalho do empreendimento */}
                               <div className="flex flex-wrap items-center justify-between gap-4 pb-3 border-b border-slate-200/60 dark:border-slate-700/60">
                                 <div className="min-w-0">
-                                  <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 truncate" title={ent}>{ent}</h3>
+                                  <h3 className="text-base font-extrabold text-slate-800 dark:text-slate-100 truncate" title={ent}>{shortEnterpriseName(ent)}</h3>
                                   <p className="text-xs text-slate-400 dark:text-slate-400 mt-0.5">
                                     {numFloors} pavimento(s) · {entUnits.length} unidade(s) · {areaTotal.toLocaleString("pt-BR", { maximumFractionDigits: 0 })} m² priv.
                                   </p>
@@ -5187,7 +5195,7 @@ export function ExecutiveDashboard() {
                     {Array.from(new Set(qVisible.map(u => u.enterprise))).sort().map(ent => (
                       <div key={ent}>
                         <h3 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 mb-2">
-                          {ent} <span className="text-[11px] font-semibold text-slate-400">({qVisible.filter(u => u.enterprise === ent).length} un.)</span>
+                          {shortEnterpriseName(ent)} <span className="text-[11px] font-semibold text-slate-400">({qVisible.filter(u => u.enterprise === ent).length} un.)</span>
                         </h3>
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
                           {qVisible.filter(u => u.enterprise === ent).map((u, idx) => (
