@@ -558,6 +558,10 @@ export function ExecutiveDashboard() {
   // Pre-seleciona "Apartamento" no filtro Tipo Imóvel uma única vez, quando as unidades carregam.
   const defaultedUnitTypeRef = useRef(false);
   const [selectedUnitStatuses, setSelectedUnitStatuses] = useState<Set<string>>(new Set());
+  // Status de CONTRATO (Emitido/Cancelado/...) — filtro das sub-abas Vendas e Clientes.
+  // Separado de selectedUnitStatuses (Disponível/Vendida/...), que é status de UNIDADE
+  // (Unidades/Quadro Espelho); compartilhar os dois zerava Vendas ao navegar da Visão Geral.
+  const [selectedContractStatuses, setSelectedContractStatuses] = useState<Set<string>>(new Set());
   const [selectedUnitEnterprises, setSelectedUnitEnterprises] = useState<Set<string>>(new Set());
   const [selectedUnitTypes, setSelectedUnitTypes] = useState<Set<string>>(new Set());
   const [selectedUnits, setSelectedUnits] = useState<Set<string>>(new Set());
@@ -3449,9 +3453,9 @@ export function ExecutiveDashboard() {
             const customerName = c.salesContractCustomers?.[0]?.name || "";
             if (!selectedUnitCustomers.has(customerName)) return false;
           }
-          if (selectedUnitStatuses.size > 0) {
+          if (selectedContractStatuses.size > 0) {
             const situation = c.cancellationDate ? "Cancelado" : c.situation || "Outro";
-            if (!selectedUnitStatuses.has(situation)) return false;
+            if (!selectedContractStatuses.has(situation)) return false;
           }
           return true;
         });
@@ -4003,10 +4007,10 @@ export function ExecutiveDashboard() {
                 label="Status"
                 icon={<CheckCircle className="h-4 w-4" />}
                 allOptions={allVendasStatuses}
-                selected={selectedUnitStatuses}
-                onToggle={(name) => { setSelectedUnitStatuses(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
-                onSelectAll={() => setSelectedUnitStatuses(new Set(allVendasStatuses))}
-                onClear={() => setSelectedUnitStatuses(new Set())}
+                selected={selectedContractStatuses}
+                onToggle={(name) => { setSelectedContractStatuses(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
+                onSelectAll={() => setSelectedContractStatuses(new Set(allVendasStatuses))}
+                onClear={() => setSelectedContractStatuses(new Set())}
                 activeColor="emerald"
               />
               <MultiSelectFilter
@@ -4458,10 +4462,10 @@ export function ExecutiveDashboard() {
                     label="Status"
                     icon={<CheckCircle className="h-4 w-4" />}
                     allOptions={allVendasStatuses}
-                    selected={selectedUnitStatuses}
-                    onToggle={(name) => { setSelectedUnitStatuses(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
-                    onSelectAll={() => setSelectedUnitStatuses(new Set(allVendasStatuses))}
-                    onClear={() => setSelectedUnitStatuses(new Set())}
+                    selected={selectedContractStatuses}
+                    onToggle={(name) => { setSelectedContractStatuses(prev => { const n = new Set(prev); if (n.has(name)) n.delete(name); else n.add(name); return n; }); }}
+                    onSelectAll={() => setSelectedContractStatuses(new Set(allVendasStatuses))}
+                    onClear={() => setSelectedContractStatuses(new Set())}
                     activeColor="emerald"
                   />
                 </div>
