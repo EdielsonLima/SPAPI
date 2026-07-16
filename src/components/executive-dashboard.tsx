@@ -5180,8 +5180,14 @@ export function ExecutiveDashboard() {
                     </div>
                   );
                 })() : (
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3 mt-4">
-                    {qVisible.map((u, idx) => (
+                  <div className="mt-4 space-y-6">
+                    {Array.from(new Set(qVisible.map(u => u.enterprise))).sort().map(ent => (
+                      <div key={ent}>
+                        <h3 className="text-sm font-extrabold text-slate-700 dark:text-slate-200 mb-2">
+                          {ent} <span className="text-[11px] font-semibold text-slate-400">({qVisible.filter(u => u.enterprise === ent).length} un.)</span>
+                        </h3>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+                          {qVisible.filter(u => u.enterprise === ent).map((u, idx) => (
                       <div
                         key={`${u.unit}-${idx}`}
                         className={`relative rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-1 group ${cardStyle(u.status)}`}
@@ -5210,6 +5216,9 @@ export function ExecutiveDashboard() {
                             <p className="text-[10px] text-slate-400 mt-1 font-medium">{formatDate(u.contractDate)}</p>
                           </div>
                         )}
+                      </div>
+                          ))}
+                        </div>
                       </div>
                     ))}
                   </div>
