@@ -1,5 +1,30 @@
 # CLAUDE.md — Regras do Projeto DTSIENGE
 
+## Controle de Locações / Aluguéis — SÓ HOLDING (Validado em 2026-07-31)
+
+Página exclusiva do modo Holding: `Financeiro > Locações > Aluguéis` (`/financeiro/alugueis`).
+Réplica do Power BI `FINANCEIRO HOLDING.pbix` (páginas "ALUGUEIS À RECEBER" / "ALUGUEIS REALIZADO").
+
+### NAO ALTERAR sem pedido explicito do usuario:
+- Regra do que é aluguel em `src/lib/alugueis-utils.ts`:
+  - `documentIdentificationId` ∈ {LOC, LNC} **E** alguma `paymentsCategories[].financialCategoryId` ∈ {10513, 10514}
+  - 10513 = Receita de locação Pessoa Física · 10514 = Receita de locação Pessoa Jurídica
+- Imóvel = `documentNumber` do título (é onde o Sienge guarda o nome do imóvel)
+- Realizado = soma de `payments[].netAmount` por `paymentDate`
+- A Receber = `correctedBalanceAmount - discountAmount` (NÃO subtrair taxAmount — isso é regra de CP)
+- Escopo: 3 empresas (Holding, Silva Packer, Sul Brasil) — as que têm contrato de locação
+
+### Isolamento (regra dura)
+- `alugueis-utils.ts` e `alugueis-view.tsx` NÃO são importados por nenhuma tela das demais
+  empresas. As fórmulas são duplicadas de propósito (não reutilizam `dashboard-utils`)
+- Sidebar: item adicionado só quando `isHolding` — em modo SP o menu volta intacto
+- Snapshot em `validations/holding/alugueis.json` (subdiretório de propósito:
+  `check-validations.js` só lê `validations/*.json` da raiz)
+- Conferência: `node scripts/valida-alugueis.js` → deve dar 0 divergências
+
+Validado contra o Power BI (recorte 01/01/2026 a 11/06/2026, última baixa do CSV do BI):
+Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 · Sul Brasil R$ 409.983,42
+
 ## Controle de Orçamento por Empresa (Criado em 2026-04-16)
 
 - Campo `controla_orcamento` (BOOLEAN) na tabela `company_settings` (default FALSE)

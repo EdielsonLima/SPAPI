@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ import {
   UserX,
   Ban,
   ArrowLeftRight,
+  KeyRound,
 } from "lucide-react";
 import { useCompanyMode } from "@/lib/company-context";
 import Image from "next/image";
@@ -167,6 +168,29 @@ export function Sidebar() {
   const pathname = usePathname();
   const { setMode, label: companyLabel, isHolding } = useCompanyMode();
 
+  // Menu do modo Holding = menu padrao + "Locacoes > Alugueis".
+  // Em modo Silva Packer o array retorna intacto — nenhuma tela das demais
+  // empresas e afetada por esta adicao.
+  const menu = useMemo<MenuItem[]>(() => {
+    if (!isHolding) return menuItems;
+    return menuItems.map((item) =>
+      item.label === "Financeiro"
+        ? {
+            ...item,
+            children: [
+              ...(item.children || []),
+              {
+                label: "Alugueis",
+                href: "/financeiro/alugueis",
+                icon: <KeyRound className="h-4 w-4" />,
+                group: "Locacoes",
+              },
+            ],
+          }
+        : item
+    );
+  }, [isHolding]);
+
   useEffect(() => {
     const today = new Date();
     const endDate = today.toISOString().split("T")[0];
@@ -247,7 +271,7 @@ export function Sidebar() {
 
         {/* Menu */}
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto overflow-x-hidden">
-          {menuItems.map((item) => {
+          {menu.map((item) => {
             if (item.href) {
               const active = isActive(item.href);
               const linkContent = (
@@ -330,7 +354,7 @@ export function Sidebar() {
                     <div
                       className={cn(
                         "overflow-hidden transition-all duration-200",
-                        isOpen ? "max-h-96 mt-1" : "max-h-0"
+                        isOpen ? "max-h-[640px] mt-1" : "max-h-0"
                       )}
                     >
                       <div className="ml-4 pl-3 border-l border-slate-700 space-y-1">

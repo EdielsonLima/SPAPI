@@ -1,0 +1,45 @@
+{
+  "_doc": "Snapshot de validacoes da pagina Controle de Locacoes (Alugueis) — EXCLUSIVA do modo Holding. Fonte: Power BI 'FINANCEIRO HOLDING.pbix', paginas 'ALUGUEIS A RECEBER' e 'ALUGUEIS REALIZADO'. Regra: titulo de receber com documento LOC/LNC E categoria financeira 10513/10514 (Receita de locacao PF/PJ) — ver src/lib/alugueis-utils.ts. O recorte de data (01/01/2026 a 11/06/2026) e o do CSV que alimentava o Power BI, cujo ultimo lancamento de baixa foi 11/06/2026. Realizado = soma de payments[].netAmount por paymentDate. Valores em reais, 2 casas decimais.",
+  "validations": [
+    {
+      "scope": "alugueis-realizado",
+      "company": "TOTAL",
+      "startDate": "2026-01-01",
+      "endDate": "2026-06-11",
+      "expected": 2328855.21,
+      "tolerance": 0.005,
+      "validated_at": "2026-07-31",
+      "source": "Power BI FINANCEIRO HOLDING.pbix — pagina ALUGUEIS REALIZADO, card 'Total Recebido Aluguel'"
+    },
+    {
+      "scope": "alugueis-realizado",
+      "company": "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA",
+      "startDate": "2026-01-01",
+      "endDate": "2026-06-11",
+      "expected": 1444930.96,
+      "tolerance": 0.005,
+      "validated_at": "2026-07-31",
+      "source": "Power BI FINANCEIRO HOLDING.pbix — grafico 'Total a Receber por empresa'"
+    },
+    {
+      "scope": "alugueis-realizado",
+      "company": "SILVA ADMINISTRADORA HOLDING LTDA",
+      "startDate": "2026-01-01",
+      "endDate": "2026-06-11",
+      "expected": 473940.83,
+      "tolerance": 0.005,
+      "validated_at": "2026-07-31",
+      "source": "Power BI FINANCEIRO HOLDING.pbix — grafico 'Total a Receber por empresa'"
+    },
+    {
+      "scope": "alugueis-realizado",
+      "company": "SUL BRASIL EMPREENDIMENTOS IMOBILIARIOS LTDA",
+      "startDate": "2026-01-01",
+      "endDate": "2026-06-11",
+      "expected": 409983.42,
+      "tolerance": 0.005,
+      "validated_at": "2026-07-31",
+      "source": "Power BI FINANCEIRO HOLDING.pbix — grafico 'Total a Receber por empresa'"
+    }
+  ]
+}
