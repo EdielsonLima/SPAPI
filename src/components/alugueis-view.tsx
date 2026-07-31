@@ -43,13 +43,19 @@ import { useCompanyMode } from "@/lib/company-context";
 import { formatCurrency, formatDate, formatCompactCurrency } from "@/lib/dashboard-utils";
 import {
   MESES_CURTOS,
+  ROTULO_PERFIL,
+  TOLERANCIAS_BAIXA,
+  TOLERANCIA_BAIXA_PADRAO,
   diasEmAtraso,
+  mapaPagadores,
   resumoImovel,
   hojeISO,
   isAluguel,
   nomeCurtoEmpresa,
   nomeImovel,
   saldoAberto,
+  type PerfilPagador,
+  type ResumoPagador,
 } from "@/lib/alugueis-utils";
 import { SiengeIncome } from "@/types/sienge";
 import { cn } from "@/lib/utils";
@@ -100,6 +106,7 @@ export function AlugueisView() {
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(0);
   const [expandida, setExpandida] = useState<string | null>(null);
+  const [tolerancia, setTolerancia] = useState(TOLERANCIA_BAIXA_PADRAO);
 
   // Mesmo intervalo usado pelas Contas a Receber — reaproveita o cache do banco
   // em vez de disparar uma nova consulta ao Sienge.
@@ -241,6 +248,13 @@ export function AlugueisView() {
     () => linhasRealizadoTodas.filter((l) => empresaSelecionada(l.empresa)),
     [linhasRealizadoTodas, empresaSelecionada]
   );
+
+  /**
+   * Perfil de pagamento por cliente. Roda sobre TODOS os titulos de locacao
+   * (sem recorte de periodo/empresa) — o comportamento do cliente nao muda
+   * porque o usuario filtrou um mes.
+   */
+  const pagadores = useMemo(() => mapaPagadores(items, tolerancia), [items, tolerancia]);
 
   /** Cor fixa por empresa — os cards e o grafico usam a mesma. */
   const corPorEmpresa = useMemo(() => {
@@ -459,6 +473,30 @@ export function AlugueisView() {
               className="pl-9 h-9"
             />
           </div>
+          <div className="flex items-center gap-1.5">
+            <span
+              className="text-[11px] text-slate-400"
+              title="Atrasos ate este limite sao tratados como baixa nao registrada, nao como inadimplencia."
+            >
+              Tolerancia de baixa
+            </span>
+            <div className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
+              {TOLERANCIAS_BAIXA.map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setTolerancia(d)}
+                  className={cn(
+                    "px-2.5 h-7 rounded-md text-xs font-medium transition-colors",
+                    tolerancia === d
+                      ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+                  )}
+                >
+                  {d}d
+                </button>
+              ))}
+            </div>
+          </div>
           {ehReceber && (
             <div className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
               {([
@@ -665,13 +703,14 @@ export function AlugueisView() {
                     <th className="text-left font-semibold px-4 py-2.5">Cliente</th>
                     <th className="text-left font-semibold px-4 py-2.5">Empresa</th>
                     {ehReceber && <th className="text-right font-semibold px-4 py-2.5">Dias</th>}
+                    <th className="text-left font-semibold px-4 py-2.5">Perfil</th>
                     <th className="text-right font-semibold px-4 py-2.5">Valor</th>
                   </tr>
                 </thead>
                 <tbody>
                   {linhasPagina.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">
+                      <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-400">
                         Nenhum aluguel encontrado com os filtros atuais.
                       </td>
                     </tr>
@@ -712,19 +751,24 @@ export function AlugueisView() {
                               )}
                             </td>
                           )}
+                          <td className="px-4 py-2.5">
+                            <BadgePerfil resumo={pagadores.get(l.cliente)} tolerancia={tolerancia} />
+                          </td>
                           <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-slate-800 dark:text-slate-100">
                             {formatCurrency(l.valor)}
                           </td>
                         </tr>
                         {aberta && (
                           <tr className="border-b border-slate-200 dark:border-slate-700">
-                            <td colSpan={ehReceber ? 7 : 6} className="p-0">
+                            <td colSpan={ehReceber ? 8 : 7} className="p-0">
                               <Detalhe
                                 item={l.item}
                                 imovel={l.imovel}
                                 todos={items}
                                 hoje={hoje}
                                 parcelaAtual={ehReceber ? l.key : null}
+                                pagador={pagadores.get(l.cliente)}
+                                tolerancia={tolerancia}
                               />
                             </td>
                           </tr>
@@ -736,7 +780,7 @@ export function AlugueisView() {
                 {linhas.length > 0 && (
                   <tfoot className="bg-slate-50 dark:bg-slate-900/60 border-t-2 border-slate-200 dark:border-slate-700">
                     <tr className="font-bold text-slate-900 dark:text-slate-50">
-                      <td className="px-4 py-3" colSpan={ehReceber ? 6 : 5}>
+                      <td className="px-4 py-3" colSpan={ehReceber ? 7 : 6}>
                         Total — {linhas.length} {linhas.length === 1 ? "registro" : "registros"}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(totalValor)}</td>
@@ -773,6 +817,52 @@ export function AlugueisView() {
   );
 }
 
+const ESTILO_PERFIL: Record<PerfilPagador, string> = {
+  "em-dia": "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400",
+  pontual: "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400",
+  cronico: "bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300/80",
+  "sem-historico": "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+};
+
+const ROTULO_CURTO: Record<PerfilPagador, string> = {
+  "em-dia": "Em dia",
+  pontual: "Pontual",
+  cronico: "Cronico",
+  "sem-historico": "Sem hist.",
+};
+
+/** Explica o perfil sem esconder o numero bruto de atrasos. */
+function explicarPerfil(r: ResumoPagador, tolerancia: number): string {
+  if (r.perfil === "sem-historico") return "Nenhuma parcela paga registrada para este cliente.";
+  const dentro = r.atrasoQualquerQtd - r.atrasoRealQtd;
+  const ressalva =
+    dentro > 0
+      ? ` ${dentro} ${dentro === 1 ? "parcela atrasou" : "parcelas atrasaram"} ate ${tolerancia} dias e nao ${dentro === 1 ? "foi contada" : "foram contadas"} — nesse prazo o mais provavel e baixa nao registrada.`
+      : "";
+  if (r.perfil === "em-dia") {
+    return `${r.pagasQtd} parcelas pagas, nenhuma com mais de ${tolerancia} dias de atraso.${ressalva}`;
+  }
+  return (
+    `${r.atrasoRealQtd} de ${r.pagasQtd} parcelas pagas com mais de ${tolerancia} dias de atraso ` +
+    `(${r.pctAtrasoReal}%) — media ${r.atrasoRealMedio}d, maior ${r.atrasoRealMaximo}d.${ressalva}`
+  );
+}
+
+function BadgePerfil({ resumo, tolerancia }: { resumo?: ResumoPagador; tolerancia: number }) {
+  if (!resumo) return <span className="text-slate-300">-</span>;
+  return (
+    <span
+      title={explicarPerfil(resumo, tolerancia)}
+      className={cn(
+        "inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap cursor-help",
+        ESTILO_PERFIL[resumo.perfil]
+      )}
+    >
+      {ROTULO_CURTO[resumo.perfil]}
+    </span>
+  );
+}
+
 /**
  * Painel da linha expandida. O valor esta no cruzamento com o historico do
  * imovel — os campos avulsos do titulo (defaulterSituation, subJudicie,
@@ -785,21 +875,22 @@ function Detalhe({
   todos,
   hoje,
   parcelaAtual,
+  pagador,
+  tolerancia,
 }: {
   item: SiengeIncome;
   imovel: string;
   todos: SiengeIncome[];
   hoje: string;
   parcelaAtual: string | null;
+  pagador?: ResumoPagador;
+  tolerancia: number;
 }) {
   const r = useMemo(() => resumoImovel(todos, imovel, hoje), [todos, imovel, hoje]);
 
   const [parcelaN, parcelaTotal] = (item.installmentNumber || "").split("/");
   // "1/1" e lancamento avulso, nao contrato terminando.
   const ultimaParcela = parcelaN && parcelaN === parcelaTotal && parcelaTotal !== "1";
-  const pctAtraso = r.pagasQtd ? Math.round((r.atrasoQtd / r.pagasQtd) * 100) : 0;
-  const cronico = r.pagasQtd >= 6 && pctAtraso >= 50;
-
   const original = item.originalAmount || 0;
   const saldo = saldoAberto(item);
   const parcial = saldo > 0 && original > 0 && Math.abs(original - saldo) > 0.01;
@@ -837,45 +928,65 @@ function Detalhe({
         )}
       </div>
 
-      {/* 2. Comportamento de pagamento */}
+      {/* 2. Comportamento de pagamento — do CLIENTE, ja com a tolerancia aplicada */}
       <div className="space-y-2">
-        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-          Comportamento de pagamento do imovel
-        </h4>
-        <Info rotulo="Parcelas pagas">
-          {r.pagasQtd} <span className="text-slate-400">({formatCurrency(r.pagasValor)})</span>
-        </Info>
-        <Info rotulo="Pagas com atraso">
-          {r.pagasQtd === 0 ? (
-            <span className="text-slate-400">sem historico de pagamento neste imovel</span>
-          ) : r.atrasoQtd === 0 ? (
-            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-              nenhuma — sempre em dia
-            </span>
-          ) : (
-            <>
-              <span className={cn("font-medium", cronico && "text-red-600 dark:text-red-300/80")}>
-                {r.atrasoQtd} ({pctAtraso}%)
-              </span>
-              <span className="text-slate-400"> · media {r.atrasoMedio}d · maior {r.atrasoMaximo}d</span>
-            </>
-          )}
-        </Info>
-        {cronico && (
-          <p className="text-[11px] rounded bg-red-50 dark:bg-red-950/30 px-2 py-1 text-red-700 dark:text-red-300/80">
-            Atraso cronico: atrasa em {pctAtraso}% das parcelas
-          </p>
+        <div className="flex items-center gap-2">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+            Comportamento de pagamento do cliente
+          </h4>
+          {pagador && <BadgePerfil resumo={pagador} tolerancia={tolerancia} />}
+        </div>
+        {!pagador ? (
+          <p className="text-sm text-slate-400">Sem dados de pagamento para este cliente.</p>
+        ) : (
+          <>
+            <Info rotulo="Parcelas pagas">
+              {pagador.pagasQtd}{" "}
+              <span className="text-slate-400">({formatCurrency(pagador.pagasValor)})</span>
+            </Info>
+            <Info rotulo={`Atraso acima de ${tolerancia}d`}>
+              {pagador.pagasQtd === 0 ? (
+                <span className="text-slate-400">sem historico de pagamento</span>
+              ) : pagador.atrasoRealQtd === 0 ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium">nenhuma</span>
+              ) : (
+                <>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      pagador.perfil === "cronico" && "text-red-600 dark:text-red-300/80"
+                    )}
+                  >
+                    {pagador.atrasoRealQtd} ({pagador.pctAtrasoReal}%)
+                  </span>
+                  <span className="text-slate-400">
+                    {" "}
+                    · media {pagador.atrasoRealMedio}d · maior {pagador.atrasoRealMaximo}d
+                  </span>
+                </>
+              )}
+            </Info>
+            {pagador.atrasoQualquerQtd > pagador.atrasoRealQtd && (
+              <p className="text-[11px] rounded bg-slate-100 dark:bg-slate-800/70 px-2 py-1 text-slate-500 dark:text-slate-400">
+                {pagador.atrasoQualquerQtd - pagador.atrasoRealQtd} parcela
+                {pagador.atrasoQualquerQtd - pagador.atrasoRealQtd === 1 ? "" : "s"} com atraso de ate{" "}
+                {tolerancia} dias fora da conta — nesse prazo costuma ser baixa nao registrada, nao
+                inadimplencia
+              </p>
+            )}
+            {pagador.perfil === "cronico" && (
+              <p className="text-[11px] rounded bg-red-50 dark:bg-red-950/30 px-2 py-1 text-red-700 dark:text-red-300/80">
+                {ROTULO_PERFIL.cronico}: passa de {tolerancia} dias em {pagador.pctAtrasoReal}% das
+                parcelas
+              </p>
+            )}
+            <Info rotulo="Ultimo pagamento">
+              {pagador.ultimoPagamento
+                ? `${formatDate(pagador.ultimoPagamento.data)} — ${formatCurrency(pagador.ultimoPagamento.valor)}`
+                : "nenhum recebimento registrado"}
+            </Info>
+          </>
         )}
-        {r.atrasoQtd > 0 && !cronico && r.pagasQtd >= 6 && (
-          <p className="text-[11px] rounded bg-amber-50 dark:bg-amber-950/30 px-2 py-1 text-amber-700 dark:text-amber-400">
-            Atraso pontual: paga em dia em {100 - pctAtraso}% das parcelas
-          </p>
-        )}
-        <Info rotulo="Ultimo pagamento">
-          {r.ultimoPagamento
-            ? `${formatDate(r.ultimoPagamento.data)} — ${formatCurrency(r.ultimoPagamento.valor)}`
-            : "nenhum recebimento registrado"}
-        </Info>
         {parcial && (
           <Info rotulo="Recebimento parcial">
             <span className="text-blue-600 dark:text-blue-400">

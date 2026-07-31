@@ -14,6 +14,19 @@ Réplica do Power BI `FINANCEIRO HOLDING.pbix` (páginas "ALUGUEIS À RECEBER" /
 - A Receber = `correctedBalanceAmount - discountAmount` (NÃO subtrair taxAmount — isso é regra de CP)
 - Escopo: 3 empresas (Holding, Silva Packer, Sul Brasil) — as que têm contrato de locação
 
+### Perfil de pagamento do cliente (coluna "Perfil") — Criado em 2026-07-31
+- Classifica o CLIENTE (não o imóvel): agrupar por `clientName` é o pagador real
+  e ainda contorna variações de grafia do mesmo imóvel ("casa rua 3000" vs "CASA RUA 3000")
+- **Tolerância de baixa** (`TOLERANCIA_BAIXA_PADRAO = 5` dias, ajustável na tela para 3/5/7):
+  atraso até esse limite NÃO conta como atraso. Motivo: quase sempre é o financeiro
+  que ainda não deu baixa no Sienge, não inadimplência do inquilino
+- Base do número (1.403 parcelas quitadas): 61,9% sem atraso · 1 a 5 dias = 24,1% ·
+  acima de 5 dias = 14,0%
+- Crônico = `PCT_CRONICO` (30%) ou mais das parcelas pagas com atraso acima da
+  tolerância, com no mínimo `MIN_PARCELAS_PERFIL` (5) parcelas pagas
+- Em dia = nenhuma acima da tolerância · Pontual = tem, mas abaixo do corte
+- O tooltip do badge sempre mostra quantas parcelas ficaram de fora pela tolerância
+
 ### Isolamento (regra dura)
 - `alugueis-utils.ts` e `alugueis-view.tsx` NÃO são importados por nenhuma tela das demais
   empresas. As fórmulas são duplicadas de propósito (não reutilizam `dashboard-utils`)

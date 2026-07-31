@@ -85,6 +85,120 @@ export function hojeISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * Tolerancia de baixa, em dias.
+ *
+ * Atraso pequeno em aluguel quase nunca e inadimplencia: o inquilino pagou e o
+ * financeiro ainda nao deu baixa no Sienge. Atrasos ATE este limite nao contam
+ * como atraso na classificacao do pagador.
+ *
+ * Base do numero (cache de 2026-07-16, 1.403 parcelas de locacao quitadas):
+ *   61,9% quitadas sem atraso · 1 a 5 dias concentra 24,1% · acima de 5 dias
+ *   sobram 14,0%. Com 5 dias, casos como CELITA MOREIRA (12 atrasos, nenhum
+ *   acima de 5d) saem de "atraso" e viram "em dia", que e a leitura correta.
+ * O usuario pode ajustar para 3 ou 7 dias na propria tela.
+ */
+export const TOLERANCIA_BAIXA_PADRAO = 5;
+export const TOLERANCIAS_BAIXA = [3, 5, 7];
+
+/** A partir deste percentual de parcelas com atraso real o pagador e cronico. */
+export const PCT_CRONICO = 0.3;
+
+/** Abaixo disso nao ha historico suficiente para chamar alguem de cronico. */
+export const MIN_PARCELAS_PERFIL = 5;
+
+export type PerfilPagador = "sem-historico" | "em-dia" | "pontual" | "cronico";
+
+export interface ResumoPagador {
+  pagasQtd: number;
+  pagasValor: number;
+  /** Parcelas quitadas com qualquer atraso (inclusive dentro da tolerancia). */
+  atrasoQualquerQtd: number;
+  /** Parcelas quitadas com atraso ACIMA da tolerancia — as que contam. */
+  atrasoRealQtd: number;
+  atrasoRealMedio: number;
+  atrasoRealMaximo: number;
+  pctAtrasoReal: number;
+  ultimoPagamento: { data: string; valor: number } | null;
+  perfil: PerfilPagador;
+}
+
+export const ROTULO_PERFIL: Record<PerfilPagador, string> = {
+  "sem-historico": "Sem historico",
+  "em-dia": "Em dia",
+  pontual: "Atraso pontual",
+  cronico: "Atraso cronico",
+};
+
+/**
+ * Comportamento de pagamento por CLIENTE (e o cliente que paga, nao o imovel —
+ * e agrupar por cliente ainda contorna as variacoes de grafia do mesmo imovel,
+ * ex. "casa rua 3000" e "CASA RUA 3000").
+ *
+ * Uma passada so sobre todos os titulos, porque a tabela consulta o resultado
+ * linha a linha.
+ */
+export function mapaPagadores(
+  todos: SiengeIncome[],
+  toleranciaDias: number
+): Map<string, ResumoPagador> {
+  const atrasosPorCliente = new Map<string, number[]>();
+  const acumulado = new Map<
+    string,
+    { pagasQtd: number; pagasValor: number; ultimo: { data: string; valor: number } | null }
+  >();
+
+  for (const i of todos) {
+    const cliente = i.clientName || "-";
+    if (!atrasosPorCliente.has(cliente)) {
+      atrasosPorCliente.set(cliente, []);
+      acumulado.set(cliente, { pagasQtd: 0, pagasValor: 0, ultimo: null });
+    }
+    const acc = acumulado.get(cliente)!;
+
+    const recebimentos = (i.payments || []).filter((p) => (p.netAmount || 0) > 0);
+    if (recebimentos.length === 0) continue;
+
+    acc.pagasQtd++;
+    let quitacao = "";
+    for (const p of recebimentos) {
+      acc.pagasValor += p.netAmount || 0;
+      const data = (p.paymentDate || "").slice(0, 10);
+      if (data > quitacao) quitacao = data;
+      if (!acc.ultimo || data > acc.ultimo.data) acc.ultimo = { data, valor: p.netAmount || 0 };
+    }
+    atrasosPorCliente.get(cliente)!.push(diasEmAtraso((i.dueDate || "").slice(0, 10), quitacao));
+  }
+
+  const out = new Map<string, ResumoPagador>();
+  for (const [cliente, atrasos] of atrasosPorCliente) {
+    const acc = acumulado.get(cliente)!;
+    const reais = atrasos.filter((d) => d > toleranciaDias);
+    const pct = acc.pagasQtd ? reais.length / acc.pagasQtd : 0;
+
+    let perfil: PerfilPagador;
+    if (acc.pagasQtd === 0) perfil = "sem-historico";
+    else if (reais.length === 0) perfil = "em-dia";
+    else if (acc.pagasQtd >= MIN_PARCELAS_PERFIL && pct >= PCT_CRONICO) perfil = "cronico";
+    else perfil = "pontual";
+
+    out.set(cliente, {
+      pagasQtd: acc.pagasQtd,
+      pagasValor: acc.pagasValor,
+      atrasoQualquerQtd: atrasos.filter((d) => d > 0).length,
+      atrasoRealQtd: reais.length,
+      atrasoRealMedio: reais.length
+        ? Math.round(reais.reduce((a, b) => a + b, 0) / reais.length)
+        : 0,
+      atrasoRealMaximo: reais.length ? Math.max(...reais) : 0,
+      pctAtrasoReal: Math.round(pct * 100),
+      ultimoPagamento: acc.ultimo,
+      perfil,
+    });
+  }
+  return out;
+}
+
 /** Uma parcela em aberto do imovel, no resumo do historico. */
 export interface ParcelaAberta {
   key: string;
