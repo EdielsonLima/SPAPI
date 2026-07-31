@@ -80,6 +80,109 @@ export function hojeISO(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Uma parcela em aberto do imovel, no resumo do historico. */
+export interface ParcelaAberta {
+  key: string;
+  dueDate: string;
+  parcela: string;
+  valor: number;
+  dias: number;
+}
+
+/** Historico de um imovel — o que alimenta a linha expandida. */
+export interface ResumoImovel {
+  totalParcelas: number;
+  pagasQtd: number;
+  pagasValor: number;
+  /** Parcelas quitadas apos o vencimento. */
+  atrasoQtd: number;
+  atrasoMedio: number;
+  atrasoMaximo: number;
+  ultimoPagamento: { data: string; valor: number } | null;
+  vencidas: ParcelaAberta[];
+  aVencerQtd: number;
+  aVencerValor: number;
+  clientes: string[];
+  contratoInicio: string;
+}
+
+/**
+ * Consolida o historico de um imovel a partir de TODOS os titulos de locacao
+ * (sem recorte de periodo — a leitura util e o comportamento do inquilino ao
+ * longo do contrato inteiro).
+ */
+export function resumoImovel(
+  todos: SiengeIncome[],
+  imovel: string,
+  hoje: string
+): ResumoImovel {
+  const doImovel = todos.filter((i) => nomeImovel(i) === imovel);
+  const atrasos: number[] = [];
+  const vencidas: ParcelaAberta[] = [];
+  const clientes = new Set<string>();
+  let pagasQtd = 0;
+  let pagasValor = 0;
+  let aVencerQtd = 0;
+  let aVencerValor = 0;
+  let ultimoPagamento: { data: string; valor: number } | null = null;
+  let contratoInicio = "";
+
+  for (const i of doImovel) {
+    if (i.clientName) clientes.add(i.clientName);
+    const inicio = (i.billDate || i.issueDate || "").slice(0, 10);
+    if (inicio && (!contratoInicio || inicio < contratoInicio)) contratoInicio = inicio;
+
+    const recebimentos = (i.payments || []).filter((p) => (p.netAmount || 0) > 0);
+    if (recebimentos.length > 0) {
+      pagasQtd++;
+      let quitacao = "";
+      for (const p of recebimentos) {
+        pagasValor += p.netAmount || 0;
+        const data = (p.paymentDate || "").slice(0, 10);
+        if (data > quitacao) quitacao = data;
+        if (!ultimoPagamento || data > ultimoPagamento.data) {
+          ultimoPagamento = { data, valor: p.netAmount || 0 };
+        }
+      }
+      const atraso = diasEmAtraso((i.dueDate || "").slice(0, 10), quitacao);
+      if (atraso > 0) atrasos.push(atraso);
+    }
+
+    const saldo = saldoAberto(i);
+    if (saldo > 0) {
+      const venc = (i.dueDate || "").slice(0, 10);
+      const dias = diasEmAtraso(venc, hoje);
+      if (dias > 0) {
+        vencidas.push({
+          key: `${i.companyId}:${i.billId}:${i.installmentId}`,
+          dueDate: venc,
+          parcela: i.installmentNumber || "-",
+          valor: saldo,
+          dias,
+        });
+      } else {
+        aVencerQtd++;
+        aVencerValor += saldo;
+      }
+    }
+  }
+
+  return {
+    totalParcelas: doImovel.length,
+    pagasQtd,
+    pagasValor,
+    atrasoQtd: atrasos.length,
+    atrasoMedio: atrasos.length ? Math.round(atrasos.reduce((a, b) => a + b, 0) / atrasos.length) : 0,
+    atrasoMaximo: atrasos.length ? Math.max(...atrasos) : 0,
+    ultimoPagamento,
+    vencidas: vencidas.sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
+    aVencerQtd,
+    aVencerValor,
+    clientes: Array.from(clientes),
+    contratoInicio,
+  };
+}
+
 export const MESES_CURTOS = [
   "jan", "fev", "mar", "abr", "mai", "jun",
   "jul", "ago", "set", "out", "nov", "dez",

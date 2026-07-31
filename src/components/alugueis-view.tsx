@@ -12,7 +12,7 @@
  * Regras de negocio e validacao: ver src/lib/alugueis-utils.ts.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -28,6 +28,7 @@ import {
   AlertTriangle,
   Building2,
   CalendarClock,
+  ChevronRight,
   CheckCircle2,
   Home,
   Loader2,
@@ -43,6 +44,7 @@ import { formatCurrency, formatDate, formatCompactCurrency } from "@/lib/dashboa
 import {
   MESES_CURTOS,
   diasEmAtraso,
+  resumoImovel,
   hojeISO,
   isAluguel,
   nomeImovel,
@@ -62,6 +64,7 @@ interface LinhaReceber {
   empresa: string;
   dias: number;
   valor: number;
+  item: SiengeIncome;
 }
 
 interface LinhaRealizado {
@@ -71,6 +74,7 @@ interface LinhaRealizado {
   cliente: string;
   empresa: string;
   valor: number;
+  item: SiengeIncome;
 }
 
 const CORES_EMPRESA = ["#2563eb", "#0ea5e9", "#14b8a6", "#8b5cf6", "#f59e0b", "#ef4444"];
@@ -94,6 +98,7 @@ export function AlugueisView() {
   const [status, setStatus] = useState<Status>("todos");
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(0);
+  const [expandida, setExpandida] = useState<string | null>(null);
 
   // Mesmo intervalo usado pelas Contas a Receber — reaproveita o cache do banco
   // em vez de disparar uma nova consulta ao Sienge.
@@ -130,6 +135,7 @@ export function AlugueisView() {
 
   useEffect(() => {
     setPagina(0);
+    setExpandida(null);
   }, [aba, anos, meses, empresas, status, busca]);
 
   const empresasDisponiveis = useMemo(
@@ -192,6 +198,7 @@ export function AlugueisView() {
         empresa: i.companyName,
         dias,
         valor,
+        item: i,
       });
     }
     return out.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -213,6 +220,7 @@ export function AlugueisView() {
           cliente: i.clientName || "-",
           empresa: i.companyName,
           valor,
+          item: i,
         });
       });
     }
@@ -573,6 +581,7 @@ export function AlugueisView() {
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-800">
                   <tr className="text-[11px] uppercase tracking-wider text-slate-500">
+                    <th className="w-8" />
                     <th className="text-left font-semibold px-4 py-2.5">
                       {ehReceber ? "Vencimento" : "Recebimento"}
                     </th>
@@ -586,51 +595,72 @@ export function AlugueisView() {
                 <tbody>
                   {linhasPagina.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-400">
+                      <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-400">
                         Nenhum aluguel encontrado com os filtros atuais.
                       </td>
                     </tr>
                   )}
                   {linhasPagina.map((l) => {
                     const atrasada = ehReceber && (l as LinhaReceber).dias > 0;
+                    const aberta = expandida === l.key;
                     return (
-                      <tr
-                        key={l.key}
-                        className={cn(
-                          "border-b border-slate-100 dark:border-slate-800/70 transition-colors",
-                          atrasada
-                            ? "bg-red-50/70 dark:bg-red-950/20 hover:bg-red-50 dark:hover:bg-red-950/30"
-                            : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
-                        )}
-                      >
-                        <td className="px-4 py-2.5 whitespace-nowrap tabular-nums text-slate-700 dark:text-slate-200">
-                          {formatDate(ehReceber ? (l as LinhaReceber).dueDate : (l as LinhaRealizado).data)}
-                        </td>
-                        <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-100">{l.imovel}</td>
-                        <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{l.cliente}</td>
-                        <td className="px-4 py-2.5 text-xs text-slate-400">{l.empresa}</td>
-                        {ehReceber && (
-                          <td className="px-4 py-2.5 text-right tabular-nums">
-                            {(l as LinhaReceber).dias > 0 ? (
-                              <span className="text-red-600 dark:text-red-300/80 font-medium">
-                                {(l as LinhaReceber).dias}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">-</span>
-                            )}
+                      <Fragment key={l.key}>
+                        <tr
+                          onClick={() => setExpandida(aberta ? null : l.key)}
+                          className={cn(
+                            "border-b border-slate-100 dark:border-slate-800/70 transition-colors cursor-pointer",
+                            aberta
+                              ? "bg-slate-100 dark:bg-slate-800/60"
+                              : atrasada
+                                ? "bg-red-50/70 dark:bg-red-950/20 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                : "hover:bg-slate-50 dark:hover:bg-slate-800/40"
+                          )}
+                        >
+                          <td className="pl-3 text-slate-400">
+                            <ChevronRight className={cn("h-4 w-4 transition-transform", aberta && "rotate-90")} />
                           </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap tabular-nums text-slate-700 dark:text-slate-200">
+                            {formatDate(ehReceber ? (l as LinhaReceber).dueDate : (l as LinhaRealizado).data)}
+                          </td>
+                          <td className="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-100">{l.imovel}</td>
+                          <td className="px-4 py-2.5 text-slate-600 dark:text-slate-300">{l.cliente}</td>
+                          <td className="px-4 py-2.5 text-xs text-slate-400">{l.empresa}</td>
+                          {ehReceber && (
+                            <td className="px-4 py-2.5 text-right tabular-nums">
+                              {(l as LinhaReceber).dias > 0 ? (
+                                <span className="text-red-600 dark:text-red-300/80 font-medium">
+                                  {(l as LinhaReceber).dias}
+                                </span>
+                              ) : (
+                                <span className="text-slate-300">-</span>
+                              )}
+                            </td>
+                          )}
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-slate-800 dark:text-slate-100">
+                            {formatCurrency(l.valor)}
+                          </td>
+                        </tr>
+                        {aberta && (
+                          <tr className="border-b border-slate-200 dark:border-slate-700">
+                            <td colSpan={ehReceber ? 7 : 6} className="p-0">
+                              <Detalhe
+                                item={l.item}
+                                imovel={l.imovel}
+                                todos={items}
+                                hoje={hoje}
+                                parcelaAtual={ehReceber ? l.key : null}
+                              />
+                            </td>
+                          </tr>
                         )}
-                        <td className="px-4 py-2.5 text-right tabular-nums font-semibold text-slate-800 dark:text-slate-100">
-                          {formatCurrency(l.valor)}
-                        </td>
-                      </tr>
+                      </Fragment>
                     );
                   })}
                 </tbody>
                 {linhas.length > 0 && (
                   <tfoot className="bg-slate-50 dark:bg-slate-900/60 border-t-2 border-slate-200 dark:border-slate-700">
                     <tr className="font-bold text-slate-900 dark:text-slate-50">
-                      <td className="px-4 py-3" colSpan={ehReceber ? 5 : 4}>
+                      <td className="px-4 py-3" colSpan={ehReceber ? 6 : 5}>
                         Total — {linhas.length} {linhas.length === 1 ? "registro" : "registros"}
                       </td>
                       <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(totalValor)}</td>
@@ -663,6 +693,181 @@ export function AlugueisView() {
           </Card>
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * Painel da linha expandida. O valor esta no cruzamento com o historico do
+ * imovel — os campos avulsos do titulo (defaulterSituation, subJudicie,
+ * indexerName, observation) vem constantes ou vazios nos alugueis e nao
+ * entram aqui de proposito.
+ */
+function Detalhe({
+  item,
+  imovel,
+  todos,
+  hoje,
+  parcelaAtual,
+}: {
+  item: SiengeIncome;
+  imovel: string;
+  todos: SiengeIncome[];
+  hoje: string;
+  parcelaAtual: string | null;
+}) {
+  const r = useMemo(() => resumoImovel(todos, imovel, hoje), [todos, imovel, hoje]);
+
+  const [parcelaN, parcelaTotal] = (item.installmentNumber || "").split("/");
+  // "1/1" e lancamento avulso, nao contrato terminando.
+  const ultimaParcela = parcelaN && parcelaN === parcelaTotal && parcelaTotal !== "1";
+  const pctAtraso = r.pagasQtd ? Math.round((r.atrasoQtd / r.pagasQtd) * 100) : 0;
+  const cronico = r.pagasQtd >= 6 && pctAtraso >= 50;
+
+  const original = item.originalAmount || 0;
+  const saldo = saldoAberto(item);
+  const parcial = saldo > 0 && original > 0 && Math.abs(original - saldo) > 0.01;
+  const jaRecebido = (item.payments || []).reduce((s, p) => s + (p.netAmount || 0), 0);
+
+  const vencidasTotal = r.vencidas.reduce((s, v) => s + v.valor, 0);
+
+  return (
+    <div className="bg-slate-50 dark:bg-slate-900/50 px-4 py-4 grid gap-4 lg:grid-cols-3">
+      {/* 1. Contrato */}
+      <div className="space-y-2">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">Contrato</h4>
+        <Info rotulo="Parcela">
+          {item.installmentNumber || "-"}
+          {ultimaParcela && (
+            <span className="ml-2 rounded bg-amber-100 dark:bg-amber-950/50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:text-amber-400">
+              ULTIMA — contrato terminando
+            </span>
+          )}
+        </Info>
+        <Info rotulo="Inicio">{r.contratoInicio ? formatDate(r.contratoInicio) : "-"}</Info>
+        <Info rotulo="Condicao">
+          {item.paymentTerm?.descrition || item.paymentTerm?.description || "-"}
+        </Info>
+        <Info rotulo="Titulo Sienge">
+          {item.billId}/{item.installmentId}
+        </Info>
+        <Info rotulo="Cliente">
+          {item.clientName || "-"} <span className="text-slate-400">(cod. {item.clientId})</span>
+        </Info>
+        {r.clientes.length > 1 && (
+          <p className="text-[11px] text-slate-400">
+            Imovel ja teve {r.clientes.length} inquilinos: {r.clientes.join(" · ")}
+          </p>
+        )}
+      </div>
+
+      {/* 2. Comportamento de pagamento */}
+      <div className="space-y-2">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Comportamento de pagamento do imovel
+        </h4>
+        <Info rotulo="Parcelas pagas">
+          {r.pagasQtd} <span className="text-slate-400">({formatCurrency(r.pagasValor)})</span>
+        </Info>
+        <Info rotulo="Pagas com atraso">
+          {r.pagasQtd === 0 ? (
+            <span className="text-slate-400">sem historico de pagamento neste imovel</span>
+          ) : r.atrasoQtd === 0 ? (
+            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+              nenhuma — sempre em dia
+            </span>
+          ) : (
+            <>
+              <span className={cn("font-medium", cronico && "text-red-600 dark:text-red-300/80")}>
+                {r.atrasoQtd} ({pctAtraso}%)
+              </span>
+              <span className="text-slate-400"> · media {r.atrasoMedio}d · maior {r.atrasoMaximo}d</span>
+            </>
+          )}
+        </Info>
+        {cronico && (
+          <p className="text-[11px] rounded bg-red-50 dark:bg-red-950/30 px-2 py-1 text-red-700 dark:text-red-300/80">
+            Atraso cronico: atrasa em {pctAtraso}% das parcelas
+          </p>
+        )}
+        {r.atrasoQtd > 0 && !cronico && r.pagasQtd >= 6 && (
+          <p className="text-[11px] rounded bg-amber-50 dark:bg-amber-950/30 px-2 py-1 text-amber-700 dark:text-amber-400">
+            Atraso pontual: paga em dia em {100 - pctAtraso}% das parcelas
+          </p>
+        )}
+        <Info rotulo="Ultimo pagamento">
+          {r.ultimoPagamento
+            ? `${formatDate(r.ultimoPagamento.data)} — ${formatCurrency(r.ultimoPagamento.valor)}`
+            : "nenhum recebimento registrado"}
+        </Info>
+        {parcial && (
+          <Info rotulo="Recebimento parcial">
+            <span className="text-blue-600 dark:text-blue-400">
+              {formatCurrency(jaRecebido)} de {formatCurrency(original)} — saldo {formatCurrency(saldo)}
+            </span>
+          </Info>
+        )}
+      </div>
+
+      {/* 3. Situacao em aberto do imovel */}
+      <div className="space-y-2">
+        <h4 className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+          Em aberto neste imovel <span className="normal-case tracking-normal">(todos os anos)</span>
+        </h4>
+        {r.vencidas.length === 0 ? (
+          <p className="text-sm text-emerald-600 dark:text-emerald-400">Nenhuma parcela vencida.</p>
+        ) : (
+          <>
+            <Info rotulo="Vencidas">
+              <span className="text-red-600 dark:text-red-300/80 font-semibold">
+                {r.vencidas.length} {r.vencidas.length === 1 ? "parcela" : "parcelas"} ·{" "}
+                {formatCurrency(vencidasTotal)}
+              </span>
+            </Info>
+            {r.vencidas.length > 1 && (
+              <p className="text-[11px] rounded bg-red-50 dark:bg-red-950/30 px-2 py-1 text-red-700 dark:text-red-300/80">
+                Debito acumulado — {r.vencidas.length} parcelas vencidas em aberto
+              </p>
+            )}
+            <div className="space-y-1 pt-1">
+              {r.vencidas.map((v) => (
+                <div
+                  key={v.key}
+                  className={cn(
+                    "flex items-center justify-between gap-2 rounded px-2 py-1 text-xs tabular-nums",
+                    v.key === parcelaAtual
+                      ? "bg-slate-200 dark:bg-slate-700 font-semibold"
+                      : "bg-white dark:bg-slate-800/60"
+                  )}
+                >
+                  <span className="text-slate-600 dark:text-slate-300">
+                    {formatDate(v.dueDate)}
+                    <span className="text-slate-400"> · parc. {v.parcela}</span>
+                  </span>
+                  <span className="text-slate-400">{v.dias}d</span>
+                  <span className="font-medium text-slate-800 dark:text-slate-100">
+                    {formatCurrency(v.valor)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+        <Info rotulo="A vencer">
+          {r.aVencerQtd === 0
+            ? "nenhuma"
+            : `${r.aVencerQtd} ${r.aVencerQtd === 1 ? "parcela" : "parcelas"} · ${formatCurrency(r.aVencerValor)}`}
+        </Info>
+      </div>
+    </div>
+  );
+}
+
+function Info({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="text-sm">
+      <span className="text-slate-400">{rotulo}: </span>
+      <span className="text-slate-700 dark:text-slate-200">{children}</span>
     </div>
   );
 }
