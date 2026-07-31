@@ -66,6 +66,11 @@ export function nomeImovel(item: SiengeIncome): string {
   return (item.documentNumber || "").trim() || "(sem imovel)";
 }
 
+/** Nome curto da empresa (2 primeiras palavras) — usado nos cards e no grafico. */
+export function nomeCurtoEmpresa(nome: string): string {
+  return (nome || "").split(" ").slice(0, 2).join(" ");
+}
+
 /** Dias de atraso de uma parcela em aberto (0 quando ainda nao venceu). */
 export function diasEmAtraso(dueDate: string, hoje: string): number {
   const venc = (dueDate || "").slice(0, 10);

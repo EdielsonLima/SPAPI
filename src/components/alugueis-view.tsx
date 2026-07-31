@@ -47,6 +47,7 @@ import {
   resumoImovel,
   hojeISO,
   isAluguel,
+  nomeCurtoEmpresa,
   nomeImovel,
   saldoAberto,
 } from "@/lib/alugueis-utils";
@@ -156,14 +157,19 @@ export function AlugueisView() {
 
   const passaFiltrosBase = useCallback(
     (i: SiengeIncome) => {
-      if (empresas.size > 0 && !empresas.has(i.companyName)) return false;
       if (busca.trim()) {
         const alvo = `${nomeImovel(i)} ${i.clientName || ""}`.toLowerCase();
         if (!alvo.includes(busca.trim().toLowerCase())) return false;
       }
       return true;
     },
-    [empresas, busca]
+    [busca]
+  );
+
+  /** Empresa selecionada? (vazio = todas). */
+  const empresaSelecionada = useCallback(
+    (nome: string) => empresas.size === 0 || empresas.has(nome),
+    [empresas]
   );
 
   const noPeriodo = useCallback(
@@ -178,8 +184,8 @@ export function AlugueisView() {
     [anos, meses]
   );
 
-  /** Parcelas em aberto (A Receber). */
-  const linhasReceber = useMemo<LinhaReceber[]>(() => {
+  /** Parcelas em aberto (A Receber) — ainda SEM o recorte de empresa. */
+  const linhasReceberTodas = useMemo<LinhaReceber[]>(() => {
     const out: LinhaReceber[] = [];
     for (const i of items) {
       if (!passaFiltrosBase(i)) continue;
@@ -204,8 +210,8 @@ export function AlugueisView() {
     return out.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
   }, [items, passaFiltrosBase, noPeriodo, status, hoje]);
 
-  /** Recebimentos efetivados (Realizado). */
-  const linhasRealizado = useMemo<LinhaRealizado[]>(() => {
+  /** Recebimentos efetivados (Realizado) — ainda SEM o recorte de empresa. */
+  const linhasRealizadoTodas = useMemo<LinhaRealizado[]>(() => {
     const out: LinhaRealizado[] = [];
     for (const i of items) {
       if (!passaFiltrosBase(i)) continue;
@@ -227,17 +233,51 @@ export function AlugueisView() {
     return out.sort((a, b) => b.data.localeCompare(a.data));
   }, [items, passaFiltrosBase, noPeriodo]);
 
+  const linhasReceber = useMemo(
+    () => linhasReceberTodas.filter((l) => empresaSelecionada(l.empresa)),
+    [linhasReceberTodas, empresaSelecionada]
+  );
+  const linhasRealizado = useMemo(
+    () => linhasRealizadoTodas.filter((l) => empresaSelecionada(l.empresa)),
+    [linhasRealizadoTodas, empresaSelecionada]
+  );
+
+  /** Cor fixa por empresa — os cards e o grafico usam a mesma. */
+  const corPorEmpresa = useMemo(() => {
+    const m = new Map<string, string>();
+    empresasDisponiveis.forEach((e, idx) => m.set(e, CORES_EMPRESA[idx % CORES_EMPRESA.length]));
+    return m;
+  }, [empresasDisponiveis]);
+
+  /**
+   * Total de cada empresa nos cards. Ignora de proposito o proprio filtro de
+   * empresa: o card precisa mostrar quanto a empresa tem mesmo quando esta
+   * desmarcada, senao viraria R$ 0,00.
+   */
+  const totaisPorEmpresa = useMemo(() => {
+    const base = aba === "receber" ? linhasReceberTodas : linhasRealizadoTodas;
+    const m = new Map<string, { valor: number; qtd: number }>();
+    for (const e of empresasDisponiveis) m.set(e, { valor: 0, qtd: 0 });
+    for (const l of base) {
+      const atual = m.get(l.empresa);
+      if (!atual) continue;
+      atual.valor += l.valor;
+      atual.qtd += 1;
+    }
+    return m;
+  }, [aba, linhasReceberTodas, linhasRealizadoTodas, empresasDisponiveis]);
+
   /** Imoveis distintos com contrato no periodo (independente de saldo). */
   const totalImoveis = useMemo(() => {
     const set = new Set<string>();
     for (const i of items) {
-      if (!passaFiltrosBase(i)) continue;
+      if (!passaFiltrosBase(i) || !empresaSelecionada(i.companyName)) continue;
       const temVenc = noPeriodo((i.dueDate || "").slice(0, 10));
       const temPgto = (i.payments || []).some((p) => noPeriodo((p.paymentDate || "").slice(0, 10)));
       if (temVenc || temPgto) set.add(nomeImovel(i));
     }
     return set.size;
-  }, [items, passaFiltrosBase, noPeriodo]);
+  }, [items, passaFiltrosBase, empresaSelecionada, noPeriodo]);
 
   const ehReceber = aba === "receber";
   const linhas = ehReceber ? linhasReceber : linhasRealizado;
@@ -259,7 +299,7 @@ export function AlugueisView() {
     const map = new Map<string, number>();
     for (const l of linhas) map.set(l.empresa, (map.get(l.empresa) || 0) + l.valor);
     return Array.from(map.entries())
-      .map(([nome, valor]) => ({ nome, curto: nome.split(" ").slice(0, 2).join(" "), valor }))
+      .map(([nome, valor]) => ({ nome, curto: nomeCurtoEmpresa(nome), valor }))
       .sort((a, b) => b.valor - a.valor);
   }, [linhas]);
 
@@ -360,8 +400,9 @@ export function AlugueisView() {
         })}
       </div>
 
-      {/* Filtros */}
-      <Card className="border-0 shadow-sm p-4 space-y-3">
+      {/* Filtros — periodo a esquerda, cards de empresa ocupando a direita */}
+      <Card className="border-0 shadow-sm p-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="space-y-3 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 w-14">Ano</span>
           {anosDisponiveis.map((ano) => (
@@ -408,25 +449,6 @@ export function AlugueisView() {
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 w-14">Empresa</span>
-          {empresasDisponiveis.map((e) => (
-            <button
-              key={e}
-              onClick={() => toggle(empresas, e, setEmpresas)}
-              title={e}
-              className={cn(
-                "px-3 h-7 rounded-md text-xs font-medium transition-colors max-w-[240px] truncate",
-                empresas.size === 0 || empresas.has(e)
-                  ? "bg-slate-800 dark:bg-slate-200 text-white dark:text-slate-900"
-                  : "bg-slate-100 dark:bg-slate-800 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-              )}
-            >
-              {e}
-            </button>
-          ))}
-        </div>
-
         <div className="flex flex-wrap items-center gap-3 pt-1">
           <div className="relative flex-1 min-w-[220px] max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -461,6 +483,60 @@ export function AlugueisView() {
               ))}
             </div>
           )}
+        </div>
+        </div>
+
+        {/* Cards de empresa — clicaveis, mesmo comportamento dos chips anteriores */}
+        <div className="grid gap-2 sm:grid-cols-3 xl:w-[560px]">
+          {empresasDisponiveis.map((e) => {
+            const selecionada = empresaSelecionada(e);
+            const cor = corPorEmpresa.get(e) || CORES_EMPRESA[0];
+            const t = totaisPorEmpresa.get(e) || { valor: 0, qtd: 0 };
+            return (
+              <button
+                key={e}
+                onClick={() => toggle(empresas, e, setEmpresas)}
+                title={e}
+                aria-pressed={selecionada}
+                className={cn(
+                  "group relative flex flex-col justify-center overflow-hidden rounded-xl border p-3 text-left transition-all",
+                  selecionada
+                    ? "border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800/70 shadow-sm"
+                    : "border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/40 opacity-55 hover:opacity-80"
+                )}
+              >
+                <span
+                  className="absolute inset-y-0 left-0 w-1 transition-all"
+                  style={{ backgroundColor: cor, opacity: selecionada ? 1 : 0.35 }}
+                />
+                <div className="pl-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide leading-tight text-slate-500 dark:text-slate-400 line-clamp-2">
+                      {nomeCurtoEmpresa(e)}
+                    </p>
+                    <span
+                      className={cn(
+                        "mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full border-2 transition-colors",
+                        selecionada ? "border-transparent" : "border-slate-300 dark:border-slate-600"
+                      )}
+                      style={selecionada ? { backgroundColor: cor } : undefined}
+                    />
+                  </div>
+                  <p
+                    className={cn(
+                      "mt-2 text-xl font-bold tabular-nums leading-none",
+                      selecionada ? "text-slate-900 dark:text-slate-50" : "text-slate-400"
+                    )}
+                  >
+                    {formatCompactCurrency(t.valor)}
+                  </p>
+                  <p className="mt-1.5 text-[11px] text-slate-400">
+                    {t.qtd} {ehReceber ? (t.qtd === 1 ? "parcela" : "parcelas") : t.qtd === 1 ? "recebimento" : "recebimentos"}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
         </div>
       </Card>
 
@@ -529,8 +605,8 @@ export function AlugueisView() {
                       contentStyle={{ fontSize: 12, borderRadius: 8 }}
                     />
                     <Bar dataKey="valor" radius={[0, 4, 4, 0]} barSize={26}>
-                      {porEmpresa.map((_, idx) => (
-                        <Cell key={idx} fill={CORES_EMPRESA[idx % CORES_EMPRESA.length]} />
+                      {porEmpresa.map((d) => (
+                        <Cell key={d.nome} fill={corPorEmpresa.get(d.nome) || CORES_EMPRESA[0]} />
                       ))}
                       <LabelList
                         dataKey="valor"
