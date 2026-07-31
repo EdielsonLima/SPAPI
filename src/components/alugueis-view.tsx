@@ -30,6 +30,7 @@ import {
   CalendarClock,
   ChevronRight,
   CheckCircle2,
+  FileSignature,
   Home,
   Loader2,
   RefreshCw,
@@ -44,6 +45,7 @@ import { formatCurrency, formatDate, formatCompactCurrency } from "@/lib/dashboa
 import {
   MESES_CURTOS,
   ROTULO_PERFIL,
+  agruparContratos,
   TOLERANCIAS_BAIXA,
   TOLERANCIA_BAIXA_PADRAO,
   diasEmAtraso,
@@ -57,10 +59,11 @@ import {
   type PerfilPagador,
   type ResumoPagador,
 } from "@/lib/alugueis-utils";
+import { AlugueisContratos } from "@/components/alugueis-contratos";
 import { SiengeIncome } from "@/types/sienge";
 import { cn } from "@/lib/utils";
 
-type Aba = "receber" | "realizado";
+type Aba = "receber" | "realizado" | "contratos";
 type Status = "todos" | "vencido" | "avencer";
 
 interface LinhaReceber {
@@ -269,9 +272,20 @@ export function AlugueisView() {
    * desmarcada, senao viraria R$ 0,00.
    */
   const totaisPorEmpresa = useMemo(() => {
-    const base = aba === "receber" ? linhasReceberTodas : linhasRealizadoTodas;
     const m = new Map<string, { valor: number; qtd: number }>();
     for (const e of empresasDisponiveis) m.set(e, { valor: 0, qtd: 0 });
+    if (aba === "contratos") {
+      // nos contratos o card mostra o aluguel mensal contratado (vigentes)
+      for (const c of agruparContratos(items, hoje)) {
+        if (c.status !== "vigente" && c.status !== "vence-breve") continue;
+        const atual = m.get(c.empresa);
+        if (!atual) continue;
+        atual.valor += c.valorMes;
+        atual.qtd += 1;
+      }
+      return m;
+    }
+    const base = aba === "receber" ? linhasReceberTodas : linhasRealizadoTodas;
     for (const l of base) {
       const atual = m.get(l.empresa);
       if (!atual) continue;
@@ -279,7 +293,7 @@ export function AlugueisView() {
       atual.qtd += 1;
     }
     return m;
-  }, [aba, linhasReceberTodas, linhasRealizadoTodas, empresasDisponiveis]);
+  }, [aba, items, hoje, linhasReceberTodas, linhasRealizadoTodas, empresasDisponiveis]);
 
   /** Imoveis distintos com contrato no periodo (independente de saldo). */
   const totalImoveis = useMemo(() => {
@@ -294,6 +308,7 @@ export function AlugueisView() {
   }, [items, passaFiltrosBase, empresaSelecionada, noPeriodo]);
 
   const ehReceber = aba === "receber";
+  const ehContratos = aba === "contratos";
   const linhas = ehReceber ? linhasReceber : linhasRealizado;
 
   const totalValor = useMemo(
@@ -391,6 +406,7 @@ export function AlugueisView() {
         {([
           { id: "receber" as const, label: "Alugueis a Receber", icon: CalendarClock, cor: "amber" },
           { id: "realizado" as const, label: "Alugueis Realizados", icon: CheckCircle2, cor: "emerald" },
+          { id: "contratos" as const, label: "Contratos", icon: FileSignature, cor: "violet" },
         ]).map((t) => {
           const ativo = aba === t.id;
           const Icone = t.icon;
@@ -403,7 +419,9 @@ export function AlugueisView() {
                 ativo
                   ? t.cor === "amber"
                     ? "border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 font-semibold"
-                    : "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold"
+                    : t.cor === "violet"
+                      ? "border-violet-500 bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-400 font-semibold"
+                      : "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold"
                   : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
               )}
             >
@@ -417,6 +435,7 @@ export function AlugueisView() {
       {/* Filtros — periodo a esquerda, cards de empresa ocupando a direita */}
       <Card className="border-0 shadow-sm p-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto]">
         <div className="space-y-3 min-w-0">
+        {!ehContratos && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 w-14">Ano</span>
           {anosDisponiveis.map((ano) => (
@@ -439,7 +458,9 @@ export function AlugueisView() {
             </button>
           )}
         </div>
+        )}
 
+        {!ehContratos && (
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 w-14">Mes</span>
           {MESES_CURTOS.map((m, idx) => (
@@ -462,6 +483,7 @@ export function AlugueisView() {
             </button>
           )}
         </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3 pt-1">
           <div className="relative flex-1 min-w-[220px] max-w-sm">
@@ -473,6 +495,7 @@ export function AlugueisView() {
               className="pl-9 h-9"
             />
           </div>
+          {!ehContratos && (
           <div className="flex items-center gap-1.5">
             <span
               className="text-[11px] text-slate-400"
@@ -497,6 +520,7 @@ export function AlugueisView() {
               ))}
             </div>
           </div>
+          )}
           {ehReceber && (
             <div className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
               {([
@@ -569,7 +593,18 @@ export function AlugueisView() {
                     {formatCompactCurrency(t.valor)}
                   </p>
                   <p className="mt-1.5 text-[11px] text-slate-400">
-                    {t.qtd} {ehReceber ? (t.qtd === 1 ? "parcela" : "parcelas") : t.qtd === 1 ? "recebimento" : "recebimentos"}
+                    {t.qtd}{" "}
+                    {ehContratos
+                      ? t.qtd === 1
+                        ? "contrato vigente"
+                        : "contratos vigentes"
+                      : ehReceber
+                        ? t.qtd === 1
+                          ? "parcela"
+                          : "parcelas"
+                        : t.qtd === 1
+                          ? "recebimento"
+                          : "recebimentos"}
                   </p>
                 </div>
               </button>
@@ -589,6 +624,13 @@ export function AlugueisView() {
           <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
           <span className="ml-3 text-sm text-slate-500">Carregando alugueis...</span>
         </Card>
+      ) : ehContratos ? (
+        <AlugueisContratos
+          items={items}
+          hoje={hoje}
+          empresaSelecionada={empresaSelecionada}
+          busca={busca}
+        />
       ) : (
         <>
           {/* KPIs */}

@@ -27,6 +27,25 @@ Réplica do Power BI `FINANCEIRO HOLDING.pbix` (páginas "ALUGUEIS À RECEBER" /
 - Em dia = nenhuma acima da tolerância · Pontual = tem, mas abaixo do corte
 - O tooltip do badge sempre mostra quantas parcelas ficaram de fora pela tolerância
 
+### Aba Contratos — vencimento e renovação (Criado em 2026-07-31)
+- Um contrato = um `billId` do Sienge (o lote de parcelas criado junto)
+- Sucessor é casado pela chave NORMALIZADA do imóvel (`chaveImovel`): sem tirar
+  acento/zero à esquerda, "GALPÃO 01 CANELINHA" e "GALPAO 1 CANELINHA" viram
+  imóveis diferentes e a taxa de renovação cai de 48% para 30% (erro real cometido)
+- Status: `renovado` (tem sucessor) · `vencido` (venceu, sem sucessor) ·
+  `vence-breve` (≤ `DIAS_ALERTA_VENCIMENTO` = 90 dias) · `vigente` ·
+  `encerrado` (venceu há mais de `MESES_ATE_ENCERRADO` = 6 meses sem sucessor)
+- Filtro padrão da tabela: vencido + vence-breve + vigente. "Renovado" fora por
+  padrão porque o sucessor já aparece como linha própria — incluir os dois
+  duplicaria o imóvel e inflaria a soma do rodapé
+- `taxaRenovacao` só conta contratos encerrados há 6+ meses (carência), senão um
+  contrato que venceu semana passada contaria como "não renovado"
+- **Nunca usar `setMonth()` direto sobre data com dia 31** — usar `deslocarMes`/
+  `competencia`. O bug fez setembro e novembro sumirem do cronograma
+- Números validados em 31/07/2026: 97 contratos · 18 vencidos (R$ 220.514,68/mês) ·
+  5 vencendo em 90d (R$ 20.673,08/mês) · 33 vigentes (R$ 211.390,39/mês) ·
+  renovação histórica 49% (22 de 45) com reajuste mediano +6,5%
+
 ### Isolamento (regra dura)
 - `alugueis-utils.ts` e `alugueis-view.tsx` NÃO são importados por nenhuma tela das demais
   empresas. As fórmulas são duplicadas de propósito (não reutilizam `dashboard-utils`)

@@ -302,6 +302,231 @@ export function resumoImovel(
   };
 }
 
+/* ------------------------------------------------------------------ *
+ * CONTRATOS — acompanhamento de vencimento e renovacao
+ * ------------------------------------------------------------------ */
+
+/**
+ * Chave normalizada do imovel, usada para casar um contrato com o seguinte.
+ *
+ * O mesmo imovel aparece grafado de varias formas no Sienge — "GALPÃO 01
+ * CANELINHA" e "GALPAO 01 CANELINHA", "MILANO SL 02" e "MILANO SL 2". Sem
+ * normalizar, renovacao real conta como contrato encerrado (a taxa de
+ * renovacao media medida saltou de 30% para 48% ao corrigir isso).
+ */
+export function chaveImovel(nome: string): string {
+  return (nome || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[´`'.]/g, "")
+    .replace(/\b0+(\d)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Desloca uma data ISO em N meses SEM overflow de dia.
+ *
+ * `new Date("2026-07-31").setMonth(+2)` da 01/10 em vez de 30/09, porque
+ * setembro nao tem dia 31 — isso fazia setembro e novembro sumirem do
+ * cronograma de vencimentos. Ancorar no dia 1 elimina o problema.
+ */
+export function deslocarMes(iso: string, meses: number): Date {
+  const d = new Date(`${iso.slice(0, 7)}-01T12:00:00`);
+  d.setMonth(d.getMonth() + meses);
+  return d;
+}
+
+/** Competencia (YYYY-MM) N meses a frente/atras de uma data ISO. */
+export function competencia(iso: string, meses = 0): string {
+  const d = deslocarMes(iso, meses);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Janela, em dias, para o contrato entrar no alerta de "vence em breve". */
+export const DIAS_ALERTA_VENCIMENTO = 90;
+
+/**
+ * Apos este prazo sem contrato sucessor, para de ser pendencia de renovacao e
+ * passa a ser imovel encerrado — o inquilino saiu e o espaco vagou. Mesma
+ * carencia usada na taxa de renovacao, e coerente com o historico: quando
+ * renova, o contrato novo aparece em 1 mes na mediana.
+ */
+export const MESES_ATE_ENCERRADO = 6;
+
+export type StatusContrato =
+  | "renovado"
+  | "vencido"
+  | "vence-breve"
+  | "vigente"
+  | "encerrado";
+
+export const ROTULO_CONTRATO: Record<StatusContrato, string> = {
+  renovado: "Renovado",
+  vencido: "Vencido sem renovacao",
+  "vence-breve": "Vence em breve",
+  vigente: "Vigente",
+  encerrado: "Encerrado",
+};
+
+export interface Contrato {
+  billId: number;
+  imovel: string;
+  chave: string;
+  cliente: string;
+  empresa: string;
+  /** Primeiro e ultimo vencimento do contrato (YYYY-MM-DD). */
+  inicio: string;
+  fim: string;
+  parcelas: number;
+  /** Valor da ultima parcela — e o aluguel mensal vigente. */
+  valorMes: number;
+  /** Saldo ainda em aberto dentro deste contrato. */
+  emAberto: number;
+  /** Contrato seguinte do mesmo imovel, quando ja cadastrado. */
+  sucessor: { billId: number; inicio: string; valorMes: number } | null;
+  /** Quantos contratos anteriores o imovel ja teve (sinal de que costuma renovar). */
+  renovacoesAnteriores: number;
+  status: StatusContrato;
+  /** Negativo = ja venceu. */
+  diasParaVencer: number;
+}
+
+/**
+ * Agrupa os titulos de locacao por contrato (billId) e resolve, para cada um,
+ * se ja existe contrato sucessor cadastrado para o mesmo imovel.
+ */
+export function agruparContratos(todos: SiengeIncome[], hoje: string): Contrato[] {
+  const mapa = new Map<
+    number,
+    {
+      imovel: string;
+      cliente: string;
+      empresa: string;
+      vencimentos: string[];
+      valorUltimo: number;
+      fimAtual: string;
+      emAberto: number;
+    }
+  >();
+
+  for (const i of todos) {
+    const venc = (i.dueDate || "").slice(0, 10);
+    if (!venc) continue;
+    let c = mapa.get(i.billId);
+    if (!c) {
+      c = {
+        imovel: nomeImovel(i),
+        cliente: i.clientName || "-",
+        empresa: i.companyName,
+        vencimentos: [],
+        valorUltimo: 0,
+        fimAtual: "",
+        emAberto: 0,
+      };
+      mapa.set(i.billId, c);
+    }
+    c.vencimentos.push(venc);
+    c.emAberto += Math.max(0, saldoAberto(i));
+    // o aluguel mensal vigente e o valor da ultima parcela do contrato
+    if (venc >= c.fimAtual) {
+      c.fimAtual = venc;
+      c.valorUltimo = i.originalAmount || 0;
+    }
+  }
+
+  const contratos: Contrato[] = [];
+  for (const [billId, c] of mapa) {
+    const ordenados = c.vencimentos.sort();
+    contratos.push({
+      billId,
+      imovel: c.imovel,
+      chave: chaveImovel(c.imovel),
+      cliente: c.cliente,
+      empresa: c.empresa,
+      inicio: ordenados[0],
+      fim: ordenados[ordenados.length - 1],
+      parcelas: ordenados.length,
+      valorMes: c.valorUltimo,
+      emAberto: c.emAberto,
+      sucessor: null,
+      renovacoesAnteriores: 0,
+      status: "vigente",
+      diasParaVencer: 0,
+    });
+  }
+
+  // sucessor / anteriores, por imovel normalizado
+  const porChave = new Map<string, Contrato[]>();
+  for (const c of contratos) {
+    if (!porChave.has(c.chave)) porChave.set(c.chave, []);
+    porChave.get(c.chave)!.push(c);
+  }
+  for (const grupo of porChave.values()) {
+    grupo.sort((a, b) => a.inicio.localeCompare(b.inicio));
+    grupo.forEach((c, idx) => {
+      c.renovacoesAnteriores = idx;
+      const seguinte = grupo.slice(idx + 1).find((o) => o.inicio > c.fim);
+      c.sucessor = seguinte
+        ? { billId: seguinte.billId, inicio: seguinte.inicio, valorMes: seguinte.valorMes }
+        : null;
+    });
+  }
+
+  const limite = new Date(`${hoje}T12:00:00`);
+  limite.setDate(limite.getDate() + DIAS_ALERTA_VENCIMENTO);
+  const limiteISO = limite.toISOString().slice(0, 10);
+
+  const encerradoISO = `${competencia(hoje, -MESES_ATE_ENCERRADO)}-01`;
+
+  for (const c of contratos) {
+    c.diasParaVencer = Math.round(
+      (new Date(`${c.fim}T12:00:00`).getTime() - new Date(`${hoje}T12:00:00`).getTime()) / 86_400_000
+    );
+    if (c.sucessor) c.status = "renovado";
+    else if (c.fim < encerradoISO) c.status = "encerrado";
+    else if (c.fim < hoje) c.status = "vencido";
+    else if (c.fim <= limiteISO) c.status = "vence-breve";
+    else c.status = "vigente";
+  }
+
+  return contratos.sort((a, b) => a.fim.localeCompare(b.fim));
+}
+
+/**
+ * Taxa historica de renovacao: dos contratos que ja venceram, quantos ganharam
+ * um sucessor. So conta os encerrados ha pelo menos `mesesCarencia` meses — um
+ * contrato que venceu semana passada ainda pode ser renovado e contaria como
+ * "nao renovado" sem motivo.
+ */
+export function taxaRenovacao(
+  contratos: Contrato[],
+  hoje: string,
+  mesesCarencia = 6
+): { renovados: number; total: number; pct: number; reajusteMediano: number } {
+  const corteISO = `${competencia(hoje, -mesesCarencia)}-01`;
+
+  let renovados = 0;
+  let total = 0;
+  const reajustes: number[] = [];
+  for (const c of contratos) {
+    if (c.fim > corteISO) continue;
+    total++;
+    if (c.sucessor) {
+      renovados++;
+      if (c.valorMes > 0) reajustes.push((c.sucessor.valorMes / c.valorMes - 1) * 100);
+    }
+  }
+  reajustes.sort((a, b) => a - b);
+  return {
+    renovados,
+    total,
+    pct: total ? Math.round((renovados / total) * 100) : 0,
+    reajusteMediano: reajustes.length ? reajustes[Math.floor(reajustes.length / 2)] : 0,
+  };
+}
+
 export const MESES_CURTOS = [
   "jan", "fev", "mar", "abr", "mai", "jun",
   "jul", "ago", "set", "out", "nov", "dez",
