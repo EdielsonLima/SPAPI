@@ -89,6 +89,21 @@ function getTabGroup(tab: MainTab): string {
 function companyStorageKey(tab: MainTab): string {
   return `dashboard_companies_${getTabGroup(tab)}`;
 }
+
+// Aluguel (locação) — MESMA regra da página Aluguéis (src/lib/alugueis-utils.ts:
+// isAluguel), duplicada de propósito para não importar aqui o módulo isolado da
+// Holding. Título de RECEBER com documento LOC/LNC E categoria financeira
+// 10513/10514 (Receita de locação PF/PJ). Usada só no modo Holding, para trazer
+// os aluguéis de Silva Packer e Sul Brasil ao CR do Painel (consolidação do
+// grupo). Se um dia a regra de aluguel mudar em alugueis-utils, ajustar aqui também.
+const ALUGUEL_DOC_IDS_CR = new Set(["LOC", "LNC"]);
+const ALUGUEL_CATEGORY_IDS_CR = new Set(["10513", "10514"]);
+function isAluguelIncome(i: SiengeIncome): boolean {
+  if (!ALUGUEL_DOC_IDS_CR.has((i.documentIdentificationId || "").trim())) return false;
+  return (i.paymentsCategories || []).some((c) =>
+    ALUGUEL_CATEGORY_IDS_CR.has(String(c.financialCategoryId || "").trim())
+  );
+}
 type ChartView = "mensal" | "anual" | "diario";
 
 // === Reusable Multi-Select Filter ===
@@ -760,8 +775,31 @@ export function ExecutiveDashboard() {
       !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`));
     }), [incomeItems, exclusionSet, companyModeFilter, isHolding]);
 
+  // === CR consolidado da Holding ===
+  // No modo Holding, o Contas a Receber consolida o grupo: além dos recebíveis
+  // da própria Holding (consistentIncome), inclui os ALUGUÉIS das demais empresas
+  // (Silva Packer, Sul Brasil) — mesma regra da página Aluguéis (isAluguelIncome:
+  // LOC/LNC + categoria 10513/10514). Fora da Holding é idêntico a consistentIncome
+  // (as 12 empresas validadas NÃO mudam). Alimenta SÓ as telas de CR (A Receber,
+  // Recebidas, Inadimplência, Calendário de Recebimentos) — DRE e Resumo continuam
+  // usando consistentIncome de propósito, para não alterar números já validados.
+  const consistentIncomeCR = useMemo(() => {
+    if (!isHolding) return consistentIncome;
+    const alugueisOutras = incomeItems.filter(i =>
+      i.companyName !== holdingName &&            // Holding já entra por consistentIncome
+      isAluguelIncome(i) &&
+      !isExcludedFinancialDocType(
+        i.documentIdentificationName,
+        (i as { forecastDocument?: string | null }).forecastDocument,
+        { excludeLocacao: false }
+      ) &&
+      !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
+    );
+    return [...consistentIncome, ...alugueisOutras];
+  }, [isHolding, consistentIncome, incomeItems, holdingName, exclusionSet]);
+
   // Active data source based on section
-  const activeItems = section === "cr" ? consistentIncome : consistentItems;
+  const activeItems = section === "cr" ? consistentIncomeCR : consistentItems;
 
   const availableMonths = useMemo(() => {
     const months = new Set<string>();
@@ -1284,11 +1322,11 @@ export function ExecutiveDashboard() {
   // Números de documento disponíveis nos dados de income (CR)
   const allDocNumbers = useMemo(() => {
     const nums = new Set<string>();
-    consistentIncome.forEach(i => {
+    consistentIncomeCR.forEach(i => {
       if (i.documentNumber) nums.add(i.documentNumber);
     });
     return Array.from(nums).sort();
-  }, [consistentIncome]);
+  }, [consistentIncomeCR]);
 
   // === Apply filters to items (works for both Outcome and Income) ===
   const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string; companyId?: number; billId?: number; installmentId?: number }>(list: T[]): T[] => {
@@ -1536,9 +1574,11 @@ export function ExecutiveDashboard() {
   }, [allBankMovementsFull]);
 
   // CR Recebidas: income items + BMs órfãos sintetizados como recebimentos
+  // Usa consistentIncomeCR para, no modo Holding, incluir os aluguéis realizados
+  // de Silva Packer e Sul Brasil (consolidação do grupo).
   const consistentIncomeForRecebidas = useMemo(
-    () => [...consistentIncome, ...incomeBankMovementsAsItems],
-    [consistentIncome, incomeBankMovementsAsItems]
+    () => [...consistentIncomeCR, ...incomeBankMovementsAsItems],
+    [consistentIncomeCR, incomeBankMovementsAsItems]
   );
 
   const itemsPagas = useMemo(() =>
@@ -1552,10 +1592,10 @@ export function ExecutiveDashboard() {
 
   // === CR Filtered item sets ===
   const itemsAReceber = useMemo(() =>
-    consistentIncome.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr), [consistentIncome, todayStr]);
+    consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr), [consistentIncomeCR, todayStr]);
 
   const itemsInadimplencia = useMemo(() =>
-    consistentIncome.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentIncome, todayStr]);
+    consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentIncomeCR, todayStr]);
 
   const itemsRecebidas = useMemo(() =>
     consistentIncomeForRecebidas.filter(i =>
@@ -7198,7 +7238,7 @@ export function ExecutiveDashboard() {
       {activeTab === "calendario-recebimento" && (
         <CalendarioRecebimentoTab
           itemsAReceber={itemsAReceber}
-          allIncomeItems={consistentIncome}
+          allIncomeItems={consistentIncomeCR}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
         />
