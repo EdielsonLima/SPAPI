@@ -8,55 +8,66 @@ import pool from "@/lib/db";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type R = any;
 
-// Mapping: accountNumber → bankName (from Power BI DimBanco)
+// Mapping: accountNumber → bankName (DimBanco).
+// Lista canônica das contas bancárias que DEVEM aparecer na tela de Saldos —
+// validada 2026-08-06 contra a relação de saldos da Cátia (Silva Packer).
+// São exatamente estas 17 contas (nada de Cash/COFRE/aplicações internas/XP zerado).
+// Ao alterar, manter em sincronia com src/lib/dimBanco.ts. Números conferidos
+// contra o que o Sienge /accounts-balances realmente devolve (ex.: Caixa CC Sul
+// Brasil é "5791519180" sem hífen; aplicações vêm com prefixo "A").
 const BANK_NAMES: Record<string, string> = {
-  "570920-2": "Banco XP",
-  "A0257918-9": "Aplicação Bradesco",
-  "275226-3": "Banco do Brasil",
+  // Silva Packer (companyId 1)
   "0257918-9": "Banco Bradesco",
-  "2261-8": "Caixa Econômica",
-  "CAIXA": "Cash",
-  "479-0": "Banco do Brasil",
-  "490-1": "Banco do Brasil",
-  "487-1": "Banco do Brasil",
-  "274-7": "Banco do Brasil",
-  "276-3": "Banco do Brasil",
-  "277-1": "Banco do Brasil",
-  "572226-0": "Banco XP",
-  "5370-8": "Banco do Brasil",
-  "5026-3": "Caixa Econômica",
-  "0241711-1": "Banco Bradesco",
+  "275226-3": "Banco do Brasil",
   "00483730-8": "BTG Pactual - CH",
   "00910779-3": "BTG Pactual - JP",
+  // Sul Brasil (companyId 3)
+  "0241711-1": "Banco Bradesco",
+  "A0241711-1": "Aplicação Bradesco",
+  "5370-8": "Banco do Brasil",
+  "5791519180": "Caixa Econômica",
+  "A5026-3": "Aplicação Caixa",
+  // Empreendimentos (Banco do Brasil)
+  "490-1": "Banco do Brasil",   // Edifício 135 Jardins
+  "274-7": "Banco do Brasil",   // Solar di Capri
+  "479-0": "Banco do Brasil",   // Palacio Elizabeth
+  "487-1": "Banco do Brasil",   // Residencial Hannover
+  "277-1": "Banco do Brasil",   // Solar di Siena
+  "276-3": "Banco do Brasil",   // Tesla Residencial
+  "924-5": "Banco do Brasil",   // Serenity
+  "1241-6": "Banco do Brasil",  // Rozza
 };
 
-// Exact mapping: accountNumber → companyId (from Sienge data)
-// This ensures we know which company owns each DimBanco account
+// Exact mapping: accountNumber → companyId (dono da conta no Sienge).
+// O companyId TEM que casar com o que o /accounts-balances devolve, senão o
+// preenchimento por cache não resolve. Ex.: as duas contas BTG são do companyId 1
+// (Silva Packer) no Sienge, mesmo a Cátia listando-as sob "Sul Brasil".
 const DIMBAN_ACCOUNT_COMPANY: Record<string, number> = {
-  "00483730-8": 1,  // BTG Pactual - CH → Silva Packer
-  "00910779-3": 1,  // BTG Pactual - JP → Silva Packer
-  "0257918-9": 1,   // Banco Bradesco → Silva Packer
-  "A0257918-9": 1,  // Aplicação Bradesco → Silva Packer
-  "2261-8": 1,      // Caixa Econômica → Silva Packer
-  "CAIXA": 1,       // Cash → Silva Packer
-  "275226-3": 1,    // Banco do Brasil → Silva Packer
-  "570920-2": 1,    // Banco XP → Silva Packer
-  "0241711-1": 3,   // Banco Bradesco → Sul Brasil
-  "5370-8": 3,      // Banco do Brasil → Sul Brasil
-  "572226-0": 3,    // Banco XP → Sul Brasil
-  "5026-3": 3,      // Caixa Econômica → Sul Brasil
-  "490-1": 4,       // Banco do Brasil → Edifício 135 Jardins
-  "274-7": 5,       // Banco do Brasil → Solar di Capri
-  "479-0": 6,       // Banco do Brasil → Palacio Elizabeth
-  "487-1": 7,       // Banco do Brasil → Residencial Hannover
-  "277-1": 8,       // Banco do Brasil → Solar di Siena
-  "276-3": 9,       // Banco do Brasil → Tesla Residencial
+  // Silva Packer
+  "0257918-9": 1,   // Banco Bradesco
+  "275226-3": 1,    // Banco do Brasil
+  "00483730-8": 1,  // BTG Pactual - CH
+  "00910779-3": 1,  // BTG Pactual - JP
+  // Sul Brasil
+  "0241711-1": 3,   // Banco Bradesco
+  "A0241711-1": 3,  // Aplicação Bradesco
+  "5370-8": 3,      // Banco do Brasil
+  "5791519180": 3,  // Caixa Econômica (Conta Corrente)
+  "A5026-3": 3,     // Aplicação Caixa
+  // Empreendimentos
+  "490-1": 4,       // Edifício 135 Jardins
+  "274-7": 5,       // Solar di Capri
+  "479-0": 6,       // Palacio Elizabeth
+  "487-1": 7,       // Residencial Hannover
+  "277-1": 8,       // Solar di Siena
+  "276-3": 9,       // Tesla Residencial
+  "924-5": 10,      // Serenity
+  "1241-6": 11,     // Rozza
 };
 
-// Accounts that are only valid for specific companies (companyId)
-const COMPANY_RESTRICTED_ACCOUNTS: Record<string, number> = {
-  "CAIXA": 1, // Only Silva Packer
-};
+// Contas válidas só para empresas específicas. Vazio: os 17 números acima são
+// únicos por empresa (não há mais a conta genérica "CAIXA" compartilhada).
+const COMPANY_RESTRICTED_ACCOUNTS: Record<string, number> = {};
 
 function isInDimBanco(accountNumber: string, companyId: number): boolean {
   if (!BANK_NAMES[accountNumber]) return false;

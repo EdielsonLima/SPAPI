@@ -6,51 +6,55 @@
 // Usado pelo cron de refresh (cached_daily_balances) e pelo conector MCP
 // (saldos_bancarios) para filtrar/nomear contas igual ao Painel.
 
+// Lista canônica das 17 contas bancárias que DEVEM aparecer (validada 2026-08-06
+// contra a relação da Cátia). MANTER EM SINCRONIA com route.ts.
 export const BANK_NAMES: Record<string, string> = {
-  "570920-2": "Banco XP",
-  "A0257918-9": "Aplicação Bradesco",
-  "275226-3": "Banco do Brasil",
+  // Silva Packer (companyId 1)
   "0257918-9": "Banco Bradesco",
-  "2261-8": "Caixa Econômica",
-  "CAIXA": "Cash",
-  "479-0": "Banco do Brasil",
-  "490-1": "Banco do Brasil",
-  "487-1": "Banco do Brasil",
-  "274-7": "Banco do Brasil",
-  "276-3": "Banco do Brasil",
-  "277-1": "Banco do Brasil",
-  "572226-0": "Banco XP",
-  "5370-8": "Banco do Brasil",
-  "5026-3": "Caixa Econômica",
-  "0241711-1": "Banco Bradesco",
+  "275226-3": "Banco do Brasil",
   "00483730-8": "BTG Pactual - CH",
   "00910779-3": "BTG Pactual - JP",
+  // Sul Brasil (companyId 3)
+  "0241711-1": "Banco Bradesco",
+  "A0241711-1": "Aplicação Bradesco",
+  "5370-8": "Banco do Brasil",
+  "5791519180": "Caixa Econômica",
+  "A5026-3": "Aplicação Caixa",
+  // Empreendimentos (Banco do Brasil)
+  "490-1": "Banco do Brasil",   // Edifício 135 Jardins
+  "274-7": "Banco do Brasil",   // Solar di Capri
+  "479-0": "Banco do Brasil",   // Palacio Elizabeth
+  "487-1": "Banco do Brasil",   // Residencial Hannover
+  "277-1": "Banco do Brasil",   // Solar di Siena
+  "276-3": "Banco do Brasil",   // Tesla Residencial
+  "924-5": "Banco do Brasil",   // Serenity
+  "1241-6": "Banco do Brasil",  // Rozza
 };
 
 export const DIMBAN_ACCOUNT_COMPANY: Record<string, number> = {
+  // Silva Packer
+  "0257918-9": 1,
+  "275226-3": 1,
   "00483730-8": 1,
   "00910779-3": 1,
-  "0257918-9": 1,
-  "A0257918-9": 1,
-  "2261-8": 1,
-  "CAIXA": 1,
-  "275226-3": 1,
-  "570920-2": 1,
+  // Sul Brasil
   "0241711-1": 3,
+  "A0241711-1": 3,
   "5370-8": 3,
-  "572226-0": 3,
-  "5026-3": 3,
-  "490-1": 4,
-  "274-7": 5,
-  "479-0": 6,
-  "487-1": 7,
-  "277-1": 8,
-  "276-3": 9,
+  "5791519180": 3,
+  "A5026-3": 3,
+  // Empreendimentos
+  "490-1": 4,   // Edifício 135 Jardins
+  "274-7": 5,   // Solar di Capri
+  "479-0": 6,   // Palacio Elizabeth
+  "487-1": 7,   // Residencial Hannover
+  "277-1": 8,   // Solar di Siena
+  "276-3": 9,   // Tesla Residencial
+  "924-5": 10,  // Serenity
+  "1241-6": 11, // Rozza
 };
 
-export const COMPANY_RESTRICTED_ACCOUNTS: Record<string, number> = {
-  CAIXA: 1, // só Silva Packer
-};
+export const COMPANY_RESTRICTED_ACCOUNTS: Record<string, number> = {};
 
 export function isInDimBanco(accountNumber: string, companyId: number): boolean {
   if (!BANK_NAMES[accountNumber]) return false;
@@ -65,15 +69,9 @@ export function expectedDimBancoKeys(): string[] {
   return Object.entries(DIMBAN_ACCOUNT_COMPANY).map(([acc, compId]) => `${compId}:${acc}`);
 }
 
-// Contas OCULTADAS no filtro do Painel do Edielson (localStorage do navegador,
-// espelhadas aqui a pedido dele em 2026-06-06 para o conector/relatório bater
-// com a tela — "12 contas em 8 empresas"). Se o filtro do Painel mudar,
-// atualizar esta lista. Chave: "companyId:accountNumber".
-export const REPORT_EXCLUDED_ACCOUNTS = new Set<string>([
-  "1:570920-2",   // Banco XP — Silva Packer
-  "1:0257918-9",  // Banco Bradesco — Silva Packer
-  "1:A0257918-9", // Aplicação Bradesco — Silva Packer
-  "1:2261-8",     // Caixa Econômica — Silva Packer
-  "3:572226-0",   // Banco XP — Sul Brasil
-  "3:5026-3",     // Caixa Econômica — Sul Brasil
-]);
+// Contas ocultadas no relatório/conector MCP para bater com a tela de Saldos.
+// Vazio desde 2026-08-06: a tela agora mostra EXATAMENTE a lista canônica da
+// Cátia (as 17 contas de BANK_NAMES acima), então o relatório espelha a tela
+// sem exclusões adicionais. As contas antes excluídas (Cash, XP zerado,
+// aplicação/caixa internas da Silva Packer) saíram do próprio DIMBAN.
+export const REPORT_EXCLUDED_ACCOUNTS = new Set<string>([]);

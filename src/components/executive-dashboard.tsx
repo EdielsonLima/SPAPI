@@ -693,7 +693,7 @@ export function ExecutiveDashboard() {
   const [expandedBankCompanies, setExpandedBankCompanies] = useState<Set<string>>(new Set());
   const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("dashboard_saldos_accounts");
+      const saved = localStorage.getItem("dashboard_saldos_accounts_v2");
       if (saved) return new Set(JSON.parse(saved));
     }
     return new Set<string>(); // empty = all selected (will be initialized after fetch)
@@ -966,7 +966,7 @@ export function ExecutiveDashboard() {
         if (json.data && json.data.length > 0) {
           setBankAccounts(json.data);
           // Initialize selected accounts if not saved before
-          const saved = localStorage.getItem("dashboard_saldos_accounts");
+          const saved = localStorage.getItem("dashboard_saldos_accounts_v2");
           if (!saved) {
             // Default: select only accounts that are in DimBanco (valid accounts)
             const validNums = new Set<string>(
@@ -976,7 +976,7 @@ export function ExecutiveDashboard() {
             );
             setSelectedBankAccounts(validNums);
             // Auto-save so it persists
-            localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(validNums)));
+            localStorage.setItem("dashboard_saldos_accounts_v2", JSON.stringify(Array.from(validNums)));
           }
           setBankAccountsInitialized(true);
         } else if (json.error) {
@@ -6415,7 +6415,7 @@ export function ExecutiveDashboard() {
                       return acc?.companyName || "";
                     }}
                     onSaveDefault={() => {
-                      localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(selectedBankAccounts)));
+                      localStorage.setItem("dashboard_saldos_accounts_v2", JSON.stringify(Array.from(selectedBankAccounts)));
                       toast.success("Padrao de contas salvo!");
                     }}
                   />
@@ -6430,14 +6430,14 @@ export function ExecutiveDashboard() {
                     className="h-7 text-xs text-slate-500"
                     onClick={() => {
                       if (!window.confirm("Tem certeza que deseja resetar o filtro de contas para o padrão? Suas seleções atuais serão perdidas.")) return;
-                      localStorage.removeItem("dashboard_saldos_accounts");
+                      localStorage.removeItem("dashboard_saldos_accounts_v2");
                       const validNums = new Set<string>(
                         bankAccounts
                           .filter(a => a.isInDimBanco)
                           .map(a => String(a.bankAccountId))
                       );
                       setSelectedBankAccounts(validNums);
-                      localStorage.setItem("dashboard_saldos_accounts", JSON.stringify(Array.from(validNums)));
+                      localStorage.setItem("dashboard_saldos_accounts_v2", JSON.stringify(Array.from(validNums)));
                       toast.success("Filtro resetado para padrao DimBanco!");
                     }}
                   >

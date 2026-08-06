@@ -127,14 +127,25 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
 
 Os valores da DRE foram validados contra o Power BI e batem 100%.
 
-## Saldos Bancários - Regras (Validado em 2026-04-02)
+## Saldos Bancários - Regras (Validado em 2026-04-02, lista canônica revalidada em 2026-08-06)
 
 ### NAO ALTERAR sem pedido explicito do usuario:
 - Mapeamento DimBanco (conta → banco) em `src/app/api/sienge/bank-accounts/route.ts`
-- Mapeamento DIMBAN_ACCOUNT_COMPANY (conta → empresa) no mesmo arquivo
-- Conta CAIXA só aparece para Silva Packer (companyId=1)
+  (`BANK_NAMES`) e cópia sincronizada em `src/lib/dimBanco.ts` (usada pelo cron + MCP)
+- Mapeamento DIMBAN_ACCOUNT_COMPANY (conta → empresa/companyId) nos dois arquivos
+- **Lista canônica = exatamente 17 contas** (relação da Cátia/Silva Packer, 2026-08-06):
+  a tela de Saldos mostra por padrão SÓ essas 17 (as `isInDimBanco`); Cash/COFRE/
+  aplicações internas/XP zerado ficam de fora. companyId TEM que casar com o
+  `/accounts-balances` do Sienge, senão o preenchimento por cache não resolve
+- Cuidado com o número real no Sienge: Caixa CC Sul Brasil é `5791519180` (SEM hífen),
+  aplicações vêm com prefixo `A` (`A5026-3`, `A0241711-1`); BTG CARLOS/JOÃO são
+  companyId 1 (Silva Packer) mesmo a Cátia listando sob "Sul Brasil"
+- Serenity (`924-5`/comp10) e Rozza (`1241-6`/comp11) só vêm da API em dias alternados;
+  o cache cobre os dias vazios — NÃO remover do mapa por parecerem "faltantes"
 - Contas faltantes da API são preenchidas do cache PostgreSQL (cached_daily_balances)
-- Filtro de contas salvo por empresa no localStorage
+- Seleção salva no localStorage `dashboard_saldos_accounts_v2` (o `_v2` reseta a
+  seleção antiga quando a lista canônica muda); `REPORT_EXCLUDED_ACCOUNTS` vazio
+  (o relatório MCP espelha a tela)
 - Gráfico de evolução diária com cache no banco (dias passados não mudam)
 
 ## Resumo Financeiro - Regras (Criado em 2026-04-05)
