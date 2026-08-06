@@ -6354,12 +6354,12 @@ export function ExecutiveDashboard() {
             const allAccountNums = Array.from(new Set(bankAccounts.map(a => String(a.bankAccountId)))).sort();
             const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
 
-            // Data display: apply BOTH company filter AND account filter
-            const filteredAccounts = bankAccounts.filter(a => {
-              if (!effectiveSelected.has(String(a.bankAccountId))) return false;
-              if (selectedCompanies.size > 0 && !selectedCompanies.has(a.companyName)) return false;
-              return true;
-            });
+            // Filtra SÓ pelo seletor de Contas (selectedBankAccounts). NÃO aplica o
+            // filtro de "Empresas" (selectedCompanies): ele é orientado a CP/CR e não
+            // inclui os empreendimentos donos de contas bancárias (ex.: Serenity comp10,
+            // Rozza comp11). Aplicá-lo derrubava essas contas e fazia o total da aba
+            // divergir do card "Saldo Bancário" do Geral (que usa a mesma base de contas).
+            const filteredAccounts = bankAccounts.filter(a => effectiveSelected.has(String(a.bankAccountId)));
 
             // Group by company
             const byCompany: Record<string, { companyName: string; accounts: typeof bankAccounts }> = {};
