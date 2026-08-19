@@ -28,6 +28,7 @@ import {
   Ban,
   ArrowLeftRight,
   KeyRound,
+  ListChecks,
 } from "lucide-react";
 import { useCompanyMode } from "@/lib/company-context";
 import Image from "next/image";
@@ -104,6 +105,12 @@ const menuItems: MenuItem[] = [
         href: "/financeiro/inadimplentes",
         icon: <UserX className="h-4 w-4" />,
         group: "Recebimentos",
+      },
+      {
+        label: "Conferencia",
+        href: "/financeiro/conferencia",
+        icon: <ListChecks className="h-4 w-4" />,
+        group: "Conferencia",
       },
     ],
   },

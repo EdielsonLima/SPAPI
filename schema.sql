@@ -307,3 +307,24 @@ CREATE TABLE IF NOT EXISTS indices_valor_m2 (
   atualizado_em    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(cidade, uf)
 );
+
+-- ── Conferência de títulos (mutirão CP/CR com o financeiro) ─────────────────
+-- Guarda a DECISÃO tomada sobre cada parcela vencida / inadimplente.
+-- Não apaga nada no Sienge: é o registro de que o título já foi conferido e
+-- qual foi o veredito, para a conversa não recomeçar do zero a cada auditoria.
+CREATE TABLE IF NOT EXISTS conferencia_titulos (
+  tipo            VARCHAR(2)   NOT NULL,           -- 'cp' (a pagar) | 'cr' (a receber)
+  company_id      INTEGER      NOT NULL,
+  bill_id         INTEGER      NOT NULL,
+  installment_id  INTEGER      NOT NULL,
+  status          VARCHAR(12)  NOT NULL,           -- real | pago | corrigir | excluir
+  observacao      TEXT         NOT NULL DEFAULT '',
+  company_name    TEXT         NOT NULL DEFAULT '',
+  contraparte     TEXT         NOT NULL DEFAULT '', -- credor (cp) ou cliente (cr)
+  due_date        TEXT         NOT NULL DEFAULT '',
+  valor           NUMERIC(14,2) NOT NULL DEFAULT 0,
+  atualizado_por  TEXT         NOT NULL DEFAULT '',
+  atualizado_em   TIMESTAMP    NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (tipo, company_id, bill_id, installment_id)
+);
+CREATE INDEX IF NOT EXISTS idx_conferencia_tipo_status ON conferencia_titulos (tipo, status);

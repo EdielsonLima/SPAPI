@@ -1012,3 +1012,60 @@ export async function upsertIndicadoresDebit(
 }
 
 export default pool;
+
+// ─── Conferência de títulos (mutirão CP/CR) ─────────────────────────────────
+// Registra a decisão tomada sobre cada parcela vencida/inadimplente conferida
+// com o financeiro. Não altera nada no Sienge — é só o veredito.
+
+export type ConferenciaStatus = "real" | "pago" | "corrigir" | "excluir";
+
+export interface ConferenciaRegistro {
+  tipo: "cp" | "cr";
+  companyId: number;
+  billId: number;
+  installmentId: number;
+  status: ConferenciaStatus;
+  observacao: string;
+  companyName: string;
+  contraparte: string;
+  dueDate: string;
+  valor: number;
+  atualizadoPor: string;
+  atualizadoEm: string;
+}
+
+export async function getConferencia(): Promise<ConferenciaRegistro[]> {
+  const { rows } = await pool.query(
+    `SELECT tipo, company_id AS "companyId", bill_id AS "billId",
+            installment_id AS "installmentId", status, observacao,
+            company_name AS "companyName", contraparte, due_date AS "dueDate",
+            valor::float8 AS valor, atualizado_por AS "atualizadoPor",
+            atualizado_em AS "atualizadoEm"
+       FROM conferencia_titulos`
+  );
+  return rows;
+}
+
+export async function saveConferencia(r: Omit<ConferenciaRegistro, "atualizadoEm">) {
+  await pool.query(
+    `INSERT INTO conferencia_titulos
+       (tipo, company_id, bill_id, installment_id, status, observacao,
+        company_name, contraparte, due_date, valor, atualizado_por)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     ON CONFLICT (tipo, company_id, bill_id, installment_id) DO UPDATE SET
+       status = $5, observacao = $6, company_name = $7, contraparte = $8,
+       due_date = $9, valor = $10, atualizado_por = $11, atualizado_em = NOW()`,
+    [r.tipo, r.companyId, r.billId, r.installmentId, r.status, r.observacao,
+     r.companyName, r.contraparte, r.dueDate, r.valor, r.atualizadoPor]
+  );
+}
+
+export async function deleteConferencia(
+  tipo: string, companyId: number, billId: number, installmentId: number
+) {
+  await pool.query(
+    `DELETE FROM conferencia_titulos
+      WHERE tipo = $1 AND company_id = $2 AND bill_id = $3 AND installment_id = $4`,
+    [tipo, companyId, billId, installmentId]
+  );
+}
