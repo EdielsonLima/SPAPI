@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import {
   CartesianGrid,
   Legend,
@@ -19,11 +19,15 @@ import type { CubIndicadorRow, PctIndicadorRow } from "@/lib/db";
 import {
   INDICADORES_COMPARAVEIS,
   JANELA_MESES,
+  acumuladoAte,
   dadosDoGrafico,
   montarComparativo,
+  rotuloMesLongo,
   rotuloPeriodo,
   spreadContra,
+  variacaoNoMes,
   type ModoComparativo,
+  type SerieComparativa,
   type SlugComparavel,
 } from "@/lib/indicadores/comparativo";
 import { cn } from "@/lib/utils";
@@ -38,6 +42,135 @@ const MODOS: { id: ModoComparativo; rotulo: string; ajuda: string }[] = [
 function pctSinal(v: number): string {
   const s = v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return `${v > 0 ? "+" : ""}${s}%`;
+}
+
+interface ItemTooltip {
+  dataKey?: string | number;
+  payload?: { chave?: number };
+}
+
+/**
+ * Tooltip do comparativo.
+ *
+ * O numero do grafico sozinho nao diz muito — "106,46" so faz sentido junto do
+ * que ele significa. Aqui cada indicador aparece com a variacao do proprio mes,
+ * o acumulado ate ali e o indice em base 100, e o rodape traz a distancia entre
+ * o que mais subiu e o que menos subiu naquele ponto.
+ */
+function TooltipComparativo({
+  active,
+  payload,
+  series,
+  modo,
+}: {
+  active?: boolean;
+  payload?: ItemTooltip[];
+  series: SerieComparativa[];
+  modo: ModoComparativo;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  const chave = payload[0]?.payload?.chave;
+  if (chave === undefined) return null;
+
+  const linhas = payload
+    .map((item) => {
+      const serie = series.find((s) => s.slug === item.dataKey);
+      if (!serie) return null;
+      return {
+        serie,
+        mensal: variacaoNoMes(serie, chave),
+        acumulado: acumuladoAte(serie, chave),
+      };
+    })
+    .filter((x): x is { serie: SerieComparativa; mensal: number | null; acumulado: number } => x !== null)
+    .sort((a, b) => b.acumulado - a.acumulado);
+
+  if (linhas.length === 0) return null;
+
+  // ponto ancora: antecede a janela, entao nao tem variacao propria
+  const ancora = linhas.every((l) => l.mensal === null);
+  const topo = linhas[0];
+  const base = linhas[linhas.length - 1];
+  // arredonda ANTES de subtrair: senao o rodape mostra 1,21 p.p. enquanto as
+  // linhas exibem +4,75 e +3,53, que dao 1,22 — o usuario faz a conta e estranha
+  const arred = (v: number) => Math.round(v * 100) / 100;
+  const distancia = arred(topo.acumulado) - arred(base.acumulado);
+
+  return (
+    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white/95 dark:bg-slate-900/95 shadow-lg backdrop-blur px-3 py-2.5 min-w-[230px]">
+      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+        {rotuloMesLongo(chave)}
+      </p>
+
+      {ancora ? (
+        <p className="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+          Inicio da janela — todos partem de 100
+        </p>
+      ) : (
+        <>
+          <div className="mt-2 grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-baseline">
+            <span className="text-[10px] uppercase tracking-wider text-slate-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 text-right">
+              no mes
+            </span>
+            <span className="text-[10px] uppercase tracking-wider text-slate-400 text-right">
+              acumulado
+            </span>
+
+            {linhas.map(({ serie, mensal, acumulado }) => (
+              <Fragment key={serie.slug}>
+                <span className="flex items-center gap-1.5 min-w-0">
+                  <span
+                    className="h-2 w-2 rounded-full shrink-0"
+                    style={{ backgroundColor: serie.cor }}
+                  />
+                  <span className="text-xs font-medium text-slate-700 dark:text-slate-200 truncate">
+                    {serie.nome}
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    "text-xs tabular-nums text-right",
+                    mensal !== null && mensal < 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : "text-slate-600 dark:text-slate-300"
+                  )}
+                >
+                  {mensal === null ? "—" : pctSinal(mensal)}
+                </span>
+                <span className="text-xs font-semibold tabular-nums text-right text-slate-800 dark:text-slate-100">
+                  {pctSinal(acumulado)}
+                </span>
+              </Fragment>
+            ))}
+          </div>
+
+          {modo === "base100" && (
+            <div className="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-x-3 gap-y-0.5">
+              {linhas.map(({ serie, acumulado }) => (
+                <span key={serie.slug} className="text-[10px] text-slate-400 tabular-nums">
+                  {serie.nome} base 100 ={" "}
+                  {(100 * (1 + acumulado / 100)).toLocaleString("pt-BR", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {linhas.length > 1 && Math.abs(distancia) >= 0.005 && (
+            <p className="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400">
+              <strong className="text-slate-700 dark:text-slate-200">{topo.serie.nome}</strong>{" "}
+              {distancia.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}{" "}
+              p.p. acima do {base.serie.nome}
+            </p>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
 export function CompararContent({
@@ -227,17 +360,8 @@ export function CompararContent({
                     <ReferenceLine y={100} stroke="rgba(148,163,184,0.6)" strokeDasharray="4 4" />
                   )}
                   <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 10 }}
-                    formatter={(valor: unknown, nome: unknown) => {
-                      const v = Number(valor) || 0;
-                      const s = series.find((x) => x.slug === nome);
-                      return [
-                        modo === "base100"
-                          ? v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                          : pctSinal(v),
-                        s?.nome ?? String(nome),
-                      ];
-                    }}
+                    cursor={{ stroke: "rgba(148,163,184,0.5)", strokeWidth: 1 }}
+                    content={<TooltipComparativo series={series} modo={modo} />}
                   />
                   <Legend
                     formatter={(valor) => {

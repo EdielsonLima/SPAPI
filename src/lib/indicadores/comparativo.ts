@@ -237,3 +237,30 @@ export function rotuloPeriodo(meses: number[]): string {
   const u = meses[meses.length - 1];
   return `${rotuloMes(Math.floor(p / 100), p % 100)} a ${rotuloMes(Math.floor(u / 100), u % 100)}`;
 }
+
+const MESES_LONGOS = [
+  "Janeiro", "Fevereiro", "Marco", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+/** "Julho/2026" — cabecalho do tooltip, onde cabe o nome inteiro. */
+export function rotuloMesLongo(chave: number): string {
+  const ano = Math.floor(chave / 100);
+  const mes = chave % 100;
+  return `${MESES_LONGOS[mes - 1] ?? "?"}/${ano}`;
+}
+
+/** Acumulado composto do inicio da janela ate o mes informado, em %. */
+export function acumuladoAte(serie: SerieComparativa, chave: number): number {
+  let fator = 1;
+  for (const p of serie.pontos) {
+    if (p.chave > chave) break;
+    fator *= 1 + p.variacao / 100;
+  }
+  return (fator - 1) * 100;
+}
+
+/** Variacao do proprio mes; null no ponto ancora, que antecede a janela. */
+export function variacaoNoMes(serie: SerieComparativa, chave: number): number | null {
+  return serie.pontos.find((p) => p.chave === chave)?.variacao ?? null;
+}
