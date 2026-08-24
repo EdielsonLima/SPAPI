@@ -7,6 +7,7 @@ import type { CubIndicadorRow, PctIndicadorRow, ValorM2Row } from "@/lib/db";
 import { CubContent, type CubKpis } from "./cub-content";
 import { PctIndicadorContent, type PctKpis } from "./pct-indicador-content";
 import { ValorM2Content, type ValorM2Kpis } from "./valor-m2-content";
+import { CompararContent } from "./comparar-content";
 
 type ApiResponse = {
   cub: {
@@ -47,7 +48,7 @@ type ApiResponse = {
   };
 };
 
-type SubTab = "cub" | "cdi" | "ipca" | "igpm" | "incc" | "valorm2";
+type SubTab = "cub" | "cdi" | "ipca" | "igpm" | "incc" | "valorm2" | "comparar";
 
 export function IndicadoresTab() {
   const [data, setData] = useState<ApiResponse | null>(null);
@@ -110,6 +111,7 @@ export function IndicadoresTab() {
     { value: "igpm", label: "IGP-M", color: "border-violet-500 text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30" },
     { value: "incc", label: "INCC", color: "border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30" },
     { value: "valorm2", label: "Valor m²", color: "border-rose-500 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30" },
+    { value: "comparar", label: "Comparar", color: "border-slate-800 dark:border-slate-200 text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-800" },
   ];
 
   return (
@@ -216,6 +218,15 @@ export function IndicadoresTab() {
           kpis={data.incc.kpis}
           atualizadoEm={data.incc.atualizadoEm}
           onSynced={load}
+        />
+      )}
+      {data && active === "comparar" && (
+        <CompararContent
+          cub={data.cub.rows}
+          cdi={data.cdi.rows}
+          ipca={data.ipca.rows}
+          igpm={data.igpm.rows}
+          incc={data.incc.rows}
         />
       )}
       {data && active === "valorm2" && (
