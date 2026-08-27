@@ -46,6 +46,7 @@ import {
   FolderOpen,
   Users,
 } from "lucide-react";
+import { TituloDetalheSheet } from "./titulo-detalhe-sheet";
 import { SiengeOutcome, SiengeIncome, SiengeBankMovement } from "@/types/sienge";
 import { getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { useCompanyMode } from "@/lib/company-context";
@@ -414,8 +415,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
   const [sortField, setSortField] = useState<SortField>(isPagas ? "paymentDate" : "dueDate");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(0);
-  const [expandedBills, setExpandedBills] = useState<Set<number>>(new Set());
-  const [subSort, setSubSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "installmentId", dir: "asc" });
+  // Detalhe do titulo agora abre em painel lateral. A linha expandida abria
+  // uma segunda tabela dentro da primeira e confundia com os titulos vizinhos.
+  const [detalhe, setDetalhe] = useState<ContasItem | null>(null);
   const perPage = 25;
 
   const [billNotes, setBillNotes] = useState<Record<number, string | null>>({});
@@ -437,20 +439,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     }
   }, []);
 
-  const toggleBillExpand = useCallback((billId: number) => {
-    setExpandedBills((prev) => {
-      const wasExpanded = prev.has(billId);
-      const next = new Set(prev);
-      if (wasExpanded) {
-        next.delete(billId);
-      } else {
-        next.add(billId);
-      }
-      if (!wasExpanded) {
-        setTimeout(() => fetchBillNotes(billId), 0);
-      }
-      return next;
-    });
+  const abrirDetalhe = useCallback((item: ContasItem) => {
+    setDetalhe(item);
+    fetchBillNotes(item.billId);
   }, [fetchBillNotes]);
 
   const [error, setError] = useState(false);
@@ -1413,7 +1404,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
     <TableHead className={className}>
       <button
         onClick={() => handleSort(field)}
-        className="flex items-center gap-0.5 hover:text-white transition-colors w-full"
+        className="flex items-center gap-0.5 hover:text-slate-900 dark:hover:text-white transition-colors w-full"
       >
         {children}
         <SortIcon field={field} />
@@ -1447,7 +1438,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           <div className={`h-1.5 ${isPagas ? "bg-gradient-to-r from-emerald-500 to-emerald-400" : isOverdue ? "bg-gradient-to-r from-red-500 to-red-400" : "bg-gradient-to-r from-amber-500 to-amber-400"}`} />
           <CardContent className="p-4">
             <div className={`text-xs font-bold uppercase tracking-widest ${isPagas ? "text-emerald-600/80" : isOverdue ? "text-red-600/80" : "text-amber-600/80"}`}>{isPagas ? (isIncome ? "Recebido Hoje" : "Pago Hoje") : isOverdue ? (isIncome ? "Inadimplentes Hoje" : "Vencidas Hoje") : (isIncome ? "A Receber Hoje" : "A Pagar Hoje")}</div>
-            <div className={`text-2xl font-black mt-1 ${isPagas ? "text-emerald-700" : isOverdue ? "text-red-700" : "text-amber-700"}`}>
+            <div className={`text-2xl font-bold mt-1 ${isPagas ? "text-emerald-700" : isOverdue ? "text-red-700" : "text-amber-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(todayStats.valor)}
             </div>
             {!loading && (
@@ -1463,7 +1454,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           <div className={`h-1.5 ${isPagas ? "bg-gradient-to-r from-teal-500 to-teal-400" : isOverdue ? "bg-gradient-to-r from-orange-500 to-orange-400" : "bg-gradient-to-r from-blue-500 to-blue-400"}`} />
           <CardContent className="p-4">
             <div className={`text-xs font-bold uppercase tracking-widest ${isPagas ? "text-teal-600/80" : isOverdue ? "text-orange-600/80" : "text-blue-600/80"}`}>{isPagas ? (isIncome ? "Recebido ultimos 7 dias" : "Pago ultimos 7 dias") : isOverdue ? (isIncome ? "Inadimplentes ultimos 7 dias" : "Vencidas ultimos 7 dias") : (isIncome ? "A Receber em 7 dias" : "A Pagar em 7 dias")}</div>
-            <div className={`text-2xl font-black mt-1 ${isPagas ? "text-teal-700" : isOverdue ? "text-orange-700" : "text-blue-700"}`}>
+            <div className={`text-2xl font-bold mt-1 ${isPagas ? "text-teal-700" : isOverdue ? "text-orange-700" : "text-blue-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(weekStats.valor)}
             </div>
             {!loading && (
@@ -1479,7 +1470,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           <div className="h-1.5 bg-gradient-to-r from-slate-400 to-slate-300" />
           <CardContent className="p-4">
             <div className="text-xs font-bold uppercase tracking-widest text-slate-500/80">Total Parcelas</div>
-            <div className="text-2xl font-black text-slate-800 mt-1">
+            <div className="text-2xl font-bold text-slate-800 mt-1">
               {loading ? <Skeleton className="h-7 w-16" /> : sorted.length}
             </div>
             {!loading && (
@@ -1493,7 +1484,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           <div className={`h-1.5 ${isPagas ? "bg-gradient-to-r from-green-500 to-green-400" : "bg-gradient-to-r from-indigo-500 to-indigo-400"}`} />
           <CardContent className="p-4">
             <div className={`text-xs font-bold uppercase tracking-widest ${isPagas ? "text-green-600/80" : "text-indigo-600/80"}`}>{isPagas ? (isIncome ? "Total Recebido" : "Total Pago") : "Valor no Vencimento"}</div>
-            <div className={`text-2xl font-black mt-1 ${isPagas ? "text-green-700" : "text-indigo-700"}`}>
+            <div className={`text-2xl font-bold mt-1 ${isPagas ? "text-green-700" : "text-indigo-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(isPagas ? totalPaid : totalAmount)}
             </div>
           </CardContent>
@@ -1503,7 +1494,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
             <div className="h-1.5 bg-gradient-to-r from-rose-500 to-rose-400" />
             <CardContent className="p-4">
               <div className="text-xs font-bold uppercase tracking-widest text-rose-600/80">Desconto</div>
-              <div className="text-2xl font-black text-rose-700 mt-1">
+              <div className="text-2xl font-bold text-rose-700 mt-1">
                 {loading ? <Skeleton className="h-7 w-32" /> : formatCurrency(totalDiscount)}
               </div>
               {!loading && (
@@ -1518,7 +1509,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           <div className={`h-1.5 ${isOverdue ? "bg-gradient-to-r from-red-500 to-red-400" : "bg-gradient-to-r from-violet-500 to-violet-400"}`} />
           <CardContent className="p-4">
             <div className={`text-xs font-bold uppercase tracking-widest ${isOverdue ? "text-red-600/80" : "text-violet-600/80"}`}>{isPagas ? counterpartLabelPlural.charAt(0).toUpperCase() + counterpartLabelPlural.slice(1) : "Saldo Pendente"}</div>
-            <div className={`text-2xl font-black mt-1 ${isOverdue ? "text-red-700" : "text-violet-700"}`}>
+            <div className={`text-2xl font-bold mt-1 ${isOverdue ? "text-red-700" : "text-violet-700"}`}>
               {loading ? <Skeleton className="h-7 w-32" /> : isPagas
                 ? `${new Set(sorted.map((i) => getCounterpartId(i))).size}`
                 : formatCurrency(totalBalance)}
@@ -1609,7 +1600,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                           key={dia}
                           type="button"
                           onClick={() => toggleDia(dia)}
-                          className={`h-8 w-8 text-xs rounded-md font-mono transition-colors ${
+                          className={`h-8 w-8 text-xs rounded-md tabular-nums transition-colors ${
                             filterDia.includes(dia)
                               ? "bg-blue-500 text-white font-bold"
                               : "hover:bg-slate-100 text-slate-700"
@@ -1830,7 +1821,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           })()}
           <div>
             <Table containerClassName="overflow-visible">
-              <TableHeader className="bg-slate-800 text-slate-100 sticky -top-4 md:-top-6 z-20 shadow-md [&_th]:text-slate-200">
+              <TableHeader className="bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur sticky -top-4 md:-top-6 z-20 border-b border-slate-200 dark:border-slate-800 shadow-sm [&_th]:text-slate-500 dark:[&_th]:text-slate-400 [&_th]:font-semibold [&_th]:text-[11px] [&_th]:uppercase [&_th]:tracking-wider">
                 <TableRow>
                   <TableHead className="w-[40px]" />
                   <TableHead className="min-w-[50px] text-xs">Parc.</TableHead>
@@ -1899,49 +1890,40 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                       );
                     })
                   : (() => {
-                      const seenExpandedBills = new Set<number>();
                       return paginatedItems.map((item, idx) => {
                       const days = daysDiff(item.dueDate);
                       const billParcelas = parcelasByBill.get(item.billId) || [];
                       const totalParcelas = billParcelas.length;
-                      const isExpanded = expandedBills.has(item.billId);
-                      const isFirstOfBill = !seenExpandedBills.has(item.billId);
-                      if (isExpanded) seenExpandedBills.add(item.billId);
-                      const showExpandedPanel = isExpanded && isFirstOfBill;
-                      // Count matches the headers exactly
-                      const colCount =
-                        isPagas && isIncome ? 12 :
-                        isPagas && !isIncome ? 14 :
-                        isOverdue && isIncome ? 15 :
-                        isOverdue && !isIncome ? 17 :
-                        isIncome ? 11 :
-                        13;
+                      // linha destacada = a que esta aberta no painel lateral
+                      const isExpanded =
+                        detalhe?.billId === item.billId &&
+                        detalhe?.installmentId === item.installmentId;
                       return (
                         <React.Fragment key={`${item.billId}-${item.installmentId}-${idx}`}>
                           <TableRow
-                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-blue-100 border-l-4 border-blue-500 hover:bg-blue-100" : (!isIncome && companiesControlaOrcamento.has(item.companyName) && (getBuildingsCosts(item).length === 0 || getBuildingsCosts(item).every(bc => !bc.costEstimationSheetName))) ? "bg-red-50 hover:bg-red-100 border-l-4 border-red-300" : "hover:bg-slate-50 border-l-4 border-transparent"}`}
-                            onClick={() => toggleBillExpand(item.billId)}
+                            className={`cursor-pointer transition-colors ${isExpanded ? "bg-primary/10 border-l-4 border-primary hover:bg-primary/10" : (!isIncome && companiesControlaOrcamento.has(item.companyName) && (getBuildingsCosts(item).length === 0 || getBuildingsCosts(item).every(bc => !bc.costEstimationSheetName))) ? "bg-red-50 hover:bg-red-100 border-l-4 border-red-300" : "hover:bg-slate-50 border-l-4 border-transparent"}`}
+                            onClick={() => abrirDetalhe(item)}
                           >
                             <TableCell className="w-[40px] px-2">
-                              <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180 text-blue-600" : "text-slate-400"}`} />
+                              <ChevronDown className={`h-4 w-4 -rotate-90 transition-colors ${isExpanded ? "text-primary" : "text-slate-300"}`} />
                             </TableCell>
                             <TableCell className="text-sm">
                               {totalParcelas > 1 ? (
-                                <Badge variant="secondary" className="text-xs font-mono">{totalParcelas}x</Badge>
+                                <Badge variant="secondary" className="text-xs tabular-nums">{totalParcelas}x</Badge>
                               ) : (
                                 <span className="text-slate-400 text-xs">1x</span>
                               )}
                             </TableCell>
-                            <TableCell className="font-mono text-sm">{formatDate(item.dueDate)}</TableCell>
+                            <TableCell className="tabular-nums text-sm">{formatDate(item.dueDate)}</TableCell>
                             {isPagas && (
-                              <TableCell className="font-mono text-sm text-emerald-600">{formatDate(latestPaymentDate(item, filterAnos, filterMes) || item.dueDate)}</TableCell>
+                              <TableCell className="tabular-nums text-sm text-emerald-600">{formatDate(latestPaymentDate(item, filterAnos, filterMes) || item.dueDate)}</TableCell>
                             )}
                             {isOverdue && (
                               <TableCell>
-                                <Badge variant="destructive" className="text-xs font-mono">{Math.abs(days)}d</Badge>
+                                <Badge variant="destructive" className="text-xs tabular-nums">{Math.abs(days)}d</Badge>
                               </TableCell>
                             )}
-                            <TableCell className={`max-w-[250px] truncate ${isExpanded ? "font-bold text-blue-900" : "font-medium"}`} title={getCounterpartName(item)}>{getCounterpartName(item)}</TableCell>
+                            <TableCell className={`max-w-[250px] truncate ${isExpanded ? "font-bold text-primary" : "font-medium"}`} title={getCounterpartName(item)}>{getCounterpartName(item)}</TableCell>
                             <TableCell className="text-sm max-w-[180px] truncate" title={item.companyName}>{item.companyName}</TableCell>
                             <TableCell className="text-sm max-w-[180px] truncate" title={item.paymentsCategories?.map(c => c.costCenterName).filter(Boolean).join(", ") || "-"}>
                               {item.paymentsCategories?.[0]?.costCenterName || "-"}
@@ -1965,9 +1947,9 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                 )}
                               </TableCell>
                             )}
-                            <TableCell className="font-mono text-sm">{item.billId}</TableCell>
+                            <TableCell className="tabular-nums text-sm">{item.billId}</TableCell>
                             <TableCell className="text-xs">
-                              <Badge variant="outline" className="text-xs font-mono">{item.documentIdentificationId?.trim() || "-"}</Badge>
+                              <Badge variant="outline" className="text-xs tabular-nums">{item.documentIdentificationId?.trim() || "-"}</Badge>
                             </TableCell>
                             {isPagas && !isIncome && (
                               <TableCell className="text-xs text-slate-500 truncate max-w-[120px]" title={(item.payments || [])[0]?.operationTypeName || "-"}>
@@ -1976,14 +1958,14 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                             )}
                             {isIncome && (
                               <TableCell className="text-xs">
-                                <Badge variant="secondary" className="text-[10px]">
+                                <span className="text-[11px] text-slate-400">
                                   {("indexerName" in item && (item as SiengeIncome).indexerName) || "—"}
-                                </Badge>
+                                </span>
                               </TableCell>
                             )}
-                            <TableCell className="text-right font-mono text-sm">{formatCurrency(item.originalAmount)}</TableCell>
+                            <TableCell className="text-right tabular-nums text-sm">{formatCurrency(item.originalAmount)}</TableCell>
                             {isPagas ? (
-                              <TableCell className="text-right font-mono text-sm font-medium text-emerald-600">
+                              <TableCell className="text-right tabular-nums text-sm font-medium text-emerald-600">
                                 {formatCurrency(paidTotal(item, filterAnos, filterMes, isPagas ? filterTipoBaixa : undefined))}
                               </TableCell>
                             ) : (
@@ -1993,13 +1975,13 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                   const encargos = calcEncargos(item);
                                   return (
                                     <>
-                                      <TableCell className="text-right font-mono text-sm font-medium text-slate-800">
+                                      <TableCell className="text-right tabular-nums text-sm font-medium text-slate-800">
                                         {formatCurrency(item.correctedBalanceAmount)}
                                       </TableCell>
-                                      <TableCell className="text-right font-mono text-sm text-slate-600">
+                                      <TableCell className="text-right tabular-nums text-sm text-slate-600">
                                         {daysOver}
                                       </TableCell>
-                                      <TableCell className="text-right font-mono text-sm text-red-600 dark:text-red-300/70">
+                                      <TableCell className="text-right tabular-nums text-sm text-red-600 dark:text-red-300/70">
                                         {formatCurrency(encargos)}
                                       </TableCell>
                                     </>
@@ -2008,179 +1990,23 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
                                 {!isIncome && (() => {
                                   const desc = Math.max(0, (item.correctedBalanceAmount || 0) - openAmount(item, false));
                                   return (
-                                    <TableCell className={`text-right font-mono text-sm ${desc > 0 ? "font-medium text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-slate-500"}`}>
+                                    <TableCell className={`text-right tabular-nums text-sm ${desc > 0 ? "font-medium text-rose-600 dark:text-rose-400" : "text-slate-400 dark:text-slate-500"}`}>
                                       {formatCurrency(desc)}
                                     </TableCell>
                                   );
                                 })()}
                                 {isOverdue ? (
-                                  <TableCell className="text-right font-mono text-sm font-medium text-red-600">
+                                  <TableCell className="text-right tabular-nums text-sm font-medium text-red-600">
                                     {formatCurrency(openAmount(item, isIncome) + calcEncargos(item))}
                                   </TableCell>
                                 ) : (
-                                  <TableCell className="text-right font-mono text-sm font-medium text-slate-800">
+                                  <TableCell className="text-right tabular-nums text-sm font-medium text-slate-800">
                                     {formatCurrency(openAmount(item, isIncome))}
                                   </TableCell>
                                 )}
                               </>
                             )}
                           </TableRow>
-                          {showExpandedPanel && (
-                            <TableRow className="bg-blue-50/60 border-l-4 border-blue-500 border-b-2 border-b-blue-200">
-                              <TableCell colSpan={colCount} className="p-0">
-                                <div className="px-8 py-4 border-l-4 border-blue-500 ml-0 bg-blue-50/80">
-                                  {loadingNotes.has(item.billId) ? (
-                                    <div className="mb-3 text-sm flex items-center gap-2">
-                                      <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-                                      <span className="text-slate-400">Carregando observacoes...</span>
-                                    </div>
-                                  ) : billNotes[item.billId] ? (
-                                    <div className="mb-3 text-sm">
-                                      <span className="font-semibold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded">Observacoes:</span>
-                                      <span className="ml-2 text-slate-600">{billNotes[item.billId]}</span>
-                                    </div>
-                                  ) : null}
-                                  {isPagas && (item.payments || []).length > 0 && (
-                                    <>
-                                      <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
-                                        Pagamentos do Titulo {item.billId} — {getCounterpartName(item)}
-                                        <Badge className="bg-emerald-100 text-emerald-700 text-xs">{(item.payments || []).filter(p => p.netAmount > 0).length} pagamentos</Badge>
-                                        <span className="text-slate-400">|</span>
-                                        <span className="font-mono">Total: {formatCurrency(paidTotal(item))}</span>
-                                      </div>
-                                      <Table>
-                                        <TableHeader className="bg-emerald-100/50">
-                                          <TableRow className="border-b border-emerald-200/50">
-                                            <TableHead className="text-xs h-8 py-1">Dt. Pagamento</TableHead>
-                                            <TableHead className="text-xs h-8 py-1">Tipo Operacao</TableHead>
-                                            <TableHead className="text-xs text-right h-8 py-1">Valor Liquido</TableHead>
-                                            <TableHead className="text-xs text-right h-8 py-1">Juros</TableHead>
-                                            <TableHead className="text-xs text-right h-8 py-1">Multa</TableHead>
-                                            <TableHead className="text-xs text-right h-8 py-1">Desconto</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {(item.payments || []).filter(p => p.netAmount > 0).map((p, pi) => (
-                                            <TableRow key={`pay-${item.billId}-${pi}`} className="border-b border-emerald-100/50">
-                                              <TableCell className="font-mono text-xs py-1.5">{formatDate(p.paymentDate)}</TableCell>
-                                              <TableCell className="text-xs py-1.5">{p.operationTypeName || "-"}</TableCell>
-                                              <TableCell className="text-right font-mono text-xs py-1.5 font-medium text-emerald-600">{formatCurrency(p.netAmount)}</TableCell>
-                                              <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(p.interestAmount || 0)}</TableCell>
-                                              <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(p.fineAmount || 0)}</TableCell>
-                                              <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(p.discountAmount || 0)}</TableCell>
-                                            </TableRow>
-                                          ))}
-                                        </TableBody>
-                                      </Table>
-                                    </>
-                                  )}
-                                  {!isPagas && totalParcelas > 1 && (() => {
-                                    const sortedParcelas = [...billParcelas].sort((a, b) => {
-                                      let cmp = 0;
-                                      switch (subSort.field) {
-                                        case "installmentId": cmp = a.installmentId - b.installmentId; break;
-                                        case "dueDate": cmp = (a.dueDate || "").localeCompare(b.dueDate || ""); break;
-                                        case "daysOverdue": cmp = daysDiff(a.dueDate) - daysDiff(b.dueDate); break;
-                                        case "issueDate": cmp = (a.issueDate || "").localeCompare(b.issueDate || ""); break;
-                                        case "originalAmount": cmp = a.originalAmount - b.originalAmount; break;
-                                        case "correction": cmp = (a.correctedBalanceAmount - a.balanceAmount) - (b.correctedBalanceAmount - b.balanceAmount); break;
-                                        case "correctionPct": {
-                                          const pctA = a.balanceAmount > 0 ? (a.correctedBalanceAmount - a.balanceAmount) / a.balanceAmount : 0;
-                                          const pctB = b.balanceAmount > 0 ? (b.correctedBalanceAmount - b.balanceAmount) / b.balanceAmount : 0;
-                                          cmp = pctA - pctB; break;
-                                        }
-                                        case "balanceAmount": cmp = a.correctedBalanceAmount - b.correctedBalanceAmount; break;
-                                        default: cmp = 0;
-                                      }
-                                      return subSort.dir === "asc" ? cmp : -cmp;
-                                    });
-                                    const SubSortHead = ({ field, children, className = "" }: { field: string; children: React.ReactNode; className?: string }) => (
-                                      <TableHead
-                                        className={`text-xs h-8 py-1 cursor-pointer select-none hover:bg-blue-200/50 ${className}`}
-                                        onClick={() => setSubSort(prev => prev.field === field ? { field, dir: prev.dir === "asc" ? "desc" : "asc" } : { field, dir: "asc" })}
-                                      >
-                                        <span className="flex items-center gap-1 whitespace-nowrap">
-                                          {children}
-                                          {subSort.field === field ? (
-                                            subSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                                          ) : (
-                                            <ArrowUpDown className="h-3 w-3 opacity-30" />
-                                          )}
-                                        </span>
-                                      </TableHead>
-                                    );
-                                    return (
-                                    <>
-                                      <div className="text-xs font-semibold text-slate-500 mb-2 flex items-center gap-2">
-                                        Parcelas do Titulo {item.billId} — {getCounterpartName(item)}
-                                        <Badge variant="secondary" className="text-xs">{totalParcelas} parcelas</Badge>
-                                        <span className="text-slate-400">|</span>
-                                        <span className="font-mono">Total: {formatCurrency(billParcelas.reduce((s, p) => s + (p.correctedBalanceAmount || 0), 0))}</span>
-                                      </div>
-                                      <Table>
-                                        <TableHeader className="bg-blue-100/50">
-                                          <TableRow className="border-b border-blue-200/50">
-                                            <SubSortHead field="installmentId">Parcela</SubSortHead>
-                                            <SubSortHead field="dueDate">Vencimento</SubSortHead>
-                                            {isOverdue && <SubSortHead field="daysOverdue">Dias Atraso</SubSortHead>}
-                                            <SubSortHead field="issueDate">Emissao</SubSortHead>
-                                            <SubSortHead field="originalAmount" className="text-right">Valor Original</SubSortHead>
-                                            <SubSortHead field="correction" className="text-right">Correção</SubSortHead>
-                                            <SubSortHead field="correctionPct" className="text-right">%</SubSortHead>
-                                            <SubSortHead field="balanceAmount" className="text-right">Saldo</SubSortHead>
-                                            <TableHead className="text-xs h-8 py-1">Status</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {sortedParcelas.map((parcela) => {
-                                            const pDays = daysDiff(parcela.dueDate);
-                                            const isPaidItem = parcela.balanceAmount === 0;
-                                            const correcao = parcela.correctedBalanceAmount - parcela.balanceAmount;
-                                            const correcaoPct = parcela.balanceAmount > 0 ? (correcao / parcela.balanceAmount) * 100 : 0;
-                                            return (
-                                              <TableRow key={`sub-${parcela.billId}-${parcela.installmentId}`} className="border-b border-blue-100/50">
-                                                <TableCell className="font-mono text-xs py-1.5">{parcela.installmentId}</TableCell>
-                                                <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.dueDate)}</TableCell>
-                                                {isOverdue && (
-                                                  <TableCell className="text-xs py-1.5">
-                                                    <Badge variant="destructive" className="text-[10px] font-mono">{Math.abs(pDays)}d</Badge>
-                                                  </TableCell>
-                                                )}
-                                                <TableCell className="font-mono text-xs py-1.5">{formatDate(parcela.issueDate)}</TableCell>
-                                                <TableCell className="text-right font-mono text-xs py-1.5">{formatCurrency(parcela.originalAmount)}</TableCell>
-                                                <TableCell className="text-right font-mono text-xs py-1.5 text-amber-600">
-                                                  {formatCurrency(correcao)}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono text-xs py-1.5 text-amber-600">
-                                                  {isPaidItem ? "-" : `${correcaoPct.toFixed(1)}%`}
-                                                </TableCell>
-                                                <TableCell className={`text-right font-mono text-xs py-1.5 font-medium ${isPaidItem ? "text-green-600" : isOverdue ? "text-red-600 dark:text-red-300/70" : "text-slate-800 dark:text-slate-200"}`}>
-                                                  {formatCurrency(isPaidItem ? parcela.correctedBalanceAmount : openAmount(parcela, isIncome))}
-                                                </TableCell>
-                                                <TableCell className="text-xs py-1.5">
-                                                  {isPaidItem ? (
-                                                    <Badge className="bg-green-100 text-green-700 text-[10px]">Pago</Badge>
-                                                  ) : parcela.payments && parcela.payments.length > 0 ? (
-                                                    <Badge className="bg-amber-100 text-amber-700 text-[10px]">Parcial</Badge>
-                                                  ) : (
-                                                    <Badge variant="outline" className="text-[10px]">Aberto</Badge>
-                                                  )}
-                                                </TableCell>
-                                              </TableRow>
-                                            );
-                                          })}
-                                        </TableBody>
-                                      </Table>
-                                    </>
-                                    );
-                                  })()}
-                                  {!loadingNotes.has(item.billId) && !billNotes[item.billId] && (
-                                    <div className="text-xs text-slate-400">Nenhuma observacao registrada para este titulo.</div>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )}
                         </React.Fragment>
                       );
                     });
@@ -2273,6 +2099,16 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
           })()}
         </CardContent>
       </Card>
+
+      <TituloDetalheSheet
+        aberto={detalhe !== null}
+        onFechar={() => setDetalhe(null)}
+        item={detalhe}
+        parcelas={detalhe ? parcelasByBill.get(detalhe.billId) || [] : []}
+        observacao={detalhe ? billNotes[detalhe.billId] : null}
+        carregandoObs={detalhe ? loadingNotes.has(detalhe.billId) : false}
+        isIncome={isIncome}
+      />
     </div>
   );
 }
