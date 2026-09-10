@@ -329,7 +329,7 @@ export async function pagasRecebidasDia(
   const ate = parseDataISO(args.ate) || parseDataISO(args.dia) || ontem;
 
   const EXCLUDED_OPS = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
-  type Pay = { paymentDate?: string; netAmount?: number; operationTypeName?: string };
+  type Pay = { paymentDate?: string; netAmount?: number; grossAmount?: number; operationTypeName?: string };
   type Receipt = { paymentDate?: string; date?: string; netAmount?: number; operationTypeName?: string; bankMovements?: unknown[] };
   type Item = OutcomeItem & { payments?: Pay[]; receipts?: Receipt[]; clientName?: string; billId?: number; installmentId?: number };
 
@@ -338,12 +338,17 @@ export async function pagasRecebidasDia(
     return d && d >= de && d <= ate ? d : null;
   }
 
-  type Det = { quem: string; empresa: string; titulo: number | null; data: string; tipoOp: string | null; valor: number; valor_fmt: string };
+  type Det = { quem: string; empresa: string; titulo: number | null; data: string; tipoOp: string | null; valor: number; valor_fmt: string; conciliado?: boolean };
 
   function processa(items: Item[], isIncome: boolean) {
     const porEmpresa = new Map<string, { total: number; qtd: number }>();
     const det: Det[] = [];
     let total = 0, qtd = 0;
+    // Recebimento baixado mas ainda SEM movimento bancario conciliado: o valor
+    // liquido vem zerado do Sienge. Contar mesmo assim (o relatorio "Contas
+    // Recebidas" do Sienge conta) e informar separadamente — zerar escondia o
+    // dia inteiro (caso 09/09/2026: R$ 170.460,58 sumiram do fechamento).
+    let naoConciliadoTotal = 0, naoConciliadoQtd = 0;
     for (const i of items) {
       if (isExcludedFinancialDocType(i.documentIdentificationName, i.forecastDocument)) continue;
       if (isHolding(i.companyName)) continue;
@@ -354,15 +359,21 @@ export async function pagasRecebidasDia(
         : (i.receipts || []).map((r) => ({
             paymentDate: r.paymentDate || r.date,
             netAmount: (r.bankMovements && r.bankMovements.length > 0) ? (r.netAmount || 0) : 0,
+            grossAmount: r.netAmount || 0,
             operationTypeName: r.operationTypeName || "Recebimento",
           }));
       for (const p of pays) {
         const data = noPeriodo(p);
         if (!data) continue;
-        const v = p.netAmount || 0;
+        const liquido = p.netAmount || 0;
+        // Em income, netAmount=0 significa "sem movimento bancario"; o valor da
+        // baixa esta em grossAmount. Em outcome, vale o netAmount.
+        const conciliado = !isIncome || liquido !== 0;
+        const v = conciliado ? liquido : (p.grossAmount || 0);
         if (v === 0) continue;
         if (isIncome) {
-          if (v < 0) continue; // regra Resumo Financeiro: recebidas = netAmount > 0
+          if (v < 0) continue; // regra Resumo Financeiro: recebidas = valor > 0
+          if (!conciliado) { naoConciliadoTotal += v; naoConciliadoQtd++; }
         } else {
           const op = (p.operationTypeName || "").toLowerCase();
           if (EXCLUDED_OPS.some((x) => op.includes(x))) continue;
@@ -376,6 +387,7 @@ export async function pagasRecebidasDia(
             quem: (isIncome ? i.clientName : i.creditorName) || i.creditorName || "(sem nome)",
             empresa: co, titulo: i.billId ?? null, data,
             tipoOp: p.operationTypeName ?? null, valor: v, valor_fmt: fmtBRL(v),
+            ...(isIncome ? { conciliado } : {}),
           });
         }
       }
@@ -383,6 +395,13 @@ export async function pagasRecebidasDia(
     det.sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
     return {
       total, total_fmt: fmtBRL(total), qtd,
+      ...(isIncome && naoConciliadoQtd > 0 ? {
+        conciliado: { total: total - naoConciliadoTotal, total_fmt: fmtBRL(total - naoConciliadoTotal), qtd: qtd - naoConciliadoQtd },
+        nao_conciliado: {
+          total: naoConciliadoTotal, total_fmt: fmtBRL(naoConciliadoTotal), qtd: naoConciliadoQtd,
+          obs: "Baixa lancada no Sienge sem movimento bancario vinculado ainda. Entra no total; o valor liquido se confirma quando a conciliacao chegar.",
+        },
+      } : {}),
       porEmpresa: Array.from(porEmpresa.entries())
         .map(([nome, v]) => ({ empresa: nome, total: v.total, total_fmt: fmtBRL(v.total), qtd: v.qtd }))
         .sort((a, b) => Math.abs(b.total) - Math.abs(a.total)),

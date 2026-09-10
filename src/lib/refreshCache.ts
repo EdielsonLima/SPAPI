@@ -208,9 +208,21 @@ export async function refreshFinanceiroCache(): Promise<Record<string, number | 
       if (!seenKeys.has(ek)) mapped.push({ accountId: ek, amount: lastKnown[ek] ?? 0 });
     }
 
-    await cacheDailyBalance(ontem, mapped);
-    resumo.saldosContas = mapped.length;
-    resumo.saldosData = ontem;
+    // Se o Sienge nao devolveu NENHUMA conta para o dia, o array acima e feito
+    // so de valores antigos (lastKnown) — gravar isso produz um saldo identico
+    // ao do dia anterior carimbado com a data nova, que foi o que aconteceu em
+    // 09/09/2026. Melhor nao gravar o dia: o saldos_bancarios cai sozinho no
+    // ultimo dia com dado real e informa a data verdadeira.
+    if (allAccounts.length === 0) {
+      resumo.saldosAviso = `Sienge nao devolveu saldos para ${ontem} — dia NAO gravado (evita repetir o saldo do dia anterior)`;
+      resumo.saldosContas = 0;
+    } else {
+      await cacheDailyBalance(ontem, mapped);
+      resumo.saldosContas = mapped.length;
+      resumo.saldosData = ontem;
+      const estimadas = mapped.length - allAccounts.length;
+      if (estimadas > 0) resumo.saldosEstimados = estimadas;
+    }
   } catch (e) {
     // Saldos sao best-effort: nao derruba o refresh principal
     resumo.saldosErro = e instanceof Error ? e.message : String(e);
