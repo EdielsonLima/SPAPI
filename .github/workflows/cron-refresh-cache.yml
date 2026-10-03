@@ -25,7 +25,7 @@ jobs:
             code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" --max-time 290 \
               -X POST \
               -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
-              "https://spapi-production.up.railway.app/api/cron/refresh-cache") || code=000
+              "https://silva-packer-spapi.qtnzls.easypanel.host/api/cron/refresh-cache") || code=000
             echo "HTTP $code"
             cat /tmp/resp.json || true
             echo ""
