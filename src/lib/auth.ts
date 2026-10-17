@@ -2,7 +2,8 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
-import { getUserByEmail } from "@/lib/db";
+import { getUserByEmail, getActiveUserByEmailInsensitive } from "@/lib/db";
+import { validarBilhetePortal } from "@/lib/portal-sso";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -45,6 +46,22 @@ export const authOptions: NextAuthOptions = {
         }
 
         return null;
+      },
+    }),
+    // Login único: bilhete assinado pelo Portal Silva Packer (ver src/lib/portal-sso.ts).
+    // Só entra quem já tem cadastro ativo aqui com o mesmo e-mail.
+    CredentialsProvider({
+      id: "portal",
+      name: "Portal Silva Packer",
+      credentials: {
+        token: { label: "Bilhete", type: "text" },
+      },
+      async authorize(credentials) {
+        const bilhete = validarBilhetePortal(credentials?.token ?? "");
+        if (!bilhete) throw new Error("bilhete-invalido");
+        const user = await getActiveUserByEmailInsensitive(bilhete.email);
+        if (!user) throw new Error("sem-cadastro");
+        return { id: String(user.id), name: user.name, email: user.email };
       },
     }),
   ],

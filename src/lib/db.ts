@@ -769,6 +769,15 @@ export async function getUserByEmail(email: string): Promise<{ id: number; name:
   return result.rows.length > 0 ? result.rows[0] : null;
 }
 
+// Login pelo Portal: o e-mail vem do Portal e pode diferir só em maiúsculas/minúsculas.
+export async function getActiveUserByEmailInsensitive(email: string): Promise<{ id: number; name: string; email: string } | null> {
+  const result = await pool.query(
+    `SELECT id, name, email FROM users WHERE LOWER(email) = LOWER($1) AND active = TRUE LIMIT 1`,
+    [email]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
 export async function createUser(name: string, email: string, passwordHash: string) {
   await pool.query(
     `INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3)
