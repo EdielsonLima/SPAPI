@@ -1,4 +1,6 @@
 import { Pool } from "pg";
+import { randomBytes } from "crypto";
+import bcrypt from "bcryptjs";
 
 const databaseUrl = process.env.DATABASE_URL || "";
 const needsSsl =
@@ -774,6 +776,22 @@ export async function getActiveUserByEmailInsensitive(email: string): Promise<{ 
   const result = await pool.query(
     `SELECT id, name, email FROM users WHERE LOWER(email) = LOWER($1) AND active = TRUE LIMIT 1`,
     [email]
+  );
+  return result.rows.length > 0 ? result.rows[0] : null;
+}
+
+// Login pelo Portal: o Portal já liberou o card do Financeiro para a pessoa, então quem chega
+// sem cadastro ganha um. A senha é aleatória (a entrada é pelo Portal). Usuário desativado
+// aqui (active = FALSE, qualquer grafia do e-mail) não é recriado nem reativado: continua barrado.
+export async function provisionPortalUser(name: string, email: string): Promise<{ id: number; name: string; email: string } | null> {
+  const passwordHash = await bcrypt.hash(randomBytes(24).toString("base64"), 10);
+  const result = await pool.query(
+    `INSERT INTO users (name, email, password_hash)
+     SELECT $1::text, $2::text, $3::text
+     WHERE NOT EXISTS (SELECT 1 FROM users WHERE LOWER(email) = LOWER($2::text))
+     ON CONFLICT (email) DO NOTHING
+     RETURNING id, name, email`,
+    [name, email, passwordHash]
   );
   return result.rows.length > 0 ? result.rows[0] : null;
 }
