@@ -57,6 +57,32 @@ Réplica do Power BI `FINANCEIRO HOLDING.pbix` (páginas "ALUGUEIS À RECEBER" /
 Validado contra o Power BI (recorte 01/01/2026 a 11/06/2026, última baixa do CSV do BI):
 Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 · Sul Brasil R$ 409.983,42
 
+## Módulo Comercial no menu lateral (Criado em 2026-10-22)
+
+- Pedido do Edielson (22/10): replicar o Comercial do Financeiro da Leven
+  (`Leven-Construtora/financeiro-leven`, mesma base). Etapa 1 = só mudar de
+  lugar, sem alterar cálculo: a aba "Comercial" saiu do Painel Executivo e
+  virou o grupo **Comercial** no menu, uma rota por tela: `/comercial/visao-geral`,
+  `/vendas`, `/clientes`, `/unidades`, `/quadro-espelho`. Some no modo Holding.
+- Peças: `src/lib/comercial-utils.ts` (funções puras + `ABAS_COMERCIAL`),
+  `comercial-provider.tsx` (estado, fetch e filtros, montado uma vez em
+  `(authenticated)/comercial/layout.tsx`), `comercial-view.tsx` (corpo das
+  cinco telas, idêntico ao da aba antiga). `MultiSelectFilter`/`CustomTooltip`
+  foram para `multi-select-filter.tsx`, compartilhado com o Painel.
+- Chaves de localStorage são as da aba antiga (`dashboard_*_comercial`).
+- Opções do filtro Empresas saem dos contratos/unidades (não mais de 15 anos
+  de `/outcome`); nenhuma marcada = todas, como a aba antiga ao entrar nela.
+- Conferência 22/10 (mesmos dados nas duas versões, Playwright): texto das 5
+  telas idêntico entre a aba antiga e as rotas novas.
+- Próximas etapas (plano): valor da unidade pela `participationPercentage`
+  (hoje cada unidade recebe o contrato inteiro e o VGV vendido do Quadro soma
+  o mesmo contrato N vezes), telas da Leven, Quadro em torre e maquete 3D
+  (piloto Palácio Elizabeth).
+- **Suprimentos removido deste app (Edielson, 22/10):** aqui ficam só Financeiro
+  e Comercial. Telas `/suprimentos/*` apagadas e redirecionadas ao Dashboard
+  (`next.config.mjs`); as rotas `/api/sienge/purchase-*` e
+  `/api/arrival-confirmations` continuam no código.
+
 ## Controle de Orçamento por Empresa (Criado em 2026-04-16)
 
 - Campo `controla_orcamento` (BOOLEAN) na tabela `company_settings` (default FALSE)
