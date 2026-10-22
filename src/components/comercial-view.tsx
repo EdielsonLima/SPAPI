@@ -26,7 +26,7 @@ import { MultiSelectFilter } from "@/components/multi-select-filter";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import {
-  inferUnitTypeFromName, shortEnterpriseName, normalizeFloor, floorSortKey,
+  inferUnitTypeFromName, shortEnterpriseName, normalizeFloor, floorSortKey, valorDaUnidadeNoContrato,
   ABAS_COMERCIAL, type ComercialAba,
 } from "@/lib/comercial-utils";
 
@@ -229,7 +229,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
         if (existing) {
           // Enrich existing API unit with contract data
           if (!existing.contractDate || c.contractDate > existing.contractDate) {
-            existing.value = c.value || existing.value;
+            existing.value = valorDaUnidadeNoContrato(c.value || 0, c.salesContractUnits || [], u.name) || existing.value;
             existing.customer = c.salesContractCustomers?.[0]?.name || existing.customer;
             existing.contractDate = c.contractDate || existing.contractDate;
           }
@@ -243,7 +243,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
             unit: u.name,
             status,
             tipo: inferUnitType(u.name),
-            value: c.value || 0,
+            value: valorDaUnidadeNoContrato(c.value || 0, c.salesContractUnits || [], u.name),
             customer: c.salesContractCustomers?.[0]?.name || "—",
             contractDate: c.contractDate || "",
             area: 0,
