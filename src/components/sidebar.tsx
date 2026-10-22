@@ -9,7 +9,6 @@ import {
   ChevronRight,
   ChevronDown,
   LayoutDashboard,
-  ClipboardList,
   Building,
   Landmark,
   FileSpreadsheet,
@@ -17,8 +16,6 @@ import {
   DollarSign,
   Receipt,
   AlertTriangle,
-  Package,
-  ShoppingCart,
   BarChart3,
   CheckCircle,
   Settings,
@@ -29,6 +26,9 @@ import {
   ArrowLeftRight,
   KeyRound,
   ListChecks,
+  Handshake,
+  Users,
+  LayoutGrid,
 } from "lucide-react";
 import { useCompanyMode } from "@/lib/company-context";
 import Image from "next/image";
@@ -115,18 +115,35 @@ const menuItems: MenuItem[] = [
     ],
   },
   {
-    label: "Suprimentos",
-    icon: <Package className="h-5 w-5" />,
+    // Era a aba "Comercial" do Painel Executivo. Virou módulo próprio no menu
+    // (22/10/2026), como no Financeiro da Leven. Some no modo Holding.
+    label: "Comercial",
+    icon: <Handshake className="h-5 w-5" />,
     children: [
       {
-        label: "Solicitacoes",
-        href: "/suprimentos/solicitacoes",
-        icon: <ClipboardList className="h-4 w-4" />,
+        label: "Visão Geral",
+        href: "/comercial/visao-geral",
+        icon: <BarChart3 className="h-4 w-4" />,
       },
       {
-        label: "Pedidos",
-        href: "/suprimentos/pedidos",
-        icon: <ShoppingCart className="h-4 w-4" />,
+        label: "Vendas",
+        href: "/comercial/vendas",
+        icon: <Handshake className="h-4 w-4" />,
+      },
+      {
+        label: "Clientes",
+        href: "/comercial/clientes",
+        icon: <Users className="h-4 w-4" />,
+      },
+      {
+        label: "Unidades",
+        href: "/comercial/unidades",
+        icon: <Building className="h-4 w-4" />,
+      },
+      {
+        label: "Quadro Espelho",
+        href: "/comercial/quadro-espelho",
+        icon: <LayoutGrid className="h-4 w-4" />,
       },
     ],
   },
@@ -173,6 +190,13 @@ export function Sidebar() {
   const [openSubmenus, setOpenSubmenus] = useState<string[]>(["Financeiro"]);
   const [overdueCount, setOverdueCount] = useState(0);
   const pathname = usePathname();
+
+  // Abre o grupo que contém a rota atual (Financeiro, Comercial…); senão o
+  // menu Comercial nascia fechado com uma tela dele aberta.
+  useEffect(() => {
+    const grupo = menuItems.find((item) => item.children?.some((c) => pathname === c.href));
+    if (grupo) setOpenSubmenus((prev) => (prev.includes(grupo.label) ? prev : [...prev, grupo.label]));
+  }, [pathname]);
   const { setMode, label: companyLabel, isHolding } = useCompanyMode();
 
   // Menu do modo Holding = menu padrao + "Locacoes > Alugueis".
@@ -180,7 +204,7 @@ export function Sidebar() {
   // empresas e afetada por esta adicao.
   const menu = useMemo<MenuItem[]>(() => {
     if (!isHolding) return menuItems;
-    return menuItems.map((item) =>
+    return menuItems.filter((item) => item.label !== "Comercial").map((item) =>
       item.label === "Financeiro"
         ? {
             ...item,

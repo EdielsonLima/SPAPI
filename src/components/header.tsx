@@ -38,7 +38,11 @@ const pathLabels: Record<string, string[]> = {
   "/financeiro/contas-receber": ["Financeiro", "Contas a Receber"],
   "/financeiro/contas-recebidas": ["Financeiro", "Contas Recebidas"],
   "/financeiro/inadimplentes": ["Financeiro", "Inadimplentes"],
-  "/suprimentos/pedidos": ["Suprimentos", "Pedidos"],
+  "/comercial/visao-geral": ["Comercial", "Visão Geral"],
+  "/comercial/vendas": ["Comercial", "Vendas"],
+  "/comercial/clientes": ["Comercial", "Clientes"],
+  "/comercial/unidades": ["Comercial", "Unidades"],
+  "/comercial/quadro-espelho": ["Comercial", "Quadro Espelho"],
 };
 
 export function Header() {
