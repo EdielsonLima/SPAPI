@@ -23,6 +23,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS } from "@/lib/dashboard-utils";
 import { MultiSelectFilter } from "@/components/multi-select-filter";
+import { CorretoresView } from "@/components/corretores-view";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import {
@@ -41,7 +42,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
   const router = useRouter();
   const { isHolding } = useCompanyMode();
   const {
-    salesContracts, apiUnits, cubData, companySettings, chartColors,
+    salesContracts, apiUnits, comissoes, cubData, companySettings, chartColors,
     loading, refreshing, lastUpdate, refresh,
     allCompanyNames, availableYears,
     selectedCompanies, setSelectedCompanies,
@@ -1328,6 +1329,21 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           </Card>
         </>;
       })()}
+
+      {/* ─── CORRETORES E IMOBILIÁRIAS ─── (vinda do Financeiro da Leven, 22/10/2026)
+           Contratos ativos no período (Empresas/Anos/Meses do topo). */}
+      {aba === "corretores" && (
+        <CorretoresView
+          comissoes={comissoes}
+          contratos={salesContracts.filter(c => {
+            if (c.cancellationDate || c.situation === "Cancelado" || c.situation === "Distratado") return false;
+            if (selectedCompanies.size > 0 && !selectedCompanies.has(c.companyName)) return false;
+            if (selectedYears.size > 0 && c.contractDate && !selectedYears.has(c.contractDate.substring(0, 4))) return false;
+            if (selectedMonths.size > 0 && c.contractDate && !selectedMonths.has(c.contractDate.substring(5, 7))) return false;
+            return true;
+          })}
+        />
+      )}
 
       {/* ─── UNIDADES SUB-TAB ─── */}
       {aba === "unidades" && (() => {

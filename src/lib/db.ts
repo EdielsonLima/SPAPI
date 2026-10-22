@@ -359,6 +359,31 @@ export async function cacheSalesContracts(data: unknown) {
   );
 }
 
+// ─── Comissões de venda (corretores e imobiliárias) ─────────────────────────
+// Fonte da tela Comercial › Corretores: o Sienge guarda quem intermediou a
+// venda no lançamento da comissão (/commissions), não no contrato.
+
+let commissionsTableReady = false;
+export async function ensureCommissionsTable() {
+  if (commissionsTableReady) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS cached_commissions (
+    id SERIAL PRIMARY KEY, data JSONB NOT NULL, cached_at TIMESTAMP NOT NULL DEFAULT NOW()
+  )`);
+  commissionsTableReady = true;
+}
+
+export async function getCachedCommissions(): Promise<{ data: unknown; cachedAt: string } | null> {
+  const result = await pool.query(
+    `SELECT data, cached_at FROM cached_commissions WHERE cached_at > NOW() - INTERVAL '7 days' ORDER BY id DESC LIMIT 1`
+  );
+  return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
+}
+
+export async function cacheCommissions(data: unknown) {
+  await pool.query(`DELETE FROM cached_commissions`);
+  await pool.query(`INSERT INTO cached_commissions (data, cached_at) VALUES ($1, NOW())`, [JSON.stringify(data)]);
+}
+
 // ─── Units (Unidades de Empreendimentos) ─────────────────────────────────────
 
 let unitsTableReady = false;
