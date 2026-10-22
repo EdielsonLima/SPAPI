@@ -58,6 +58,28 @@ export function floorSortKey(floor: string): number {
   return -1000;
 }
 
+// Valor de UMA unidade dentro do contrato (mesma regra do Financeiro da Leven,
+// 26/09). Contrato de apartamento + vaga traz as duas unidades: dar o valor do
+// contrato inteiro a cada uma fazia o "VGV vendido" do Quadro Espelho e da
+// tela Unidades somar o mesmo contrato N vezes. A parte de cada unidade é o
+// percentual de participação do Sienge; se as participações não fecham 100%
+// (cadastro incompleto), divide em partes iguais.
+export function valorDaUnidadeNoContrato(
+  valorContrato: number,
+  unidades: { name: string; participationPercentage?: number | null }[],
+  nomeUnidade: string,
+): number {
+  if (!valorContrato || unidades.length === 0) return 0;
+  if (unidades.length === 1) return valorContrato;
+  const alvo = unidades.find(u => u.name === nomeUnidade);
+  if (!alvo) return 0;
+  const soma = unidades.reduce((s, u) => s + (u.participationPercentage || 0), 0);
+  const fatia = Math.abs(soma - 100) < 0.01
+    ? (alvo.participationPercentage || 0) / 100
+    : 1 / unidades.length;
+  return Math.round(valorContrato * fatia * 100) / 100;
+}
+
 // Unidade como o módulo recebe de /api/sienge/units.
 export interface ApiUnit {
   enterpriseName: string;

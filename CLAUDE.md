@@ -74,9 +74,14 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   de `/outcome`); nenhuma marcada = todas, como a aba antiga ao entrar nela.
 - Conferência 22/10 (mesmos dados nas duas versões, Playwright): texto das 5
   telas idêntico entre a aba antiga e as rotas novas.
-- Próximas etapas (plano): valor da unidade pela `participationPercentage`
-  (hoje cada unidade recebe o contrato inteiro e o VGV vendido do Quadro soma
-  o mesmo contrato N vezes), telas da Leven, Quadro em torre e maquete 3D
+- **Valor por unidade = parte dela no contrato (22/10)** —
+  `valorDaUnidadeNoContrato` em `comercial-utils.ts` (mesma regra da Leven):
+  `participationPercentage` do Sienge; se não fechar 100%, divide igual. Até
+  22/10 cada unidade recebia o contrato inteiro e o "VGV vendido" do Quadro
+  Espelho e da tela Unidades somava o mesmo contrato N vezes (apto + vaga).
+  Visão Geral, Vendas e Clientes somam por contrato e não mudaram.
+  Trava: `npx tsx src/__tests__/comercial-utils.test.ts`.
+- Próximas etapas (plano): telas da Leven, Quadro em torre e maquete 3D
   (piloto Palácio Elizabeth).
 - **Suprimentos removido deste app (Edielson, 22/10):** aqui ficam só Financeiro
   e Comercial. Telas `/suprimentos/*` apagadas e redirecionadas ao Dashboard
