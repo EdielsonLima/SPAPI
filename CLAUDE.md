@@ -89,6 +89,19 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   espaços; contrato sem comissão = venda direta); `tipoParceiro` separa
   imobiliária (PJ pelo nome) de corretor autônomo. Com mais de 12 meses o
   gráfico soma por ano. Ainda não conferida com dado real da Silva Packer.
+- **Corretor da casa (Edielson, 22/10):** GILBERTO BOING é corretor da casa e
+  gerente comercial. `CORRETORES_DA_CASA` em `comercial-utils.ts`: fica no
+  ranking com a etiqueta "Da casa"; "Vendido com parceiros" conta só contratos
+  com imobiliária/corretor de fora, e o da casa tem cartão próprio.
+- **Vendas: Contar por Unidades | Contratos (22/10, da Leven).** Abre em
+  Unidades (estado local, sem preferência salva). Cada unidade dos contratos
+  filtrados conta (`unidadesVendidas`), com a parte dela no valor
+  (`valorDaUnidadeNoContrato`); o tipo vem do cadastro do Sienge
+  (`propertyType`), senão do nome. Com Tipo Imóvel marcado, só as unidades do
+  tipo contam. Modo Contratos = números de antes.
+- **Exportar Excel (Vendas, 22/10):** `src/lib/excel-unidades-vendidas.ts`
+  (exceljs; o `xlsx` grátis não grava estilo), uma linha por unidade + aba
+  "Estoque no Sienge" por situação.
 - Próximas etapas (plano): telas da Leven, Quadro em torre e maquete 3D
   (piloto Palácio Elizabeth).
 - **Suprimentos removido deste app (Edielson, 22/10):** aqui ficam só Financeiro

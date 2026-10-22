@@ -10,7 +10,7 @@
  * Run: npx tsx src/__tests__/comercial-utils.test.ts
  */
 
-import { valorDaUnidadeNoContrato, rankingParceiros, tipoParceiro } from "../lib/comercial-utils";
+import { valorDaUnidadeNoContrato, rankingParceiros, tipoParceiro, unidadesVendidas, resumoPorTipo, inferUnitTypeFromName } from "../lib/comercial-utils";
 
 let passed = 0;
 let failed = 0;
@@ -82,6 +82,35 @@ check("corretor pessoa física", tipoParceiro("FABRICIO BILIBIO"), "corretor");
   const r2 = rankingParceiros([k(9, 40, "X LTDA", "AP1506", 100, "OPEN")], contratos);
   check("número com espaço casa", r2.parceiros[0]?.contratos, 1);
   check("comissão em aberto", r2.comissoesPagas, false);
+}
+
+console.log("corretor da casa");
+check("Gilberto é da casa", tipoParceiro("GILBERTO BOING"), "casa");
+check("grafia com espaço/minúscula", tipoParceiro(" Gilberto  Boing "), "casa");
+{
+  const ct = (id: number, number: string, value: number) =>
+    ({ id, number, enterpriseId: 1, value, contractDate: "2025-01-10", salesContractCustomers: [{ name: "C" + id }], salesContractUnits: [{ name: number, main: true }] });
+  const contratos = [ct(1, "101", 1000), ct(2, "102", 2000), ct(3, "103", 4000), ct(4, "104", 8000)];
+  const k = (id: number, broker: number, nome: string, num: string) =>
+    ({ commissionID: id, enterpriseID: 1, brokerID: broker, brokerName: nome, salesContractNumber: num, value: 10, installmentStatus: "PAID" });
+  const r = rankingParceiros([k(1, 7, "GILBERTO BOING", "101"), k(2, 7, "GILBERTO BOING", "102"), k(3, 8, "TERRAL - IMOVEIS LTDA", "102"), k(4, 8, "TERRAL - IMOVEIS LTDA", "103")], contratos);
+  check("casa: só contratos sem parceiro de fora", [r.contratosCasa, r.valorCasa], [1, 1000]);
+  check("parceiros: contrato com imobiliária conta fora", [r.contratosComParceiros, r.valorComParceiros], [2, 6000]);
+  check("direta = o resto", [r.contratosDiretos, r.valorDireto], [1, 8000]);
+  check("Gilberto segue no ranking", r.parceiros.map(p => p.tipo).sort(), ["casa", "imobiliaria"]);
+}
+
+console.log("unidadesVendidas");
+{
+  const c = { id: 9, number: "C9", value: 1_000_000, contractDate: "2025-03-01", enterpriseName: "PALACIO", situation: "Emitido", cancellationDate: null,
+    salesContractCustomers: [{ name: "ANA" }], paymentConditions: [{ conditionTypeId: "PM" }],
+    salesContractUnits: [{ name: "1201", participationPercentage: 85 }, { name: "G 12", participationPercentage: 15 }] };
+  const tipo = (_c: unknown, n: string) => inferUnitTypeFromName(n);
+  const us = unidadesVendidas([c], tipo);
+  check("uma linha por unidade", us.map(u => [u.unidade, u.valor]), [["1201", 850000], ["G 12", 150000]]);
+  const soApto = unidadesVendidas([c], tipo, new Set([inferUnitTypeFromName("1201")]));
+  check("filtro de tipo conta só a unidade do tipo", soApto.map(u => u.unidade), ["1201"]);
+  check("resumo por tipo", resumoPorTipo([{ tipo: "Apartamento" }, { tipo: "Apartamento" }, { tipo: "Vaga" }]), "2 apartamentos · 1 vaga");
 }
 
 console.log(`\n${passed} ok, ${failed} falha(s)`);

@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrendingUp, Clock, AlertTriangle, CheckCircle, RefreshCw, FileText, Building2, CalendarClock, X, Search, Users, Banknote,
-  ChevronRight, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Handshake, LayoutGrid, Crown,
+  ChevronRight, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Handshake, LayoutGrid, Crown, FileSpreadsheet,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import { SiengeSalesContract } from "@/types/sienge";
@@ -28,6 +28,7 @@ import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-pro
 import { useCompanyMode } from "@/lib/company-context";
 import {
   inferUnitTypeFromName, shortEnterpriseName, normalizeFloor, floorSortKey, valorDaUnidadeNoContrato,
+  unidadesVendidas, resumoPorTipo,
   ABAS_COMERCIAL, type ComercialAba,
 } from "@/lib/comercial-utils";
 
@@ -58,6 +59,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     selectedUnitCustomers, setSelectedUnitCustomers,
     toggleInSet,
   } = useComercial();
+  // Vendas: contar por unidade (padrão, como no Financeiro da Leven) ou por contrato.
+  const [contarPor, setContarPor] = React.useState<"unidades" | "contratos">("unidades");
 
   const meta = ABAS_COMERCIAL.find(a => a.key === aba)!;
   // Atalhos internos ("ver unidades disponíveis", "ver cliente") trocam de
@@ -129,7 +132,24 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
 
     const totalValue = filtered.reduce((s, c) => s + (c.value || 0), 0);
     const totalContracts = filtered.length;
-    const ticketMedio = totalContracts > 0 ? totalValue / totalContracts : 0;
+    // Vendas por unidade: cada unidade dos contratos filtrados, com a parte dela
+    // no valor do contrato. Com "Tipo Imóvel" marcado, só as unidades daquele
+    // tipo contam (no modo contratos o filtro continua escolhendo contratos).
+    const porUnidade = contarPor === "unidades";
+    // Tipo do cadastro do Sienge (o mesmo do filtro "Tipo Imóvel"); sem cadastro, pelo nome.
+    const tipoCadastro = new Map(apiUnits.map(u => [`${u.enterpriseName}||${u.name}`, u.propertyType]));
+    const tipoNoContrato = (c: { enterpriseName?: string | null }, nome: string) =>
+      tipoCadastro.get(`${c.enterpriseName}||${nome}`) || inferUnitTypeFromName(nome);
+    const uVend = unidadesVendidas(filtered, tipoNoContrato, selectedUnitTypes);
+    const medir = (cs: typeof filtered) => {
+      if (!porUnidade) return { n: cs.length, valor: cs.reduce((s, c) => s + (c.value || 0), 0) };
+      const us = unidadesVendidas(cs, tipoNoContrato, selectedUnitTypes);
+      return { n: us.length, valor: us.reduce((s, u) => s + u.valor, 0) };
+    };
+    const vendasN = porUnidade ? uVend.length : totalContracts;
+    const vendasValor = porUnidade ? uVend.reduce((s, u) => s + u.valor, 0) : totalValue;
+    const vendasTicket = vendasN > 0 ? vendasValor / vendasN : 0;
+    const rotuloN = porUnidade ? "unidades" : "contratos";
     const emitidos = filtered.filter(c => c.situation === "Emitido").length;
     const cancelados = filtered.filter(c => c.situation === "Cancelado" || c.cancellationDate).length;
 
@@ -143,30 +163,33 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
       entry.totalValue += c.value || 0;
     });
     const companyRows = Array.from(byCompany.entries())
-      .map(([name, data]) => ({ name, ...data }))
+      .map(([name, data]) => ({ name, ...data, ...medir(data.contracts) }))
       .sort((a, b) => {
         const { field, dir } = comercialSort;
         let cmp = 0;
         switch (field) {
           case "name": cmp = a.name.localeCompare(b.name); break;
-          case "contracts": cmp = a.contracts.length - b.contracts.length; break;
-          case "totalValue": cmp = a.totalValue - b.totalValue; break;
+          case "contracts": cmp = a.n - b.n; break;
+          case "totalValue": cmp = a.valor - b.valor; break;
           case "ticket": {
-            const ta = a.contracts.length > 0 ? a.totalValue / a.contracts.length : 0;
-            const tb = b.contracts.length > 0 ? b.totalValue / b.contracts.length : 0;
+            const ta = a.n > 0 ? a.valor / a.n : 0;
+            const tb = b.n > 0 ? b.valor / b.n : 0;
             cmp = ta - tb; break;
           }
-          case "pct": cmp = a.totalValue - b.totalValue; break;
+          case "pct": cmp = a.valor - b.valor; break;
         }
         return dir === "asc" ? cmp : -cmp;
       });
 
     // Monthly chart data
+    const pontosGrafico = porUnidade
+      ? uVend.map(u => ({ data: u.data, valor: u.valor }))
+      : filtered.map(c => ({ data: c.contractDate, valor: c.value || 0 }));
     const monthlyMap = new Map<string, number>();
-    filtered.forEach(c => {
-      if (!c.contractDate) return;
-      const key = c.contractDate.substring(0, 7); // YYYY-MM
-      monthlyMap.set(key, (monthlyMap.get(key) || 0) + (c.value || 0));
+    pontosGrafico.forEach(p => {
+      if (!p.data) return;
+      const key = p.data.substring(0, 7); // YYYY-MM
+      monthlyMap.set(key, (monthlyMap.get(key) || 0) + p.valor);
     });
     const monthlyChart = Array.from(monthlyMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -177,10 +200,10 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
 
     // Yearly chart data
     const yearlyMap = new Map<string, number>();
-    filtered.forEach(c => {
-      if (!c.contractDate) return;
-      const year = c.contractDate.substring(0, 4);
-      yearlyMap.set(year, (yearlyMap.get(year) || 0) + (c.value || 0));
+    pontosGrafico.forEach(p => {
+      if (!p.data) return;
+      const year = p.data.substring(0, 4);
+      yearlyMap.set(year, (yearlyMap.get(year) || 0) + p.valor);
     });
     const yearlyChart = Array.from(yearlyMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -255,6 +278,48 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     });
 
     const allUnits = Array.from(unitMap.values());
+
+    // Planilha das unidades vendidas (Vendas › Exportar Excel): uma linha por
+    // unidade dos contratos filtrados (respeita Tipo Imóvel) + aba com o
+    // estoque do Sienge por situação. Mesmo relatório do Financeiro da Leven.
+    const exportarUnidades = async () => {
+      const { planilhaUnidadesVendidas } = await import("@/lib/excel-unidades-vendidas");
+      const info = new Map(allUnits.map(u => [`${u.enterprise}||${u.unit}`, u]));
+      const linhas = uVend
+        .slice()
+        .sort((a, b) => a.empreendimento.localeCompare(b.empreendimento) || a.unidade.localeCompare(b.unidade, "pt-BR", { numeric: true }))
+        .map(u => {
+          const x = info.get(`${u.empreendimento}||${u.unidade}`);
+          return {
+            empreendimento: u.empreendimento, unidade: u.unidade, tipo: u.tipo,
+            pavimento: Number((normalizeFloor(x?.floor || "").match(/\d+/) || [])[0]) || null, area: x?.area || null,
+            estoque: x?.status || "", contrato: u.contrato, situacao: u.situacao, data: u.data,
+            cliente: u.cliente, permuta: u.permuta, valor: Math.round(u.valor * 100) / 100,
+            situacaoQuadro: x?.status || "",
+          };
+        });
+      const emps = new Set(uVend.map(u => u.empreendimento));
+      const est = allUnits.filter(u => (emps.size ? emps.has(u.enterprise) : true) && (selectedUnitTypes.size ? selectedUnitTypes.has(u.tipo) : true));
+      const porSit = new Map<string, number>();
+      est.forEach(u => porSit.set(u.status, (porSit.get(u.status) || 0) + 1));
+      const estoque = Array.from(porSit.entries()).sort((a, b) => b[1] - a[1]).map(([situacao, unidades]) => ({ situacao, unidades }));
+      const filtros = [
+        selectedUnitTypes.size ? `Tipo: ${Array.from(selectedUnitTypes).join(", ")}` : "",
+        selectedUnitEnterprises.size ? `Empreendimento: ${Array.from(selectedUnitEnterprises).map(shortEnterpriseName).join(", ")}` : "",
+        selectedContractStatuses.size ? `Situação: ${Array.from(selectedContractStatuses).join(", ")}` : "",
+        selectedYears.size && selectedYears.size < 5 ? `Ano: ${Array.from(selectedYears).sort().join(", ")}` : "",
+        selectedMonths.size ? `Meses: ${Array.from(selectedMonths).sort().map(m => MONTH_NAMES[m]?.slice(0, 3)).join(", ")}` : "",
+        selectedUnitCustomers.size ? `Cliente: ${selectedUnitCustomers.size} selecionado(s)` : "",
+      ].filter(Boolean);
+      const nomeEmp = emps.size === 1 ? shortEnterpriseName(Array.from(emps)[0]) : "Silva Packer";
+      const blob = await planilhaUnidadesVendidas(linhas, estoque, { empresa: nomeEmp, filtros });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `unidades-vendidas-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      toast.success(`${linhas.length} unidades exportadas`);
+    };
 
     // Tipo Imóvel options for Vendas (cascaded by enterprise selection)
     const vendasUnitsForEnterprise = selectedUnitEnterprises.size === 0 ? allUnits : allUnits.filter(u => selectedUnitEnterprises.has(u.enterprise));
@@ -729,6 +794,19 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           onClear={() => setSelectedUnitCustomers(new Set())}
           activeColor="rose"
         />
+        <div className="ml-auto flex items-center gap-2">
+          <span className="text-xs font-semibold text-slate-500">Contar por</span>
+          <Tabs value={contarPor} onValueChange={v => setContarPor(v as "unidades" | "contratos")}>
+            <TabsList className="h-8">
+              <TabsTrigger value="unidades" className="text-xs px-3 h-7">Unidades</TabsTrigger>
+              <TabsTrigger value="contratos" className="text-xs px-3 h-7">Contratos</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" disabled={uVend.length === 0}
+            onClick={() => { exportarUnidades().catch(() => toast.error("Não foi possível gerar a planilha")); }}>
+            <FileSpreadsheet className="h-4 w-4" /> Exportar Excel
+          </Button>
+        </div>
       </div>
       {/* KPI Cards */}
       <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-4">
@@ -737,9 +815,9 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs font-bold text-indigo-600/80 uppercase tracking-widest">Total Contratos</p>
-                <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{totalContracts}</p>
-                <p className="text-[11px] font-medium text-slate-400 mt-1">{emitidos} emitidos · {cancelados} cancelados</p>
+                <p className="text-xs font-bold text-indigo-600/80 uppercase tracking-widest">{porUnidade ? "Unidades Vendidas" : "Total Contratos"}</p>
+                <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{vendasN}</p>
+                <p className="text-[11px] font-medium text-slate-400 mt-1">{porUnidade ? (resumoPorTipo(uVend) || "nenhuma") + ` · ${totalContracts} contratos` : `${emitidos} emitidos · ${cancelados} cancelados`}</p>
               </div>
               <div className="p-3 bg-indigo-50/80 rounded-2xl ring-1 ring-indigo-100/50 shadow-sm"><FileText className="h-5 w-5 text-indigo-500" /></div>
             </div>
@@ -751,7 +829,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Valor Vendido</p>
-                <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{formatCurrency(totalValue)}</p>
+                <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{formatCurrency(vendasValor)}</p>
+                {porUnidade && selectedUnitTypes.size > 0 && <p className="text-[11px] font-medium text-slate-400 mt-1">parte das unidades filtradas no valor dos contratos</p>}
               </div>
               <div className="p-3 bg-emerald-50/80 rounded-2xl ring-1 ring-emerald-100/50 shadow-sm"><Banknote className="h-5 w-5 text-emerald-500" /></div>
             </div>
@@ -763,7 +842,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-bold text-blue-600/80 uppercase tracking-widest">Ticket Médio</p>
-                <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{formatCurrency(ticketMedio)}</p>
+                <p className="text-3xl font-black text-slate-800 mt-1 tabular-nums tracking-tight">{formatCurrency(vendasTicket)}</p>
+                <p className="text-[11px] font-medium text-slate-400 mt-1">por {porUnidade ? "unidade" : "contrato"}</p>
               </div>
               <div className="p-3 bg-blue-50/80 rounded-2xl ring-1 ring-blue-100/50 shadow-sm"><TrendingUp className="h-5 w-5 text-blue-500" /></div>
             </div>
@@ -826,7 +906,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                     <div className="min-w-0 flex-1">
                       <p className="text-[13px] font-bold text-slate-800 dark:text-slate-100 truncate" title={row.name}>{shortEnterpriseName(row.name)}</p>
                       <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        <strong className="font-extrabold text-slate-700 dark:text-slate-200 tabular-nums">{row.contracts.length}</strong> contratos · <strong className="font-extrabold text-slate-700 dark:text-slate-200 tabular-nums">{formatCurrency(row.totalValue)}</strong>
+                        <strong className="font-extrabold text-slate-700 dark:text-slate-200 tabular-nums">{row.n}</strong> {rotuloN} · <strong className="font-extrabold text-slate-700 dark:text-slate-200 tabular-nums">{formatCurrency(row.valor)}</strong>
                       </p>
                     </div>
                     <span className={`flex-shrink-0 text-sm font-black tabular-nums px-2.5 py-1 rounded-lg ${pctVendido >= 80 ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300" : pctVendido >= 50 ? "bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300" : "bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300"}`}>
@@ -946,7 +1026,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
       <Card className="border-0 shadow-sm mt-6">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-bold text-slate-700">Contratos por Empreendimento</CardTitle>
-          <CardDescription className="text-xs text-slate-400">{totalContracts} contratos · {formatCurrency(totalValue)}</CardDescription>
+          <CardDescription className="text-xs text-slate-400">{vendasN} {rotuloN} · {formatCurrency(vendasValor)}</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-auto max-h-[500px] border-t border-slate-100">
@@ -955,7 +1035,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                 <TableRow className="bg-slate-50/95 backdrop-blur-sm sticky top-0 z-10 shadow-sm border-b border-slate-200">
                 {([
                   { key: "name" as const, label: "Empreendimento", align: "left" },
-                  { key: "contracts" as const, label: "Contratos", align: "right" },
+                  { key: "contracts" as const, label: porUnidade ? "Unidades" : "Contratos", align: "right" },
                   { key: "totalValue" as const, label: "Valor Total", align: "right" },
                   { key: "ticket" as const, label: "Ticket Médio", align: "right" },
                   { key: "pct" as const, label: "% do Total", align: "right" },
@@ -982,8 +1062,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
             </TableHeader>
             <TableBody>
               {companyRows.map(row => {
-                const pct = totalValue > 0 ? (row.totalValue / totalValue) * 100 : 0;
-                const avgTicket = row.contracts.length > 0 ? row.totalValue / row.contracts.length : 0;
+                const pct = vendasValor > 0 ? (row.valor / vendasValor) * 100 : 0;
+                const avgTicket = row.n > 0 ? row.valor / row.n : 0;
                 const isExpanded = expandedComercial.has(`comercial-${row.name}`);
                 return (
                   <React.Fragment key={row.name}>
@@ -1006,8 +1086,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                           <span className="font-semibold text-[13px] text-slate-700" title={row.name}>{shortEnterpriseName(row.name)}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{row.contracts.length}</TableCell>
-                      <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{formatCurrency(row.totalValue)}</TableCell>
+                      <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{row.n}</TableCell>
+                      <TableCell className="text-right font-bold text-[13px] text-slate-700 tabular-nums">{formatCurrency(row.valor)}</TableCell>
                       <TableCell className="text-right text-[13px] text-slate-600 tabular-nums">{formatCurrency(avgTicket)}</TableCell>
                       <TableCell className="text-right pr-5">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold tabular-nums bg-indigo-50 text-indigo-700">
@@ -1046,9 +1126,9 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
               {/* Total row */}
               <TableRow className="bg-indigo-50/50 border-t-2 border-indigo-200">
                 <TableCell className="pl-5 py-3 font-bold text-[13px] text-indigo-800">TOTAL</TableCell>
-                <TableCell className="text-right font-bold text-[13px] text-indigo-800 tabular-nums">{totalContracts}</TableCell>
-                <TableCell className="text-right font-bold text-[14px] text-indigo-800 tabular-nums">{formatCurrency(totalValue)}</TableCell>
-                <TableCell className="text-right font-bold text-[13px] text-indigo-700 tabular-nums">{formatCurrency(ticketMedio)}</TableCell>
+                <TableCell className="text-right font-bold text-[13px] text-indigo-800 tabular-nums">{vendasN}</TableCell>
+                <TableCell className="text-right font-bold text-[14px] text-indigo-800 tabular-nums">{formatCurrency(vendasValor)}</TableCell>
+                <TableCell className="text-right font-bold text-[13px] text-indigo-700 tabular-nums">{formatCurrency(vendasTicket)}</TableCell>
                 <TableCell className="text-right pr-5 font-bold text-[13px] text-indigo-700">100%</TableCell>
               </TableRow>
             </TableBody>
