@@ -13,7 +13,7 @@ import { rankingParceiros, type Parceiro, type SiengeComissao } from "@/lib/come
 import type { SiengeSalesContract } from "@/types/sienge";
 import { AlertTriangle, Building2, User } from "lucide-react";
 
-type Filtro = "todos" | "imobiliaria" | "corretor";
+type Filtro = "todos" | "imobiliaria" | "corretor" | "casa";
 // Ouro, prata, bronze, iguais nos dois temas.
 const MEDALHA = [
   "bg-amber-300 text-amber-950 dark:bg-amber-300 dark:text-amber-950",
@@ -21,7 +21,8 @@ const MEDALHA = [
   "bg-orange-300 text-orange-950 dark:bg-orange-300 dark:text-orange-950",
 ];
 const plural = (n: number, s: string, p = `${s}s`) => `${n} ${n === 1 ? s : p}`;
-const rotuloTipo = (t: Parceiro["tipo"]) => (t === "corretor" ? "Corretor" : "Imobiliária");
+const rotuloTipo = (t: Parceiro["tipo"]) => (t === "casa" ? "Da casa" : t === "corretor" ? "Corretor" : "Imobiliária");
+const corAvatar = (t: Parceiro["tipo"]) => (t === "casa" ? "bg-emerald-700" : t === "corretor" ? "bg-[#4f7096]" : "bg-primary");
 const iniciais = (nome: string) => nome.replace(/\b(LTDA|EIRELI|ME|S\/?A|DE|DA|DO|DOS|DAS|E)\b/gi, " ").trim().split(/\s+/).slice(0, 2).map(w => w[0]).join("").toUpperCase();
 const mesRotulo = (m: string) => { const [a, mm] = m.split("-"); return `${MONTH_LABELS[Number(mm) - 1] || mm}/${a.slice(2)}`; };
 
@@ -45,9 +46,11 @@ export function CorretoresView({ contratos, comissoes }: { contratos: SiengeSale
   const lista = r.parceiros.filter(p => filtro === "todos" || p.tipo === filtro);
   const sel = lista.find(p => p.id === escolhido) ?? lista[0] ?? null;
   const max = Math.max(1, ...lista.map(p => p.valor));
-  const totalVendido = r.valorComParceiros + r.valorDireto;
+  const totalVendido = r.valorComParceiros + r.valorCasa + r.valorDireto;
+  const pct = (v: number) => (totalVendido ? ((v / totalVendido) * 100).toFixed(1).replace(".", ",") : "0");
   const imobs = r.parceiros.filter(p => p.tipo === "imobiliaria").length;
-  const corretores = r.parceiros.length - imobs;
+  const corretores = r.parceiros.filter(p => p.tipo === "corretor").length;
+  const daCasa = r.parceiros.filter(p => p.tipo === "casa");
   // Com mais de 12 meses de histórico as barras mensais ficam ilegíveis: soma por ano.
   const porAno = r.porMes.length > 12;
   const serie = porAno
@@ -59,14 +62,14 @@ export function CorretoresView({ contratos, comissoes }: { contratos: SiengeSale
   const maxMes = Math.max(1, ...serie.map(m => m.valor));
 
   const Tipo = ({ t }: { t: Parceiro["tipo"] }) => (
-    <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${t === "corretor" ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" : "bg-primary/10 text-primary"}`}>{rotuloTipo(t)}</span>
+    <span className={`shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${t === "casa" ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300" : t === "corretor" ? "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" : "bg-primary/10 text-primary"}`}>{rotuloTipo(t)}</span>
   );
 
   return (
     <div className="space-y-5">
       {/* Filtro por tipo */}
       <div role="group" aria-label="Tipo de parceiro" className="inline-flex gap-0.5 rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-900">
-        {([["todos", "Todos"], ["imobiliaria", "Imobiliárias"], ["corretor", "Corretores"]] as const).map(([id, rotulo]) => (
+        {([["todos", "Todos"], ["imobiliaria", "Imobiliárias"], ["corretor", "Corretores"], ["casa", "Da casa"]] as const).map(([id, rotulo]) => (
           <button key={id} type="button" aria-pressed={filtro === id} onClick={() => setFiltro(id)}
             className={`h-8 rounded-md px-3 text-xs font-bold transition-colors ${filtro === id ? "bg-white text-slate-900 shadow-sm dark:bg-slate-100 dark:text-slate-900" : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200"}`}>
             {rotulo}
@@ -75,10 +78,11 @@ export function CorretoresView({ contratos, comissoes }: { contratos: SiengeSale
       </div>
 
       {/* Indicadores */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Indicador rotulo="Vendido com parceiros" valor={formatCurrency(r.valorComParceiros)} apoio={`${plural(r.contratosComParceiros, "contrato")} · ${totalVendido ? ((r.valorComParceiros / totalVendido) * 100).toFixed(1).replace(".", ",") : "0"}% do valor vendido`} barra="bg-emerald-500" />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <Indicador rotulo="Vendido com parceiros" valor={formatCurrency(r.valorComParceiros)} apoio={`${plural(r.contratosComParceiros, "contrato")} · ${pct(r.valorComParceiros)}% do valor vendido`} barra="bg-sky-500" />
+        <Indicador rotulo="Vendido pela equipe da casa" valor={formatCurrency(r.valorCasa)} apoio={`${plural(r.contratosCasa, "contrato")} · ${pct(r.valorCasa)}%${daCasa.length ? ` · ${daCasa.map(p => p.nome.split(" ")[0]).join(", ")}` : ""}`} barra="bg-emerald-600" />
         <Indicador rotulo="Comissões" valor={formatCurrency(r.comissoes)} apoio={r.parceiros.length === 0 ? "nenhuma lançada" : r.comissoesPagas ? "todas pagas" : "há parcelas em aberto"} barra="bg-amber-500" />
-        <Indicador rotulo="Parceiros que venderam" valor={r.parceiros.length} apoio={`${plural(imobs, "imobiliária")} · ${plural(corretores, "corretor autônomo", "corretores autônomos")}`} barra="bg-indigo-500" />
+        <Indicador rotulo="Parceiros externos" valor={imobs + corretores} apoio={`${plural(imobs, "imobiliária")} · ${plural(corretores, "corretor autônomo", "corretores autônomos")}`} barra="bg-indigo-500" />
         <Indicador rotulo="Venda direta / sem corretor" valor={formatCurrency(r.valorDireto)} apoio={`${plural(r.contratosDiretos, "contrato")} sem comissão lançada`} barra="bg-slate-400" />
       </div>
 
@@ -103,7 +107,7 @@ export function CorretoresView({ contratos, comissoes }: { contratos: SiengeSale
                       <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">{rotuloTipo(p.tipo)}</span>
                     </div>
                     <div className="mt-3 flex items-center gap-3">
-                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white ${p.tipo === "corretor" ? "bg-[#4f7096]" : "bg-primary"}`}>{iniciais(p.nome)}</span>
+                      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-sm font-bold text-white ${corAvatar(p.tipo)}`}>{iniciais(p.nome)}</span>
                       <span className="text-sm font-bold leading-snug text-slate-900 dark:text-slate-50">{p.nome}</span>
                     </div>
                     <div className="mt-4 text-2xl font-bold tabular-nums text-slate-900 dark:text-white">{formatCurrency(p.valor)}</div>
@@ -180,8 +184,8 @@ export function CorretoresView({ contratos, comissoes }: { contratos: SiengeSale
                 <div className="h-1 bg-primary" />
                 <div className="border-b border-slate-100 bg-slate-50/70 px-5 pb-4 pt-4 dark:border-slate-800 dark:bg-slate-950/40">
                   <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                    {sel.tipo === "corretor" ? <User className="h-3.5 w-3.5" /> : <Building2 className="h-3.5 w-3.5" />}
-                    {sel.tipo === "corretor" ? "Corretor autônomo" : "Imobiliária parceira"}
+                    {sel.tipo === "imobiliaria" ? <Building2 className="h-3.5 w-3.5" /> : <User className="h-3.5 w-3.5" />}
+                    {sel.tipo === "casa" ? "Corretor da casa" : sel.tipo === "corretor" ? "Corretor autônomo" : "Imobiliária parceira"}
                   </div>
                   <h2 id="parceiro" className="mt-1 text-lg font-bold leading-snug text-slate-900 dark:text-white">{sel.nome}</h2>
                   <dl className="mt-4 grid grid-cols-2 gap-x-5 gap-y-3">
@@ -190,8 +194,8 @@ export function CorretoresView({ contratos, comissoes }: { contratos: SiengeSale
                     <div><dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Contratos</dt><dd className="mt-0.5 text-sm font-bold text-slate-800 dark:text-slate-100">{sel.contratos}</dd></div>
                     <div><dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">Ticket médio</dt><dd className="mt-0.5 text-sm font-bold tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(sel.ticket)}</dd></div>
                   </dl>
-                  {r.valorComParceiros > 0 && (
-                    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{((sel.valor / r.valorComParceiros) * 100).toFixed(1).replace(".", ",")}% do vendido com parceiros</p>
+                  {totalVendido > 0 && (
+                    <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">{pct(sel.valor)}% do valor vendido no período</p>
                   )}
                 </div>
                 <div className="px-5 py-4">
@@ -221,7 +225,7 @@ export function CorretoresView({ contratos, comissoes }: { contratos: SiengeSale
         <div role="note" className="flex gap-3 rounded-xl border border-amber-300/60 bg-amber-50 p-4 dark:border-amber-400/30 dark:bg-amber-400/[0.07]">
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-300" />
           <div>
-            <p className="text-[13px] font-bold text-amber-900 dark:text-amber-200">{r.contratosDiretos} dos {r.contratosDiretos + r.contratosComParceiros} contratos não têm corretor nem comissão lançados no Sienge</p>
+            <p className="text-[13px] font-bold text-amber-900 dark:text-amber-200">{r.contratosDiretos} dos {r.contratosDiretos + r.contratosComParceiros + r.contratosCasa} contratos não têm corretor nem comissão lançados no Sienge</p>
             <p className="mt-1 text-[12.5px] leading-relaxed text-slate-600 dark:text-slate-300">O ranking lê as comissões cadastradas no Sienge. Um contrato vendido por parceiro que ainda não tem a comissão lançada aparece como venda direta até o cadastro ser feito.</p>
           </div>
         </div>

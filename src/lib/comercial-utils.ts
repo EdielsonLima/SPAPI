@@ -104,6 +104,53 @@ export const ABAS_COMERCIAL: { key: ComercialAba; label: string; href: string; s
   { key: "quadro", label: "Quadro Espelho", href: "/comercial/quadro-espelho", subtitle: "Espelho de vendas por pavimento" },
 ];
 
+// Vendas contadas por UNIDADE (trazido do Financeiro da Leven em 22/10/2026).
+// Cada unidade de cada contrato vira uma linha com o tipo da unidade e a parte
+// dela no valor do contrato (valorDaUnidadeNoContrato). Com tipos escolhidos,
+// só eles contam.
+export interface UnidadeVendida { contratoId: number | null; contrato: string; unidade: string; tipo: string; valor: number; data: string; empreendimento: string; cliente: string; situacao: string; permuta: boolean }
+export function unidadesVendidas<C extends { number?: string | null; id?: number | null; value?: number | null; contractDate?: string | null; enterpriseName?: string | null; situation?: string | null; cancellationDate?: string | null; salesContractCustomers?: { name?: string | null }[] | null; paymentConditions?: { conditionTypeId: string }[] | null; salesContractUnits?: { name: string; participationPercentage?: number | null }[] | null }>(
+  contratos: C[],
+  tipoDe: (c: C, nomeUnidade: string) => string,
+  tipos: Set<string> = new Set(),
+): UnidadeVendida[] {
+  const out: UnidadeVendida[] = [];
+  for (const c of contratos) {
+    const us = c.salesContractUnits || [];
+    for (const u of us) {
+      const tipo = tipoDe(c, u.name);
+      if (tipos.size > 0 && !tipos.has(tipo)) continue;
+      out.push({
+        contratoId: c.id ?? null, contrato: String(c.number ?? c.id ?? ""), unidade: u.name, tipo, valor: valorDaUnidadeNoContrato(c.value || 0, us, u.name), data: c.contractDate || "",
+        empreendimento: c.enterpriseName || "", cliente: c.salesContractCustomers?.[0]?.name || "",
+        situacao: c.cancellationDate ? "Cancelado" : c.situation || "", permuta: ehPermuta(c),
+      });
+    }
+  }
+  return out;
+}
+
+// "53 apartamentos · 22 vagas moto · 5 vagas carro" (do maior para o menor).
+export function resumoPorTipo(us: { tipo: string }[]): string {
+  const m = new Map<string, number>();
+  us.forEach(u => m.set(u.tipo, (m.get(u.tipo) || 0) + 1));
+  const plural = (t: string, n: number) => {
+    const b = t.toLowerCase();
+    if (n === 1) return b;
+    const [p, ...r] = b.split(" ");
+    const pp = /[aeiou]$/.test(p) ? p + "s" : /l$/.test(p) ? p.slice(0, -1) + "is" : /[rz]$/.test(p) ? p + "es" : p;
+    return [pp, ...r].join(" ");
+  };
+  return Array.from(m.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t, n]) => `${n} ${plural(t, n)}`).join(" · ");
+}
+
+// Contrato de permuta = todas as condições de pagamento são "PE" (Permuta).
+// Contrato de venda com só uma parte em permuta não conta aqui.
+export function ehPermuta(c: { paymentConditions?: { conditionTypeId: string }[] | null }): boolean {
+  const conds = c.paymentConditions || [];
+  return conds.length > 0 && conds.every(p => p.conditionTypeId === "PE");
+}
+
 // ── Corretores e imobiliárias ──
 // O Sienge guarda quem intermediou a venda na COMISSÃO (/commissions), não no
 // contrato. Uma comissão aponta o contrato pelo número (salesContractNumber,
@@ -118,7 +165,15 @@ export interface SiengeComissao {
 
 // Pessoa jurídica (imobiliária) × pessoa física (corretor autônomo), pelo nome:
 // o /commissions não traz o tipo do cadastro.
-export function tipoParceiro(nome: string): "imobiliaria" | "corretor" {
+// Corretores da própria Silva Packer (equipe comercial interna), pelo nome do
+// credor no Sienge. Gilberto Boing = corretor da casa e gerente comercial
+// (Edielson, 22/10/2026). Ficam no ranking com a etiqueta "Da casa", mas o
+// "Vendido com parceiros" conta só imobiliárias e corretores de fora.
+export const CORRETORES_DA_CASA = new Set(["GILBERTO BOING"]);
+const normNome = (s: string) => (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toUpperCase();
+
+export function tipoParceiro(nome: string): "imobiliaria" | "corretor" | "casa" {
+  if (CORRETORES_DA_CASA.has(normNome(nome))) return "casa";
   return /\b(LTDA|EIRELI|S\/?A|ME|EPP|IMOBILI\w*|NEG[OÓ]CIOS|ADMINISTRA\w*|CONSULTORIA|CORRETORA)\b/i.test(nome) ? "imobiliaria" : "corretor";
 }
 
@@ -129,7 +184,7 @@ type ContratoRanking = {
 
 export interface VendaParceiro { contratoId: number; contrato: string; cliente: string; unidades: string[]; data: string; valor: number; comissao: number; comissaoPaga: boolean }
 export interface Parceiro {
-  id: number; nome: string; tipo: "imobiliaria" | "corretor";
+  id: number; nome: string; tipo: "imobiliaria" | "corretor" | "casa";
   valor: number; comissao: number; contratos: number; clientes: number; ticket: number; vendas: VendaParceiro[];
 }
 
@@ -139,10 +194,12 @@ export function rankingParceiros(comissoes: SiengeComissao[], contratos: Contrat
   contratos.forEach(c => porChave.set(`${c.enterpriseId ?? ""}|${norm(c.number)}`, c));
   const parceiros = new Map<number, { nome: string; vendas: Map<number, VendaParceiro> }>();
   const comParceiro = new Set<number>();
+  const comExterno = new Set<number>();
   comissoes.forEach(k => {
     const c = porChave.get(`${k.enterpriseID}|${norm(k.salesContractNumber)}`);
     if (!c) return; // contrato fora do recorte (filtro, cancelado)
     comParceiro.add(c.id);
+    if (tipoParceiro(k.brokerName) !== "casa") comExterno.add(c.id);
     if (!parceiros.has(k.brokerID)) parceiros.set(k.brokerID, { nome: k.brokerName, vendas: new Map() });
     const p = parceiros.get(k.brokerID)!;
     const v = p.vendas.get(c.id) ?? {
@@ -164,7 +221,10 @@ export function rankingParceiros(comissoes: SiengeComissao[], contratos: Contrat
       ticket: vendas.length ? valor / vendas.length : 0, vendas,
     };
   }).sort((a, b) => b.valor - a.valor || a.nome.localeCompare(b.nome));
-  const intermediados = contratos.filter(c => comParceiro.has(c.id));
+  // Contrato com algum parceiro de fora conta como "com parceiros"; só com a
+  // equipe da casa, conta como "casa".
+  const intermediados = contratos.filter(c => comExterno.has(c.id));
+  const daCasa = contratos.filter(c => comParceiro.has(c.id) && !comExterno.has(c.id));
   const diretos = contratos.filter(c => !comParceiro.has(c.id));
   const porMes = new Map<string, { valor: number; qtd: number }>();
   intermediados.forEach(c => {
@@ -175,6 +235,8 @@ export function rankingParceiros(comissoes: SiengeComissao[], contratos: Contrat
     parceiros: lista,
     valorComParceiros: intermediados.reduce((s, c) => s + (c.value || 0), 0),
     contratosComParceiros: intermediados.length,
+    valorCasa: daCasa.reduce((s, c) => s + (c.value || 0), 0),
+    contratosCasa: daCasa.length,
     comissoes: Math.round(lista.reduce((s, p) => s + p.comissao, 0) * 100) / 100,
     comissoesPagas: lista.every(p => p.vendas.every(v => v.comissaoPaga)),
     valorDireto: diretos.reduce((s, c) => s + (c.value || 0), 0),
