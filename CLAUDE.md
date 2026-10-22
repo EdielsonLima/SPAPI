@@ -102,6 +102,17 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
 - **Exportar Excel (Vendas, 22/10):** `src/lib/excel-unidades-vendidas.ts`
   (exceljs; o `xlsx` grátis não grava estilo), uma linha por unidade + aba
   "Estoque no Sienge" por situação.
+- **Quadro Espelho: situação e botão Valores (22/10, da Leven).** Regra única
+  `situacaoDaUnidade` em `src/lib/situacao-unidade.ts` (trava
+  `situacao-unidade.test.ts`): Vendido vermelho · Disponível verde ·
+  Permutante roxo (unidade vendida em contrato todo PE, `ehPermuta`) ·
+  Reservado amarelo (Reserva Técnica) · Proposta cinza · Vendido/Terceiros
+  rosa. Sem Investidor/Permuta de serviço (classificação manual que a Silva
+  Packer não usa). "Vendidas", "% vendido" e VGV = Vendido + Permutante (o
+  mesmo estoque Vendida de antes). Filtro Situação do Quadro é estado próprio
+  (`selectedSituacoes`), separado do status da tela Unidades. Botão **Valores**
+  desligado por padrão (`quadro_espelho_mostrar_valores`, "1"/"0"): desligado
+  = nenhum R$ no Quadro (célula, dica, VGV, cartão da Grade).
 - Próximas etapas (plano): telas da Leven, Quadro em torre e maquete 3D
   (piloto Palácio Elizabeth).
 - **Suprimentos removido deste app (Edielson, 22/10):** aqui ficam só Financeiro
