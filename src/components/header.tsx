@@ -41,6 +41,7 @@ const pathLabels: Record<string, string[]> = {
   "/comercial/visao-geral": ["Comercial", "Visão Geral"],
   "/comercial/vendas": ["Comercial", "Vendas"],
   "/comercial/clientes": ["Comercial", "Clientes"],
+  "/comercial/corretores": ["Comercial", "Corretores e Imobiliárias"],
   "/comercial/unidades": ["Comercial", "Unidades"],
   "/comercial/quadro-espelho": ["Comercial", "Quadro Espelho"],
 };

@@ -10,6 +10,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   Building,
+  BadgePercent,
   Landmark,
   FileSpreadsheet,
   Ruler,
@@ -134,6 +135,11 @@ const menuItems: MenuItem[] = [
         label: "Clientes",
         href: "/comercial/clientes",
         icon: <Users className="h-4 w-4" />,
+      },
+      {
+        label: "Corretores",
+        href: "/comercial/corretores",
+        icon: <BadgePercent className="h-4 w-4" />,
       },
       {
         label: "Unidades",

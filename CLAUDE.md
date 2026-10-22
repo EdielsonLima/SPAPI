@@ -81,6 +81,14 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   Espelho e da tela Unidades somava o mesmo contrato N vezes (apto + vaga).
   Visão Geral, Vendas e Clientes somam por contrato e não mudaram.
   Trava: `npx tsx src/__tests__/comercial-utils.test.ts`.
+- **Corretores e Imobiliárias (22/10)** — `/comercial/corretores`, trazida da
+  Leven (`corretores-view.tsx`). Lê quem vendeu nas **comissões** do Sienge
+  (`/commissions` → `/api/sienge/commissions`, cache `cached_commissions`, 7 dias
+  ou "Atualizar"), não no contrato. Regra única `rankingParceiros` em
+  `comercial-utils.ts` (casa comissão e contrato por empreendimento + número sem
+  espaços; contrato sem comissão = venda direta); `tipoParceiro` separa
+  imobiliária (PJ pelo nome) de corretor autônomo. Com mais de 12 meses o
+  gráfico soma por ano. Ainda não conferida com dado real da Silva Packer.
 - Próximas etapas (plano): telas da Leven, Quadro em torre e maquete 3D
   (piloto Palácio Elizabeth).
 - **Suprimentos removido deste app (Edielson, 22/10):** aqui ficam só Financeiro

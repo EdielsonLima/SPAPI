@@ -19,7 +19,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useTheme } from "next-themes";
 import { SiengeSalesContract } from "@/types/sienge";
 import { useCompanyMode } from "@/lib/company-context";
-import { inferUnitTypeFromName, type ApiUnit } from "@/lib/comercial-utils";
+import { inferUnitTypeFromName, type ApiUnit, type SiengeComissao } from "@/lib/comercial-utils";
 
 type SetS = React.Dispatch<React.SetStateAction<Set<string>>>;
 
@@ -29,6 +29,7 @@ export interface CompanySetting { companyId: number; companyName: string; areaM2
 interface ComercialContextValue {
   salesContracts: SiengeSalesContract[];
   apiUnits: ApiUnit[];
+  comissoes: SiengeComissao[];
   cubData: CubData | null;
   companySettings: CompanySetting[];
   chartColors: { red: string; green: string; valueText: string; mutedText: string; gridStroke: string };
@@ -93,6 +94,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
 
   const [salesContracts, setSalesContracts] = useState<SiengeSalesContract[]>([]);
   const [apiUnits, setApiUnits] = useState<ApiUnit[]>([]);
+  const [comissoes, setComissoes] = useState<SiengeComissao[]>([]);
   const [cubData, setCubData] = useState<CubData | null>(null);
   const [companySettings, setCompanySettings] = useState<CompanySetting[]>([]);
   const [loading, setLoading] = useState(true);
@@ -143,9 +145,10 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
     const refreshParam = forceRefresh ? "?forceRefresh=true" : "";
     if (forceRefresh) setRefreshing(true);
     try {
-      const [contracts, units] = await Promise.all([
+      const [contracts, units, commissions] = await Promise.all([
         fetch(`/api/sienge/sales-contracts${refreshParam}`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`/api/sienge/units${refreshParam}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`/api/sienge/commissions${refreshParam}`).then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
       if (contracts) {
         setSalesContracts(contracts.data || []);
@@ -155,6 +158,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
         }
       }
       if (units) setApiUnits(units.data || []);
+      if (commissions) setComissoes(commissions.data || []);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -225,7 +229,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
   }, [allCompanyNames]);
 
   const value: ComercialContextValue = {
-    salesContracts, apiUnits, cubData, companySettings, chartColors,
+    salesContracts, apiUnits, comissoes, cubData, companySettings, chartColors,
     loading, refreshing, lastUpdate, refresh: () => fetchData(true),
     allCompanyNames, availableYears,
     selectedCompanies, setSelectedCompanies,
