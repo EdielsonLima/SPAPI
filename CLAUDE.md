@@ -140,7 +140,10 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   torre; laterais só garagens; planta humanizada do lazer
   (`public/modelos/palacio-lazer.webp`, 18,55 px/m pela quadra) deitada na
   cobertura. Texturas desenhadas em canvas, sem arquivo. Altura da base,
-  pé-direito e escala do lazer são estimativas (sem corte).
+  pé-direito e escala do lazer são estimativas (sem corte). Pelas fotos da galeria do
+  site (23/10): coroamento com duas cúpulas escuras (uma por apartamento),
+  guarda-corpo do lazer com pilaretes + vidro escuro + floreira na frente, e
+  alambrado de 4 m na quadra (`ConfigBase.quadra`).
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no

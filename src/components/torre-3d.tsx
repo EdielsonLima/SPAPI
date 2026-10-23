@@ -19,7 +19,7 @@ import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
   configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, type Bloco, type Janela,
 } from "@/lib/torre-3d";
-import { criarTexturas, materiaisDoPredio, caixaUV, montarBase, montarLazer, montarRua } from "@/components/torre-3d-predio";
+import { criarTexturas, materiaisDoPredio, caixaUV, montarBase, montarLazer, montarRua, montarQuadra } from "@/components/torre-3d-predio";
 
 export interface Unidade3D {
   id: string;
@@ -133,6 +133,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     montarBase(base, mats, juntar, geos, Math.min(16, cfg.largura * 0.45));
     montarLazer(base, juntar, descarte);
     montarRua(base, juntar, descarte, escuro);
+    montarQuadra(base, mats, juntar, descarte);
     descarte.push(...geos);
 
     const L = cfg.largura, P = cfg.profundidade;
@@ -208,11 +209,25 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
       [-1, 1].forEach(sx => caixa({ x: sx * (n.largura / 2 - 0.3), y: (yTorre + topo + 7) / 2, z: zc - n.fundo / 2 + 0.1, w: 0.9, h: topo + 7 - yTorre, d: 0.9 }, mats.mosaico));
       caixa({ x: 0, y: topo + 7.4, z: zc, w: n.largura + 0.8, h: 0.8, d: n.fundo + 1.2 }, mats.clara);
     }
-    // Coroamento: cornija, ático com pastilha nas quinas e capa.
+    // Coroamento (foto aérea do site): cornija, platibanda clara e duas
+    // cúpulas escuras, uma sobre cada apartamento, com a casa de máquinas no meio.
     caixa({ x: 0, y: topo + 0.6, z: 0, w: L + 1.6, h: 1.2, d: P + 1.6 }, mats.clara);
-    caixa({ x: 0, y: topo + 2.9, z: 0, w: L + 0.4, h: 3.4, d: P + 0.4 }, mats.fachada);
-    [-1, 1].forEach(sx => caixa({ x: sx * (L / 2 - 1.5), y: topo + 2.9, z: P / 2 + 0.25, w: 2.4, h: 3.4, d: 0.2 }, mats.mosaico));
-    caixa({ x: 0, y: topo + 4.9, z: 0, w: L + 1.2, h: 0.7, d: P + 1.2 }, mats.clara);
+    caixa({ x: 0, y: topo + 2.4, z: 0, w: L + 0.4, h: 2.4, d: P + 0.4 }, mats.fachada);
+    [-1, 1].forEach(sx => caixa({ x: sx * (L / 2 - 1.5), y: topo + 2.4, z: P / 2 + 0.25, w: 2.4, h: 2.4, d: 0.2 }, mats.mosaico));
+    caixa({ x: 0, y: topo + 3.9, z: 0, w: L + 1.2, h: 0.6, d: P + 1.2 }, mats.clara);
+    const gCupula = new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2);
+    descarte.push(gCupula);
+    [-1, 1].forEach(sx => {
+      const w = L / 2 - 3;
+      caixa({ x: sx * (L / 4 + 0.5), y: topo + 4.8, z: 0, w: w + 0.6, h: 1.2, d: P - 1.4 }, mats.clara); // tambor
+      const c = new THREE.Mesh(gCupula, mats.cupula);
+      c.scale.set(w / 2, 5.2, (P - 2) / 2);
+      c.position.set(sx * (L / 4 + 0.5), topo + 5.4, 0);
+      c.castShadow = true;
+      grupo.add(c);
+      const lanterna = caixa({ x: sx * (L / 4 + 0.5), y: topo + 10.9, z: 0, w: 1.2, h: 0.8, d: 1.2 }, mats.clara);
+      lanterna.castShadow = false;
+    });
 
     // Interação: passar o mouse acende, clicar seleciona.
     const ray = new THREE.Raycaster();

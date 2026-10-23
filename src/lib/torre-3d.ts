@@ -46,6 +46,8 @@ export interface ConfigBase {
   contorno: [number, number][];
   // Planta humanizada do lazer, deitada na cobertura (centro e tamanho em m).
   lazer?: { url: string; x: number; z: number; largura: number; profundidade: number };
+  // Quadra na cobertura (leva alambrado), retângulo em m.
+  quadra?: { x0: number; z0: number; x1: number; z1: number };
 }
 
 export const CONFIG_PADRAO: ConfigTorre = {
@@ -95,6 +97,7 @@ export const CONFIG_PALACIO: ConfigTorre = {
     altura: 21, peDireitoLazer: 4.5, alturaLojas: 5.5,
     // Corpo principal + quadra nos fundos (contorno da planta do lazer).
     contorno: [pxM(230, 573), pxM(1075, 573), pxM(1075, 24), pxM(1875, 24), pxM(1875, 573), pxM(2235, 573), pxM(2235, 1325), pxM(230, 1325)],
+    quadra: (() => { const [x0, z0] = pxM(1075, 24), [x1, z1] = pxM(1875, 573); return { x0, z0, x1, z1 }; })(),
     lazer: { url: "/modelos/palacio-lazer.webp", ...(() => { const [x, z] = pxM(1233, 675); return { x, z }; })(), largura: 2006 / PX_M, profundidade: 1302 / PX_M },
   },
 };
