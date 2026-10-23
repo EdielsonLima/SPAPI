@@ -13,7 +13,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useTheme } from "next-themes";
-import { RotateCw, X, Maximize2 } from "lucide-react";
+import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
@@ -38,6 +38,9 @@ interface Props {
   unidades: Unidade3D[];
   empreendimento: string;
   mostrarValores: boolean;
+  // Unidade com contrato: o card mostra "Ver contrato" (abre a ficha na tela).
+  temContrato?: (id: string) => boolean;
+  onAbrirContrato?: (id: string) => void;
 }
 
 const FACHADA = new THREE.Color("#e9e1d3");   // bege da perspectiva do Palácio
@@ -45,13 +48,41 @@ const VIDRO = new THREE.Color("#1f2a33");
 const corDe = (sit: string) => new THREE.Color(COR_SITUACAO[sit] || "#f59e0b");
 const temDono = (sit: string) => sit === "Vendido" || sit === "Permutante" || sit === "Vendido/Terceiros";
 
-export default function Torre3D({ unidades, empreendimento, mostrarValores }: Props) {
+export default function Torre3D({ unidades, empreendimento, mostrarValores, temContrato, onAbrirContrato }: Props) {
   const host = useRef<HTMLDivElement>(null);
   const { resolvedTheme } = useTheme();
   const escuro = resolvedTheme === "dark";
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [girando, setGirando] = useState(true);
-  const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void } | null>(null);
+  const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void; focar: (id: string) => void } | null>(null);
+  const [espelhoAberto, setEspelhoAberto] = useState(true);
+
+  // Tela cheia (Edielson, 23/10): só a área do 3D. Fullscreen API no próprio
+  // contêiner (o ResizeObserver ajusta o canvas); navegador sem a API
+  // (iPhone) cai num modo fixo que cobre a janela.
+  const caixa = useRef<HTMLDivElement>(null);
+  const [telaCheia, setTelaCheia] = useState(false);
+  const [cheiaFixa, setCheiaFixa] = useState(false);
+  useEffect(() => {
+    const f = () => setTelaCheia(!!caixa.current && document.fullscreenElement === caixa.current);
+    document.addEventListener("fullscreenchange", f);
+    return () => document.removeEventListener("fullscreenchange", f);
+  }, []);
+  useEffect(() => {
+    if (!cheiaFixa) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setCheiaFixa(false); };
+    const ov = document.body.style.overflow; document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", esc);
+    return () => { window.removeEventListener("keydown", esc); document.body.style.overflow = ov; };
+  }, [cheiaFixa]);
+  const cheia = telaCheia || cheiaFixa;
+  const sairDaTelaCheia = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); setCheiaFixa(false); };
+  const alternarTelaCheia = () => {
+    if (cheia) { sairDaTelaCheia(); return; }
+    const el = caixa.current;
+    if (el?.requestFullscreen) el.requestFullscreen().catch(() => setCheiaFixa(true));
+    else setCheiaFixa(true);
+  };
 
   const cfg = useMemo(() => configDoEmpreendimento(empreendimento), [empreendimento]);
   // Layout: finais de cada andar na ordem da frente.
@@ -161,6 +192,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     const blocos: THREE.Object3D[] = [];
     const matsUnidade = new Map<string, { corpo: THREE.MeshStandardMaterial; sacada: THREE.MeshStandardMaterial }>();
     const janelas: { j: Janela; id: string; cor: THREE.Color }[] = [];
+    const focos = new Map<string, THREE.Vector3>(); // frente de cada unidade (câmera vai até ela)
     const neutroCorpo = new THREE.MeshStandardMaterial({ color: FACHADA.clone(), roughness: 0.8 });
     const neutroSacada = new THREE.MeshStandardMaterial({ color: "#9fb4c2", roughness: 0.2, transparent: true, opacity: 0.55 });
     descarte.push(neutroCorpo, neutroSacada);
@@ -173,7 +205,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
       });
       const sac = semSituacao ? neutroSacada : new THREE.MeshStandardMaterial({ color: u.apagada ? FACHADA.clone() : cor, roughness: 0.3, transparent: true, opacity: u.apagada ? 0.3 : 0.75 });
       if (!semSituacao) { descarte.push(corpo, sac); matsUnidade.set(u.id, { corpo, sacada: sac }); }
-      const b = caixa(blocoDaUnidade(indice, total, u.andar, primeiro, cfg), corpo);
+      const bloco = blocoDaUnidade(indice, total, u.andar, primeiro, cfg);
+      if (!semSituacao) focos.set(u.id, new THREE.Vector3(bloco.x, bloco.y, P / 2));
+      const b = caixa(bloco, corpo);
       b.userData.id = u.id; blocos.push(b);
       const sb = sacadaDaUnidade(indice, total, u.andar, primeiro, cfg);
       caixa(sb, mats.clara); // laje
@@ -276,8 +310,18 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     renderer.domElement.addEventListener("pointerdown", baixar);
     renderer.domElement.addEventListener("pointerup", soltar);
 
+    // Voo da câmera: desliza até o destino; qualquer arrasto do usuário cancela.
+    let voo: { pos: THREE.Vector3; alvo: THREE.Vector3 } | null = null;
+    const cancelarVoo = () => { voo = null; };
+    controls.addEventListener("start", cancelarVoo);
     api.current = {
-      resetar: () => { camera.position.copy(posInicial); controls.target.copy(alvo); },
+      resetar: () => { voo = { pos: posInicial.clone(), alvo: alvo.clone() }; },
+      focar: id => {
+        const f = focos.get(id); if (!f) return;
+        controls.autoRotate = false;
+        // De frente e um pouco de lado, a ~45 m: o andar e os vizinhos de cima e de baixo.
+        voo = { pos: new THREE.Vector3(f.x * 0.6 + (f.x <= 0 ? -16 : 16), f.y + 8, f.z + 44), alvo: f.clone() };
+      },
       girar: v => { controls.autoRotate = v; },
       marcar: id => { marcada = id; pintar(); },
     };
@@ -289,7 +333,14 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     });
     ro.observe(el);
     let quadro = 0;
-    const laco = () => { quadro = requestAnimationFrame(laco); controls.update(); renderer.render(scene, camera); };
+    const laco = () => {
+      quadro = requestAnimationFrame(laco);
+      if (voo) {
+        camera.position.lerp(voo.pos, 0.08); controls.target.lerp(voo.alvo, 0.08);
+        if (camera.position.distanceTo(voo.pos) < 0.3 && controls.target.distanceTo(voo.alvo) < 0.3) voo = null;
+      }
+      controls.update(); renderer.render(scene, camera);
+    };
     laco();
     (window as unknown as { __torre3d?: unknown }).__torre3d = { renderer, scene, camera, controls };
 
@@ -299,6 +350,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
       renderer.domElement.removeEventListener("pointermove", mover);
       renderer.domElement.removeEventListener("pointerdown", baixar);
       renderer.domElement.removeEventListener("pointerup", soltar);
+      controls.removeEventListener("start", cancelarVoo);
       controls.dispose();
       descarte.forEach(d => d.dispose());
       renderer.dispose();
@@ -312,32 +364,72 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
 
   const sel = selecionada ? porId.get(selecionada) : undefined;
   const contagem = SITUACOES.map(s => ({ ...s, n: unidades.filter(u => !u.apagada && u.situacao === s.nome).length })).filter(s => s.n > 0);
+  // Espelho por pavimento (do último andar para baixo), na ordem da frente.
+  const espelho = useMemo(() => {
+    const porAndar = new Map<number, (typeof layout.itens)[number][]>();
+    layout.itens.forEach(i => { if (!i.u.id) return; if (!porAndar.has(i.u.andar)) porAndar.set(i.u.andar, []); porAndar.get(i.u.andar)!.push(i); });
+    return Array.from(porAndar.entries()).sort((a, b) => b[0] - a[0]).map(([andar, lista]) => ({ andar, lista: lista.sort((a, b) => a.indice - b.indice) }));
+  }, [layout]);
+  const irPara = (id: string) => { setSelecionada(id); api.current?.focar(id); };
 
   if (layout.itens.length === 0) {
     return <p className="text-sm text-slate-400 text-center py-10">Nenhum apartamento com andar no nome (ex.: AP1201) para montar a maquete.</p>;
   }
 
+  const botao = "h-8 inline-flex items-center justify-center gap-1.5 rounded-lg border shadow-sm bg-white/90 border-slate-200 text-slate-600 hover:text-slate-900 dark:bg-slate-900/85 dark:border-slate-700 dark:text-slate-300 dark:hover:text-white";
   return (
-    <div className="relative w-full h-[640px] rounded-xl overflow-hidden border border-slate-200/60 dark:border-slate-700/60">
+    <div ref={caixa} className={`${cheiaFixa ? "fixed inset-0 z-[100] rounded-none" : cheia ? "h-full w-full" : "relative w-full h-[640px] rounded-xl border border-slate-200/60 dark:border-slate-700/60"} relative overflow-hidden ${cheia ? "bg-slate-100 dark:bg-slate-950" : ""}`}>
       <div ref={host} className="absolute inset-0" />
-      {/* Legenda */}
-      <div className="absolute left-3 top-3 rounded-lg bg-white/90 dark:bg-slate-900/85 shadow-sm px-3 py-2 text-[11px] space-y-1">
-        <p className="font-bold text-slate-700 dark:text-slate-200">{cfg.nome === "padrão" ? empreendimento : cfg.nome}</p>
-        {contagem.map(s => (
-          <div key={s.nome} className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.cor }} />
-            <span className="text-slate-600 dark:text-slate-300">{s.nome}: <strong>{s.n}</strong></span>
+      {/* Painel: legenda + espelho por pavimento (clique leva a câmera até a unidade) */}
+      <div className="absolute left-3 top-3 bottom-3 flex w-[224px] max-w-[calc(100%-1.5rem)] flex-col pointer-events-none">
+        <div className="pointer-events-auto flex max-h-full min-h-0 flex-col rounded-lg bg-white/90 dark:bg-slate-900/85 shadow-sm px-3 py-2 text-[11px]">
+          <p className="font-bold text-slate-700 dark:text-slate-200">{cfg.nome === "padrão" ? empreendimento : cfg.nome}</p>
+          <div className="mt-1 space-y-1">
+            {contagem.map(s => (
+              <div key={s.nome} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.cor }} />
+                <span className="text-slate-600 dark:text-slate-300">{s.nome}: <strong>{s.n}</strong></span>
+              </div>
+            ))}
           </div>
-        ))}
-        <p className="text-[10px] text-slate-400 pt-1">{cfg.cotaRef ? "Pelo projeto: planta tipo, cortes e garagens" : cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
+          <button type="button" onClick={() => setEspelhoAberto(v => !v)} className="mt-2 flex w-full items-center justify-between border-t border-slate-200 dark:border-slate-700 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-800 dark:hover:text-white">
+            <span className="inline-flex items-center gap-1.5"><Layers className="h-3 w-3" />Espelho por pavimento</span>
+            <ChevronUp className={`h-3.5 w-3.5 transition-transform ${espelhoAberto ? "" : "rotate-180"}`} />
+          </button>
+          {espelhoAberto && (
+            <div className="mt-1.5 min-h-0 flex-1 overflow-auto pr-1 space-y-[2px]">
+              {espelho.map(({ andar, lista }) => (
+                <div key={andar} className="flex items-center gap-1">
+                  <span className="w-5 text-right text-[10px] font-bold tabular-nums text-slate-400">{andar}</span>
+                  <div className="flex flex-1 gap-[3px]">
+                    {lista.map(({ u }) => {
+                      const ativo = u.id === selecionada;
+                      return (
+                        <button key={u.id} type="button" onClick={() => irPara(u.id)} title={`${u.unit} · ${u.situacao}`}
+                          className={`flex-1 h-[20px] rounded-[4px] text-[10px] font-bold tabular-nums text-white transition-transform hover:-translate-y-px ${ativo ? "ring-2 ring-offset-1 ring-slate-900 dark:ring-white dark:ring-offset-slate-900" : ""} ${u.apagada ? "opacity-30" : ""}`}
+                          style={{ background: COR_SITUACAO[u.situacao] || "#f59e0b" }}>
+                          {u.unit.replace(/^AP/i, "")}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-slate-400 pt-1.5">{cfg.cotaRef ? "Pelo projeto: planta tipo, cortes e garagens" : cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
+        </div>
       </div>
       {/* Controles */}
       <div className="absolute right-3 top-3 flex gap-1.5">
-        <button type="button" onClick={() => setGirando(g => !g)} title={girando ? "Parar de girar" : "Girar"} className={`h-8 w-8 inline-flex items-center justify-center rounded-lg border shadow-sm ${girando ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-white/90 border-slate-200 text-slate-600 dark:bg-slate-900/85 dark:border-slate-700 dark:text-slate-300"}`}>
+        <button type="button" onClick={() => setGirando(g => !g)} title={girando ? "Parar de girar" : "Girar"} className={`${botao} w-8 ${girando ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
           <RotateCw className="h-4 w-4" />
         </button>
-        <button type="button" onClick={() => api.current?.resetar()} title="Voltar à vista inicial" className="h-8 w-8 inline-flex items-center justify-center rounded-lg border shadow-sm bg-white/90 border-slate-200 text-slate-600 dark:bg-slate-900/85 dark:border-slate-700 dark:text-slate-300">
-          <Maximize2 className="h-4 w-4" />
+        <button type="button" onClick={() => { setSelecionada(null); api.current?.resetar(); }} title="Voltar à vista inicial" className={`${botao} w-8`}>
+          <Home className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={alternarTelaCheia} title={cheia ? "Sair da tela cheia (Esc)" : "Tela cheia"} className={`${botao} px-2.5 text-xs font-semibold`}>
+          {cheia ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}{cheia ? "Sair" : "Tela cheia"}
         </button>
       </div>
       {/* Card da unidade */}
@@ -357,6 +449,11 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
             {mostrarValores && sel.u.valor > 0 && <div className="flex justify-between"><dt className="text-slate-500">Valor no contrato</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.valor)}</dd></div>}
             {mostrarValores && sel.u.preco > 0 && <div className="flex justify-between"><dt className="text-slate-500">Preço de tabela</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.preco)}</dd></div>}
           </dl>
+          {onAbrirContrato && temContrato?.(sel.u.id) && (
+            <button type="button" onClick={() => { sairDaTelaCheia(); onAbrirContrato(sel.u.id); }} className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
+              Ver contrato
+            </button>
+          )}
         </div>
       )}
     </div>

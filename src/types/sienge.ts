@@ -404,6 +404,8 @@ export interface SiengeSalesContractPaymentCondition {
 }
 
 export interface SiengeSalesContract {
+  // Título de contas a receber gerado pelo contrato (casa com SiengeIncome.billId).
+  receivableBillId?: number;
   id: number;
   companyId: number;
   companyName: string;

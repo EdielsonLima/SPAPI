@@ -32,6 +32,7 @@ import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-pro
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
 import { andarEFinal } from "@/lib/torre-3d";
+import { FichaContrato } from "@/components/ficha-contrato";
 // three.js só baixa quando alguém abre a visão 3D.
 const Torre3D = dynamic(() => import("@/components/torre-3d"), { ssr: false, loading: () => <p className="text-sm text-slate-400 text-center py-10">Carregando maquete…</p> });
 import {
@@ -72,6 +73,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
   const [contarPor, setContarPor] = React.useState<"unidades" | "contratos">("unidades");
   // Quadro › 3D: qual empreendimento a maquete mostra (com mais de um filtrado).
   const [emp3d, setEmp3d] = React.useState("");
+  // Ficha do contrato aberta (chave "empreendimento||unidade").
+  const [fichaKey, setFichaKey] = React.useState<string | null>(null);
 
   const meta = ABAS_COMERCIAL.find(a => a.key === aba)!;
   // Atalhos internos ("ver unidades disponíveis", "ver cliente") trocam de
@@ -309,6 +312,20 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     });
 
     const allUnits = Array.from(unitMap.values());
+    // Contrato ativo de cada unidade (o mais recente): abre a ficha do contrato.
+    const contratoPorUnidade = new Map<string, SiengeSalesContract>();
+    salesContracts.forEach(c => {
+      if (c.cancellationDate || c.situation === "Cancelado" || c.situation === "Distratado") return;
+      (c.salesContractUnits || []).forEach(cu => {
+        const k = `${c.enterpriseName}||${cu.name}`;
+        const atual = contratoPorUnidade.get(k);
+        if (!atual || (c.contractDate || "") > (atual.contractDate || "")) contratoPorUnidade.set(k, c);
+      });
+    });
+    const abrirFicha = (u: { enterprise: string; unit: string }) => {
+      const k = `${u.enterprise}||${u.unit}`;
+      if (contratoPorUnidade.has(k)) setFichaKey(k);
+    };
     // Situação do Quadro (cor/legenda): estoque do Sienge + permuta pura = Permutante.
     allUnits.forEach(u => { u.situacao = situacaoDaUnidade(u.status, u.permuta); });
     // Preço de tabela (painel) só vale para unidade sem venda; a vendida mostra o contrato.
@@ -1953,7 +1970,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                       </select>
                     </div>
                   )}
-                  <Torre3D unidades={unidades3d} empreendimento={shortEnterpriseName(ent)} mostrarValores={mostrarValores} />
+                  <Torre3D unidades={unidades3d} empreendimento={shortEnterpriseName(ent)} mostrarValores={mostrarValores} temContrato={id => contratoPorUnidade.has(id)} onAbrirContrato={setFichaKey} />
                 </CardContent>
               </Card>
             );
@@ -2028,7 +2045,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                                     <div
                                       key={`${u.unit}-${i}`}
                                       title={dica(u)}
-                                      className={`min-w-[60px] rounded-md border px-2 py-1.5 text-center transition-colors cursor-default ${estilo(u.situacao).cell}`}
+                                      onClick={() => abrirFicha(u)}
+                                      className={`min-w-[60px] rounded-md border px-2 py-1.5 text-center transition-colors ${contratoPorUnidade.has(`${u.enterprise}||${u.unit}`) ? "cursor-pointer hover:ring-2 hover:ring-slate-400/60" : "cursor-default"} ${estilo(u.situacao).cell}`}
                                     >
                                       <span className="block text-xs font-bold leading-none truncate max-w-[88px]">{shortLabel(u.unit)}</span>
                                       <span className="block text-[8px] font-semibold uppercase tracking-wide mt-1 opacity-75">
@@ -2062,6 +2080,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                     {qVisible.filter(u => u.enterprise === ent).map((u, idx) => (
                 <div
                   key={`${u.unit}-${idx}`}
+                  onClick={() => abrirFicha(u)}
                   className={`relative rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-1 group ${estilo(u.situacao).card}`}
                   title={dica(u)}
                 >
@@ -2097,6 +2116,17 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           )}
         </>;
       })()}      </div>
+      {(() => {
+        const c = fichaKey ? contratoPorUnidade.get(fichaKey) : undefined;
+        const un = fichaKey ? allUnits.find(x => `${x.enterprise}||${x.unit}` === fichaKey) : undefined;
+        const [entF, unitF] = (fichaKey || "||").split("||");
+        const porNome = new Map(allUnits.filter(x => x.enterprise === entF).map(x => [x.unit, { tipo: x.tipo, area: x.area }]));
+        return (
+          <FichaContrato
+            unidade={fichaKey ? { enterprise: entF, unit: unitF, tipo: un?.tipo || "", area: un?.area || 0, floor: un?.floor || "", situacao: un?.situacao || "" } : null}
+            contrato={c} unidadesPorNome={porNome} mostrarValores={mostrarValores} onClose={() => setFichaKey(null)} />
+        );
+      })()}
     </div>
   );
 }
