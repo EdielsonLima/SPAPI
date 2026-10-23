@@ -1,6 +1,6 @@
 // Trava da geometria da maquete: npx tsx src/__tests__/torre-3d.test.ts
 import assert from "node:assert/strict";
-import { andarEFinal, ordenarFinais, sacadaDaUnidade, blocoDaUnidade, cotaDoAndar, configDoEmpreendimento, CONFIG_PALACIO, CONFIG_PADRAO, janelasDaUnidade, alturaEmbasamento, baseDaTorre } from "../lib/torre-3d";
+import { andarEFinal, ordenarFinais, sacadaDaUnidade, blocoDaUnidade, cotaDoAndar, configDoEmpreendimento, CONFIG_PALACIO, CONFIG_PADRAO, janelasDaUnidade, alturaEmbasamento, baseDaTorre, plantaDaUnidade } from "../lib/torre-3d";
 
 assert.deepEqual(andarEFinal("AP3001"), { andar: 30, final: "01" });
 assert.deepEqual(andarEFinal("AP 302"), { andar: 3, final: "02" });
@@ -41,4 +41,9 @@ assert.ok(Math.max(...zs) > 5 + CONFIG_PALACIO.sacada && Math.min(...zs) < -5 - 
 // sem base própria: retângulo em volta da torre, altura pelos andares de baixo
 assert.equal(baseDaTorre(6, CONFIG_PADRAO).altura, 15);
 assert.equal(baseDaTorre(6, CONFIG_PADRAO).contorno.length, 4);
+// Planta humanizada: final 02 é o espelho; andares 1–2 (7º e 8º do projeto) levam a nota.
+assert.deepEqual(plantaDaUnidade(CONFIG_PALACIO, "AP1801"), { url: "/modelos/palacio-planta-tipo.webp", titulo: CONFIG_PALACIO.planta!.titulo, espelhada: false, nota: null });
+assert.equal(plantaDaUnidade(CONFIG_PALACIO, "AP1802")!.espelhada, true);
+assert.ok(plantaDaUnidade(CONFIG_PALACIO, "AP201")!.nota);
+assert.equal(plantaDaUnidade(CONFIG_PADRAO, "AP101"), null);
 console.log("torre-3d: ok");

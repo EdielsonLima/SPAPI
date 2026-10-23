@@ -13,13 +13,14 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useTheme } from "next-themes";
-import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp } from "lucide-react";
+import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
-import type { DadosEntorno } from "@/lib/entorno-osm";
+import { VERSAO_ENTORNO, type DadosEntorno } from "@/lib/entorno-osm";
 import { AndamentoObraCard } from "@/components/andamento-obra-card";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
-  configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, type Bloco, type Janela,
+  configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, plantaDaUnidade, type Bloco, type Janela,
 } from "@/lib/torre-3d";
 import { criarTexturas, materiaisDoPredio, caixaUV, montarBase, montarLazer, montarRua, montarQuadra } from "@/components/torre-3d-predio";
 
@@ -61,6 +62,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void; focar: (id: string) => void; filtrar: (sits: string[]) => void } | null>(null);
   const [espelhoAberto, setEspelhoAberto] = useState(true);
   const etiqueta = useRef<HTMLDivElement>(null);
+  const bussola = useRef<HTMLDivElement>(null);
+  const [plantaAberta, setPlantaAberta] = useState(false);
+  useEffect(() => { setPlantaAberta(false); }, [selecionada]); // outra unidade = planta fechada
   const [fonteMapa, setFonteMapa] = useState("");
   const [avisoMapa, setAvisoMapa] = useState(""); // "carregando…" / "indisponível": o mapa não falha calado
   // Filtro da legenda (Edielson, 23/10: tem de funcionar na tela cheia, onde
@@ -137,13 +141,14 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(escuro ? "#0f172a" : "#dbeafe");
-    scene.fog = new THREE.Fog(scene.background as THREE.Color, 600, 1400);
+    // Com mapa da cidade: neblina a partir de ~1 km, a borda do mapa some no céu.
+    scene.fog = cfg.local ? new THREE.Fog(scene.background as THREE.Color, 1000, 2100) : new THREE.Fog(scene.background as THREE.Color, 600, 1400);
 
     const { primeiro, ultimo } = layout;
     const hBase = alturaEmbasamento(primeiro, cfg);
     const topo = cotaDoAndar(ultimo + 1, primeiro, cfg);
 
-    const camera = new THREE.PerspectiveCamera(40, largura / altura, 1, 2000);
+    const camera = new THREE.PerspectiveCamera(40, largura / altura, 1, cfg.local ? 3000 : 2000);
     // Enquadra o prédio inteiro (fov 40°): distância ~ 1,6 × a altura.
     const alvo = new THREE.Vector3(0, topo * 0.45, 0);
     // De frente, um pouco pela esquerda, como a perspectiva do Palácio.
@@ -153,7 +158,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     controls.target.copy(alvo);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI * 0.49;
-    controls.minDistance = 20; controls.maxDistance = cfg.local ? Math.max(topo * 3, 700) : topo * 3;
+    controls.minDistance = 20; controls.maxDistance = cfg.local ? Math.max(topo * 3, 1100) : topo * 3;
     controls.autoRotate = true; controls.autoRotateSpeed = 0.6;
 
     scene.add(new THREE.HemisphereLight(escuro ? "#475569" : "#ffffff", escuro ? "#1e293b" : "#cbd5e1", escuro ? 1.1 : 1.6));
@@ -165,7 +170,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     Object.assign(sol.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: topo * 4 });
     scene.add(sol);
 
-    const chao = new THREE.Mesh(new THREE.CircleGeometry(cfg.local ? 1600 : 400, 64), new THREE.MeshStandardMaterial({ color: escuro ? "#1e293b" : "#e2e8f0" }));
+    const chao = new THREE.Mesh(new THREE.CircleGeometry(cfg.local ? 2600 : 400, 64), new THREE.MeshStandardMaterial({ color: escuro ? "#1e293b" : "#e2e8f0" }));
     chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true;
     scene.add(chao);
     const descarte: { dispose(): void }[] = [chao.geometry, chao.material as THREE.Material];
@@ -188,10 +193,11 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     montarRua(base, juntar, descarte, escuro);
     // Entorno real (ruas com nome, quadras, praia), carregado depois do prédio.
     let vivo = true, entorno: { dispose: () => void } | null = null;
+    let norte: THREE.Vector2 | null = null; // direção do norte na cena (x, z), vinda do mapa
     if (cfg.local) {
       const zRua = Math.max(...base.contorno.map(p => p[1])) + 13; // eixo da rua da frente (montarRua)
       setAvisoMapa("Carregando o mapa da cidade…");
-      fetch(`/api/entorno-3d?chave=${encodeURIComponent(cfg.local.chave)}`)
+      fetch(`/api/entorno-3d?chave=${encodeURIComponent(cfg.local.chave)}&v=${VERSAO_ENTORNO}`)
         .then(r => r.ok ? r.json() : null)
         .then(async (d: DadosEntorno | null) => {
           if (!vivo) return;
@@ -202,6 +208,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           e.grupo.position.set(-(cfg.local?.ajusteX || 0), 0, zRua);
           scene.add(e.grupo); entorno = e;
           setFonteMapa(d.fonte); setAvisoMapa("");
+          if (d.norte) norte = new THREE.Vector2(d.norte[0], d.norte[1]).normalize();
         })
         .catch(() => { if (vivo) setAvisoMapa("Mapa da cidade indisponível agora"); });
     }
@@ -398,6 +405,19 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         if (camera.position.distanceTo(voo.pos) < 0.3 && controls.target.distanceTo(voo.alvo) < 0.3) voo = null;
       }
       controls.update(); renderer.render(scene, camera);
+      const bu = bussola.current;
+      if (bu) {
+        bu.style.display = norte ? "flex" : "none";
+        if (norte) {
+          // Ângulo do norte em relação ao "para frente" da câmera (o alto da tela).
+          const fx = controls.target.x - camera.position.x, fz = controls.target.z - camera.position.z;
+          const ang = Math.atan2(fx * norte.y - fz * norte.x, fx * norte.x + fz * norte.y);
+          const g = (ang * 180) / Math.PI;
+          (bu.firstElementChild as HTMLElement).style.transform = `rotate(${g}deg)`;
+          // As letras giram com a rosa, mas ficam sempre de pé.
+          bu.querySelectorAll("text").forEach(t => t.setAttribute("transform", `rotate(${-g} ${t.getAttribute("x")} ${t.getAttribute("y")})`));
+        }
+      }
       if (moldura.visible) matMoldura.opacity = 0.55 + 0.45 * Math.sin(performance.now() / 260);
       const et = etiqueta.current, b = marcada ? caixaDe.get(marcada) : undefined;
       if (et) {
@@ -517,6 +537,18 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           <AndamentoObraCard chave={cfg.local.chave} />
         </div>
       )}
+      <div ref={bussola} style={{ display: "none" }} title="Norte" className="pointer-events-none absolute top-14 right-3 h-16 w-16 items-center justify-center rounded-full bg-white/85 dark:bg-slate-900/80 shadow ring-1 ring-slate-200 dark:ring-slate-700">
+        <svg viewBox="-32 -32 64 64" className="h-full w-full">
+          <path d="M0 -21 L5 0 L0 -3 L-5 0 Z" fill="#dc2626" />
+          <path d="M0 21 L5 0 L0 3 L-5 0 Z" fill="#94a3b8" />
+          <g fontSize="9" fontWeight="700" textAnchor="middle" dominantBaseline="central" fontFamily="Inter, system-ui, sans-serif">
+            <text x="0" y="-26" fill="#dc2626">N</text>
+            <text x="0" y="26" className="fill-slate-600 dark:fill-slate-300">S</text>
+            <text x="26" y="0" className="fill-slate-600 dark:fill-slate-300">L</text>
+            <text x="-26" y="0" className="fill-slate-600 dark:fill-slate-300">O</text>
+          </g>
+        </svg>
+      </div>
       {(fonteMapa || avisoMapa) && <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] text-slate-500/80">{avisoMapa || fonteMapa}</span>}
       {/* Controles */}
       <div className="absolute right-3 top-3 flex gap-1.5">
@@ -547,6 +579,11 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
             {mostrarValores && sel.u.valor > 0 && <div className="flex justify-between"><dt className="text-slate-500">Valor no contrato</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.valor)}</dd></div>}
             {mostrarValores && sel.u.preco > 0 && <div className="flex justify-between"><dt className="text-slate-500">Preço de tabela</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.preco)}</dd></div>}
           </dl>
+          {plantaDaUnidade(cfg, sel.u.unit) && (
+            <button type="button" onClick={() => setPlantaAberta(true)} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+              <LayoutGrid className="h-3.5 w-3.5" /> Ver planta
+            </button>
+          )}
           {onAbrirContrato && temContrato?.(sel.u.id) && (
             <button type="button" onClick={() => onAbrirContrato(sel.u.id, cheia ? caixa.current : null)} className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
               Ver contrato
@@ -554,6 +591,25 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           )}
         </div>
       )}
+      {/* Planta humanizada: abre dentro da área do 3D (não tira da tela cheia). */}
+      {sel && (() => {
+        const pl = plantaDaUnidade(cfg, sel.u.unit);
+        if (!pl) return null;
+        return (
+          <Dialog open={plantaAberta} onOpenChange={setPlantaAberta}>
+            <DialogContent container={cheia ? caixa.current : undefined} className="max-w-5xl gap-3 p-5 dark:bg-slate-900">
+              <DialogTitle className="text-base">Apartamento {sel.u.unit} · {sel.u.andar}º andar</DialogTitle>
+              <DialogDescription className="text-xs">
+                {pl.titulo}{sel.u.area > 0 ? ` · ${sel.u.area.toLocaleString("pt-BR")} m² privativos` : ""}{pl.espelhada ? " · espelhada (final " + sel.u.unit.slice(-2) + ")" : ""}
+              </DialogDescription>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={pl.url} alt={pl.titulo} className="max-h-[72vh] w-full object-contain" style={pl.espelhada ? { transform: "scaleX(-1)" } : undefined} />
+              {pl.nota && <p className="text-[11px] text-amber-700 dark:text-amber-300/80">{pl.nota}</p>}
+              <p className="text-[10px] text-slate-500">Imagem ilustrativa. Móveis e decoração não fazem parte do imóvel.</p>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
     </div>
   );
 }

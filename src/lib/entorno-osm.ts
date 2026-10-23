@@ -13,12 +13,24 @@ export interface LocalEntorno {
   numero: number;           // número do lote = metros desde a Av. Atlântica (Balneário Camboriú)
   ruaFundos?: string;       // rua dos fundos: diz de que lado da rua da frente fica o lote
   bbox: [number, number, number, number]; // sul, oeste, norte, leste — onde procurar as ruas
-  raio?: number;            // m em volta do lote (padrão 700)
+  raio?: number;            // m em volta do lote com prédios (padrão RAIO_PREDIOS)
+  raioLonge?: number;       // m com ruas, praia e mar (padrão RAIO_LONGE)
   ajusteX?: number;         // m ao longo da rua, para acertar à mão depois de ver
   site?: string;            // página do empreendimento no site (andamento da obra)
 }
 
+// Sobe quando o formato ou o recorte mudam: o servidor devolve o salvo antigo
+// e refaz em segundo plano (a próxima abertura já vem nova).
+export const VERSAO_ENTORNO = 2;
+// Prédios só perto (são o peso do mapa); ruas, areia e mar vão mais longe
+// para a praia aparecer (Edielson, 23/10: "o pessoal quer saber onde fica a
+// praia"). Além disso a neblina da cena esconde a borda.
+export const RAIO_PREDIOS = 900;
+export const RAIO_LONGE = 1800;
+
 export interface DadosEntorno {
+  versao?: number;
+  norte?: [number, number];  // direção do norte no referencial (x, z), para a bússola
   fonte: string;
   lote: { lat: number; lon: number };
   ruas: { l: number; n: string; p: number[][] }[];   // largura, nome, pontos [x, z]
@@ -45,14 +57,16 @@ export function consultaLocalizar(l: LocalEntorno): string {
   return `[out:json][timeout:60];(way["highway"]["name"~"${ruas}",i](${bb});way["natural"="coastline"](${bb}););out geom tags;`;
 }
 
-export function consultaEntorno(lat: number, lon: number, raio: number): string {
+export function consultaEntorno(lat: number, lon: number, raio: number, raioLonge = RAIO_LONGE): string {
   const a = `around:${raio},${lat.toFixed(6)},${lon.toFixed(6)}`;
-  const longe = `around:${Math.max(raio * 3, 2500)},${lat.toFixed(6)},${lon.toFixed(6)}`;
-  return `[out:json][timeout:120];(
+  const meio = `around:${Math.max(raioLonge, raio)},${lat.toFixed(6)},${lon.toFixed(6)}`;
+  const longe = `around:${Math.max(raioLonge * 1.6, 2500)},${lat.toFixed(6)},${lon.toFixed(6)}`;
+  return `[out:json][timeout:180];(
 way["highway"](${a});
+way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|pedestrian)$"](${meio});
 way["building"](${a});
-way["leisure"~"park|garden|pitch|playground"](${a});
-way["landuse"~"grass|forest|recreation_ground|village_green"](${a});
+way["leisure"~"park|garden|pitch|playground"](${meio});
+way["landuse"~"grass|forest|recreation_ground|village_green"](${meio});
 way["natural"~"wood|scrub|beach|sand|water"](${longe});
 way["natural"="coastline"](${longe});
 );out geom tags;`;
@@ -114,7 +128,7 @@ export function processarEntorno(els: ElementoOSM[], lote: Lote, l: LocalEntorno
   // x = direita de quem olha o prédio da rua (olhando para -frente), z = frente.
   const xe = -fn, xn = fe;
   const local = (g: { lat: number; lon: number }[]) => g.map(p => { const [e, n] = pr.para(p.lat, p.lon); return [r1(e * xe + n * xn), r1(e * fe + n * fn)]; });
-  const out: DadosEntorno = { fonte: "© OpenStreetMap (ODbL)", lote: { lat: +lote.lat.toFixed(6), lon: +lote.lon.toFixed(6) }, ruas: [], predios: [], verde: [], areia: [], mar: [] };
+  const out: DadosEntorno = { versao: VERSAO_ENTORNO, norte: [Math.round(fe * 1000) / 1000, Math.round(fn * 1000) / 1000], fonte: "© OpenStreetMap (ODbL)", lote: { lat: +lote.lat.toFixed(6), lon: +lote.lon.toFixed(6) }, ruas: [], predios: [], verde: [], areia: [], mar: [] };
   // Lote (60 × 40 m atrás da rua da frente, com folga): o nosso prédio ocupa o lugar.
   const noLote = (p: number[][]) => { const cx = p.reduce((s, q) => s + q[0], 0) / p.length, cz = p.reduce((s, q) => s + q[1], 0) / p.length; return Math.abs(cx - (l.ajusteX || 0)) < 34 && cz < -4 && cz > -58; };
   for (const e of els) {
