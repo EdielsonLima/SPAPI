@@ -42,8 +42,9 @@ function lerParcelas(): Promise<SiengeIncome[]> {
 
 const areaFmt = (a: number) => `${a.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} m²`;
 
-export function FichaContrato({ unidade, contrato, unidadesPorNome, mostrarValores, onClose }: {
+export function FichaContrato({ unidade, contrato, unidadesPorNome, mostrarValores, dentro, onClose }: {
   unidade: UnidadeFicha | null;
+  dentro?: HTMLElement | null; // tela cheia do 3D: a ficha abre dentro dela
   contrato?: SiengeSalesContract;
   unidadesPorNome: Map<string, { tipo: string; area: number }>;
   mostrarValores: boolean;
@@ -125,7 +126,7 @@ export function FichaContrato({ unidade, contrato, unidadesPorNome, mostrarValor
 
   return (
     <Dialog open={Boolean(u)} onOpenChange={o => { if (!o) { setExpandida(null); onClose(); } }}>
-      <DialogContent className="max-w-4xl gap-0 overflow-hidden p-0 dark:bg-slate-900">
+      <DialogContent container={dentro} className="max-w-4xl gap-0 overflow-hidden p-0 dark:bg-slate-900">
         {u && (
           <>
             {/* Cabeçalho */}

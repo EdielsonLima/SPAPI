@@ -9,6 +9,8 @@
 // espelhados, sala e sacada no canto de dentro — as duas sacadas se encontram
 // no meio da frente, como na perspectiva da fachada.
 
+import type { LocalEntorno } from "@/lib/entorno-osm";
+
 export interface ConfigTorre {
   nome: string;
   largura: number;        // m, frente da torre (eixo x)
@@ -35,6 +37,9 @@ export interface ConfigTorre {
   // Primeiro andar de apartamentos do projeto. Andares abaixo do primeiro que
   // tem unidade no Sienge são desenhados sem situação (não clicáveis).
   primeiroAndar?: number;
+  // Onde fica o lote, para o entorno (ruas com nome, quadras, praia) tirado do
+  // OpenStreetMap pelo servidor (/api/entorno-3d). Sem isso, só o prédio.
+  local?: LocalEntorno;
 }
 
 // pos = m do centro da janela até a quina de fora (frente/fundos) ou até a
@@ -110,6 +115,8 @@ export const CONFIG_PALACIO: ConfigTorre = {
   // O Sienge numera os apartamentos a partir do 1º (AP101 = 7º pavimento do
   // projeto, AP3602 = 42º): "andar" aqui é sempre o do Sienge.
   cotaRef: { andar: 1, cota: 21.04 },
+  // Endereço do carimbo das plantas: Rua 2950 nº 255 e Rua 2970, Centro, BC.
+  local: { chave: "palacio-elizabeth", rua: "2950", numero: 255, ruaFundos: "2970", bbox: [-27.05, -48.665, -26.95, -48.59], site: "https://silvapacker.com.br/empreendimentos/palacio-elizabeth/" },
   base: {
     // Corte: salas comerciais + mezanino até +5,40, 4 garagens, lazer a +16,00.
     // Fachada (lojas, friso, painéis das garagens, cornija) pela perspectiva.
@@ -245,3 +252,5 @@ export function descricaoDaPosicao(indice: number, total: number): string {
   if (total === 2) return indice === 0 ? "lado esquerdo (olhando a frente)" : "lado direito (olhando a frente)";
   return `${indice + 1}º da esquerda para a direita (olhando a frente)`;
 }
+
+export const CONFIGS_COM_ENTORNO: ConfigTorre[] = [CONFIG_PALACIO];

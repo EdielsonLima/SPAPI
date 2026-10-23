@@ -171,6 +171,27 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   financeira e condições de pagamento; cada condição expande nas parcelas
   reais do `/income` (casadas por `receivableBillId` do contrato, paga /
   atrasada / a vencer). Com Valores desligado todo R$ vira "R$ ••••".
+- **3D para apresentação (23/10, Edielson).** (1) Ficha do contrato na tela
+  cheia abre DENTRO dela (`DialogContent container=`; o portal no body fazia o
+  navegador sair da tela cheia). (2) Unidade selecionada: as demais esmaecem
+  para o tom da fachada, moldura amarela pulsando e etiqueta "1202 · 12º
+  andar" presa ao prédio (posição projetada no laço). (3) Legenda do 3D é
+  filtro clicável (estado local, vale na tela cheia, onde os filtros da página
+  somem); filtrar limpa a seleção. (4) **Entorno** (ruas com nome, quadras,
+  verde, areia, mar) do OpenStreetMap: `CONFIG_PALACIO.local` (Rua 2950 nº 255
+  e Rua 2970, carimbo das plantas). O SERVIDOR baixa do Overpass uma vez
+  (`/api/entorno-3d`, tabela `entorno_3d`; `?refazer=1` baixa de novo) e acha
+  o lote pela rua: nº = metros desde a ponta da orla, lado = o da rua dos
+  fundos (`localizarLote` em `entorno-osm.ts`, trava `entorno-osm.test.ts`).
+  Errou a posição ao longo da rua → `local.ajusteX` (m). Leve: cada camada
+  é uma malha, Lambert, sem sombra; nomes de rua deitados no asfalto a cada
+  ~300 m (`torre-3d-entorno.ts`). O contêiner de nuvem do Claude não alcança o
+  OSM: conferido só com cidade sintética. (5) **Andamento da obra** (anéis no
+  rodapé do 3D): `/api/andamento-obra` relê a página do site
+  (`local.site`) a cada 6 h e só aceita se achar as 9 etapas
+  (`lerAndamentoDoHtml`, trava `andamento-obra.test.ts`); senão vale o
+  gravado (tabela `andamento_obra`, partida = site em 23/10: 100/100/55/15/
+  2/2/0/0/0). Edita à mão quem edita a Tabela de Preços (lápis no card).
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no

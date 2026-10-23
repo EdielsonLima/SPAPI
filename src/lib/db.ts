@@ -1063,6 +1063,59 @@ export async function upsertIndicadoresDebit(
   }
 }
 
+// ─── Entorno da maquete 3D (OpenStreetMap processado, ver entorno-osm.ts) ─────
+// Uma linha por empreendimento; o mapa da cidade quase não muda, então é
+// gerado uma vez e só refeito a pedido (?refazer=1).
+
+let entornoPronto = false;
+async function ensureEntorno() {
+  if (entornoPronto) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS entorno_3d (
+    chave TEXT PRIMARY KEY, dados JSONB NOT NULL, atualizado_em TIMESTAMP NOT NULL DEFAULT NOW())`);
+  entornoPronto = true;
+}
+
+export async function lerEntorno(chave: string): Promise<unknown | null> {
+  await ensureEntorno();
+  const { rows } = await pool.query(`SELECT dados FROM entorno_3d WHERE chave = $1`, [chave]);
+  return rows[0]?.dados ?? null;
+}
+
+export async function gravarEntorno(chave: string, dados: unknown) {
+  await ensureEntorno();
+  await pool.query(
+    `INSERT INTO entorno_3d (chave, dados, atualizado_em) VALUES ($1, $2, NOW())
+     ON CONFLICT (chave) DO UPDATE SET dados = EXCLUDED.dados, atualizado_em = NOW()`,
+    [chave, JSON.stringify(dados)]);
+}
+
+// ─── Andamento da obra (maquete 3D) ──────────────────────────────────────────
+
+let andamentoPronto = false;
+async function ensureAndamento() {
+  if (andamentoPronto) return;
+  await pool.query(`CREATE TABLE IF NOT EXISTS andamento_obra (
+    chave TEXT PRIMARY KEY, etapas JSONB NOT NULL, fonte TEXT NOT NULL DEFAULT 'painel',
+    atualizado_por TEXT NOT NULL DEFAULT '', atualizado_em TIMESTAMP NOT NULL DEFAULT NOW())`);
+  andamentoPronto = true;
+}
+
+export async function lerAndamento(chave: string): Promise<{ etapas: unknown; fonte: string; atualizadoEm: string } | null> {
+  await ensureAndamento();
+  const { rows } = await pool.query(
+    `SELECT etapas, fonte, atualizado_em AS "atualizadoEm" FROM andamento_obra WHERE chave = $1`, [chave]);
+  return rows[0] ?? null;
+}
+
+export async function gravarAndamento(chave: string, etapas: unknown, fonte: string, por: string) {
+  await ensureAndamento();
+  await pool.query(
+    `INSERT INTO andamento_obra (chave, etapas, fonte, atualizado_por, atualizado_em) VALUES ($1, $2, $3, $4, NOW())
+     ON CONFLICT (chave) DO UPDATE SET etapas = EXCLUDED.etapas, fonte = EXCLUDED.fonte,
+       atualizado_por = EXCLUDED.atualizado_por, atualizado_em = NOW()`,
+    [chave, JSON.stringify(etapas), fonte, por]);
+}
+
 export default pool;
 
 // ─── Conferência de títulos (mutirão CP/CR) ─────────────────────────────────
