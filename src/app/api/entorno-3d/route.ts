@@ -9,9 +9,9 @@ import { consultaLocalizar, consultaEntorno, localizarLote, processarEntorno, ty
 //  GET ?chave=palacio-elizabeth → dados do banco; na 1ª vez baixa do
 //  OpenStreetMap (Overpass), processa e guarda. ?refazer=1 baixa de novo.
 
-const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter"];
+const OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.private.coffee/api/interpreter", "https://overpass.kumi.systems/api/interpreter", "https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
 
-async function overpass(q: string): Promise<ElementoOSM[]> {
+async function overpass(q: string, falhas: string[]): Promise<ElementoOSM[]> {
   let ultimo: unknown;
   for (const url of OVERPASS) {
     try {
@@ -20,14 +20,15 @@ async function overpass(q: string): Promise<ElementoOSM[]> {
         headers: { "User-Agent": "DTConsultorias-Torre3D/1.0 (edielson@dtconsultorias.com)" },
         signal: AbortSignal.timeout(150_000), cache: "no-store",
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`);
       return ((await r.json()) as { elements: ElementoOSM[] }).elements;
-    } catch (e) { ultimo = e; console.warn("[entorno-3d] overpass falhou", url, e); }
+    } catch (e) { ultimo = e; falhas.push(`${new URL(url).host}: ${e instanceof Error ? e.message : e}`); console.warn("[entorno-3d] overpass falhou", url, e); }
   }
   throw ultimo;
 }
 
 const gerando = new Map<string, Promise<unknown>>(); // duas telas abertas não baixam duas vezes
+let ultimaFalha: { quando: string; etapa: string; erro: string; tentativas: string[] } | null = null;
 
 export async function GET(req: NextRequest) {
   if (!(await getServerSession(authOptions))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -35,6 +36,11 @@ export async function GET(req: NextRequest) {
   const local = CONFIGS_COM_ENTORNO.find(c => c.local?.chave === chave)?.local;
   if (!local) return NextResponse.json({ error: "Empreendimento sem entorno." }, { status: 404 });
   const refazer = req.nextUrl.searchParams.get("refazer") === "1";
+  // ?diag=1: o que deu errado na última tentativa (o mapa falha calado na tela).
+  if (req.nextUrl.searchParams.get("diag") === "1") {
+    const salvo = await lerEntorno(chave).catch(() => null) as { ruas?: unknown[]; predios?: unknown[]; lote?: unknown } | null;
+    return NextResponse.json({ noBanco: !!salvo, ruas: salvo?.ruas?.length ?? 0, predios: salvo?.predios?.length ?? 0, lote: salvo?.lote ?? null, gerando: gerando.has(chave), ultimaFalha });
+  }
   try {
     if (!refazer) {
       const salvo = await lerEntorno(chave);
@@ -42,11 +48,26 @@ export async function GET(req: NextRequest) {
     }
     if (!gerando.has(chave)) {
       gerando.set(chave, (async () => {
-        const lote = localizarLote(await overpass(consultaLocalizar(local)), local);
-        if (!lote) throw new Error(`Rua ${local.rua} não encontrada no OpenStreetMap`);
-        const dados = processarEntorno(await overpass(consultaEntorno(lote.lat, lote.lon, local.raio ?? 700)), lote, local);
-        await gravarEntorno(chave, dados);
-        return dados;
+        const falhas: string[] = [];
+        let etapa = "localizar a rua";
+        try {
+          const els = await overpass(consultaLocalizar(local), falhas);
+          const lote = localizarLote(els, local);
+          if (!lote) {
+            const nomes = Array.from(new Set(els.map(e => e.tags?.name).filter(Boolean))).slice(0, 10).join(", ");
+            throw new Error(`Rua ${local.rua} não encontrada no OpenStreetMap (${els.length} elementos; nomes: ${nomes || "nenhum"})`);
+          }
+          etapa = "baixar o entorno";
+          const dados = processarEntorno(await overpass(consultaEntorno(lote.lat, lote.lon, local.raio ?? 700), falhas), lote, local);
+          if (!dados.ruas.length) throw new Error("Overpass devolveu o entorno sem nenhuma rua");
+          etapa = "gravar no banco";
+          await gravarEntorno(chave, dados);
+          ultimaFalha = null;
+          return dados;
+        } catch (e) {
+          ultimaFalha = { quando: new Date().toISOString(), etapa, erro: e instanceof Error ? e.message : String(e), tentativas: falhas };
+          throw e;
+        }
       })().finally(() => gerando.delete(chave)));
     }
     return NextResponse.json(await gerando.get(chave));

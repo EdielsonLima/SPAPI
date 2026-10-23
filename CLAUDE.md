@@ -186,7 +186,12 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   Errou a posição ao longo da rua → `local.ajusteX` (m). Leve: cada camada
   é uma malha, Lambert, sem sombra; nomes de rua deitados no asfalto a cada
   ~300 m (`torre-3d-entorno.ts`). O contêiner de nuvem do Claude não alcança o
-  OSM: conferido só com cidade sintética. (5) **Andamento da obra** (anéis no
+  OSM: conferido só com cidade sintética.
+  Na 1ª publicação (23/10) o mapa não apareceu e a tela não avisava: agora
+  mostra "Carregando…"/"indisponível", o nome da rua casa qualquer grafia
+  com o número (`Rua 2.950`, `Rua 2950 - Centro`; o ponto vai como `[.]`,
+  nunca `\.`, que o Overpass recusa) e `/api/entorno-3d?chave=…&diag=1`
+  devolve a última falha (etapa, erro, tentativa por servidor). (5) **Andamento da obra** (anéis no
   rodapé do 3D): `/api/andamento-obra` relê a página do site
   (`local.site`) a cada 6 h e só aceita se achar as 9 etapas
   (`lerAndamentoDoHtml`, trava `andamento-obra.test.ts`); senão vale o
