@@ -157,6 +157,20 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   quadra, deixava a base 1,8× maior). Torre a 35,9 m da divisa esquerda, com
   a frente a 3,3 m da Rua 2.950. PDFs fora do repositório (WhatsApp do
   Rodrigo e arquivos do projeto, `comercial/projetos-palacio/`).
+- **Espelho ao lado do 3D, tela cheia e Ficha do contrato (23/10, Edielson).**
+  No 3D, o painel da esquerda tem o "Espelho por pavimento" (andares do
+  Sienge, decrescentes): clicar numa unidade seleciona e leva a câmera até
+  ela (voo suave, cancelado se o usuário arrastar). Botão Home volta à vista
+  inicial; **Tela cheia** usa a Fullscreen API no contêiner (sem ela, cobre
+  a janela com `fixed inset-0`); Esc sai. Antes o botão com ícone de tela
+  cheia só reposicionava a câmera. **Ficha do contrato**
+  (`ficha-contrato.tsx`, da Leven, sem classificação): abre por "Ver
+  contrato" no card do 3D e pelo clique na unidade no Espelho 2D e na Grade
+  (só unidade com contrato ativo, o mais recente não cancelado). Mostra
+  compradores, unidades do contrato com a parte de cada uma, posição
+  financeira e condições de pagamento; cada condição expande nas parcelas
+  reais do `/income` (casadas por `receivableBillId` do contrato, paga /
+  atrasada / a vencer). Com Valores desligado todo R$ vira "R$ ••••".
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no
@@ -169,8 +183,11 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   ninguém). Por ora só o Edielson (23/10); depois Carlos, Humberto ou quem
   usar o painel. Com Valores ligado, o Quadro e o 3D mostram o preço de
   tabela nas unidades sem venda.
-- Próximas etapas (plano): reservas (gravam no Sienge — exige definição de
-  quem pode e OK explícito).
+- **Escopo do Comercial na Silva Packer (Edielson, 23/10): só visualização.**
+  Nada de reserva nem de proposta/contrato pelo painel (diferente da Leven):
+  o painel mostra o que já está vendido (com a ficha do contrato) e o que
+  está disponível. A única coisa que se edita é a Tabela de Preços (preços e
+  reajustes), que fica no banco do painel e não escreve no Sienge.
 - **Suprimentos removido deste app (Edielson, 22/10):** aqui ficam só Financeiro
   e Comercial. Telas `/suprimentos/*` apagadas e redirecionadas ao Dashboard
   (`next.config.mjs`); as rotas `/api/sienge/purchase-*` e
