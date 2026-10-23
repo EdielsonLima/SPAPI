@@ -25,10 +25,11 @@ assert.equal(conta(je, "fundos"), 5);
 je.forEach((j, i) => { assert.ok(Math.abs(j.x + jd[i].x) < 1e-9 && j.z === jd[i].z); });
 // janela da frente fica fora da sacada e dentro da torre
 je.filter(j => j.face === "frente" && !j.porta).forEach(j => { assert.ok(j.x < -CONFIG_PALACIO.larguraSacada && j.x > -CONFIG_PALACIO.largura / 2); });
-// Palácio pelos cortes AA/BB: lazer a +16,00, 7º a +21,04, 9º a +27,52, 42º a +134,44
-const c = (a: number) => Math.round(cotaDoAndar(a, 9, CONFIG_PALACIO) * 100) / 100;
-assert.equal(c(7), 21.04); assert.equal(c(9), 27.52); assert.equal(c(42), 134.44);
-assert.equal(Math.round(alturaEmbasamento(9, CONFIG_PALACIO) * 100) / 100, 21.04);
+// Palácio pelos cortes AA/BB: lazer a +16,00; AP101 (7º do projeto) a +21,04,
+// AP301 (9º) a +27,52, AP3602 (42º) a +134,44
+const c = (a: number) => Math.round(cotaDoAndar(a, 1, CONFIG_PALACIO) * 100) / 100;
+assert.equal(c(1), 21.04); assert.equal(c(3), 27.52); assert.equal(c(36), 134.44);
+assert.equal(Math.round(alturaEmbasamento(1, CONFIG_PALACIO) * 100) / 100, 21.04);
 assert.equal(CONFIG_PALACIO.base!.altura, 16);
 // contorno das garagens: 60,24 m de comprimento, 22,7 + 16 m de fundo; a torre
 // e a sacada cabem dentro, núcleo também

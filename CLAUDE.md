@@ -148,10 +148,11 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   salas comerciais com mezanino 0,00–5,40 · garagens +5,40/+8,05/+10,70/
   +13,35 · lazer +16,00 · **7º e 8º "tipo diferenciado"** +21,04/+24,28 ·
   tipo 9º–42º, **3,24 m piso a piso** (42º a +134,44); casa de máquinas e
-  reservatórios ~7 m acima da cobertura. `CONFIG_PALACIO.cotaRef` fixa a cota
-  do 7º e `cotaDoAndar` conta dali; `primeiroAndar: 7` faz o 7º e o 8º
-  aparecerem sem situação (cinza, sem clique) enquanto o Sienge não tiver
-  unidade neles. Base em L de **60,24 × 22,7 m + 24 × 16 m** nos fundos (a
+  reservatórios ~7 m acima da cobertura. **O Sienge numera do 1º:** AP101 = 7º
+  pavimento do projeto, AP3602 = 42º (quadro espelho do Sienge, 23/10) — os
+  andares do 3D e do card são os do Sienge. `CONFIG_PALACIO.cotaRef` = andar 1
+  a +21,04 e `cotaDoAndar` conta dali. `primeiroAndar` (opcional) desenha sem
+  situação andares do projeto que o Sienge não tenha; o Palácio não usa. Base em L de **60,24 × 22,7 m + 24 × 16 m** nos fundos (a
   quadra); a planta do lazer é **33,28 px/m** (a escala antiga, 18,55 pela
   quadra, deixava a base 1,8× maior). Torre a 35,9 m da divisa esquerda, com
   a frente a 3,3 m da Rua 2.950. PDFs fora do repositório (WhatsApp do

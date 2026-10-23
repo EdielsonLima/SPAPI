@@ -84,6 +84,7 @@ const pxM = (x: number, y: number): [number, number] => [+((x - TORRE[0]) / PX_M
 // térreo de salas comerciais com mezanino 0,00–5,40; garagens 1–4 a +5,40,
 // +8,05, +10,70 e +13,35; lazer a +16,00; 7º e 8º "tipo diferenciado" a
 // +21,04 e +24,28; tipo do 9º (+27,52) ao 42º (+134,44), 3,24 m piso a piso.
+// No Sienge são os andares 1 a 36 (AP101 a AP3602).
 export const CONFIG_PALACIO: ConfigTorre = {
   nome: "Palácio Elizabeth",
   largura: 32.5, profundidade: 10, peDireito: 3.24, sacada: 3, larguraSacada: 7.05, embasamento: 8,
@@ -106,8 +107,9 @@ export const CONFIG_PALACIO: ConfigTorre = {
     { face: "lado", pos: 3.35, w: 0.7, h: 0.7, peitoril: 1.5 },
   ],
   nucleo: { largura: 6.1, fundo: 4.3 },
-  cotaRef: { andar: 7, cota: 21.04 },
-  primeiroAndar: 7,
+  // O Sienge numera os apartamentos a partir do 1º (AP101 = 7º pavimento do
+  // projeto, AP3602 = 42º): "andar" aqui é sempre o do Sienge.
+  cotaRef: { andar: 1, cota: 21.04 },
   base: {
     // Corte: salas comerciais + mezanino até +5,40, 4 garagens, lazer a +16,00.
     // Fachada (lojas, friso, painéis das garagens, cornija) pela perspectiva.
