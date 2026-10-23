@@ -113,8 +113,19 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (`selectedSituacoes`), separado do status da tela Unidades. Botão **Valores**
   desligado por padrão (`quadro_espelho_mostrar_valores`, "1"/"0"): desligado
   = nenhum R$ no Quadro (célula, dica, VGV, cartão da Grade).
-- Próximas etapas (plano): telas da Leven, Quadro em torre e maquete 3D
-  (piloto Palácio Elizabeth).
+- **Maquete 3D do Quadro (23/10, piloto Palácio Elizabeth).** Terceira visão
+  do Quadro (Espelho · **3D** · Grade). Estudo de massa gerado dos dados do
+  Sienge, sem maquete do arquiteto: cada apartamento é um bloco do pavimento
+  tingido pela situação; a sacada leva a cor forte. Geometria toda em
+  `src/lib/torre-3d.ts` (trava `torre-3d.test.ts`): `CONFIG_PALACIO` (2 por
+  andar, espelhados, sacadas encostadas no meio da frente; medidas estimadas
+  pela planta), `andarEFinal` lê andar/final do nome (AP3001 → 30/"01"),
+  `ordenarFinais` decide o lado (ajuste de lado só ali). Embasamento = os
+  pavimentos abaixo do 1º andar de apartamentos. `torre-3d.tsx` (three.js via
+  `next/dynamic`, só baixa ao abrir o 3D): clique abre o card da unidade
+  (cliente só com dono, valor só com Valores ligado). Só apartamentos; vagas
+  ficam na Torre. Outro empreendimento usa `CONFIG_PADRAO`.
+- Próximas etapas (plano): telas da Leven (tabela de preços, reservas).
 - **Suprimentos removido deste app (Edielson, 22/10):** aqui ficam só Financeiro
   e Comercial. Telas `/suprimentos/*` apagadas e redirecionadas ao Dashboard
   (`next.config.mjs`); as rotas `/api/sienge/purchase-*` e

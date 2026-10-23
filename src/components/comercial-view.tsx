@@ -7,6 +7,7 @@
 // estado/dados que antes viviam no dashboard vivem em ComercialProvider.
 
 import React from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,9 @@ import { CorretoresView } from "@/components/corretores-view";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
+import { andarEFinal } from "@/lib/torre-3d";
+// three.js só baixa quando alguém abre a visão 3D.
+const Torre3D = dynamic(() => import("@/components/torre-3d"), { ssr: false, loading: () => <p className="text-sm text-slate-400 text-center py-10">Carregando maquete…</p> });
 import {
   inferUnitTypeFromName, shortEnterpriseName, normalizeFloor, floorSortKey, valorDaUnidadeNoContrato,
   unidadesVendidas, resumoPorTipo, ehPermuta,
@@ -64,6 +68,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
   } = useComercial();
   // Vendas: contar por unidade (padrão, como no Financeiro da Leven) ou por contrato.
   const [contarPor, setContarPor] = React.useState<"unidades" | "contratos">("unidades");
+  // Quadro › 3D: qual empreendimento a maquete mostra (com mais de um filtrado).
+  const [emp3d, setEmp3d] = React.useState("");
 
   const meta = ABAS_COMERCIAL.find(a => a.key === aba)!;
   // Atalhos internos ("ver unidades disponíveis", "ver cliente") trocam de
@@ -1880,6 +1886,12 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                   Espelho (Torre)
                 </button>
                 <button
+                  onClick={() => setQuadroView("3d")}
+                  className={`px-3 h-7 text-xs font-bold rounded-md transition-all ml-0.5 ${quadroView === "3d" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
+                >
+                  3D
+                </button>
+                <button
                   onClick={() => setQuadroView("grade")}
                   className={`px-3 h-7 text-xs font-bold rounded-md transition-all ml-0.5 ${quadroView === "grade" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
                 >
@@ -1898,7 +1910,34 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                 <p className="text-xs text-slate-400 mt-1">Escolha um empreendimento no filtro acima para visualizar o quadro de unidades</p>
               </CardContent>
             </Card>
-          ) : quadroView === "espelho" ? (() => {
+          ) : quadroView === "3d" ? (() => {
+            // ── Maquete 3D: um empreendimento por vez, só apartamentos (vagas e salas ficam na Torre) ──
+            const ents = Array.from(new Set(qUnits.map(u => u.enterprise))).sort();
+            const ent = ents.includes(emp3d) ? emp3d : (ents.find(e => /PALACIO ELIZABETH/i.test(e.normalize("NFD").replace(/[\u0300-\u036f]/g, ""))) || ents[0] || "");
+            const visiveis = new Set(qVisible.map(u => `${u.enterprise}||${u.unit}`));
+            const unidades3d = qUnits
+              .filter(u => u.enterprise === ent && u.tipo === "Apartamento")
+              .flatMap(u => {
+                const pos = andarEFinal(u.unit, normalizeFloor(u.floor));
+                if (!pos) return [];
+                return [{ id: `${u.enterprise}||${u.unit}`, unit: u.unit, andar: pos.andar, final: pos.final, situacao: u.situacao, area: u.area, cliente: u.customer, valor: u.value, apagada: !visiveis.has(`${u.enterprise}||${u.unit}`) }];
+              });
+            return (
+              <Card className="border-0 shadow-sm mt-3">
+                <CardContent className="p-4 space-y-3">
+                  {ents.length > 1 && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-slate-500 font-semibold">Maquete de</span>
+                      <select value={ent} onChange={e => setEmp3d(e.target.value)} className="h-7 rounded-md border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700 px-2 text-xs">
+                        {ents.map(e => <option key={e} value={e}>{shortEnterpriseName(e)}</option>)}
+                      </select>
+                    </div>
+                  )}
+                  <Torre3D unidades={unidades3d} empreendimento={shortEnterpriseName(ent)} mostrarValores={mostrarValores} />
+                </CardContent>
+              </Card>
+            );
+          })() : quadroView === "espelho" ? (() => {
             // ── Espelho (torre): um bloco por empreendimento, unidades agrupadas por pavimento ──
             const shortLabel = (name: string) => { const p = name.split(".").pop() || name; return p.length > 10 ? p.slice(-9) : p; };
             const entNames = Array.from(new Set(qVisible.map(u => u.enterprise))).sort();
