@@ -35,12 +35,14 @@ export interface ElementoOSM {
   members?: { role?: string; geometry?: { lat: number; lon: number }[] }[];
 }
 
-const nomeRua = (n: string) => `^Rua ${n.slice(0, 1)}\\.?${n.slice(1)}$`;
+// Casa "Rua 2950", "Rua 2.950", "R. 2950 - Centro"… O ponto vai como [.] e não
+// como \. — o Overpass trata "\." dentro de string como escape inválido.
+const nomeRua = (n: string) => `(^|[^0-9])${n.slice(0, 1)}[.]?${n.slice(1)}([^0-9]|$)`;
 
 export function consultaLocalizar(l: LocalEntorno): string {
   const bb = l.bbox.join(",");
   const ruas = [l.rua, l.ruaFundos].filter(Boolean).map(n => nomeRua(n!)).join("|");
-  return `[out:json][timeout:60];(way["highway"]["name"~"${ruas}"](${bb});way["natural"="coastline"](${bb}););out geom tags;`;
+  return `[out:json][timeout:60];(way["highway"]["name"~"${ruas}",i](${bb});way["natural"="coastline"](${bb}););out geom tags;`;
 }
 
 export function consultaEntorno(lat: number, lon: number, raio: number): string {

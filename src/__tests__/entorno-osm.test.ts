@@ -4,7 +4,7 @@
 // entorno processado (usado na conferência por imagem).
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
-import { localizarLote, processarEntorno, type ElementoOSM, type LocalEntorno } from "../lib/entorno-osm";
+import { consultaLocalizar, localizarLote, processarEntorno, type ElementoOSM, type LocalEntorno } from "../lib/entorno-osm";
 
 const lat0 = -26.995, lon0 = -48.633, kx = Math.cos((lat0 * Math.PI) / 180) * 111320, ky = 110540;
 const ang = (20 * Math.PI) / 180;                       // orla 20° a leste do norte
@@ -59,6 +59,13 @@ assert.ok(d.mar.length > 0 && d.mar.every(q => q.reduce((s, p) => s + p[0], 0) /
 assert.ok(d.predios.length > 50);
 assert.ok(!d.predios.some(b => { const cx = b.p.reduce((s, p) => s + p[0], 0) / b.p.length, cz = b.p.reduce((s, p) => s + p[1], 0) / b.p.length; return Math.abs(cx) < 30 && cz < -10 && cz > -50; }));
 assert.equal(d.verde.length, 1); assert.equal(d.areia.length, 1);
+
+// Grafias do OSM: "Rua 2.950" e "Rua 2950 - Centro" também acham o lote; "Rua 29500" não.
+const so = (nome: string) => localizarLote([els[0], via(nome, "residential", [[0, 60], [0, 900]])], local);
+assert.ok(so("Rua 2.950"), "Rua 2.950"); assert.ok(so("Rua 2950 - Centro"), "Rua 2950 - Centro");
+assert.equal(so("Rua 29500"), null, "Rua 29500 não é a 2950");
+// O Overpass não aceita "\\." dentro de string: o ponto vai como [.].
+assert.ok(!consultaLocalizar(local).includes("\\"), "consulta sem barra invertida");
 
 if (process.env.SAIDA) writeFileSync(process.env.SAIDA, JSON.stringify(d));
 console.log("entorno-osm: ok", { ruas: d.ruas.length, predios: d.predios.length, kb: Math.round(JSON.stringify(d).length / 1024) });

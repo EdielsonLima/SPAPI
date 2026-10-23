@@ -62,6 +62,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   const [espelhoAberto, setEspelhoAberto] = useState(true);
   const etiqueta = useRef<HTMLDivElement>(null);
   const [fonteMapa, setFonteMapa] = useState("");
+  const [avisoMapa, setAvisoMapa] = useState(""); // "carregando…" / "indisponível": o mapa não falha calado
   // Filtro da legenda (Edielson, 23/10: tem de funcionar na tela cheia, onde
   // os filtros da página somem). Vazio = todas; as de fora esmaecem.
   const [filtro, setFiltro] = useState<string[]>([]);
@@ -189,18 +190,20 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     let vivo = true, entorno: { dispose: () => void } | null = null;
     if (cfg.local) {
       const zRua = Math.max(...base.contorno.map(p => p[1])) + 13; // eixo da rua da frente (montarRua)
+      setAvisoMapa("Carregando o mapa da cidade…");
       fetch(`/api/entorno-3d?chave=${encodeURIComponent(cfg.local.chave)}`)
         .then(r => r.ok ? r.json() : null)
         .then(async (d: DadosEntorno | null) => {
-          if (!d || !vivo) return;
+          if (!vivo) return;
+          if (!d?.ruas?.length) { setAvisoMapa("Mapa da cidade indisponível agora"); return; }
           const { montarEntorno } = await import("@/components/torre-3d-entorno");
           if (!vivo) return;
           const e = montarEntorno(d, escuro);
           e.grupo.position.set(-(cfg.local?.ajusteX || 0), 0, zRua);
           scene.add(e.grupo); entorno = e;
-          setFonteMapa(d.fonte);
+          setFonteMapa(d.fonte); setAvisoMapa("");
         })
-        .catch(() => {});
+        .catch(() => { if (vivo) setAvisoMapa("Mapa da cidade indisponível agora"); });
     }
     montarQuadra(base, mats, juntar, descarte);
     descarte.push(...geos);
@@ -514,7 +517,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           <AndamentoObraCard chave={cfg.local.chave} />
         </div>
       )}
-      {fonteMapa && <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] text-slate-500/80">{fonteMapa}</span>}
+      {(fonteMapa || avisoMapa) && <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] text-slate-500/80">{avisoMapa || fonteMapa}</span>}
       {/* Controles */}
       <div className="absolute right-3 top-3 flex gap-1.5">
         <button type="button" onClick={() => setGirando(g => !g)} title={girando ? "Parar de girar" : "Girar"} className={`${botao} w-8 ${girando ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
