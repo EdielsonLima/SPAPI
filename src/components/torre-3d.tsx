@@ -19,7 +19,7 @@ import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
   configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, type Bloco, type Janela,
 } from "@/lib/torre-3d";
-import { criarTexturas, materiaisDoPredio, caixaUV, montarBase, montarLazer, montarRua } from "@/components/torre-3d-predio";
+import { criarTexturas, materiaisDoPredio, caixaUV, montarBase, montarLazer, montarRua, montarQuadra } from "@/components/torre-3d-predio";
 
 export interface Unidade3D {
   id: string;
@@ -59,13 +59,24 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     const porAndar = new Map<number, Unidade3D[]>();
     unidades.forEach(u => { if (!porAndar.has(u.andar)) porAndar.set(u.andar, []); porAndar.get(u.andar)!.push(u); });
     const andares = Array.from(porAndar.keys()).sort((a, b) => a - b);
-    const primeiro = andares[0] ?? 1;
     const ultimo = andares[andares.length - 1] ?? 1;
     const itens = andares.flatMap(a => {
       const lista = porAndar.get(a)!;
       const ordem = ordenarFinais(lista.map(u => u.final), cfg);
       return lista.map(u => ({ u, indice: ordem.indexOf(u.final), total: ordem.length }));
     });
+    // Andares do projeto abaixo do primeiro com unidade no Sienge (Palácio:
+    // 7º e 8º diferenciados): mesmos finais do andar de cima, sem situação.
+    let primeiro = andares[0] ?? 1;
+    if (cfg.primeiroAndar && andares.length && cfg.primeiroAndar < primeiro) {
+      const ordem = ordenarFinais(porAndar.get(primeiro)!.map(u => u.final), cfg);
+      for (let a = cfg.primeiroAndar; a < primeiro; a++)
+        ordem.forEach((f, indice) => itens.push({
+          u: { id: "", unit: "", andar: a, final: f, situacao: "", area: 0, cliente: "", valor: 0, preco: 0, apagada: false },
+          indice, total: ordem.length,
+        }));
+      primeiro = cfg.primeiroAndar;
+    }
     return { itens, primeiro, ultimo };
   }, [unidades, cfg]);
   const porId = useMemo(() => new Map(layout.itens.map(i => [i.u.id, i])), [layout]);
@@ -133,6 +144,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     montarBase(base, mats, juntar, geos, Math.min(16, cfg.largura * 0.45));
     montarLazer(base, juntar, descarte);
     montarRua(base, juntar, descarte, escuro);
+    montarQuadra(base, mats, juntar, descarte);
     descarte.push(...geos);
 
     const L = cfg.largura, P = cfg.profundidade;
@@ -149,15 +161,18 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     const blocos: THREE.Object3D[] = [];
     const matsUnidade = new Map<string, { corpo: THREE.MeshStandardMaterial; sacada: THREE.MeshStandardMaterial }>();
     const janelas: { j: Janela; id: string; cor: THREE.Color }[] = [];
+    const neutroCorpo = new THREE.MeshStandardMaterial({ color: FACHADA.clone(), roughness: 0.8 });
+    const neutroSacada = new THREE.MeshStandardMaterial({ color: "#9fb4c2", roughness: 0.2, transparent: true, opacity: 0.55 });
+    descarte.push(neutroCorpo, neutroSacada);
     layout.itens.forEach(({ u, indice, total }) => {
       const cor = corDe(u.situacao);
-      const corpo = new THREE.MeshStandardMaterial({
+      const semSituacao = !u.id;
+      const corpo = semSituacao ? neutroCorpo : new THREE.MeshStandardMaterial({
         color: u.apagada ? FACHADA.clone() : FACHADA.clone().lerp(cor, 0.45), roughness: 0.8,
         transparent: u.apagada, opacity: u.apagada ? 0.35 : 1,
       });
-      const sac = new THREE.MeshStandardMaterial({ color: u.apagada ? FACHADA.clone() : cor, roughness: 0.3, transparent: true, opacity: u.apagada ? 0.3 : 0.75 });
-      descarte.push(corpo, sac);
-      matsUnidade.set(u.id, { corpo, sacada: sac });
+      const sac = semSituacao ? neutroSacada : new THREE.MeshStandardMaterial({ color: u.apagada ? FACHADA.clone() : cor, roughness: 0.3, transparent: true, opacity: u.apagada ? 0.3 : 0.75 });
+      if (!semSituacao) { descarte.push(corpo, sac); matsUnidade.set(u.id, { corpo, sacada: sac }); }
       const b = caixa(blocoDaUnidade(indice, total, u.andar, primeiro, cfg), corpo);
       b.userData.id = u.id; blocos.push(b);
       const sb = sacadaDaUnidade(indice, total, u.andar, primeiro, cfg);
@@ -168,7 +183,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
         const lado = caixa({ x: sb.x + l * (sb.w / 2 - 0.04), y: sb.y + 0.6, z: sb.z, w: 0.08, h: 1.1, d: sb.d }, sac, false);
         lado.userData.id = u.id; blocos.push(lado);
       });
-      const vidro = u.apagada ? new THREE.Color("#5b6470") : VIDRO.clone().lerp(cor, 0.5);
+      const vidro = semSituacao ? VIDRO.clone() : u.apagada ? new THREE.Color("#5b6470") : VIDRO.clone().lerp(cor, 0.5);
       janelasDaUnidade(indice, total, u.andar, primeiro, cfg).forEach(j => janelas.push({ j, id: u.id, cor: j.aberta ? new THREE.Color("#3a3f45") : vidro }));
     });
 
@@ -208,11 +223,25 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
       [-1, 1].forEach(sx => caixa({ x: sx * (n.largura / 2 - 0.3), y: (yTorre + topo + 7) / 2, z: zc - n.fundo / 2 + 0.1, w: 0.9, h: topo + 7 - yTorre, d: 0.9 }, mats.mosaico));
       caixa({ x: 0, y: topo + 7.4, z: zc, w: n.largura + 0.8, h: 0.8, d: n.fundo + 1.2 }, mats.clara);
     }
-    // Coroamento: cornija, ático com pastilha nas quinas e capa.
+    // Coroamento (foto aérea do site): cornija, platibanda clara e duas
+    // cúpulas escuras, uma sobre cada apartamento, com a casa de máquinas no meio.
     caixa({ x: 0, y: topo + 0.6, z: 0, w: L + 1.6, h: 1.2, d: P + 1.6 }, mats.clara);
-    caixa({ x: 0, y: topo + 2.9, z: 0, w: L + 0.4, h: 3.4, d: P + 0.4 }, mats.fachada);
-    [-1, 1].forEach(sx => caixa({ x: sx * (L / 2 - 1.5), y: topo + 2.9, z: P / 2 + 0.25, w: 2.4, h: 3.4, d: 0.2 }, mats.mosaico));
-    caixa({ x: 0, y: topo + 4.9, z: 0, w: L + 1.2, h: 0.7, d: P + 1.2 }, mats.clara);
+    caixa({ x: 0, y: topo + 2.4, z: 0, w: L + 0.4, h: 2.4, d: P + 0.4 }, mats.fachada);
+    [-1, 1].forEach(sx => caixa({ x: sx * (L / 2 - 1.5), y: topo + 2.4, z: P / 2 + 0.25, w: 2.4, h: 2.4, d: 0.2 }, mats.mosaico));
+    caixa({ x: 0, y: topo + 3.9, z: 0, w: L + 1.2, h: 0.6, d: P + 1.2 }, mats.clara);
+    const gCupula = new THREE.SphereGeometry(1, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2);
+    descarte.push(gCupula);
+    [-1, 1].forEach(sx => {
+      const w = L / 2 - 3;
+      caixa({ x: sx * (L / 4 + 0.5), y: topo + 4.8, z: 0, w: w + 0.6, h: 1.2, d: P - 1.4 }, mats.clara); // tambor
+      const c = new THREE.Mesh(gCupula, mats.cupula);
+      c.scale.set(w / 2, 5.2, (P - 2) / 2);
+      c.position.set(sx * (L / 4 + 0.5), topo + 5.4, 0);
+      c.castShadow = true;
+      grupo.add(c);
+      const lanterna = caixa({ x: sx * (L / 4 + 0.5), y: topo + 10.9, z: 0, w: 1.2, h: 0.8, d: 1.2 }, mats.clara);
+      lanterna.castShadow = false;
+    });
 
     // Interação: passar o mouse acende, clicar seleciona.
     const ray = new THREE.Raycaster();
@@ -232,8 +261,8 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
       ray.setFromCamera(ponteiro, camera);
       const hit = ray.intersectObjects(blocos, false)[0];
       if (!hit) return null;
-      if (hit.instanceId !== undefined && hit.object.userData.ids) return (hit.object.userData.ids as string[])[hit.instanceId] ?? null;
-      return (hit.object.userData.id as string | undefined) ?? null;
+      if (hit.instanceId !== undefined && hit.object.userData.ids) return (hit.object.userData.ids as string[])[hit.instanceId] || null;
+      return (hit.object.userData.id as string | undefined) || null;
     };
     const mover = (ev: PointerEvent) => { const id = achar(ev); if (id !== sobre) { sobre = id; renderer.domElement.style.cursor = id ? "pointer" : "grab"; pintar(); } };
     let inicio = { x: 0, y: 0 };
@@ -300,7 +329,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
             <span className="text-slate-600 dark:text-slate-300">{s.nome}: <strong>{s.n}</strong></span>
           </div>
         ))}
-        <p className="text-[10px] text-slate-400 pt-1">{cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
+        <p className="text-[10px] text-slate-400 pt-1">{cfg.cotaRef ? "Pelo projeto: planta tipo, cortes e garagens" : cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
       </div>
       {/* Controles */}
       <div className="absolute right-3 top-3 flex gap-1.5">

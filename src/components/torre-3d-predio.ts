@@ -109,7 +109,16 @@ export function criarTexturas() {
     c.lineWidth = 8; c.strokeRect(6, 6, w - 12, h - 12);
     c.beginPath(); c.arc(w / 2, h * 0.3, w * 0.3, 0, Math.PI * 2); c.stroke();
   }, false);
-  return { mosaico, veneziana, friso, loja, vitral, portao };
+  // Alambrado da quadra (foto do terraço no site): malha losango, 4 por metro.
+  const alambrado = texturaCanvas(128, 128, (c, w) => {
+    c.clearRect(0, 0, w, w);
+    c.strokeStyle = "rgba(40,44,48,.95)"; c.lineWidth = 6;
+    for (let k = -w; k < w * 2; k += w / 4) {
+      c.beginPath(); c.moveTo(k, 0); c.lineTo(k + w, w); c.stroke();
+      c.beginPath(); c.moveTo(k + w, 0); c.lineTo(k, w); c.stroke();
+    }
+  });
+  return { mosaico, veneziana, friso, loja, vitral, portao, alambrado };
 }
 export type Texturas = ReturnType<typeof criarTexturas>;
 
@@ -173,6 +182,7 @@ interface Materiais {
   fachada: THREE.Material; clara: THREE.Material; pedra: THREE.Material; mosaico: THREE.Material;
   veneziana: THREE.Material; toldo: THREE.Material; friso: THREE.Material; loja: THREE.Material;
   vitral: THREE.Material; portao: THREE.Material; guarda: THREE.Material; telhado: THREE.Material;
+  verde: THREE.Material; cupula: THREE.Material; alambrado: THREE.Material;
 }
 
 export function materiaisDoPredio(tx: Texturas): Materiais {
@@ -189,7 +199,11 @@ export function materiaisDoPredio(tx: Texturas): Materiais {
     loja: std({ map: tx.loja, emissive: "#3a2a14", roughness: 0.2, metalness: 0.1 }),
     vitral: std({ map: tx.vitral, roughness: 0.15, metalness: 0.4 }),
     portao: std({ map: tx.portao, roughness: 0.4, metalness: 0.5 }),
-    guarda: new THREE.MeshStandardMaterial({ color: "#cfe3ef", transparent: true, opacity: 0.35, roughness: 0.05 }),
+    guarda: new THREE.MeshStandardMaterial({ color: "#5b6b78", transparent: true, opacity: 0.55, roughness: 0.05, metalness: 0.3 }),
+    verde: std({ color: "#4d7a43", roughness: 0.95 }),
+    // Cúpulas do coroamento (foto aérea do site): cobertura escura, curva.
+    cupula: std({ color: "#454b52", roughness: 0.5, metalness: 0.2 }),
+    alambrado: new THREE.MeshStandardMaterial({ map: tx.alambrado, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 0.6 }),
     telhado: std({ color: "#d9d2c5" }),
   };
 }
@@ -241,7 +255,16 @@ function decorarFace(g: THREE.Group, L: number, tipo: Tipo, H: number, hL: numbe
   box({ x: L / 2, y: 0.3, z: 0.15, w: L, h: 0.6, d: 0.3 }, mats.pedra);
   box({ x: L / 2, y: H - 0.55, z: 0.6, w: L + 1.2, h: 1.1, d: 1.2 }, mats.clara);
   box({ x: L / 2, y: H - 1.45, z: 0.3, w: L + 0.6, h: 0.5, d: 0.6 }, mats.clara);
-  box({ x: L / 2, y: H + 0.55, z: 0.05, w: L, h: 1.1, d: 0.06 }, mats.guarda, false);
+  // Guarda-corpo do lazer (foto da piscina no site): pilaretes de pedra clara
+  // a cada ~4 m com vidro escuro entre eles; na frente, floreira por dentro.
+  box({ x: L / 2, y: H + 0.6, z: 0.05, w: L, h: 1.2, d: 0.06 }, mats.guarda, false);
+  const nP = Math.max(1, Math.round(L / 4));
+  for (let k = 0; k <= nP; k++) box({ x: (L * k) / nP, y: H + 0.7, z: 0.05, w: 0.5, h: 1.4, d: 0.5 }, mats.clara);
+  box({ x: L / 2, y: H + 1.45, z: 0.05, w: L + 0.5, h: 0.12, d: 0.55 }, mats.clara);
+  if (tipo === "frente") {
+    box({ x: L / 2, y: H + 0.35, z: -0.8, w: L - 1, h: 0.7, d: 0.9 }, mats.toldo);
+    box({ x: L / 2, y: H + 0.85, z: -0.8, w: L - 1.2, h: 0.45, d: 0.8 }, mats.verde);
+  }
   if (tipo === "fundos") return;
 
   const temGaragem = H - hL > 7;
@@ -323,6 +346,29 @@ export function montarLazer(base: ConfigBase, add: (o: THREE.Object3D) => void, 
     m.receiveShadow = true;
     add(m);
     descarte.push(tex, mat, geo);
+  });
+}
+
+// Alambrado de 4 m em volta da quadra, na cobertura da base.
+export function montarQuadra(base: ConfigBase, mats: Materiais, add: (o: THREE.Object3D) => void, descarte: { dispose(): void }[]) {
+  const q = base.quadra;
+  if (!q) return;
+  const h = 4, y = base.altura + h / 2;
+  const lados: [number, number, number, number][] = [[q.x0, q.z0, q.x1, q.z0], [q.x1, q.z0, q.x1, q.z1], [q.x0, q.z1, q.x1, q.z1], [q.x0, q.z0, q.x0, q.z1]];
+  lados.forEach(([ax, az, bx, bz]) => {
+    const L = Math.hypot(bx - ax, bz - az);
+    const geo = new THREE.PlaneGeometry(L, h);
+    const uv = geo.attributes.uv as THREE.BufferAttribute;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * L, uv.getY(i) * h);
+    const tela = new THREE.Mesh(geo, mats.alambrado);
+    tela.position.set((ax + bx) / 2, y, (az + bz) / 2);
+    tela.rotation.y = Math.atan2(-(bz - az), bx - ax);
+    add(tela); descarte.push(geo);
+    const nP = Math.max(1, Math.round(L / 5));
+    for (let k = 0; k <= nP; k++) {
+      const poste = caixaUV({ x: ax + ((bx - ax) * k) / nP, y, z: az + ((bz - az) * k) / nP, w: 0.12, h, d: 0.12 }, mats.toldo);
+      add(poste); descarte.push(poste.geometry);
+    }
   });
 }
 
