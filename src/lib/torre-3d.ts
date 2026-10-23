@@ -29,6 +29,12 @@ export interface ConfigTorre {
   // Núcleo de escada e elevadores atrás da lâmina (m), centrado em x.
   nucleo?: { largura: number; fundo: number };
   base?: ConfigBase;
+  // Cota de piso de um andar tirada do corte; com ela as cotas dos demais
+  // andares saem de `peDireito` a partir dali, e não do embasamento.
+  cotaRef?: { andar: number; cota: number };
+  // Primeiro andar de apartamentos do projeto. Andares abaixo do primeiro que
+  // tem unidade no Sienge são desenhados sem situação (não clicáveis).
+  primeiroAndar?: number;
 }
 
 // pos = m do centro da janela até a quina de fora (frente/fundos) ou até a
@@ -61,18 +67,26 @@ export const CONFIG_PADRAO: ConfigTorre = {
 // pela quadra (linhas de 40 m = 742 px → 18,55 px/m). Os elevadores (px 1395 ×
 // 845) ficam 2,97 m atrás do centro da lâmina na planta tipo, então o centro
 // da torre cai em px 1395 × 900. Converte px da planta em m.
-const PX_M = 18.55, NUCLEO = [1395, 900];
-const pxM = (x: number, y: number): [number, number] => [+((x - NUCLEO[0]) / PX_M).toFixed(2), +((y - NUCLEO[1]) / PX_M).toFixed(2)];
+// Planta humanizada do lazer: 33,28 px/m (60,24 m de comprimento no
+// carimbo das garagens = 2.005 px). Origem = centro da lâmina da torre, que
+// nas garagens fica a 35,9 m da divisa esquerda e com a frente a 3,3 m da
+// divisa da Rua 2.950 (lâmina de 10 m, núcleo saindo mais 4,3 m).
+const PX_M = 33.28, TORRE = [1423, 1325 - 8.3 * 33.28];
+const pxM = (x: number, y: number): [number, number] => [+((x - TORRE[0]) / PX_M).toFixed(2), +((y - TORRE[1]) / PX_M).toFixed(2)];
 
 // Planta baixa tipo do Palácio (arquitetônico, 1/50, mar/2022 — "Pré-formas
 // tipo 9º ao 42º pavimento", 34×), enviada pelo Edielson em 23/10: lâmina de
 // 32,5 × 10,0 m, final 01 à esquerda e 02 à direita olhando a frente; living
 // das duas no meio da frente com uma sacada única de 14,1 × 3,0 m (dividida ao
 // meio, churrasqueira em cada lado); suítes nas pontas; núcleo de 6,1 m que
-// sai 4,3 m pelos fundos. Pé-direito 3,06 m é estimativa (não há corte).
+// sai 4,3 m pelos fundos.
+// Cortes AA/BB e plantas do térreo, mezanino e garagens (Rodrigo, 23/10):
+// térreo de salas comerciais com mezanino 0,00–5,40; garagens 1–4 a +5,40,
+// +8,05, +10,70 e +13,35; lazer a +16,00; 7º e 8º "tipo diferenciado" a
+// +21,04 e +24,28; tipo do 9º (+27,52) ao 42º (+134,44), 3,24 m piso a piso.
 export const CONFIG_PALACIO: ConfigTorre = {
   nome: "Palácio Elizabeth",
-  largura: 32.5, profundidade: 10, peDireito: 3.06, sacada: 3, larguraSacada: 7.05, embasamento: 8,
+  largura: 32.5, profundidade: 10, peDireito: 3.24, sacada: 3, larguraSacada: 7.05, embasamento: 8,
   ordemFinais: ["01", "02"],
   janelas: { frente: 2, lateral: 1, fundos: 4 },
   janelasTipo: [
@@ -92,9 +106,12 @@ export const CONFIG_PALACIO: ConfigTorre = {
     { face: "lado", pos: 3.35, w: 0.7, h: 0.7, peitoril: 1.5 },
   ],
   nucleo: { largura: 6.1, fundo: 4.3 },
+  cotaRef: { andar: 7, cota: 21.04 },
+  primeiroAndar: 7,
   base: {
-    // Perspectiva: térreo de lojas + friso + garagens (painéis altos) + cornija.
-    altura: 21, peDireitoLazer: 4.5, alturaLojas: 5.5,
+    // Corte: salas comerciais + mezanino até +5,40, 4 garagens, lazer a +16,00.
+    // Fachada (lojas, friso, painéis das garagens, cornija) pela perspectiva.
+    altura: 16, peDireitoLazer: 5.04, alturaLojas: 5.4,
     // Corpo principal + quadra nos fundos (contorno da planta do lazer).
     contorno: [pxM(230, 573), pxM(1075, 573), pxM(1075, 24), pxM(1875, 24), pxM(1875, 573), pxM(2235, 573), pxM(2235, 1325), pxM(230, 1325)],
     quadra: (() => { const [x0, z0] = pxM(1075, 24), [x1, z1] = pxM(1875, 573); return { x0, z0, x1, z1 }; })(),
@@ -151,9 +168,11 @@ export function sacadaDaUnidade(indice: number, total: number, andar: number, pr
 // Cota do piso: o embasamento ocupa os pavimentos abaixo do primeiro andar de
 // apartamentos (garagens e lojas), com o mesmo pé-direito.
 export function cotaDoAndar(andar: number, primeiroAndar: number, cfg: ConfigTorre): number {
+  if (cfg.cotaRef) return cfg.cotaRef.cota + (andar - cfg.cotaRef.andar) * cfg.peDireito;
   return alturaEmbasamento(primeiroAndar, cfg) + (andar - primeiroAndar) * cfg.peDireito;
 }
 export function alturaEmbasamento(primeiroAndar: number, cfg: ConfigTorre): number {
+  if (cfg.cotaRef) return cotaDoAndar(Math.min(primeiroAndar, cfg.primeiroAndar ?? primeiroAndar), primeiroAndar, cfg);
   if (cfg.base) return cfg.base.altura + cfg.base.peDireitoLazer;
   return Math.max(1, primeiroAndar - 1) * cfg.peDireito;
 }

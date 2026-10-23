@@ -59,13 +59,24 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     const porAndar = new Map<number, Unidade3D[]>();
     unidades.forEach(u => { if (!porAndar.has(u.andar)) porAndar.set(u.andar, []); porAndar.get(u.andar)!.push(u); });
     const andares = Array.from(porAndar.keys()).sort((a, b) => a - b);
-    const primeiro = andares[0] ?? 1;
     const ultimo = andares[andares.length - 1] ?? 1;
     const itens = andares.flatMap(a => {
       const lista = porAndar.get(a)!;
       const ordem = ordenarFinais(lista.map(u => u.final), cfg);
       return lista.map(u => ({ u, indice: ordem.indexOf(u.final), total: ordem.length }));
     });
+    // Andares do projeto abaixo do primeiro com unidade no Sienge (Palácio:
+    // 7º e 8º diferenciados): mesmos finais do andar de cima, sem situação.
+    let primeiro = andares[0] ?? 1;
+    if (cfg.primeiroAndar && andares.length && cfg.primeiroAndar < primeiro) {
+      const ordem = ordenarFinais(porAndar.get(primeiro)!.map(u => u.final), cfg);
+      for (let a = cfg.primeiroAndar; a < primeiro; a++)
+        ordem.forEach((f, indice) => itens.push({
+          u: { id: "", unit: "", andar: a, final: f, situacao: "", area: 0, cliente: "", valor: 0, preco: 0, apagada: false },
+          indice, total: ordem.length,
+        }));
+      primeiro = cfg.primeiroAndar;
+    }
     return { itens, primeiro, ultimo };
   }, [unidades, cfg]);
   const porId = useMemo(() => new Map(layout.itens.map(i => [i.u.id, i])), [layout]);
@@ -150,15 +161,18 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     const blocos: THREE.Object3D[] = [];
     const matsUnidade = new Map<string, { corpo: THREE.MeshStandardMaterial; sacada: THREE.MeshStandardMaterial }>();
     const janelas: { j: Janela; id: string; cor: THREE.Color }[] = [];
+    const neutroCorpo = new THREE.MeshStandardMaterial({ color: FACHADA.clone(), roughness: 0.8 });
+    const neutroSacada = new THREE.MeshStandardMaterial({ color: "#9fb4c2", roughness: 0.2, transparent: true, opacity: 0.55 });
+    descarte.push(neutroCorpo, neutroSacada);
     layout.itens.forEach(({ u, indice, total }) => {
       const cor = corDe(u.situacao);
-      const corpo = new THREE.MeshStandardMaterial({
+      const semSituacao = !u.id;
+      const corpo = semSituacao ? neutroCorpo : new THREE.MeshStandardMaterial({
         color: u.apagada ? FACHADA.clone() : FACHADA.clone().lerp(cor, 0.45), roughness: 0.8,
         transparent: u.apagada, opacity: u.apagada ? 0.35 : 1,
       });
-      const sac = new THREE.MeshStandardMaterial({ color: u.apagada ? FACHADA.clone() : cor, roughness: 0.3, transparent: true, opacity: u.apagada ? 0.3 : 0.75 });
-      descarte.push(corpo, sac);
-      matsUnidade.set(u.id, { corpo, sacada: sac });
+      const sac = semSituacao ? neutroSacada : new THREE.MeshStandardMaterial({ color: u.apagada ? FACHADA.clone() : cor, roughness: 0.3, transparent: true, opacity: u.apagada ? 0.3 : 0.75 });
+      if (!semSituacao) { descarte.push(corpo, sac); matsUnidade.set(u.id, { corpo, sacada: sac }); }
       const b = caixa(blocoDaUnidade(indice, total, u.andar, primeiro, cfg), corpo);
       b.userData.id = u.id; blocos.push(b);
       const sb = sacadaDaUnidade(indice, total, u.andar, primeiro, cfg);
@@ -169,7 +183,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
         const lado = caixa({ x: sb.x + l * (sb.w / 2 - 0.04), y: sb.y + 0.6, z: sb.z, w: 0.08, h: 1.1, d: sb.d }, sac, false);
         lado.userData.id = u.id; blocos.push(lado);
       });
-      const vidro = u.apagada ? new THREE.Color("#5b6470") : VIDRO.clone().lerp(cor, 0.5);
+      const vidro = semSituacao ? VIDRO.clone() : u.apagada ? new THREE.Color("#5b6470") : VIDRO.clone().lerp(cor, 0.5);
       janelasDaUnidade(indice, total, u.andar, primeiro, cfg).forEach(j => janelas.push({ j, id: u.id, cor: j.aberta ? new THREE.Color("#3a3f45") : vidro }));
     });
 
@@ -247,8 +261,8 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
       ray.setFromCamera(ponteiro, camera);
       const hit = ray.intersectObjects(blocos, false)[0];
       if (!hit) return null;
-      if (hit.instanceId !== undefined && hit.object.userData.ids) return (hit.object.userData.ids as string[])[hit.instanceId] ?? null;
-      return (hit.object.userData.id as string | undefined) ?? null;
+      if (hit.instanceId !== undefined && hit.object.userData.ids) return (hit.object.userData.ids as string[])[hit.instanceId] || null;
+      return (hit.object.userData.id as string | undefined) || null;
     };
     const mover = (ev: PointerEvent) => { const id = achar(ev); if (id !== sobre) { sobre = id; renderer.domElement.style.cursor = id ? "pointer" : "grab"; pintar(); } };
     let inicio = { x: 0, y: 0 };
@@ -315,7 +329,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
             <span className="text-slate-600 dark:text-slate-300">{s.nome}: <strong>{s.n}</strong></span>
           </div>
         ))}
-        <p className="text-[10px] text-slate-400 pt-1">{cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
+        <p className="text-[10px] text-slate-400 pt-1">{cfg.cotaRef ? "Pelo projeto: planta tipo, cortes e garagens" : cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
       </div>
       {/* Controles */}
       <div className="absolute right-3 top-3 flex gap-1.5">

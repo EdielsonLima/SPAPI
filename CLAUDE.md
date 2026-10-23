@@ -135,15 +135,27 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   também abre a unidade). Pilastras de pastilha nas quinas, cinta a cada 10
   andares, coroamento. Base (`ConfigBase`, desenho em
   `src/components/torre-3d-predio.ts`): contorno tirado da planta do lazer,
-  21 m + 4,5 m de lazer sob a torre; frente com lojas, toldos, friso
+  frente com lojas, toldos, friso
   ornamental, garagens com veneziana em arco e portal de vidro no eixo da
   torre; laterais só garagens; planta humanizada do lazer
-  (`public/modelos/palacio-lazer.webp`, 18,55 px/m pela quadra) deitada na
-  cobertura. Texturas desenhadas em canvas, sem arquivo. Altura da base,
-  pé-direito e escala do lazer são estimativas (sem corte). Pelas fotos da galeria do
+  (`public/modelos/palacio-lazer.webp`) deitada na cobertura. Texturas
+  desenhadas em canvas, sem arquivo. Pelas fotos da galeria do
   site (23/10): coroamento com duas cúpulas escuras (uma por apartamento),
   guarda-corpo do lazer com pilaretes + vidro escuro + floreira na frente, e
   alambrado de 4 m na quadra (`ConfigBase.quadra`).
+- **Medidas pelos projetos do Rodrigo (engenheiro, 23/10, WhatsApp):** cortes
+  AA/BB e plantas térreo/mezanino/garagens 1–4 (1/75, mar/2022). Cotas:
+  salas comerciais com mezanino 0,00–5,40 · garagens +5,40/+8,05/+10,70/
+  +13,35 · lazer +16,00 · **7º e 8º "tipo diferenciado"** +21,04/+24,28 ·
+  tipo 9º–42º, **3,24 m piso a piso** (42º a +134,44); casa de máquinas e
+  reservatórios ~7 m acima da cobertura. `CONFIG_PALACIO.cotaRef` fixa a cota
+  do 7º e `cotaDoAndar` conta dali; `primeiroAndar: 7` faz o 7º e o 8º
+  aparecerem sem situação (cinza, sem clique) enquanto o Sienge não tiver
+  unidade neles. Base em L de **60,24 × 22,7 m + 24 × 16 m** nos fundos (a
+  quadra); a planta do lazer é **33,28 px/m** (a escala antiga, 18,55 pela
+  quadra, deixava a base 1,8× maior). Torre a 35,9 m da divisa esquerda, com
+  a frente a 3,3 m da Rua 2.950. PDFs fora do repositório (WhatsApp do
+  Rodrigo e arquivos do projeto, `comercial/projetos-palacio/`).
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no

@@ -25,10 +25,18 @@ assert.equal(conta(je, "fundos"), 5);
 je.forEach((j, i) => { assert.ok(Math.abs(j.x + jd[i].x) < 1e-9 && j.z === jd[i].z); });
 // janela da frente fica fora da sacada e dentro da torre
 je.filter(j => j.face === "frente" && !j.porta).forEach(j => { assert.ok(j.x < -CONFIG_PALACIO.larguraSacada && j.x > -CONFIG_PALACIO.largura / 2); });
-// base do Palácio: 21 m + lazer; a torre cabe dentro do contorno
-assert.equal(alturaEmbasamento(1, CONFIG_PALACIO), 25.5);
+// Palácio pelos cortes AA/BB: lazer a +16,00, 7º a +21,04, 9º a +27,52, 42º a +134,44
+const c = (a: number) => Math.round(cotaDoAndar(a, 9, CONFIG_PALACIO) * 100) / 100;
+assert.equal(c(7), 21.04); assert.equal(c(9), 27.52); assert.equal(c(42), 134.44);
+assert.equal(Math.round(alturaEmbasamento(9, CONFIG_PALACIO) * 100) / 100, 21.04);
+assert.equal(CONFIG_PALACIO.base!.altura, 16);
+// contorno das garagens: 60,24 m de comprimento, 22,7 + 16 m de fundo; a torre
+// e a sacada cabem dentro, núcleo também
 const xs = CONFIG_PALACIO.base!.contorno.map(p => p[0]), zs = CONFIG_PALACIO.base!.contorno.map(p => p[1]);
-assert.ok(Math.min(...xs) < -17 && Math.max(...xs) > 17 && Math.min(...zs) < -8.5 && Math.max(...zs) > 8.5 + 2.4);
+assert.ok(Math.abs(Math.max(...xs) - Math.min(...xs) - 60.24) < 0.5);
+assert.ok(Math.abs(Math.max(...zs) - Math.min(...zs) - 38.75) < 1);
+assert.ok(Math.min(...xs) < -16.25 && Math.max(...xs) > 16.25);
+assert.ok(Math.max(...zs) > 5 + CONFIG_PALACIO.sacada && Math.min(...zs) < -5 - 4.3);
 // sem base própria: retângulo em volta da torre, altura pelos andares de baixo
 assert.equal(baseDaTorre(6, CONFIG_PADRAO).altura, 15);
 assert.equal(baseDaTorre(6, CONFIG_PADRAO).contorno.length, 4);
