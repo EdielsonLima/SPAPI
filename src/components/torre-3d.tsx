@@ -28,6 +28,7 @@ export interface Unidade3D {
   area: number;
   cliente: string;
   valor: number;
+  preco: number;    // preço de tabela (unidade sem venda), 0 = sem preço
   apagada: boolean; // fora do filtro da tela → esmaecida
 }
 
@@ -278,6 +279,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
             {sel.u.area > 0 && <div className="flex justify-between"><dt className="text-slate-500">Área privativa</dt><dd className="font-semibold tabular-nums">{sel.u.area.toLocaleString("pt-BR")} m²</dd></div>}
             {temDono(sel.u.situacao) && sel.u.cliente && sel.u.cliente !== "—" && <div className="flex justify-between gap-3"><dt className="text-slate-500">Cliente</dt><dd className="font-semibold text-right truncate" title={sel.u.cliente}>{sel.u.cliente}</dd></div>}
             {mostrarValores && sel.u.valor > 0 && <div className="flex justify-between"><dt className="text-slate-500">Valor no contrato</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.valor)}</dd></div>}
+            {mostrarValores && sel.u.preco > 0 && <div className="flex justify-between"><dt className="text-slate-500">Preço de tabela</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.preco)}</dd></div>}
           </dl>
         </div>
       )}

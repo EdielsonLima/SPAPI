@@ -62,6 +62,10 @@ interface ComercialContextValue {
   selectedUnits: Set<string>; setSelectedUnits: SetS;
   selectedUnitCustomers: Set<string>; setSelectedUnitCustomers: SetS;
   toggleInSet: (setter: SetS, name: string) => void;
+  // Tabela de preços (painel): unitId do Sienge → preço; quem pode editar.
+  precosTabela: Map<number, number>;
+  podeEditarPrecos: boolean;
+  recarregarPrecos: () => Promise<void>;
 }
 
 const ComercialContext = createContext<ComercialContextValue | null>(null);
@@ -244,6 +248,19 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
     if (valid.size > 0) setSelectedCompanies(valid);
   }, [allCompanyNames]);
 
+  const [precosTabela, setPrecosTabela] = useState<Map<number, number>>(new Map());
+  const [podeEditarPrecos, setPodeEditarPrecos] = useState(false);
+  const recarregarPrecos = useCallback(async () => {
+    try {
+      const r = await fetch("/api/tabela-precos");
+      if (!r.ok) return;
+      const d = await r.json() as { podeEditar?: boolean; precos?: { unitId: number; valor: number }[] };
+      setPrecosTabela(new Map((d.precos || []).map(p => [p.unitId, p.valor])));
+      setPodeEditarPrecos(Boolean(d.podeEditar));
+    } catch { /* sem tabela: o quadro só não mostra preço */ }
+  }, []);
+  useEffect(() => { recarregarPrecos(); }, [recarregarPrecos]);
+
   const value: ComercialContextValue = {
     salesContracts, apiUnits, comissoes, cubData, companySettings, chartColors,
     loading, refreshing, lastUpdate, refresh: () => fetchData(true),
@@ -261,6 +278,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
     selectedUnitCustomers, setSelectedUnitCustomers,
     toggleInSet,
+    precosTabela, podeEditarPrecos, recarregarPrecos,
   };
 
   return <ComercialContext.Provider value={value}>{children}</ComercialContext.Provider>;
