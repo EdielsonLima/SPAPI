@@ -125,6 +125,22 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   `next/dynamic`, só baixa ao abrir o 3D): clique abre o card da unidade
   (cliente só com dono, valor só com Valores ligado). Só apartamentos; vagas
   ficam na Torre. Outro empreendimento usa `CONFIG_PADRAO`.
+- **Maquete detalhada (23/10, pedido do Edielson: "não ficar um pavimento reto
+  sem janelas").** Torre pela **planta baixa tipo** (arquitetônico 1/50,
+  mar/2022, "tipo 9º ao 42º", 34×): lâmina 32,5 × 10 m, final 01 à esquerda,
+  sacada única de 14,1 × 3 m no meio da frente (dividida ao meio), núcleo de
+  6,1 m saindo 4,3 m pelos fundos. Janelas uma a uma em
+  `CONFIG_PALACIO.janelasTipo` (posição medida da quina; o final 02 é o
+  espelho), desenhadas por `janelasDaUnidade` e instanciadas (clique na janela
+  também abre a unidade). Pilastras de pastilha nas quinas, cinta a cada 10
+  andares, coroamento. Base (`ConfigBase`, desenho em
+  `src/components/torre-3d-predio.ts`): contorno tirado da planta do lazer,
+  21 m + 4,5 m de lazer sob a torre; frente com lojas, toldos, friso
+  ornamental, garagens com veneziana em arco e portal de vidro no eixo da
+  torre; laterais só garagens; planta humanizada do lazer
+  (`public/modelos/palacio-lazer.webp`, 18,55 px/m pela quadra) deitada na
+  cobertura. Texturas desenhadas em canvas, sem arquivo. Altura da base,
+  pé-direito e escala do lazer são estimativas (sem corte).
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no
