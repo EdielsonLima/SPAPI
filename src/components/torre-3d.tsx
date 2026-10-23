@@ -192,25 +192,40 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     montarLazer(base, juntar, descarte);
     montarRua(base, juntar, descarte, escuro);
     // Entorno real (ruas com nome, quadras, praia), carregado depois do prédio.
-    let vivo = true, entorno: { dispose: () => void } | null = null;
+    let vivo = true, entorno: { grupo: THREE.Group; dispose: () => void } | null = null;
     let norte: THREE.Vector2 | null = null; // direção do norte na cena (x, z), vinda do mapa
     if (cfg.local) {
       const zRua = Math.max(...base.contorno.map(p => p[1])) + 13; // eixo da rua da frente (montarRua)
-      setAvisoMapa("Carregando o mapa da cidade…");
-      fetch(`/api/entorno-3d?chave=${encodeURIComponent(cfg.local.chave)}&v=${VERSAO_ENTORNO}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(async (d: DadosEntorno | null) => {
-          if (!vivo) return;
-          if (!d?.ruas?.length) { setAvisoMapa("Mapa da cidade indisponível agora"); return; }
-          const { montarEntorno } = await import("@/components/torre-3d-entorno");
-          if (!vivo) return;
-          const e = montarEntorno(d, escuro);
-          e.grupo.position.set(-(cfg.local?.ajusteX || 0), 0, zRua);
-          scene.add(e.grupo); entorno = e;
-          setFonteMapa(d.fonte); setAvisoMapa("");
-          if (d.norte) norte = new THREE.Vector2(d.norte[0], d.norte[1]).normalize();
-        })
-        .catch(() => { if (vivo) setAvisoMapa("Mapa da cidade indisponível agora"); });
+      let versaoNaCena = 0, tentativas = 0, espera: ReturnType<typeof setTimeout> | null = null;
+      // Com o mapa de uma versão antiga no banco, o servidor devolve o que tem e
+      // refaz por trás; aqui a tela pergunta de novo a cada 20 s e troca o mapa
+      // na hora quando o novo chega (sem fechar e abrir).
+      const carregar = () => {
+        if (versaoNaCena === 0) setAvisoMapa("Carregando o mapa da cidade…");
+        fetch(`/api/entorno-3d?chave=${encodeURIComponent(cfg.local!.chave)}&v=${VERSAO_ENTORNO}`, { cache: "no-store" })
+          .then(r => r.ok ? r.json() : null)
+          .then(async (d: DadosEntorno | null) => {
+            if (!vivo) return;
+            const versao = d?.versao ?? 1;
+            if (d?.ruas?.length && versao > versaoNaCena) {
+              const { montarEntorno } = await import("@/components/torre-3d-entorno");
+              if (!vivo) return;
+              if (entorno) { scene.remove(entorno.grupo); entorno.dispose(); }
+              const e = montarEntorno(d, escuro);
+              e.grupo.position.set(-(cfg.local?.ajusteX || 0), 0, zRua);
+              scene.add(e.grupo); entorno = e; versaoNaCena = versao;
+              setFonteMapa(d.fonte);
+              if (d.norte) norte = new THREE.Vector2(d.norte[0], d.norte[1]).normalize();
+            }
+            if (versaoNaCena >= VERSAO_ENTORNO) { setAvisoMapa(""); return; }
+            setAvisoMapa(versaoNaCena ? "Atualizando o mapa da cidade…" : "Carregando o mapa da cidade…");
+            if (++tentativas < 30) espera = setTimeout(carregar, 20_000); // até 10 min
+            else setAvisoMapa(versaoNaCena ? "" : "Mapa da cidade indisponível agora");
+          })
+          .catch(() => { if (vivo && !versaoNaCena) setAvisoMapa("Mapa da cidade indisponível agora"); });
+      };
+      carregar();
+      descarte.push({ dispose: () => { if (espera) clearTimeout(espera); } });
     }
     montarQuadra(base, mats, juntar, descarte);
     descarte.push(...geos);
