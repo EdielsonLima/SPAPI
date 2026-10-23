@@ -18,7 +18,7 @@ async function overpass(q: string, falhas: string[]): Promise<ElementoOSM[]> {
       const r = await fetch(url, {
         method: "POST", body: new URLSearchParams({ data: q }),
         headers: { "User-Agent": "DTConsultorias-Torre3D/1.0 (edielson@dtconsultorias.com)" },
-        signal: AbortSignal.timeout(150_000), cache: "no-store",
+        signal: AbortSignal.timeout(200_000), cache: "no-store",
       });
       if (!r.ok) throw new Error(`HTTP ${r.status} ${(await r.text().catch(() => "")).slice(0, 200)}`);
       return ((await r.json()) as { elements: ElementoOSM[] }).elements;
@@ -44,7 +44,9 @@ export async function GET(req: NextRequest) {
   try {
     const salvo = refazer ? null : await lerEntorno(chave) as DadosEntorno | null;
     if (salvo && salvo.versao === VERSAO_ENTORNO) return NextResponse.json(salvo, { headers: { "Cache-Control": "private, max-age=86400" } });
-    if (!gerando.has(chave)) {
+    // Depois de uma falha, espera 2 min antes de tentar de novo (a tela pergunta a cada 20 s).
+    const falhouHaPouco = !!ultimaFalha && Date.now() - Date.parse(ultimaFalha.quando) < 120_000;
+    if (!gerando.has(chave) && !(salvo && falhouHaPouco)) {
       gerando.set(chave, (async () => {
         const falhas: string[] = [];
         let etapa = "localizar a rua";
@@ -71,7 +73,7 @@ export async function GET(req: NextRequest) {
     }
     // Versão antiga no banco: mostra ela agora; a nova fica pronta para a próxima abertura.
     if (salvo) return NextResponse.json(salvo, { headers: { "Cache-Control": "no-store" } });
-    return NextResponse.json(await gerando.get(chave));
+    return NextResponse.json(await gerando.get(chave)!);
   } catch (e) {
     console.error("[entorno-3d]", e);
     return NextResponse.json({ error: "Mapa do entorno indisponível agora." }, { status: 503 });

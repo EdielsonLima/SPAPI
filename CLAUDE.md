@@ -199,6 +199,11 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   do entorno). `VERSAO_ENTORNO` no dado: versão antiga no banco é servida
   na hora e refeita em segundo plano (a próxima abertura já vem nova); o
   cliente pede com `&v=` para não pegar a resposta antiga do navegador.
+  A tela pergunta de novo a cada 20 s (até 10 min) enquanto a versão não é a
+  atual e troca o mapa na cena na hora ("Atualizando o mapa da cidade…"); a
+  bússola só existe com o dado novo (`norte`). Depois de uma falha o servidor
+  espera 2 min para tentar de novo; a espera do fetch (200 s) tem de ser
+  maior que o `timeout` da consulta Overpass (180 s).
   **Ver planta:** botão no card da unidade abre a planta humanizada do tipo
   (`CONFIG_PALACIO.planta`, imagem do site `SIL_ELI_PH_TIPO` em
   `public/modelos/palacio-planta-tipo.webp`), dentro da tela cheia. A imagem
