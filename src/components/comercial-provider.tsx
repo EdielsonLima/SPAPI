@@ -49,7 +49,7 @@ interface ComercialContextValue {
   clientesSort: { field: "name" | "contracts" | "units" | "lastDate" | "totalValue"; dir: "asc" | "desc" };
   setClientesSort: React.Dispatch<React.SetStateAction<ComercialContextValue["clientesSort"]>>;
   comercialChartView: "anual" | "mensal"; setComercialChartView: React.Dispatch<React.SetStateAction<"anual" | "mensal">>;
-  quadroView: "grade" | "espelho"; setQuadroView: React.Dispatch<React.SetStateAction<"grade" | "espelho">>;
+  quadroView: "grade" | "espelho" | "3d"; setQuadroView: React.Dispatch<React.SetStateAction<"grade" | "espelho" | "3d">>;
   selectedUnitStatuses: Set<string>; setSelectedUnitStatuses: SetS;
   // Quadro: filtro por situação (Vendido, Permutante…; situacao-unidade.ts),
   // separado do status de estoque da tela Unidades.
@@ -126,8 +126,8 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
   const [clienteSearch, setClienteSearch] = useState("");
   const [clientesSort, setClientesSort] = useState<ComercialContextValue["clientesSort"]>({ field: "totalValue", dir: "desc" });
   const [comercialChartView, setComercialChartView] = useState<"anual" | "mensal">("anual");
-  // Quadro Espelho: "grade" (lista plana) ou "espelho" (torre por pavimento)
-  const [quadroView, setQuadroView] = useState<"grade" | "espelho">("espelho");
+  // Quadro Espelho: "grade" (lista plana), "espelho" (torre por pavimento) ou "3d" (maquete)
+  const [quadroView, setQuadroView] = useState<"grade" | "espelho" | "3d">("espelho");
   const [selectedUnitStatuses, setSelectedUnitStatuses] = useState<Set<string>>(new Set());
   const [selectedSituacoes, setSelectedSituacoes] = useState<Set<string>>(new Set());
   // Começa desligado (servidor e primeira pintura iguais) e lê a preferência depois.
