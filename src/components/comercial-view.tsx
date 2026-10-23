@@ -26,6 +26,8 @@ import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS } from "@/lib/dashboard-utils";
 import { MultiSelectFilter } from "@/components/multi-select-filter";
 import { CorretoresView } from "@/components/corretores-view";
+import { TabelaPrecosView } from "@/components/tabela-precos-view";
+import { semVenda } from "@/lib/tabela-precos";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
@@ -64,7 +66,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     selectedUnitEnterprises, setSelectedUnitEnterprises,
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
     selectedUnitCustomers, setSelectedUnitCustomers,
-    toggleInSet,
+    toggleInSet, precosTabela,
   } = useComercial();
   // Vendas: contar por unidade (padrão, como no Financeiro da Leven) ou por contrato.
   const [contarPor, setContarPor] = React.useState<"unidades" | "contratos">("unidades");
@@ -99,6 +101,20 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           {[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-24" />)}
         </div>
         <Skeleton className="h-[400px]" />
+      </div>
+    );
+  }
+
+  // Tabela de Preços: tela própria, sem os filtros de Empresa/Ano do módulo
+  // (preço é por unidade, não por período). Mesma tela do Financeiro da Leven.
+  if (aba === "precos") {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{meta.label}</h1>
+          <p className="text-sm text-muted-foreground">{meta.subtitle}</p>
+        </div>
+        <TabelaPrecosView />
       </div>
     );
   }
@@ -226,7 +242,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     });
 
     // ─── Unit analysis: API units + sales contract enrichment ───
-    type UnitRecord = { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string; area: number; floor: string; permuta: boolean; situacao: string };
+    type UnitRecord = { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string; area: number; floor: string; permuta: boolean; situacao: string; unitId?: number };
     const unitMap = new Map<string, UnitRecord>();
 
     // 1. Seed from real Sienge /units API (source of truth for status)
@@ -247,6 +263,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           floor: u.floor || "",
           permuta: false,
           situacao: "",
+          unitId: u.id,
         });
       });
     }
@@ -294,6 +311,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     const allUnits = Array.from(unitMap.values());
     // Situação do Quadro (cor/legenda): estoque do Sienge + permuta pura = Permutante.
     allUnits.forEach(u => { u.situacao = situacaoDaUnidade(u.status, u.permuta); });
+    // Preço de tabela (painel) só vale para unidade sem venda; a vendida mostra o contrato.
+    const precoTabela = (u: UnitRecord) => (u.unitId != null && semVenda(u.status) ? precosTabela.get(u.unitId) ?? 0 : 0);
 
     // Planilha das unidades vendidas (Vendas › Exportar Excel): uma linha por
     // unidade dos contratos filtrados (respeita Tipo Imóvel) + aba com o
@@ -1765,6 +1784,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           `${u.unit} — ${u.situacao}`,
           temDono(u.situacao) && u.customer && u.customer !== "—" ? `Cliente: ${u.customer}` : "",
           mostrarValores && temDono(u.situacao) && u.value ? `Valor: ${formatCurrency(u.value)}` : "",
+          mostrarValores && precoTabela(u) ? `Preço de tabela: ${formatCurrency(precoTabela(u))}` : "",
           u.area ? `Área: ${u.area} m²` : "",
         ].filter(Boolean).join("\n");
 
@@ -1920,7 +1940,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
               .flatMap(u => {
                 const pos = andarEFinal(u.unit, normalizeFloor(u.floor));
                 if (!pos) return [];
-                return [{ id: `${u.enterprise}||${u.unit}`, unit: u.unit, andar: pos.andar, final: pos.final, situacao: u.situacao, area: u.area, cliente: u.customer, valor: u.value, apagada: !visiveis.has(`${u.enterprise}||${u.unit}`) }];
+                return [{ id: `${u.enterprise}||${u.unit}`, unit: u.unit, andar: pos.andar, final: pos.final, situacao: u.situacao, area: u.area, cliente: u.customer, valor: u.value, preco: precoTabela(u), apagada: !visiveis.has(`${u.enterprise}||${u.unit}`) }];
               });
             return (
               <Card className="border-0 shadow-sm mt-3">
@@ -2014,9 +2034,10 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                                       <span className="block text-[8px] font-semibold uppercase tracking-wide mt-1 opacity-75">
                                         {u.situacao === "Disponível" ? "Livre" : u.situacao}
                                       </span>
-                                      {mostrarValores && u.situacao !== "Disponível" && u.value > 0 && (
-                                        <span className="block text-[9px] font-semibold tabular-nums mt-0.5 opacity-80">{formatCompactCurrency(u.value)}</span>
-                                      )}
+                                      {(() => {
+                                        const v = precoTabela(u) || (u.situacao !== "Disponível" ? u.value : 0);
+                                        return mostrarValores && v > 0 ? <span className="block text-[9px] font-semibold tabular-nums mt-0.5 opacity-80">{formatCompactCurrency(v)}</span> : null;
+                                      })()}
                                     </div>
                                   ))}
                                 </div>

@@ -1121,3 +1121,150 @@ export async function deleteConferencia(
     [tipo, companyId, billId, installmentId]
   );
 }
+
+// ─── Tabela de preços das unidades (Comercial) ──────────────────────────────
+// Preço de tabela das unidades não vendidas. Toda gravação passa por
+// gravarPrecos, que atualiza a tabela e escreve o histórico na MESMA
+// transação — não existe preço alterado sem registro de quem e por quê.
+
+// spapi não roda schema.sql na subida: as tabelas nascem aqui na 1ª chamada
+// (mesmo padrão de cached_commissions). Estrutura idêntica à do schema da Leven.
+let tabelaPrecosPronta = false;
+async function ensureTabelaPrecos() {
+  if (tabelaPrecosPronta) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tabela_precos_unidades (
+      unit_id         INTEGER       PRIMARY KEY,
+      enterprise_id   INTEGER       NOT NULL,
+      unidade         TEXT          NOT NULL DEFAULT '',
+      valor           NUMERIC(14,2) NOT NULL,
+      atualizado_por  TEXT          NOT NULL DEFAULT '',
+      atualizado_em   TIMESTAMP     NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_tabela_precos_empreendimento ON tabela_precos_unidades (enterprise_id);
+    CREATE TABLE IF NOT EXISTS tabela_precos_historico (
+      id              SERIAL        PRIMARY KEY,
+      lote            TEXT          NOT NULL,
+      unit_id         INTEGER       NOT NULL,
+      enterprise_id   INTEGER       NOT NULL,
+      unidade         TEXT          NOT NULL DEFAULT '',
+      valor_anterior  NUMERIC(14,2),
+      valor_novo      NUMERIC(14,2),
+      tipo            VARCHAR(12)   NOT NULL,
+      descricao       TEXT          NOT NULL DEFAULT '',
+      criado_por      TEXT          NOT NULL DEFAULT '',
+      criado_em       TIMESTAMP     NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_tabela_precos_hist_unidade ON tabela_precos_historico (unit_id, criado_em DESC);
+    CREATE INDEX IF NOT EXISTS idx_tabela_precos_hist_lote ON tabela_precos_historico (lote);
+  `);
+  tabelaPrecosPronta = true;
+}
+
+export interface PrecoUnidade {
+  unitId: number;
+  enterpriseId: number;
+  unidade: string;
+  valor: number;
+  atualizadoPor: string;
+  atualizadoEm: string;
+}
+
+export interface AlteracaoPreco {
+  unitId: number;
+  enterpriseId: number;
+  unidade: string;
+  valor: number | null;          // null = remove o preço
+}
+
+export interface HistoricoPreco {
+  lote: string;
+  unitId: number;
+  enterpriseId: number;
+  unidade: string;
+  valorAnterior: number | null;
+  valorNovo: number | null;
+  tipo: string;
+  descricao: string;
+  criadoPor: string;
+  criadoEm: string;
+}
+
+export async function listarPrecos(): Promise<PrecoUnidade[]> {
+  await ensureTabelaPrecos();
+  const { rows } = await pool.query(
+    `SELECT unit_id AS "unitId", enterprise_id AS "enterpriseId", unidade,
+            valor::float8 AS valor, atualizado_por AS "atualizadoPor",
+            atualizado_em AS "atualizadoEm"
+       FROM tabela_precos_unidades`
+  );
+  return rows;
+}
+
+// Grava as alterações e o histórico numa transação. Retorna quantas unidades
+// mudaram de fato (valor igual ao atual não gera linha de histórico).
+export async function gravarPrecos(
+  alteracoes: AlteracaoPreco[],
+  meta: { lote: string; tipo: string; descricao: string; usuario: string },
+): Promise<number> {
+  if (alteracoes.length === 0) return 0;
+  await ensureTabelaPrecos();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const ids = alteracoes.map(a => a.unitId);
+    const { rows } = await client.query(
+      `SELECT unit_id, valor::float8 AS valor FROM tabela_precos_unidades WHERE unit_id = ANY($1::int[]) FOR UPDATE`,
+      [ids],
+    );
+    const atual = new Map<number, number>(rows.map((r: { unit_id: number; valor: number }) => [r.unit_id, r.valor]));
+    let mudou = 0;
+    for (const a of alteracoes) {
+      const antes = atual.has(a.unitId) ? atual.get(a.unitId)! : null;
+      if (antes === a.valor) continue;
+      if (a.valor === null) {
+        if (antes === null) continue;
+        await client.query(`DELETE FROM tabela_precos_unidades WHERE unit_id = $1`, [a.unitId]);
+      } else {
+        await client.query(
+          `INSERT INTO tabela_precos_unidades (unit_id, enterprise_id, unidade, valor, atualizado_por, atualizado_em)
+           VALUES ($1,$2,$3,$4,$5,NOW())
+           ON CONFLICT (unit_id) DO UPDATE SET
+             enterprise_id = $2, unidade = $3, valor = $4, atualizado_por = $5, atualizado_em = NOW()`,
+          [a.unitId, a.enterpriseId, a.unidade, a.valor, meta.usuario],
+        );
+      }
+      await client.query(
+        `INSERT INTO tabela_precos_historico
+           (lote, unit_id, enterprise_id, unidade, valor_anterior, valor_novo, tipo, descricao, criado_por)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [meta.lote, a.unitId, a.enterpriseId, a.unidade, antes, a.valor,
+         a.valor === null ? "remocao" : meta.tipo, meta.descricao, meta.usuario],
+      );
+      mudou++;
+    }
+    await client.query("COMMIT");
+    return mudou;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function listarHistoricoPrecos(opts: { unitId?: number; limite?: number } = {}): Promise<HistoricoPreco[]> {
+  await ensureTabelaPrecos();
+  const limite = Math.min(Math.max(opts.limite ?? 500, 1), 2000);
+  const { rows } = await pool.query(
+    `SELECT lote, unit_id AS "unitId", enterprise_id AS "enterpriseId", unidade,
+            valor_anterior::float8 AS "valorAnterior", valor_novo::float8 AS "valorNovo",
+            tipo, descricao, criado_por AS "criadoPor", criado_em AS "criadoEm"
+       FROM tabela_precos_historico
+      WHERE ($1::int IS NULL OR unit_id = $1)
+      ORDER BY criado_em DESC, id DESC
+      LIMIT $2`,
+    [opts.unitId ?? null, limite],
+  );
+  return rows;
+}

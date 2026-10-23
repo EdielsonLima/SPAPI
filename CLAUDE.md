@@ -125,7 +125,20 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   `next/dynamic`, só baixa ao abrir o 3D): clique abre o card da unidade
   (cliente só com dono, valor só com Valores ligado). Só apartamentos; vagas
   ficam na Torre. Outro empreendimento usa `CONFIG_PADRAO`.
-- Próximas etapas (plano): telas da Leven (tabela de preços, reservas).
+- **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
+  (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
+  (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no
+  servidor, `/api/tabela-precos/reajuste`) e histórico. Regras em
+  `src/lib/tabela-precos.ts` (trava `tabela-precos.test.ts`). Tabelas
+  `tabela_precos_unidades` e `tabela_precos_historico` nascem na 1ª chamada
+  (`ensureTabelaPrecos` em `db.ts`); toda gravação passa por `gravarPrecos`
+  (preço + histórico na mesma transação). **Quem edita:** só quem está em
+  `TABELA_PRECOS_EMAILS` (senão `RESERVA_UNIDADE_EMAILS`; sem as duas,
+  ninguém). Por ora só o Edielson (23/10); depois Carlos, Humberto ou quem
+  usar o painel. Com Valores ligado, o Quadro e o 3D mostram o preço de
+  tabela nas unidades sem venda.
+- Próximas etapas (plano): reservas (gravam no Sienge — exige definição de
+  quem pode e OK explícito).
 - **Suprimentos removido deste app (Edielson, 22/10):** aqui ficam só Financeiro
   e Comercial. Telas `/suprimentos/*` apagadas e redirecionadas ao Dashboard
   (`next.config.mjs`); as rotas `/api/sienge/purchase-*` e

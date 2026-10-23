@@ -46,6 +46,14 @@ export function normalizeFloor(floor: string): string {
 // numéricos desc → Garagens (podium G4..G1, decrescente) → Mezanino → Térreo →
 // desconhecido. As garagens ficam ACIMA do térreo (G4 no topo, G1 logo acima do
 // térreo), como no espelho do empreendimento.
+// Pavimento a exibir: o do Sienge quando existe; senão o do nome (AP1201 → 12º).
+export function pavimentoDaUnidade(floor: string, name: string): string {
+  const f = normalizeFloor(floor);
+  if (f) return f;
+  const m = (name || "").trim().match(/^[A-Za-z\s.-]*(\d{3,})$/);
+  return m ? `${parseInt(m[1].slice(0, -2), 10)}º` : "";
+}
+
 export function floorSortKey(floor: string): number {
   const f = normalizeFloor(floor);
   if (!f) return -1000;
@@ -82,6 +90,8 @@ export function valorDaUnidadeNoContrato(
 
 // Unidade como o módulo recebe de /api/sienge/units.
 export interface ApiUnit {
+  id?: number;
+  enterpriseId?: number;
   enterpriseName: string;
   companyName: string;
   name: string;
@@ -92,7 +102,7 @@ export interface ApiUnit {
   privateArea: number;
 }
 
-export type ComercialAba = "visao" | "vendas" | "clientes" | "corretores" | "unidades" | "quadro";
+export type ComercialAba = "visao" | "vendas" | "clientes" | "corretores" | "unidades" | "quadro" | "precos";
 
 // Rota de cada tela do módulo. A ordem é a do menu.
 export const ABAS_COMERCIAL: { key: ComercialAba; label: string; href: string; subtitle: string }[] = [
@@ -102,6 +112,7 @@ export const ABAS_COMERCIAL: { key: ComercialAba; label: string; href: string; s
   { key: "corretores", label: "Corretores e Imobiliárias", href: "/comercial/corretores", subtitle: "Quem vendeu, quanto e a comissão lançada no Sienge" },
   { key: "unidades", label: "Unidades", href: "/comercial/unidades", subtitle: "Situação comercial de cada unidade" },
   { key: "quadro", label: "Quadro Espelho", href: "/comercial/quadro-espelho", subtitle: "Espelho de vendas por pavimento" },
+  { key: "precos", label: "Tabela de Preços", href: "/comercial/tabela-precos", subtitle: "Preço de tabela das unidades não vendidas, com reajustes e histórico" },
 ];
 
 // Vendas contadas por UNIDADE (trazido do Financeiro da Leven em 22/10/2026).
