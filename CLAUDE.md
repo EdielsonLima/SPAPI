@@ -191,7 +191,19 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   mostra "Carregando…"/"indisponível", o nome da rua casa qualquer grafia
   com o número (`Rua 2.950`, `Rua 2950 - Centro`; o ponto vai como `[.]`,
   nunca `\.`, que o Overpass recusa) e `/api/entorno-3d?chave=…&diag=1`
-  devolve a última falha (etapa, erro, tentativa por servidor). (5) **Andamento da obra** (anéis no
+  devolve a última falha (etapa, erro, tentativa por servidor).
+  **Praia e bússola (Edielson, 23/10, "o pessoal quer saber onde fica a
+  praia"):** prédios só até `RAIO_PREDIOS` (900 m); ruas principais, verde,
+  areia e mar até `RAIO_LONGE` (1,8 km); neblina de 1 a 2,1 km esconde a
+  borda. Bússola N/S/L/O no canto (gira com a câmera; `norte` vem no dado
+  do entorno). `VERSAO_ENTORNO` no dado: versão antiga no banco é servida
+  na hora e refeita em segundo plano (a próxima abertura já vem nova); o
+  cliente pede com `&v=` para não pegar a resposta antiga do navegador.
+  **Ver planta:** botão no card da unidade abre a planta humanizada do tipo
+  (`CONFIG_PALACIO.planta`, imagem do site `SIL_ELI_PH_TIPO` em
+  `public/modelos/palacio-planta-tipo.webp`), dentro da tela cheia. A imagem
+  é o final 01; o 02 sai espelhado. Andares 1–2 do Sienge (7º e 8º
+  diferenciados) mostram a planta tipo com aviso. (5) **Andamento da obra** (anéis no
   rodapé do 3D): `/api/andamento-obra` relê a página do site
   (`local.site`) a cada 6 h e só aceita se achar as 9 etapas
   (`lerAndamentoDoHtml`, trava `andamento-obra.test.ts`); senão vale o

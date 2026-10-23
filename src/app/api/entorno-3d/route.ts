@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { lerEntorno, gravarEntorno } from "@/lib/db";
 import { CONFIGS_COM_ENTORNO } from "@/lib/torre-3d";
-import { consultaLocalizar, consultaEntorno, localizarLote, processarEntorno, type ElementoOSM } from "@/lib/entorno-osm";
+import { consultaLocalizar, consultaEntorno, localizarLote, processarEntorno, RAIO_PREDIOS, RAIO_LONGE, VERSAO_ENTORNO, type ElementoOSM, type DadosEntorno } from "@/lib/entorno-osm";
 
 // Entorno da maquete 3D (ruas com nome, quadras, praia e mar).
 //  GET ?chave=palacio-elizabeth → dados do banco; na 1ª vez baixa do
@@ -42,10 +42,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ noBanco: !!salvo, ruas: salvo?.ruas?.length ?? 0, predios: salvo?.predios?.length ?? 0, lote: salvo?.lote ?? null, gerando: gerando.has(chave), ultimaFalha });
   }
   try {
-    if (!refazer) {
-      const salvo = await lerEntorno(chave);
-      if (salvo) return NextResponse.json(salvo, { headers: { "Cache-Control": "private, max-age=86400" } });
-    }
+    const salvo = refazer ? null : await lerEntorno(chave) as DadosEntorno | null;
+    if (salvo && salvo.versao === VERSAO_ENTORNO) return NextResponse.json(salvo, { headers: { "Cache-Control": "private, max-age=86400" } });
     if (!gerando.has(chave)) {
       gerando.set(chave, (async () => {
         const falhas: string[] = [];
@@ -58,7 +56,7 @@ export async function GET(req: NextRequest) {
             throw new Error(`Rua ${local.rua} não encontrada no OpenStreetMap (${els.length} elementos; nomes: ${nomes || "nenhum"})`);
           }
           etapa = "baixar o entorno";
-          const dados = processarEntorno(await overpass(consultaEntorno(lote.lat, lote.lon, local.raio ?? 700), falhas), lote, local);
+          const dados = processarEntorno(await overpass(consultaEntorno(lote.lat, lote.lon, local.raio ?? RAIO_PREDIOS, local.raioLonge ?? RAIO_LONGE), falhas), lote, local);
           if (!dados.ruas.length) throw new Error("Overpass devolveu o entorno sem nenhuma rua");
           etapa = "gravar no banco";
           await gravarEntorno(chave, dados);
@@ -69,7 +67,10 @@ export async function GET(req: NextRequest) {
           throw e;
         }
       })().finally(() => gerando.delete(chave)));
+      gerando.get(chave)!.catch(() => {}); // refazendo em segundo plano: a falha fica no diag
     }
+    // Versão antiga no banco: mostra ela agora; a nova fica pronta para a próxima abertura.
+    if (salvo) return NextResponse.json(salvo, { headers: { "Cache-Control": "no-store" } });
     return NextResponse.json(await gerando.get(chave));
   } catch (e) {
     console.error("[entorno-3d]", e);
