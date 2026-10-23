@@ -1,9 +1,10 @@
 "use client";
 
 // Maquete 3D do Quadro Espelho (Silva Packer) — "tabela de vendas em 3D", como
-// a do Financeiro da Leven, em versão de estudo de massa: cada apartamento é um
-// bloco do pavimento na cor da situação; a sacada (no canto de dentro, no
-// Palácio) leva a cor forte. Clique abre o card da unidade.
+// a do Financeiro da Leven: cada apartamento é um bloco do pavimento na cor da
+// situação, com as janelas da planta tipo (vidro na cor da situação) e a
+// sacada em vidro colorido. Base, lojas e lazer em torre-3d-predio.ts.
+// Clique (no corpo, na sacada ou numa janela) abre o card da unidade.
 //
 // Toda medida vem de lib/torre-3d (configDoEmpreendimento). Ajustar a planta
 // ou o lado dos finais não mexe aqui.
@@ -16,8 +17,9 @@ import { RotateCw, X, Maximize2 } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
-  configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, type Bloco,
+  configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, type Bloco, type Janela,
 } from "@/lib/torre-3d";
+import { criarTexturas, materiaisDoPredio, caixaUV, montarBase, montarLazer, montarRua } from "@/components/torre-3d-predio";
 
 export interface Unidade3D {
   id: string;
@@ -38,18 +40,10 @@ interface Props {
   mostrarValores: boolean;
 }
 
-const FACHADA = new THREE.Color("#e7dfd2");   // bege da perspectiva do Palácio
-const BASE = new THREE.Color("#d8cebd");
-const VENEZIANA = new THREE.Color("#3b3f45");
+const FACHADA = new THREE.Color("#e9e1d3");   // bege da perspectiva do Palácio
+const VIDRO = new THREE.Color("#1f2a33");
 const corDe = (sit: string) => new THREE.Color(COR_SITUACAO[sit] || "#f59e0b");
 const temDono = (sit: string) => sit === "Vendido" || sit === "Permutante" || sit === "Vendido/Terceiros";
-
-function caixa(b: Bloco, mat: THREE.Material): THREE.Mesh {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), mat);
-  m.position.set(b.x, b.y, b.z);
-  m.castShadow = true; m.receiveShadow = true;
-  return m;
-}
 
 export default function Torre3D({ unidades, empreendimento, mostrarValores }: Props) {
   const host = useRef<HTMLDivElement>(null);
@@ -90,7 +84,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(escuro ? "#0f172a" : "#dbeafe");
-    scene.fog = new THREE.Fog(scene.background as THREE.Color, 250, 600);
+    scene.fog = new THREE.Fog(scene.background as THREE.Color, 600, 1400);
 
     const { primeiro, ultimo } = layout;
     const hBase = alturaEmbasamento(primeiro, cfg);
@@ -98,8 +92,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
 
     const camera = new THREE.PerspectiveCamera(40, largura / altura, 1, 2000);
     // Enquadra o prédio inteiro (fov 40°): distância ~ 1,6 × a altura.
-    const alvo = new THREE.Vector3(0, topo * 0.5, 0);
-    const posInicial = new THREE.Vector3(topo * 0.85, topo * 0.6, topo * 1.65);
+    const alvo = new THREE.Vector3(0, topo * 0.45, 0);
+    // De frente, um pouco pela esquerda, como a perspectiva do Palácio.
+    const posInicial = new THREE.Vector3(-topo * 0.75, topo * 0.5, topo * 1.6);
     camera.position.copy(posInicial);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.copy(alvo);
@@ -113,62 +108,111 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     sol.position.set(topo * 0.6, topo * 1.2, topo * 0.8);
     sol.castShadow = true;
     sol.shadow.mapSize.set(2048, 2048);
-    const s = Math.max(topo, 60);
+    const s = Math.max(topo, 90);
     Object.assign(sol.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: topo * 4 });
     scene.add(sol);
 
     const chao = new THREE.Mesh(new THREE.CircleGeometry(400, 64), new THREE.MeshStandardMaterial({ color: escuro ? "#1e293b" : "#e2e8f0" }));
     chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true;
     scene.add(chao);
-    const descarte: (THREE.BufferGeometry | THREE.Material)[] = [chao.geometry, chao.material as THREE.Material];
+    const descarte: { dispose(): void }[] = [chao.geometry, chao.material as THREE.Material];
 
-    const matFachada = new THREE.MeshStandardMaterial({ color: FACHADA, roughness: 0.85 });
-    const matBase = new THREE.MeshStandardMaterial({ color: BASE, roughness: 0.9 });
-    const matVeneziana = new THREE.MeshStandardMaterial({ color: VENEZIANA, roughness: 0.6 });
-    const matVidro = new THREE.MeshStandardMaterial({ color: "#1f2937", roughness: 0.15, metalness: 0.5 });
-    descarte.push(matFachada, matBase, matVeneziana, matVidro);
+    const tx = criarTexturas();
+    const mats = materiaisDoPredio(tx);
+    Object.values(tx).forEach(t => descarte.push(t));
+    Object.values(mats).forEach(m => descarte.push(m));
     const grupo = new THREE.Group();
     scene.add(grupo);
+    const geos: THREE.BufferGeometry[] = [];
+    const juntar = (o: THREE.Object3D) => { grupo.add(o); };
     const add = (m: THREE.Mesh) => { grupo.add(m); descarte.push(m.geometry); return m; };
+    const caixa = (b: Bloco, mat: THREE.Material, sombra = true) => add(caixaUV(b, mat, sombra));
 
-    // Embasamento: garagens com venezianas escuras e lojas no térreo.
-    // Vai da frente das sacadas (+2 m) até `embasamento` m atrás da torre.
-    const wB = cfg.largura + cfg.embasamento * 2;
-    const zFrenteBase = cfg.profundidade / 2 + cfg.sacada + 2, zFundoBase = -cfg.profundidade / 2 - cfg.embasamento;
-    add(caixa({ x: 0, y: hBase / 2, z: (zFrenteBase + zFundoBase) / 2, w: wB, h: hBase, d: zFrenteBase - zFundoBase }, matBase));
-    const nVen = 5;
-    for (let i = 0; i < nVen; i++) {
-      const w = wB / nVen - 2;
-      const x = -wB / 2 + (wB / nVen) * i + wB / nVen / 2;
-      if (i === Math.floor(nVen / 2)) { add(caixa({ x, y: hBase / 2 + 1, z: zFrenteBase + 0.05, w: w * 0.7, h: hBase - 2, d: 0.1 }, matVidro)); continue; }
-      add(caixa({ x, y: hBase * 0.6, z: zFrenteBase + 0.05, w, h: hBase * 0.55, d: 0.1 }, matVeneziana));
+    // Embasamento (lojas, garagens, portal), lazer na cobertura e a rua.
+    const base = baseDaTorre(primeiro, cfg);
+    montarBase(base, mats, juntar, geos, Math.min(16, cfg.largura * 0.45));
+    montarLazer(base, juntar, descarte);
+    montarRua(base, juntar, descarte, escuro);
+    descarte.push(...geos);
+
+    const L = cfg.largura, P = cfg.profundidade;
+    const yTorre = base.altura;                      // pé da torre (piso do lazer)
+    // Pavimento de lazer sob a torre: vidro recuado entre pilares.
+    if (hBase - yTorre > 1) {
+      const matLazer = new THREE.MeshStandardMaterial({ color: escuro ? "#38bdf8" : "#b9d3e2", roughness: 0.1, metalness: 0.3, emissive: escuro ? "#0c4a6e" : "#000000" });
+      descarte.push(matLazer);
+      caixa({ x: 0, y: yTorre + (hBase - yTorre) / 2, z: 0, w: L - 2, h: hBase - yTorre, d: P - 2 }, matLazer);
+      [-1, 1].forEach(sx => [-1, 1].forEach(sz => caixa({ x: sx * (L / 2 - 0.6), y: yTorre + (hBase - yTorre) / 2, z: sz * (P / 2 - 0.6), w: 1.2, h: hBase - yTorre, d: 1.2 }, mats.mosaico)));
     }
 
     // Apartamentos: corpo tingido pela situação + sacada na cor forte.
-    const blocos: THREE.Mesh[] = [];
+    const blocos: THREE.Object3D[] = [];
     const matsUnidade = new Map<string, { corpo: THREE.MeshStandardMaterial; sacada: THREE.MeshStandardMaterial }>();
+    const janelas: { j: Janela; id: string; cor: THREE.Color }[] = [];
     layout.itens.forEach(({ u, indice, total }) => {
       const cor = corDe(u.situacao);
       const corpo = new THREE.MeshStandardMaterial({
-        color: u.apagada ? FACHADA.clone() : FACHADA.clone().lerp(cor, 0.55), roughness: 0.8,
+        color: u.apagada ? FACHADA.clone() : FACHADA.clone().lerp(cor, 0.45), roughness: 0.8,
         transparent: u.apagada, opacity: u.apagada ? 0.35 : 1,
       });
-      const sac = new THREE.MeshStandardMaterial({ color: u.apagada ? FACHADA.clone() : cor, roughness: 0.4, transparent: true, opacity: u.apagada ? 0.3 : 0.9 });
+      const sac = new THREE.MeshStandardMaterial({ color: u.apagada ? FACHADA.clone() : cor, roughness: 0.3, transparent: true, opacity: u.apagada ? 0.3 : 0.75 });
       descarte.push(corpo, sac);
       matsUnidade.set(u.id, { corpo, sacada: sac });
-      const b = add(caixa(blocoDaUnidade(indice, total, u.andar, primeiro, cfg), corpo));
+      const b = caixa(blocoDaUnidade(indice, total, u.andar, primeiro, cfg), corpo);
       b.userData.id = u.id; blocos.push(b);
       const sb = sacadaDaUnidade(indice, total, u.andar, primeiro, cfg);
-      add(caixa(sb, matFachada)); // laje
-      const gc = add(caixa({ ...sb, y: sb.y + 0.6, h: 1.1, d: 0.08, z: sb.z + sb.d / 2 - 0.04 }, sac)); // guarda-corpo
+      caixa(sb, mats.clara); // laje
+      const gc = caixa({ ...sb, y: sb.y + 0.6, h: 1.1, d: 0.08, z: sb.z + sb.d / 2 - 0.04 }, sac, false); // guarda-corpo de vidro
       gc.userData.id = u.id; blocos.push(gc);
+      [-1, 1].forEach(l => { // guarda-corpo das pontas da sacada
+        const lado = caixa({ x: sb.x + l * (sb.w / 2 - 0.04), y: sb.y + 0.6, z: sb.z, w: 0.08, h: 1.1, d: sb.d }, sac, false);
+        lado.userData.id = u.id; blocos.push(lado);
+      });
+      const vidro = u.apagada ? new THREE.Color("#5b6470") : VIDRO.clone().lerp(cor, 0.5);
+      janelasDaUnidade(indice, total, u.andar, primeiro, cfg).forEach(j => janelas.push({ j, id: u.id, cor: j.aberta ? new THREE.Color("#3a3f45") : vidro }));
     });
-    // Lajes (frisos) entre pavimentos e coroamento.
+
+    // Janelas: vidro (cor da situação, escurecida) e moldura clara, instanciados.
+    const gJanela = new THREE.BoxGeometry(1, 1, 1);
+    const matVidroJ = new THREE.MeshStandardMaterial({ roughness: 0.12, metalness: 0.35 });
+    descarte.push(gJanela, matVidroJ);
+    const vidros = new THREE.InstancedMesh(gJanela, matVidroJ, janelas.length);
+    const molduras = new THREE.InstancedMesh(gJanela, mats.clara, janelas.length);
+    const idDaJanela: string[] = [];
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), eixoY = new THREE.Vector3(0, 1, 0);
+    janelas.forEach(({ j, id, cor }, k) => {
+      const lateral = j.face === "esquerda" || j.face === "direita";
+      const sinal = j.face === "frente" || j.face === "direita" ? 1 : -1;
+      q.setFromAxisAngle(eixoY, lateral ? Math.PI / 2 : 0);
+      const fora = (d: number) => lateral ? new THREE.Vector3(j.x + sinal * d, j.y, j.z) : new THREE.Vector3(j.x, j.y, j.z + sinal * d);
+      m4.compose(fora(0.08), q, new THREE.Vector3(j.w, j.h, 0.06)); vidros.setMatrixAt(k, m4); vidros.setColorAt(k, cor);
+      m4.compose(fora(0.04), q, new THREE.Vector3(j.w + 0.24, j.h + 0.24, 0.1)); molduras.setMatrixAt(k, m4);
+      idDaJanela.push(id);
+    });
+    vidros.userData.ids = idDaJanela;
+    grupo.add(vidros, molduras); blocos.push(vidros);
+
+    // Lajes (frisos) entre pavimentos; a cada 10 andares uma cinta mais forte.
     for (let a = primeiro; a <= ultimo + 1; a++) {
-      add(caixa({ x: 0, y: cotaDoAndar(a, primeiro, cfg), z: 0, w: cfg.largura + 0.6, h: 0.3, d: cfg.profundidade + 0.6 }, matFachada));
+      const forte = a === primeiro || (a - primeiro) % 10 === 0;
+      caixa({ x: 0, y: cotaDoAndar(a, primeiro, cfg), z: 0, w: L + (forte ? 1 : 0.5), h: forte ? 0.6 : 0.3, d: P + (forte ? 1 : 0.5) }, forte ? mats.clara : mats.fachada);
     }
-    add(caixa({ x: 0, y: topo + 2, z: 0, w: cfg.largura + 1.2, h: 4, d: cfg.profundidade + 1.2 }, matFachada));
-    add(caixa({ x: 0, y: topo + 6, z: -1, w: cfg.largura * 0.5, h: 4, d: cfg.profundidade * 0.5 }, matBase));
+    // Pilastras de pastilha nas quinas, da base ao coroamento.
+    [-1, 1].forEach(sx => [-1, 1].forEach(sz => caixa({ x: sx * (L / 2 - 0.45), y: (yTorre + topo + 1) / 2, z: sz * (P / 2 - 0.45), w: 1.3, h: topo + 1 - yTorre, d: 1.3 }, mats.mosaico)));
+    // Divisória das sacadas no meio da frente (planta: parede entre os livings).
+    if (cfg.janelasTipo) caixa({ x: 0, y: (hBase + topo) / 2, z: P / 2 + cfg.sacada / 2, w: 0.25, h: topo - hBase, d: cfg.sacada }, mats.fachada);
+    // Núcleo de escada e elevadores saindo pelos fundos.
+    if (cfg.nucleo) {
+      const n = cfg.nucleo, zc = -P / 2 - n.fundo / 2 + 0.2;
+      caixa({ x: 0, y: (yTorre + topo + 7) / 2, z: zc, w: n.largura, h: topo + 7 - yTorre, d: n.fundo + 0.4 }, mats.fachada);
+      [-1, 1].forEach(sx => caixa({ x: sx * (n.largura / 2 - 0.3), y: (yTorre + topo + 7) / 2, z: zc - n.fundo / 2 + 0.1, w: 0.9, h: topo + 7 - yTorre, d: 0.9 }, mats.mosaico));
+      caixa({ x: 0, y: topo + 7.4, z: zc, w: n.largura + 0.8, h: 0.8, d: n.fundo + 1.2 }, mats.clara);
+    }
+    // Coroamento: cornija, ático com pastilha nas quinas e capa.
+    caixa({ x: 0, y: topo + 0.6, z: 0, w: L + 1.6, h: 1.2, d: P + 1.6 }, mats.clara);
+    caixa({ x: 0, y: topo + 2.9, z: 0, w: L + 0.4, h: 3.4, d: P + 0.4 }, mats.fachada);
+    [-1, 1].forEach(sx => caixa({ x: sx * (L / 2 - 1.5), y: topo + 2.9, z: P / 2 + 0.25, w: 2.4, h: 3.4, d: 0.2 }, mats.mosaico));
+    caixa({ x: 0, y: topo + 4.9, z: 0, w: L + 1.2, h: 0.7, d: P + 1.2 }, mats.clara);
 
     // Interação: passar o mouse acende, clicar seleciona.
     const ray = new THREE.Raycaster();
@@ -186,7 +230,10 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
       const r = renderer.domElement.getBoundingClientRect();
       ponteiro.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
       ray.setFromCamera(ponteiro, camera);
-      return (ray.intersectObjects(blocos, false)[0]?.object.userData.id as string | undefined) ?? null;
+      const hit = ray.intersectObjects(blocos, false)[0];
+      if (!hit) return null;
+      if (hit.instanceId !== undefined && hit.object.userData.ids) return (hit.object.userData.ids as string[])[hit.instanceId] ?? null;
+      return (hit.object.userData.id as string | undefined) ?? null;
     };
     const mover = (ev: PointerEvent) => { const id = achar(ev); if (id !== sobre) { sobre = id; renderer.domElement.style.cursor = id ? "pointer" : "grab"; pintar(); } };
     let inicio = { x: 0, y: 0 };
@@ -215,7 +262,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
     let quadro = 0;
     const laco = () => { quadro = requestAnimationFrame(laco); controls.update(); renderer.render(scene, camera); };
     laco();
-    (window as unknown as { __torre3d?: unknown }).__torre3d = { renderer, scene, camera };
+    (window as unknown as { __torre3d?: unknown }).__torre3d = { renderer, scene, camera, controls };
 
     return () => {
       cancelAnimationFrame(quadro);
@@ -253,7 +300,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores }: Pr
             <span className="text-slate-600 dark:text-slate-300">{s.nome}: <strong>{s.n}</strong></span>
           </div>
         ))}
-        <p className="text-[10px] text-slate-400 pt-1">Estudo de massa: medidas estimadas</p>
+        <p className="text-[10px] text-slate-400 pt-1">{cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
       </div>
       {/* Controles */}
       <div className="absolute right-3 top-3 flex gap-1.5">

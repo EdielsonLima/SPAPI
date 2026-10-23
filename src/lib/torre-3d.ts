@@ -20,20 +20,83 @@ export interface ConfigTorre {
   // Ordem dos finais da esquerda para a direita, olhando a frente. Vazio = ordem
   // numérica. Ajuste de lado se faz só aqui.
   ordemFinais: string[];
+  // Janelas por apartamento em cada face (frente = fora da sacada; lateral só
+  // nos apartamentos da ponta; fundos = largura do apartamento).
+  janelas: { frente: number; lateral: number; fundos: number };
+  // Janelas tiradas da planta (apartamento da esquerda; o da direita é o
+  // espelho). Quando existe, substitui a contagem de `janelas`.
+  janelasTipo?: JanelaTipo[];
+  // Núcleo de escada e elevadores atrás da lâmina (m), centrado em x.
+  nucleo?: { largura: number; fundo: number };
+  base?: ConfigBase;
+}
+
+// pos = m do centro da janela até a quina de fora (frente/fundos) ou até a
+// face dos fundos (lado). peitoril = m do piso até a janela.
+export interface JanelaTipo { face: "frente" | "fundos" | "lado"; pos: number; w: number; h: number; peitoril: number; aberta?: boolean }
+
+// Embasamento detalhado: lojas no térreo, garagens com painéis de veneziana em
+// arco, portal de vidro no eixo da torre e o lazer na cobertura.
+export interface ConfigBase {
+  altura: number;          // m do térreo até a cobertura (lazer)
+  peDireitoLazer: number;  // m do pavimento de lazer, entre a base e o 1º andar de apartamentos
+  alturaLojas: number;     // m do térreo comercial
+  // Contorno da base em metros, no plano da torre: x para a direita, z para a
+  // frente (+z = rua), origem no centro da torre. Frente = maior z.
+  contorno: [number, number][];
+  // Planta humanizada do lazer, deitada na cobertura (centro e tamanho em m).
+  lazer?: { url: string; x: number; z: number; largura: number; profundidade: number };
 }
 
 export const CONFIG_PADRAO: ConfigTorre = {
   nome: "padrão",
   largura: 28, profundidade: 18, peDireito: 3, sacada: 2.2, larguraSacada: 7, embasamento: 6,
   ordemFinais: [],
+  janelas: { frente: 1, lateral: 3, fundos: 2 },
 };
 
-// Planta tipo do Palácio (4 suítes, ~ 18 × 15 m por apartamento, sacada no canto).
-// Medidas estimadas pela planta humanizada — conferir com o projeto.
+// Planta do lazer do Palácio (imagem enviada pelo Edielson em 23/10): medida
+// pela quadra (linhas de 40 m = 742 px → 18,55 px/m). Os elevadores (px 1395 ×
+// 845) ficam 2,97 m atrás do centro da lâmina na planta tipo, então o centro
+// da torre cai em px 1395 × 900. Converte px da planta em m.
+const PX_M = 18.55, NUCLEO = [1395, 900];
+const pxM = (x: number, y: number): [number, number] => [+((x - NUCLEO[0]) / PX_M).toFixed(2), +((y - NUCLEO[1]) / PX_M).toFixed(2)];
+
+// Planta baixa tipo do Palácio (arquitetônico, 1/50, mar/2022 — "Pré-formas
+// tipo 9º ao 42º pavimento", 34×), enviada pelo Edielson em 23/10: lâmina de
+// 32,5 × 10,0 m, final 01 à esquerda e 02 à direita olhando a frente; living
+// das duas no meio da frente com uma sacada única de 14,1 × 3,0 m (dividida ao
+// meio, churrasqueira em cada lado); suítes nas pontas; núcleo de 6,1 m que
+// sai 4,3 m pelos fundos. Pé-direito 3,06 m é estimativa (não há corte).
 export const CONFIG_PALACIO: ConfigTorre = {
   nome: "Palácio Elizabeth",
-  largura: 34, profundidade: 17, peDireito: 3.06, sacada: 2.4, larguraSacada: 8, embasamento: 8,
+  largura: 32.5, profundidade: 10, peDireito: 3.06, sacada: 3, larguraSacada: 7.05, embasamento: 8,
   ordemFinais: ["01", "02"],
+  janelas: { frente: 2, lateral: 1, fundos: 4 },
+  janelasTipo: [
+    // Frente: BWC 0,60×0,60, suítes 1,50×2,10 (porta-janela) e BWC 0,60×0,60.
+    { face: "frente", pos: 1.5, w: 0.6, h: 0.6, peitoril: 1.6 },
+    { face: "frente", pos: 3.7, w: 1.5, h: 2.1, peitoril: 0.1 },
+    { face: "frente", pos: 6.8, w: 1.5, h: 2.1, peitoril: 0.1 },
+    { face: "frente", pos: 9.0, w: 0.6, h: 0.6, peitoril: 1.6 },
+    // Fundos: suíte 1,50×1,20, BWC 0,60×0,60, suíte 1,50×1,20, serviço
+    // 1,00×1,20 e a sacada técnica aberta (peitoril 1,20) encostada no núcleo.
+    { face: "fundos", pos: 2.4, w: 1.5, h: 1.2, peitoril: 0.9 },
+    { face: "fundos", pos: 4.7, w: 0.6, h: 0.6, peitoril: 1.5 },
+    { face: "fundos", pos: 6.65, w: 1.5, h: 1.2, peitoril: 0.9 },
+    { face: "fundos", pos: 9.25, w: 1.0, h: 1.2, peitoril: 0.9 },
+    { face: "fundos", pos: 11.6, w: 2.8, h: 2.2, peitoril: 0.1, aberta: true },
+    // Lateral: só o vão de 0,70×0,70 do BWC (o resto é parede de concreto).
+    { face: "lado", pos: 3.35, w: 0.7, h: 0.7, peitoril: 1.5 },
+  ],
+  nucleo: { largura: 6.1, fundo: 4.3 },
+  base: {
+    // Perspectiva: térreo de lojas + friso + garagens (painéis altos) + cornija.
+    altura: 21, peDireitoLazer: 4.5, alturaLojas: 5.5,
+    // Corpo principal + quadra nos fundos (contorno da planta do lazer).
+    contorno: [pxM(230, 573), pxM(1075, 573), pxM(1075, 24), pxM(1875, 24), pxM(1875, 573), pxM(2235, 573), pxM(2235, 1325), pxM(230, 1325)],
+    lazer: { url: "/modelos/palacio-lazer.webp", ...(() => { const [x, z] = pxM(1233, 675); return { x, z }; })(), largura: 2006 / PX_M, profundidade: 1302 / PX_M },
+  },
 };
 
 export function configDoEmpreendimento(nome: string): ConfigTorre {
@@ -88,7 +151,68 @@ export function cotaDoAndar(andar: number, primeiroAndar: number, cfg: ConfigTor
   return alturaEmbasamento(primeiroAndar, cfg) + (andar - primeiroAndar) * cfg.peDireito;
 }
 export function alturaEmbasamento(primeiroAndar: number, cfg: ConfigTorre): number {
+  if (cfg.base) return cfg.base.altura + cfg.base.peDireitoLazer;
   return Math.max(1, primeiroAndar - 1) * cfg.peDireito;
+}
+
+// Base sem contorno próprio: retângulo `embasamento` m em volta da torre, da
+// frente das sacadas (+2 m) até atrás.
+export function baseDaTorre(primeiroAndar: number, cfg: ConfigTorre): ConfigBase {
+  if (cfg.base) return cfg.base;
+  const x = cfg.largura / 2 + cfg.embasamento, zf = cfg.profundidade / 2 + cfg.sacada + 2, zt = -cfg.profundidade / 2 - cfg.embasamento;
+  const altura = alturaEmbasamento(primeiroAndar, cfg);
+  return { altura, peDireitoLazer: 0, alturaLojas: Math.min(5, altura), contorno: [[-x, zt], [x, zt], [x, zf], [-x, zf]] };
+}
+
+// Janela (ou porta da sacada) de um apartamento numa face da torre. x/z = centro
+// na face; y = centro; face diz para onde ela olha.
+export interface Janela { x: number; y: number; z: number; w: number; h: number; face: "frente" | "fundos" | "esquerda" | "direita"; porta?: boolean; aberta?: boolean }
+
+const espalhar = (a: number, b: number, n: number) => Array.from({ length: n }, (_, i) => a + ((b - a) * (i + 0.5)) / n);
+
+export function janelasDaUnidade(indice: number, total: number, andar: number, primeiroAndar: number, cfg: ConfigTorre): Janela[] {
+  const piso = cotaDoAndar(andar, primeiroAndar, cfg);
+  const w = cfg.largura / Math.max(1, total);
+  const x0 = -cfg.largura / 2 + w * indice, x1 = x0 + w;
+  const zF = cfg.profundidade / 2, zT = -cfg.profundidade / 2;
+  const jw = 1.5, jh = 1.6, yJ = piso + 0.9 + jh / 2;
+  const out: Janela[] = [];
+  if (cfg.janelasTipo) {
+    const sac = sacadaDaUnidade(indice, total, andar, primeiroAndar, cfg);
+    const ph = cfg.peDireito - 0.7;
+    out.push({ x: sac.x, y: piso + 0.2 + ph / 2, z: zF, w: sac.w * 0.86, h: ph, face: "frente", porta: true });
+    // Da esquerda: medido da quina esquerda; da direita: espelho. Com mais de
+    // dois finais, só os das pontas têm lateral.
+    const esq = indice < total / 2;
+    cfg.janelasTipo.forEach(j => {
+      const y = piso + j.peitoril + j.h / 2;
+      if (j.face === "lado") {
+        if (indice !== 0 && indice !== total - 1) return;
+        out.push({ x: esq ? -cfg.largura / 2 : cfg.largura / 2, y, z: zT + j.pos, w: j.w, h: j.h, face: esq ? "esquerda" : "direita", aberta: j.aberta });
+        return;
+      }
+      const x = esq ? x0 + j.pos : x1 - j.pos;
+      out.push({ x, y, z: j.face === "frente" ? zF : zT, w: j.w, h: j.h, face: j.face, aberta: j.aberta });
+    });
+    return out;
+  }
+  // Porta de vidro atrás da sacada, e janelas da frente no trecho livre.
+  const sac = sacadaDaUnidade(indice, total, andar, primeiroAndar, cfg);
+  const ph = cfg.peDireito - 0.7;
+  out.push({ x: sac.x, y: piso + 0.2 + ph / 2, z: zF, w: sac.w * 0.86, h: ph, face: "frente", porta: true });
+  const livres: [number, number][] = [[x0, sac.x - sac.w / 2], [sac.x + sac.w / 2, x1]].filter(([a, b]) => b - a > jw + 1) as [number, number][];
+  const totalLivre = livres.reduce((t, [a, b]) => t + b - a, 0);
+  livres.forEach(([a, b]) => {
+    const n = Math.max(1, Math.round(cfg.janelas.frente * (b - a) / Math.max(totalLivre, 1)));
+    // Recuo de 1,6 m da quina (pilastra) para a janela não encostar nela.
+    const ia = a <= -cfg.largura / 2 + 0.01 ? a + 1.6 : a + 0.6, ib = b >= cfg.largura / 2 - 0.01 ? b - 1.6 : b - 0.6;
+    espalhar(ia, ib, n).forEach(x => out.push({ x, y: yJ, z: zF, w: jw, h: jh, face: "frente" }));
+  });
+  espalhar(x0 + 0.8, x1 - 0.8, cfg.janelas.fundos).forEach(x => out.push({ x, y: yJ, z: zT, w: jw, h: jh, face: "fundos" }));
+  const laterais = espalhar(zT + 1.6, zF - 1.6, cfg.janelas.lateral);
+  if (indice === 0) laterais.forEach(z => out.push({ x: -cfg.largura / 2, y: yJ, z, w: jw, h: jh, face: "esquerda" }));
+  if (indice === total - 1) laterais.forEach(z => out.push({ x: cfg.largura / 2, y: yJ, z, w: jw, h: jh, face: "direita" }));
+  return out;
 }
 
 // "lado esquerdo, olhando a frente" — para o card da unidade.
