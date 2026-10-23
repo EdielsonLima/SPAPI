@@ -75,6 +75,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
   const [emp3d, setEmp3d] = React.useState("");
   // Ficha do contrato aberta (chave "empreendimento||unidade").
   const [fichaKey, setFichaKey] = React.useState<string | null>(null);
+  const [fichaDentro, setFichaDentro] = React.useState<HTMLElement | null>(null);
 
   const meta = ABAS_COMERCIAL.find(a => a.key === aba)!;
   // Atalhos internos ("ver unidades disponíveis", "ver cliente") trocam de
@@ -1970,7 +1971,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                       </select>
                     </div>
                   )}
-                  <Torre3D unidades={unidades3d} empreendimento={shortEnterpriseName(ent)} mostrarValores={mostrarValores} temContrato={id => contratoPorUnidade.has(id)} onAbrirContrato={setFichaKey} />
+                  <Torre3D unidades={unidades3d} empreendimento={shortEnterpriseName(ent)} mostrarValores={mostrarValores} temContrato={id => contratoPorUnidade.has(id)} onAbrirContrato={(id, dentro) => { setFichaDentro(dentro); setFichaKey(id); }} />
                 </CardContent>
               </Card>
             );
@@ -2124,7 +2125,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
         return (
           <FichaContrato
             unidade={fichaKey ? { enterprise: entF, unit: unitF, tipo: un?.tipo || "", area: un?.area || 0, floor: un?.floor || "", situacao: un?.situacao || "" } : null}
-            contrato={c} unidadesPorNome={porNome} mostrarValores={mostrarValores} onClose={() => setFichaKey(null)} />
+            contrato={c} unidadesPorNome={porNome} mostrarValores={mostrarValores} dentro={fichaDentro} onClose={() => { setFichaKey(null); setFichaDentro(null); }} />
         );
       })()}
     </div>

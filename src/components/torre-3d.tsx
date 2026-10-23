@@ -15,6 +15,8 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useTheme } from "next-themes";
 import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
+import type { DadosEntorno } from "@/lib/entorno-osm";
+import { AndamentoObraCard } from "@/components/andamento-obra-card";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
   configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, type Bloco, type Janela,
@@ -40,7 +42,9 @@ interface Props {
   mostrarValores: boolean;
   // Unidade com contrato: o card mostra "Ver contrato" (abre a ficha na tela).
   temContrato?: (id: string) => boolean;
-  onAbrirContrato?: (id: string) => void;
+  // dentro: na tela cheia, a ficha abre DENTRO da área do 3D (senão o
+  // navegador sai da tela cheia para mostrá-la).
+  onAbrirContrato?: (id: string, dentro: HTMLElement | null) => void;
 }
 
 const FACHADA = new THREE.Color("#e9e1d3");   // bege da perspectiva do Palácio
@@ -54,8 +58,14 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   const escuro = resolvedTheme === "dark";
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [girando, setGirando] = useState(true);
-  const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void; focar: (id: string) => void } | null>(null);
+  const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void; focar: (id: string) => void; filtrar: (sits: string[]) => void } | null>(null);
   const [espelhoAberto, setEspelhoAberto] = useState(true);
+  const etiqueta = useRef<HTMLDivElement>(null);
+  const [fonteMapa, setFonteMapa] = useState("");
+  // Filtro da legenda (Edielson, 23/10: tem de funcionar na tela cheia, onde
+  // os filtros da página somem). Vazio = todas; as de fora esmaecem.
+  const [filtro, setFiltro] = useState<string[]>([]);
+  const alternarFiltro = (s: string) => { setSelecionada(null); setFiltro(f => f.includes(s) ? f.filter(x => x !== s) : [...f, s]); };
 
   // Tela cheia (Edielson, 23/10): só a área do 3D. Fullscreen API no próprio
   // contêiner (o ResizeObserver ajusta o canvas); navegador sem a API
@@ -142,7 +152,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     controls.target.copy(alvo);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI * 0.49;
-    controls.minDistance = 20; controls.maxDistance = topo * 3;
+    controls.minDistance = 20; controls.maxDistance = cfg.local ? Math.max(topo * 3, 700) : topo * 3;
     controls.autoRotate = true; controls.autoRotateSpeed = 0.6;
 
     scene.add(new THREE.HemisphereLight(escuro ? "#475569" : "#ffffff", escuro ? "#1e293b" : "#cbd5e1", escuro ? 1.1 : 1.6));
@@ -154,7 +164,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     Object.assign(sol.shadow.camera, { left: -s, right: s, top: s, bottom: -s, near: 1, far: topo * 4 });
     scene.add(sol);
 
-    const chao = new THREE.Mesh(new THREE.CircleGeometry(400, 64), new THREE.MeshStandardMaterial({ color: escuro ? "#1e293b" : "#e2e8f0" }));
+    const chao = new THREE.Mesh(new THREE.CircleGeometry(cfg.local ? 1600 : 400, 64), new THREE.MeshStandardMaterial({ color: escuro ? "#1e293b" : "#e2e8f0" }));
     chao.rotation.x = -Math.PI / 2; chao.receiveShadow = true;
     scene.add(chao);
     const descarte: { dispose(): void }[] = [chao.geometry, chao.material as THREE.Material];
@@ -175,6 +185,23 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     montarBase(base, mats, juntar, geos, Math.min(16, cfg.largura * 0.45));
     montarLazer(base, juntar, descarte);
     montarRua(base, juntar, descarte, escuro);
+    // Entorno real (ruas com nome, quadras, praia), carregado depois do prédio.
+    let vivo = true, entorno: { dispose: () => void } | null = null;
+    if (cfg.local) {
+      const zRua = Math.max(...base.contorno.map(p => p[1])) + 13; // eixo da rua da frente (montarRua)
+      fetch(`/api/entorno-3d?chave=${encodeURIComponent(cfg.local.chave)}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(async (d: DadosEntorno | null) => {
+          if (!d || !vivo) return;
+          const { montarEntorno } = await import("@/components/torre-3d-entorno");
+          if (!vivo) return;
+          const e = montarEntorno(d, escuro);
+          e.grupo.position.set(-(cfg.local?.ajusteX || 0), 0, zRua);
+          scene.add(e.grupo); entorno = e;
+          setFonteMapa(d.fonte);
+        })
+        .catch(() => {});
+    }
     montarQuadra(base, mats, juntar, descarte);
     descarte.push(...geos);
 
@@ -190,7 +217,8 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
 
     // Apartamentos: corpo tingido pela situação + sacada na cor forte.
     const blocos: THREE.Object3D[] = [];
-    const matsUnidade = new Map<string, { corpo: THREE.MeshStandardMaterial; sacada: THREE.MeshStandardMaterial }>();
+    const matsUnidade = new Map<string, { corpo: THREE.MeshStandardMaterial; sacada: THREE.MeshStandardMaterial; corBase: THREE.Color; sacBase: THREE.Color; opBase: number }>();
+    const caixaDe = new Map<string, Bloco>(); // corpo de cada unidade (moldura e etiqueta da seleção)
     const janelas: { j: Janela; id: string; cor: THREE.Color }[] = [];
     const focos = new Map<string, THREE.Vector3>(); // frente de cada unidade (câmera vai até ela)
     const neutroCorpo = new THREE.MeshStandardMaterial({ color: FACHADA.clone(), roughness: 0.8 });
@@ -204,9 +232,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         transparent: u.apagada, opacity: u.apagada ? 0.35 : 1,
       });
       const sac = semSituacao ? neutroSacada : new THREE.MeshStandardMaterial({ color: u.apagada ? FACHADA.clone() : cor, roughness: 0.3, transparent: true, opacity: u.apagada ? 0.3 : 0.75 });
-      if (!semSituacao) { descarte.push(corpo, sac); matsUnidade.set(u.id, { corpo, sacada: sac }); }
+      if (!semSituacao) { descarte.push(corpo, sac); matsUnidade.set(u.id, { corpo, sacada: sac, corBase: corpo.color.clone(), sacBase: sac.color.clone(), opBase: sac.opacity }); }
       const bloco = blocoDaUnidade(indice, total, u.andar, primeiro, cfg);
-      if (!semSituacao) focos.set(u.id, new THREE.Vector3(bloco.x, bloco.y, P / 2));
+      if (!semSituacao) { focos.set(u.id, new THREE.Vector3(bloco.x, bloco.y, P / 2)); caixaDe.set(u.id, bloco); }
       const b = caixa(bloco, corpo);
       b.userData.id = u.id; blocos.push(b);
       const sb = sacadaDaUnidade(indice, total, u.andar, primeiro, cfg);
@@ -239,6 +267,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
       idDaJanela.push(id);
     });
     vidros.userData.ids = idDaJanela;
+    const corVidro = janelas.map(j => j.cor);
     grupo.add(vidros, molduras); blocos.push(vidros);
 
     // Lajes (frisos) entre pavimentos; a cada 10 andares uma cinta mais forte.
@@ -282,13 +311,38 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     const ponteiro = new THREE.Vector2();
     let sobre: string | null = null;
     let marcada: string | null = null;
+    let filtroSit = new Set<string>();
+    const sitDe = new Map(layout.itens.map(i => [i.u.id, i.u.situacao]));
+    const fora = (id: string) => id !== marcada && ((filtroSit.size > 0 && !filtroSit.has(sitDe.get(id) || "")) || !!marcada);
+    // Seleção (Edielson, 23/10: "tenho que saber qual é a unidade que eu
+    // cliquei"): a unidade fica na cor cheia, com moldura que pulsa e etiqueta
+    // com o número; as demais esmaecem para o tom da fachada.
+    const CINZA = FACHADA.clone(), cinzaVidro = new THREE.Color("#8b97a3"), tmp = new THREE.Color();
     const pintar = () => {
       matsUnidade.forEach((m, id) => {
+        const apaga = fora(id);
+        m.corpo.color.copy(m.corBase); if (apaga) m.corpo.color.lerp(CINZA, 0.8);
+        m.sacada.color.copy(m.sacBase); if (apaga) m.sacada.color.lerp(CINZA, 0.8);
+        m.sacada.opacity = apaga ? 0.35 : m.opBase;
         const on = id === sobre || id === marcada;
         m.corpo.emissive.set(on ? (id === marcada ? "#ffffff" : "#94a3b8") : "#000000");
-        m.corpo.emissiveIntensity = id === marcada ? 0.45 : 0.25;
+        m.corpo.emissiveIntensity = id === marcada ? 0.25 : 0.25;
       });
+      idDaJanela.forEach((id, k) => {
+        tmp.copy(corVidro[k]); if (id && fora(id)) tmp.lerp(cinzaVidro, 0.75);
+        vidros.setColorAt(k, tmp);
+      });
+      if (vidros.instanceColor) vidros.instanceColor.needsUpdate = true;
+      const b = marcada ? caixaDe.get(marcada) : undefined;
+      moldura.visible = !!b;
+      if (b) { moldura.position.set(b.x, b.y, b.z); moldura.scale.set(b.w + 0.5, b.h + 0.3, b.d + 0.5 + cfg.sacada); moldura.position.z += cfg.sacada / 2; }
     };
+    // Moldura da unidade selecionada (arestas de uma caixa, pulsando no laço).
+    const gMoldura = new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1));
+    const matMoldura = new THREE.LineBasicMaterial({ color: "#facc15", transparent: true, depthTest: false });
+    const moldura = new THREE.LineSegments(gMoldura, matMoldura);
+    moldura.visible = false; moldura.renderOrder = 10; scene.add(moldura);
+    descarte.push(gMoldura, matMoldura);
     const achar = (ev: PointerEvent) => {
       const r = renderer.domElement.getBoundingClientRect();
       ponteiro.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
@@ -324,6 +378,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
       },
       girar: v => { controls.autoRotate = v; },
       marcar: id => { marcada = id; pintar(); },
+      filtrar: sits => { filtroSit = new Set(sits); pintar(); },
     };
 
     const ro = new ResizeObserver(() => {
@@ -340,11 +395,23 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         if (camera.position.distanceTo(voo.pos) < 0.3 && controls.target.distanceTo(voo.alvo) < 0.3) voo = null;
       }
       controls.update(); renderer.render(scene, camera);
+      if (moldura.visible) matMoldura.opacity = 0.55 + 0.45 * Math.sin(performance.now() / 260);
+      const et = etiqueta.current, b = marcada ? caixaDe.get(marcada) : undefined;
+      if (et) {
+        if (!b) { et.style.display = "none"; return; }
+        // Ponto acima da sacada, na frente da unidade.
+        pEt.set(b.x, b.y + b.h / 2 + 0.4, b.z + b.d / 2 + cfg.sacada).project(camera);
+        if (pEt.z > 1) { et.style.display = "none"; return; }
+        et.style.display = "block";
+        et.style.transform = `translate(${(pEt.x + 1) / 2 * el.clientWidth}px, ${(1 - pEt.y) / 2 * el.clientHeight}px)`;
+      }
     };
+    const pEt = new THREE.Vector3();
     laco();
     (window as unknown as { __torre3d?: unknown }).__torre3d = { renderer, scene, camera, controls };
 
     return () => {
+      vivo = false; entorno?.dispose();
       cancelAnimationFrame(quadro);
       ro.disconnect();
       renderer.domElement.removeEventListener("pointermove", mover);
@@ -361,6 +428,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
 
   useEffect(() => { api.current?.girar(girando); }, [girando, layout, escuro]);
   useEffect(() => { api.current?.marcar(selecionada); if (selecionada) setGirando(false); }, [selecionada, layout, escuro]);
+  useEffect(() => { api.current?.filtrar(filtro); }, [filtro, layout, escuro]);
 
   const sel = selecionada ? porId.get(selecionada) : undefined;
   const contagem = SITUACOES.map(s => ({ ...s, n: unidades.filter(u => !u.apagada && u.situacao === s.nome).length })).filter(s => s.n > 0);
@@ -380,17 +448,38 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   return (
     <div ref={caixa} className={`${cheiaFixa ? "fixed inset-0 z-[100] rounded-none" : cheia ? "h-full w-full" : "relative w-full h-[640px] rounded-xl border border-slate-200/60 dark:border-slate-700/60"} relative overflow-hidden ${cheia ? "bg-slate-100 dark:bg-slate-950" : ""}`}>
       <div ref={host} className="absolute inset-0" />
+      {/* Etiqueta da unidade selecionada, presa ao prédio (posição no laço do 3D) */}
+      <div ref={etiqueta} className="pointer-events-none absolute left-0 top-0 z-10 hidden">
+        {sel && (
+          <div className="-translate-x-1/2 -translate-y-full flex flex-col items-center">
+            <div className="flex items-center gap-1.5 rounded-md bg-slate-900/90 px-2.5 py-1 text-white shadow-lg ring-2 ring-yellow-400">
+              <span className="h-2 w-2 rounded-full" style={{ background: COR_SITUACAO[sel.u.situacao] || "#f59e0b" }} />
+              <span className="text-sm font-black tracking-tight">{sel.u.unit.replace(/^AP\s*/i, "")}</span>
+              <span className="text-[10px] font-semibold text-slate-300">{sel.u.andar}º andar</span>
+            </div>
+            <div className="h-5 w-0.5 bg-yellow-400" />
+          </div>
+        )}
+      </div>
       {/* Painel: legenda + espelho por pavimento (clique leva a câmera até a unidade) */}
       <div className="absolute left-3 top-3 bottom-3 flex w-[224px] max-w-[calc(100%-1.5rem)] flex-col pointer-events-none">
         <div className="pointer-events-auto flex max-h-full min-h-0 flex-col rounded-lg bg-white/90 dark:bg-slate-900/85 shadow-sm px-3 py-2 text-[11px]">
           <p className="font-bold text-slate-700 dark:text-slate-200">{cfg.nome === "padrão" ? empreendimento : cfg.nome}</p>
           <div className="mt-1 space-y-1">
-            {contagem.map(s => (
-              <div key={s.nome} className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.cor }} />
-                <span className="text-slate-600 dark:text-slate-300">{s.nome}: <strong>{s.n}</strong></span>
-              </div>
-            ))}
+            {contagem.map(s => {
+              const on = filtro.length === 0 || filtro.includes(s.nome);
+              return (
+                <button key={s.nome} type="button" onClick={() => alternarFiltro(s.nome)} title={`Mostrar só ${s.nome} (clique de novo para tirar)`}
+                  className={`flex w-full items-center gap-1.5 rounded px-1 -mx-1 py-0.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 ${on ? "" : "opacity-40"}`}>
+                  <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.cor }} />
+                  <span className="flex-1 text-slate-600 dark:text-slate-300">{s.nome}: <strong>{s.n}</strong></span>
+                  {filtro.includes(s.nome) && <span className="text-[9px] font-bold uppercase text-slate-400">filtro</span>}
+                </button>
+              );
+            })}
+            {filtro.length > 0 && (
+              <button type="button" onClick={() => setFiltro([])} className="text-[10px] font-semibold text-sky-600 hover:underline dark:text-sky-400">Mostrar todas</button>
+            )}
           </div>
           <button type="button" onClick={() => setEspelhoAberto(v => !v)} className="mt-2 flex w-full items-center justify-between border-t border-slate-200 dark:border-slate-700 pt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-800 dark:hover:text-white">
             <span className="inline-flex items-center gap-1.5"><Layers className="h-3 w-3" />Espelho por pavimento</span>
@@ -406,7 +495,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
                       const ativo = u.id === selecionada;
                       return (
                         <button key={u.id} type="button" onClick={() => irPara(u.id)} title={`${u.unit} · ${u.situacao}`}
-                          className={`flex-1 h-[20px] rounded-[4px] text-[10px] font-bold tabular-nums text-white transition-transform hover:-translate-y-px ${ativo ? "ring-2 ring-offset-1 ring-slate-900 dark:ring-white dark:ring-offset-slate-900" : ""} ${u.apagada ? "opacity-30" : ""}`}
+                          className={`flex-1 h-[20px] rounded-[4px] text-[10px] font-bold tabular-nums text-white transition-transform hover:-translate-y-px ${ativo ? "ring-2 ring-offset-1 ring-slate-900 dark:ring-white dark:ring-offset-slate-900" : ""} ${u.apagada || (filtro.length > 0 && !filtro.includes(u.situacao)) ? "opacity-30" : ""}`}
                           style={{ background: COR_SITUACAO[u.situacao] || "#f59e0b" }}>
                           {u.unit.replace(/^AP/i, "")}
                         </button>
@@ -420,6 +509,12 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           <p className="text-[10px] text-slate-400 pt-1.5">{cfg.cotaRef ? "Pelo projeto: planta tipo, cortes e garagens" : cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
         </div>
       </div>
+      {cfg.local && (
+        <div className={`pointer-events-none absolute bottom-3 left-[248px] right-3 flex ${sel ? "justify-start" : "justify-center"} max-md:hidden`}>
+          <AndamentoObraCard chave={cfg.local.chave} />
+        </div>
+      )}
+      {fonteMapa && <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] text-slate-500/80">{fonteMapa}</span>}
       {/* Controles */}
       <div className="absolute right-3 top-3 flex gap-1.5">
         <button type="button" onClick={() => setGirando(g => !g)} title={girando ? "Parar de girar" : "Girar"} className={`${botao} w-8 ${girando ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
@@ -450,7 +545,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
             {mostrarValores && sel.u.preco > 0 && <div className="flex justify-between"><dt className="text-slate-500">Preço de tabela</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.preco)}</dd></div>}
           </dl>
           {onAbrirContrato && temContrato?.(sel.u.id) && (
-            <button type="button" onClick={() => { sairDaTelaCheia(); onAbrirContrato(sel.u.id); }} className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
+            <button type="button" onClick={() => onAbrirContrato(sel.u.id, cheia ? caixa.current : null)} className="mt-3 inline-flex w-full items-center justify-center rounded-lg bg-slate-900 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200">
               Ver contrato
             </button>
           )}
