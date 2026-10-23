@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   TrendingUp, Clock, AlertTriangle, CheckCircle, RefreshCw, FileText, Building2, CalendarClock, X, Search, Users, Banknote,
   ChevronRight, ChevronDown, ArrowUpDown, ArrowUp, ArrowDown, Ruler, Handshake, LayoutGrid, Crown, FileSpreadsheet,
+  Eye, EyeOff,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, Cell } from "recharts";
 import { SiengeSalesContract } from "@/types/sienge";
@@ -26,9 +27,10 @@ import { MultiSelectFilter } from "@/components/multi-select-filter";
 import { CorretoresView } from "@/components/corretores-view";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
+import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
 import {
   inferUnitTypeFromName, shortEnterpriseName, normalizeFloor, floorSortKey, valorDaUnidadeNoContrato,
-  unidadesVendidas, resumoPorTipo,
+  unidadesVendidas, resumoPorTipo, ehPermuta,
   ABAS_COMERCIAL, type ComercialAba,
 } from "@/lib/comercial-utils";
 
@@ -53,6 +55,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     comercialChartView, setComercialChartView,
     quadroView, setQuadroView,
     selectedUnitStatuses, setSelectedUnitStatuses,
+    selectedSituacoes, setSelectedSituacoes, mostrarValores, setMostrarValores,
     selectedContractStatuses, setSelectedContractStatuses,
     selectedUnitEnterprises, setSelectedUnitEnterprises,
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
@@ -217,7 +220,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     });
 
     // ─── Unit analysis: API units + sales contract enrichment ───
-    type UnitRecord = { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string; area: number; floor: string };
+    type UnitRecord = { enterprise: string; unit: string; status: string; tipo: string; value: number; customer: string; contractDate: string; area: number; floor: string; permuta: boolean; situacao: string };
     const unitMap = new Map<string, UnitRecord>();
 
     // 1. Seed from real Sienge /units API (source of truth for status)
@@ -236,6 +239,8 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           contractDate: "",
           area: u.privateArea || 0,
           floor: u.floor || "",
+          permuta: false,
+          situacao: "",
         });
       });
     }
@@ -256,6 +261,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
             existing.value = valorDaUnidadeNoContrato(c.value || 0, c.salesContractUnits || [], u.name) || existing.value;
             existing.customer = c.salesContractCustomers?.[0]?.name || existing.customer;
             existing.contractDate = c.contractDate || existing.contractDate;
+            existing.permuta = ehPermuta(c);
           }
         } else if (apiUnits.length === 0) {
           // Fallback: no API units loaded, use contract-based inference
@@ -272,12 +278,16 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
             contractDate: c.contractDate || "",
             area: 0,
             floor: "",
+            permuta: ehPermuta(c),
+            situacao: "",
           });
         }
       });
     });
 
     const allUnits = Array.from(unitMap.values());
+    // Situação do Quadro (cor/legenda): estoque do Sienge + permuta pura = Permutante.
+    allUnits.forEach(u => { u.situacao = situacaoDaUnidade(u.status, u.permuta); });
 
     // Planilha das unidades vendidas (Vendas › Exportar Excel): uma linha por
     // unidade dos contratos filtrados (respeita Tipo Imóvel) + aba com o
@@ -1711,7 +1721,6 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
         const qTypeOptions = Array.from(new Set(qUnitsForEnterprise.map(u => u.tipo))).sort();
         const qUnitsForType = selectedUnitTypes.size === 0 ? qUnitsForEnterprise : qUnitsForEnterprise.filter(u => selectedUnitTypes.has(u.tipo));
         const qUnitNames = Array.from(new Set(qUnitsForType.map(u => u.unit))).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-        const qStatusOptions = Array.from(new Set(allUnits.map(u => u.status))).sort();
         const qCustomerOptions = Array.from(new Set(allUnits.map(u => u.customer).filter(c => c && c !== "—"))).sort();
 
         // Filter units
@@ -1723,37 +1732,35 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           return true;
         }).sort((a, b) => a.unit.localeCompare(b.unit, undefined, { numeric: true }));
 
-        const qVendidas = qUnits.filter(u => u.status === "Vendida").length;
-        const qDisponiveis = qUnits.filter(u => u.status === "Disponível").length;
-        const qReserva = qUnits.filter(u => u.status === "Reserva Técnica").length;
-        const qProposta = qUnits.filter(u => u.status === "Proposta").length;
-        const qVendTerceiros = qUnits.filter(u => u.status === "Vendido/Terceiros").length;
-        const qOutros = qUnits.length - qVendidas - qDisponiveis - qReserva - qProposta - qVendTerceiros;
+        // Situações (situacao-unidade.ts): ordem da legenda + as que o Sienge
+        // trouxer fora da lista, com o nome dele.
+        const qSitOrdem = [...SITUACOES.map(s => s.nome as string), ...Array.from(new Set(qUnits.map(u => u.situacao))).filter(s => !SITUACOES.some(x => x.nome === s)).sort()];
+        const qContagem = qSitOrdem.map(nome => ({ nome, n: qUnits.filter(u => u.situacao === nome).length })).filter(x => x.n > 0);
+        const qSitOptions = Array.from(new Set(allUnits.map(u => u.situacao))).sort((a, b) => qSitOrdem.indexOf(a) - qSitOrdem.indexOf(b));
+        const qVendidas = qUnits.filter(u => ehVendida(u.situacao)).length;
 
-        // Filter by status if active
-        const qVisible = selectedUnitStatuses.size === 0 ? qUnits : qUnits.filter(u => selectedUnitStatuses.has(u.status));
+        // Filter by situação if active
+        const qVisible = selectedSituacoes.size === 0 ? qUnits : qUnits.filter(u => selectedSituacoes.has(u.situacao));
 
-        // Card colors by status
-        const cardStyle = (status: string) => {
-          switch (status) {
-            case "Vendida": return "bg-red-50/70 border-red-200 border-l-[4px] border-l-red-500 hover:bg-red-100/80 hover:border-red-300 hover:shadow-md";
-            case "Disponível": return "bg-emerald-50/70 border-emerald-200 border-l-[4px] border-l-emerald-500 hover:bg-emerald-100/80 hover:border-emerald-300 hover:shadow-md";
-            case "Reserva Técnica": return "bg-blue-50/70 border-blue-200 border-l-[4px] border-l-blue-500 hover:bg-blue-100/80 hover:border-blue-300 hover:shadow-md";
-            case "Proposta": return "bg-orange-50/70 border-orange-200 border-l-[4px] border-l-orange-500 hover:bg-orange-100/80 hover:border-orange-300 hover:shadow-md";
-            case "Vendido/Terceiros": return "bg-pink-50/70 border-pink-200 border-l-[4px] border-l-pink-500 hover:bg-pink-100/80 hover:border-pink-300 hover:shadow-md";
-            default: return "bg-amber-50/70 border-amber-200 border-l-[4px] border-l-amber-500 hover:bg-amber-100/80 hover:border-amber-300 hover:shadow-md";
-          }
+        // Cores por situação (classes literais aqui: src/lib não entra no content do Tailwind)
+        const ESTILO: Record<string, { cell: string; card: string; dot: string; text: string; bar: string; num: string }> = {
+          "Vendido": { cell: "bg-red-100 border-red-300 text-red-800 hover:bg-red-200", card: "bg-red-50/70 border-red-200 border-l-[4px] border-l-red-500 hover:bg-red-100/80 hover:border-red-300 hover:shadow-md", dot: "bg-red-500", text: "text-red-700", bar: "bg-red-400", num: "text-red-600 dark:text-red-300/80" },
+          "Disponível": { cell: "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200", card: "bg-emerald-50/70 border-emerald-200 border-l-[4px] border-l-emerald-500 hover:bg-emerald-100/80 hover:border-emerald-300 hover:shadow-md", dot: "bg-emerald-500", text: "text-emerald-700", bar: "bg-emerald-400", num: "text-emerald-600" },
+          "Permutante": { cell: "bg-violet-100 border-violet-300 text-violet-800 hover:bg-violet-200", card: "bg-violet-50/70 border-violet-200 border-l-[4px] border-l-violet-500 hover:bg-violet-100/80 hover:border-violet-300 hover:shadow-md", dot: "bg-violet-500", text: "text-violet-700", bar: "bg-violet-400", num: "text-violet-600" },
+          "Reservado": { cell: "bg-yellow-100 border-yellow-300 text-yellow-800 hover:bg-yellow-200", card: "bg-yellow-50/70 border-yellow-200 border-l-[4px] border-l-yellow-500 hover:bg-yellow-100/80 hover:border-yellow-300 hover:shadow-md", dot: "bg-yellow-500", text: "text-yellow-700", bar: "bg-yellow-400", num: "text-yellow-600" },
+          "Proposta": { cell: "bg-slate-200 border-slate-300 text-slate-700 hover:bg-slate-300", card: "bg-slate-50/70 border-slate-200 border-l-[4px] border-l-slate-400 hover:bg-slate-100/80 hover:border-slate-300 hover:shadow-md", dot: "bg-slate-400", text: "text-slate-600", bar: "bg-slate-400", num: "text-slate-600" },
+          "Vendido/Terceiros": { cell: "bg-pink-100 border-pink-300 text-pink-800 hover:bg-pink-200", card: "bg-pink-50/70 border-pink-200 border-l-[4px] border-l-pink-500 hover:bg-pink-100/80 hover:border-pink-300 hover:shadow-md", dot: "bg-pink-500", text: "text-pink-700", bar: "bg-pink-400", num: "text-pink-600" },
         };
-        const statusTextColor = (status: string) => {
-          switch (status) {
-            case "Vendida": return "text-red-700";
-            case "Disponível": return "text-emerald-700";
-            case "Reserva Técnica": return "text-blue-700";
-            case "Proposta": return "text-orange-700";
-            case "Vendido/Terceiros": return "text-pink-700";
-            default: return "text-amber-700";
-          }
-        };
+        const OUTRO = { cell: "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200", card: "bg-amber-50/70 border-amber-200 border-l-[4px] border-l-amber-500 hover:bg-amber-100/80 hover:border-amber-300 hover:shadow-md", dot: "bg-amber-500", text: "text-amber-700", bar: "bg-amber-400", num: "text-amber-600" };
+        const estilo = (sit: string) => ESTILO[sit] || OUTRO;
+        // Com Valores desligado, nenhum R$ aparece no Quadro (tela mostrada a cliente).
+        const temDono = (sit: string) => ehVendida(sit) || sit === "Vendido/Terceiros";
+        const dica = (u: (typeof qUnits)[number]) => [
+          `${u.unit} — ${u.situacao}`,
+          temDono(u.situacao) && u.customer && u.customer !== "—" ? `Cliente: ${u.customer}` : "",
+          mostrarValores && temDono(u.situacao) && u.value ? `Valor: ${formatCurrency(u.value)}` : "",
+          u.area ? `Área: ${u.area} m²` : "",
+        ].filter(Boolean).join("\n");
 
         return <>
           {/* Filters */}
@@ -1796,13 +1803,13 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
               activeColor="cyan"
             />
             <MultiSelectFilter
-              label="Status"
+              label="Situação"
               icon={<CheckCircle className="h-3.5 w-3.5" />}
-              allOptions={qStatusOptions}
-              selected={selectedUnitStatuses}
-              onToggle={v => setSelectedUnitStatuses(prev => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; })}
-              onSelectAll={() => setSelectedUnitStatuses(new Set(qStatusOptions))}
-              onClear={() => setSelectedUnitStatuses(new Set())}
+              allOptions={qSitOptions}
+              selected={selectedSituacoes}
+              onToggle={v => setSelectedSituacoes(prev => { const n = new Set(prev); if (n.has(v)) n.delete(v); else n.add(v); return n; })}
+              onSelectAll={() => setSelectedSituacoes(new Set(qSitOptions))}
+              onClear={() => setSelectedSituacoes(new Set())}
               activeColor="emerald"
             />
             <MultiSelectFilter
@@ -1821,16 +1828,22 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
           {qUnits.length > 0 && (
             <Card className="border-0 shadow-sm mt-4">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-4">
+                <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                  <div className="flex items-center gap-4 flex-wrap">
                     <span className="text-sm font-bold text-slate-700">{qUnits.length} unidades</span>
-                    <div className="flex items-center gap-3 text-xs">
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-400" /><span className="text-slate-500">Vendidas: <strong className="text-red-600 dark:text-red-300/70">{qVendidas}</strong></span></span>
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-400" /><span className="text-slate-500">Disponíveis: <strong className="text-emerald-600">{qDisponiveis}</strong></span></span>
-                      {qReserva > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-400" /><span className="text-slate-500">Reserva: <strong className="text-blue-600">{qReserva}</strong></span></span>}
-                      {qProposta > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-400" /><span className="text-slate-500">Proposta: <strong className="text-orange-600">{qProposta}</strong></span></span>}
-                      {qVendTerceiros > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-pink-400" /><span className="text-slate-500">Vend/Terceiros: <strong className="text-pink-600">{qVendTerceiros}</strong></span></span>}
-                      {qOutros > 0 && <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-amber-400" /><span className="text-slate-500">Outros: <strong className="text-amber-600">{qOutros}</strong></span></span>}
+                    <div className="flex items-center gap-3 text-xs flex-wrap">
+                      {qContagem.map(c => (
+                        <button
+                          key={c.nome}
+                          type="button"
+                          onClick={() => setSelectedSituacoes(prev => { const n = new Set(prev); if (n.has(c.nome)) n.delete(c.nome); else n.add(c.nome); return n; })}
+                          className={`flex items-center gap-1.5 rounded px-1 -mx-1 transition-opacity ${selectedSituacoes.size > 0 && !selectedSituacoes.has(c.nome) ? "opacity-40" : ""}`}
+                          title={`Mostrar só ${c.nome}`}
+                        >
+                          <span className={`w-3 h-3 rounded-sm ${estilo(c.nome).bar}`} />
+                          <span className="text-slate-500">{c.nome}: <strong className={estilo(c.nome).num}>{c.n}</strong></span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                   <span className="text-xs font-bold text-slate-500">
@@ -1838,20 +1851,27 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                   </span>
                 </div>
                 <div className="w-full h-4 flex gap-[2px]">
-                  {qVendidas > 0 && <div className="h-full bg-red-400 transition-all rounded-full shadow-inner" style={{ width: `${(qVendidas / qUnits.length) * 100}%` }} title={`Vendidas: ${qVendidas}`} />}
-                  {qDisponiveis > 0 && <div className="h-full bg-emerald-400 transition-all rounded-full shadow-inner" style={{ width: `${(qDisponiveis / qUnits.length) * 100}%` }} title={`Disponível: ${qDisponiveis}`} />}
-                  {qReserva > 0 && <div className="h-full bg-blue-400 transition-all rounded-full shadow-inner" style={{ width: `${(qReserva / qUnits.length) * 100}%` }} title={`Reserva Tećnica: ${qReserva}`} />}
-                  {qProposta > 0 && <div className="h-full bg-orange-400 transition-all rounded-full shadow-inner" style={{ width: `${(qProposta / qUnits.length) * 100}%` }} title={`Proposta: ${qProposta}`} />}
-                  {qVendTerceiros > 0 && <div className="h-full bg-pink-400 transition-all rounded-full shadow-inner" style={{ width: `${(qVendTerceiros / qUnits.length) * 100}%` }} title={`Vendido/Terceiros: ${qVendTerceiros}`} />}
-                  {qOutros > 0 && <div className="h-full bg-amber-400 transition-all rounded-full shadow-inner" style={{ width: `${(qOutros / qUnits.length) * 100}%` }} title={`Outros: ${qOutros}`} />}
+                  {qContagem.map(c => (
+                    <div key={c.nome} className={`h-full ${estilo(c.nome).bar} transition-all rounded-full shadow-inner`} style={{ width: `${(c.n / qUnits.length) * 100}%` }} title={`${c.nome}: ${c.n}`} />
+                  ))}
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {/* Toggle de visualização: Espelho (torre) x Grade */}
+          {/* Valores + visualização: Espelho (torre) x Grade */}
           {selectedUnitEnterprises.size > 0 && (
-            <div className="flex items-center justify-end mt-4">
+            <div className="flex items-center justify-end gap-2 mt-4">
+              <button
+                type="button"
+                onClick={() => setMostrarValores(!mostrarValores)}
+                aria-pressed={mostrarValores}
+                title={mostrarValores ? "Esconder os valores (R$) do Quadro" : "Mostrar os valores (R$) no Quadro"}
+                className={`inline-flex items-center gap-1.5 px-3 h-7 text-xs font-bold rounded-lg border ${mostrarValores ? "border-blue-200 bg-blue-50 text-blue-700" : "border-slate-200/50 bg-slate-100/80 text-slate-500 hover:text-slate-700"}`}
+              >
+                {mostrarValores ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                Valores
+              </button>
               <div className="inline-flex items-center p-0.5 bg-slate-100/80 rounded-lg border border-slate-200/50 shadow-inner">
                 <button
                   onClick={() => setQuadroView("espelho")}
@@ -1880,7 +1900,6 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
             </Card>
           ) : quadroView === "espelho" ? (() => {
             // ── Espelho (torre): um bloco por empreendimento, unidades agrupadas por pavimento ──
-            const cellBg = (s: string) => s === "Vendida" ? "bg-red-100 border-red-300 text-red-800 hover:bg-red-200" : s === "Disponível" ? "bg-emerald-100 border-emerald-300 text-emerald-800 hover:bg-emerald-200" : s === "Reserva Técnica" ? "bg-blue-100 border-blue-300 text-blue-800 hover:bg-blue-200" : s === "Proposta" ? "bg-orange-100 border-orange-300 text-orange-800 hover:bg-orange-200" : s === "Vendido/Terceiros" ? "bg-pink-100 border-pink-300 text-pink-800 hover:bg-pink-200" : "bg-amber-100 border-amber-300 text-amber-800 hover:bg-amber-200";
             const shortLabel = (name: string) => { const p = name.split(".").pop() || name; return p.length > 10 ? p.slice(-9) : p; };
             const entNames = Array.from(new Set(qVisible.map(u => u.enterprise))).sort();
             return (
@@ -1889,11 +1908,9 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                 <Card className="border-0 shadow-sm">
                   <CardContent className="p-3">
                     <div className="flex flex-wrap items-center gap-3 text-[11px]">
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-200 border border-emerald-300" /><span className="text-slate-500">Disponível</span></span>
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-200 border border-red-300" /><span className="text-slate-500">Vendida</span></span>
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-200 border border-blue-300" /><span className="text-slate-500">Reserva</span></span>
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-orange-200 border border-orange-300" /><span className="text-slate-500">Proposta</span></span>
-                      <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-pink-200 border border-pink-300" /><span className="text-slate-500">Vend/Terceiros</span></span>
+                      {SITUACOES.map(s => (
+                        <span key={s.nome} className="flex items-center gap-1.5"><span className={`w-3 h-3 rounded-sm border ${estilo(s.nome).cell}`} /><span className="text-slate-500">{s.nome}</span></span>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -1908,9 +1925,10 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                   const entVisible = qVisible.filter(u => u.enterprise === ent);
                   const numFloors = new Set(entUnits.map(u => normalizeFloor(u.floor)).filter(Boolean)).size;
                   const areaTotal = entUnits.reduce((s, u) => s + (u.area || 0), 0);
-                  const vgvVendido = entUnits.filter(u => u.status === "Vendida").reduce((s, u) => s + (u.value || 0), 0);
-                  const entVend = entUnits.filter(u => u.status === "Vendida").length;
-                  const entDisp = entUnits.filter(u => u.status === "Disponível").length;
+                  const vgvVendido = entUnits.filter(u => ehVendida(u.situacao)).reduce((s, u) => s + (u.value || 0), 0);
+                  const entVend = entUnits.filter(u => ehVendida(u.situacao)).length;
+                  const entPerm = entUnits.filter(u => u.situacao === "Permutante").length;
+                  const entDisp = entUnits.filter(u => u.situacao === "Disponível").length;
                   const pctVend = entUnits.length > 0 ? (entVend / entUnits.length) * 100 : 0;
                   const fmap = new Map<string, typeof entVisible>();
                   entVisible.forEach(u => { const f = normalizeFloor(u.floor) || "—"; if (!fmap.has(f)) fmap.set(f, []); fmap.get(f)!.push(u); });
@@ -1931,8 +1949,9 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                           <div className="flex items-center gap-5 text-center">
                             <div><p className="text-xl font-black text-emerald-600 tabular-nums leading-none">{entDisp}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Disponíveis</p></div>
                             <div><p className="text-xl font-black text-red-500 dark:text-red-300/80 tabular-nums leading-none">{entVend}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Vendidas</p></div>
+                            {entPerm > 0 && <div><p className="text-xl font-black text-violet-600 tabular-nums leading-none">{entPerm}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Permutantes</p></div>}
                             <div><p className="text-xl font-black text-slate-700 dark:text-slate-200 tabular-nums leading-none">{pctVend.toFixed(0)}%</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">Vendido</p></div>
-                            <div><p className="text-xl font-black text-blue-600 tabular-nums leading-none">{formatCompactCurrency(vgvVendido)}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">VGV Vendido</p></div>
+                            {mostrarValores && <div><p className="text-xl font-black text-blue-600 tabular-nums leading-none">{formatCompactCurrency(vgvVendido)}</p><p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold mt-1">VGV Vendido</p></div>}
                           </div>
                         </div>
                         {/* Torre por pavimento */}
@@ -1949,13 +1968,16 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                                   {g.units.map((u, i) => (
                                     <div
                                       key={`${u.unit}-${i}`}
-                                      title={`${u.unit} — ${u.status}${u.status === "Vendida" ? `\nCliente: ${u.customer}\nValor: ${formatCurrency(u.value)}` : ""}${u.area ? `\nÁrea: ${u.area} m²` : ""}`}
-                                      className={`min-w-[60px] rounded-md border px-2 py-1.5 text-center transition-colors cursor-default ${cellBg(u.status)}`}
+                                      title={dica(u)}
+                                      className={`min-w-[60px] rounded-md border px-2 py-1.5 text-center transition-colors cursor-default ${estilo(u.situacao).cell}`}
                                     >
                                       <span className="block text-xs font-bold leading-none truncate max-w-[88px]">{shortLabel(u.unit)}</span>
                                       <span className="block text-[8px] font-semibold uppercase tracking-wide mt-1 opacity-75">
-                                        {u.status === "Disponível" ? "Livre" : u.status === "Vendida" ? "Vendida" : u.status}
+                                        {u.situacao === "Disponível" ? "Livre" : u.situacao}
                                       </span>
+                                      {mostrarValores && u.situacao !== "Disponível" && u.value > 0 && (
+                                        <span className="block text-[9px] font-semibold tabular-nums mt-0.5 opacity-80">{formatCompactCurrency(u.value)}</span>
+                                      )}
                                     </div>
                                   ))}
                                 </div>
@@ -1980,29 +2002,29 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                     {qVisible.filter(u => u.enterprise === ent).map((u, idx) => (
                 <div
                   key={`${u.unit}-${idx}`}
-                  className={`relative rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-1 group ${cardStyle(u.status)}`}
-                  title={u.status === "Vendida" ? `Unidade ${u.unit}\nStatus: ${u.status}\nCliente: ${u.customer}\nValor: ${formatCurrency(u.value)}` : `Unidade ${u.unit} — ${u.status}`}
+                  className={`relative rounded-xl border p-3 cursor-pointer transition-all duration-300 hover:-translate-y-1 group ${estilo(u.situacao).card}`}
+                  title={dica(u)}
                 >
                   <div className="flex justify-between items-start">
                     <p className="text-lg font-extrabold text-slate-800 leading-none">{u.unit}</p>
-                    <div className={`w-2 h-2 rounded-full ${u.status === "Vendida" ? "bg-red-500" : u.status === "Disponível" ? "bg-emerald-500" : u.status === "Reserva Técnica" ? "bg-blue-500" : u.status === "Proposta" ? "bg-orange-500" : u.status === "Vendido/Terceiros" ? "bg-pink-500" : "bg-slate-300"}`} />
+                    <div className={`w-2 h-2 rounded-full ${estilo(u.situacao).dot}`} />
                   </div>
-                  <p className={`text-[10px] font-bold mt-2 uppercase tracking-wide ${statusTextColor(u.status)}`}>{u.status}</p>
+                  <p className={`text-[10px] font-bold mt-2 uppercase tracking-wide ${estilo(u.situacao).text}`}>{u.situacao}</p>
                   {u.tipo !== "Apartamento" && (
                     <p className="text-[9px] text-slate-400 font-medium mt-0.5">{u.tipo}</p>
                   )}
                   {/* Hover overlay with details */}
-                  {u.status === "Vendida" && (
+                  {ehVendida(u.situacao) && (
                     <div className="absolute z-10 -inset-x-2 -inset-y-3 bg-white/95 backdrop-blur-md rounded-xl p-4 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-200 shadow-[0_10px_40px_rgba(0,0,0,0.12)] border border-slate-100 flex flex-col justify-center scale-95 group-hover:scale-100 origin-center">
                       <div className="flex items-center justify-between mb-1">
                         <p className="text-base font-black text-slate-800">{u.unit}</p>
-                        <Badge variant="outline" className="text-[9px] bg-red-50 text-red-600 border-red-200 px-1.5 py-0 uppercase font-bold tracking-wider rounded-md">Vendida</Badge>
+                        <Badge variant="outline" className={`text-[9px] px-1.5 py-0 uppercase font-bold tracking-wider rounded-md ${u.situacao === "Permutante" ? "bg-violet-50 text-violet-600 border-violet-200" : "bg-red-50 text-red-600 border-red-200"}`}>{u.situacao}</Badge>
                       </div>
                       <div className="mb-2">
                         <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block mb-0.5">Cliente</span>
                         <p className="text-[11px] text-slate-700 font-semibold leading-tight line-clamp-2" title={u.customer}>{u.customer || "Não informado"}</p>
                       </div>
-                      <p className="text-[13px] font-black text-slate-800 tabular-nums bg-slate-50 px-2 py-1 rounded inline-block w-max">{formatCurrency(u.value)}</p>
+                      {mostrarValores && <p className="text-[13px] font-black text-slate-800 tabular-nums bg-slate-50 px-2 py-1 rounded inline-block w-max">{formatCurrency(u.value)}</p>}
                       <p className="text-[10px] text-slate-400 mt-1 font-medium">{formatDate(u.contractDate)}</p>
                     </div>
                   )}

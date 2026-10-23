@@ -51,6 +51,11 @@ interface ComercialContextValue {
   comercialChartView: "anual" | "mensal"; setComercialChartView: React.Dispatch<React.SetStateAction<"anual" | "mensal">>;
   quadroView: "grade" | "espelho"; setQuadroView: React.Dispatch<React.SetStateAction<"grade" | "espelho">>;
   selectedUnitStatuses: Set<string>; setSelectedUnitStatuses: SetS;
+  // Quadro: filtro por situação (Vendido, Permutante…; situacao-unidade.ts),
+  // separado do status de estoque da tela Unidades.
+  selectedSituacoes: Set<string>; setSelectedSituacoes: SetS;
+  // Quadro: botão Valores. Desligado = nenhum R$ no Quadro (tela mostrada a cliente).
+  mostrarValores: boolean; setMostrarValores: (v: boolean) => void;
   selectedContractStatuses: Set<string>; setSelectedContractStatuses: SetS;
   selectedUnitEnterprises: Set<string>; setSelectedUnitEnterprises: SetS;
   selectedUnitTypes: Set<string>; setSelectedUnitTypes: SetS;
@@ -70,6 +75,7 @@ export function useComercial(): ComercialContextValue {
 export const COMPANY_KEY = "dashboard_companies_comercial";
 export const YEARS_KEY = "dashboard_years_comercial";
 const MONTHS_KEY = "dashboard_months_comercial";
+const VALORES_KEY = "quadro_espelho_mostrar_valores";
 
 function loadLs(key: string): Set<string> | null {
   if (typeof window === "undefined") return null;
@@ -123,6 +129,16 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
   // Quadro Espelho: "grade" (lista plana) ou "espelho" (torre por pavimento)
   const [quadroView, setQuadroView] = useState<"grade" | "espelho">("espelho");
   const [selectedUnitStatuses, setSelectedUnitStatuses] = useState<Set<string>>(new Set());
+  const [selectedSituacoes, setSelectedSituacoes] = useState<Set<string>>(new Set());
+  // Começa desligado (servidor e primeira pintura iguais) e lê a preferência depois.
+  const [mostrarValores, setMostrarValoresState] = useState(false);
+  useEffect(() => {
+    try { setMostrarValoresState(localStorage.getItem(VALORES_KEY) === "1"); } catch { /* sem storage */ }
+  }, []);
+  const setMostrarValores = useCallback((v: boolean) => {
+    setMostrarValoresState(v);
+    try { localStorage.setItem(VALORES_KEY, v ? "1" : "0"); } catch { /* sem storage */ }
+  }, []);
   // Status de CONTRATO (Emitido/Cancelado/...) — filtro de Vendas e Clientes.
   // Separado de selectedUnitStatuses (Disponível/Vendida/...), que é status de UNIDADE
   // (Unidades/Quadro Espelho); compartilhar os dois zerava Vendas ao navegar da Visão Geral.
@@ -239,6 +255,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
     comercialChartView, setComercialChartView,
     quadroView, setQuadroView,
     selectedUnitStatuses, setSelectedUnitStatuses,
+    selectedSituacoes, setSelectedSituacoes, mostrarValores, setMostrarValores,
     selectedContractStatuses, setSelectedContractStatuses,
     selectedUnitEnterprises, setSelectedUnitEnterprises,
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
