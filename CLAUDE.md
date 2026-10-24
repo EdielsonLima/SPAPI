@@ -204,6 +204,14 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   bússola só existe com o dado novo (`norte`). Depois de uma falha o servidor
   espera 2 min para tentar de novo; a espera do fetch (200 s) tem de ser
   maior que o `timeout` da consulta Overpass (180 s).
+  **Mar = um polígono só (24/10, `VERSAO_ENTORNO` 3).** No ar o mar aparecia
+  entre as quadras: cada trecho de `natural=coastline` virava um retângulo de
+  3 km para a direita, e as margens do rio (também coastline, entrando na
+  cidade) varriam os prédios. `poligonoDoMar` em `entorno-osm.ts`: eixo
+  principal = soma dos trechos; a costa é amostrada a cada 50 m e em cada
+  faixa de 50 m ao longo do eixo fica só o ponto mais para o mar (o desvio
+  pelo rio some); o polígono segue esse contorno e fecha 3 km mar adentro.
+  Trava no `entorno-osm.test.ts` (margem de rio no meio da orla).
   **Ver planta:** botão no card da unidade abre a planta humanizada do tipo
   (`CONFIG_PALACIO.planta`, imagem do site `SIL_ELI_PH_TIPO` em
   `public/modelos/palacio-planta-tipo.webp`), dentro da tela cheia. A imagem

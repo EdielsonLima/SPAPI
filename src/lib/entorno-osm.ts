@@ -21,7 +21,7 @@ export interface LocalEntorno {
 
 // Sobe quando o formato ou o recorte mudam: o servidor devolve o salvo antigo
 // e refaz em segundo plano (a próxima abertura já vem nova).
-export const VERSAO_ENTORNO = 2;
+export const VERSAO_ENTORNO = 3;
 // Prédios só perto (são o peso do mapa); ruas, areia e mar vão mais longe
 // para a praia aparecer (Edielson, 23/10: "o pessoal quer saber onde fica a
 // praia"). Além disso a neblina da cena esconde a borda.
@@ -131,6 +131,7 @@ export function processarEntorno(els: ElementoOSM[], lote: Lote, l: LocalEntorno
   const out: DadosEntorno = { versao: VERSAO_ENTORNO, norte: [Math.round(fe * 1000) / 1000, Math.round(fn * 1000) / 1000], fonte: "© OpenStreetMap (ODbL)", lote: { lat: +lote.lat.toFixed(6), lon: +lote.lon.toFixed(6) }, ruas: [], predios: [], verde: [], areia: [], mar: [] };
   // Lote (60 × 40 m atrás da rua da frente, com folga): o nosso prédio ocupa o lugar.
   const noLote = (p: number[][]) => { const cx = p.reduce((s, q) => s + q[0], 0) / p.length, cz = p.reduce((s, q) => s + q[1], 0) / p.length; return Math.abs(cx - (l.ajusteX || 0)) < 34 && cz < -4 && cz > -58; };
+  const costa: number[][][] = [];
   for (const e of els) {
     const t = e.tags || {};
     const g = e.geometry; if (!g || g.length < 2) continue;
@@ -143,15 +144,7 @@ export function processarEntorno(els: ElementoOSM[], lote: Lote, l: LocalEntorno
       const h = hm > 0 ? hm : lv > 0 ? lv * 3 : ALTURA_TIPO[t.building] ?? 9;
       out.predios.push({ h: r1(h), p });
     } else if (t.natural === "coastline") {
-      // Mar = faixa larga à DIREITA do sentido da linha (convenção do OSM: terra à esquerda).
-      const p = local(g);
-      for (let i = 1; i < p.length; i++) {
-        const [x0, z0] = p[i - 1], [x1, z1] = p[i];
-        const L = Math.hypot(x1 - x0, z1 - z0) || 1;
-        // Nesse referencial, a direita do sentido (x, z) é (-dz, dx) (conferido no teste).
-        const nx = -(z1 - z0) / L * 3000, nz = (x1 - x0) / L * 3000;
-        out.mar.push([[x0, z0], [x1, z1], [r1(x1 + nx), r1(z1 + nz)], [r1(x0 + nx), r1(z0 + nz)]]);
-      }
+      costa.push(local(g)); // vira UM polígono depois do laço (poligonoDoMar)
     } else if (t.natural === "beach" || t.natural === "sand") {
       out.areia.push(local(g));
     } else if (t.natural === "water") {
@@ -160,5 +153,44 @@ export function processarEntorno(els: ElementoOSM[], lote: Lote, l: LocalEntorno
       out.verde.push(local(g));
     }
   }
+  const mar = poligonoDoMar(costa);
+  if (mar) out.mar.push(mar);
   return out;
+}
+
+// Mar = UM polígono à direita da costa (convenção do OSM: terra à esquerda do
+// sentido). Antes cada trecho virava um retângulo de 3 km para a direita; nas
+// margens do rio (também marcadas como coastline, entrando na cidade) esses
+// retângulos varriam as quadras e o mar aparecia entre os prédios (visto no
+// ar em 24/10). Agora: eixo principal da costa = soma dos trechos; a costa é
+// amostrada a cada 50 m e, em cada faixa de 50 m ao longo do eixo, fica só o
+// ponto mais para o mar — o desvio pelo rio (para dentro) some. O polígono
+// segue esse contorno e fecha 3 km mar adentro. O rio aparece pelo
+// natural=water, não pela costa.
+export function poligonoDoMar(trechos: number[][][]): number[][] | null {
+  let ux = 0, uz = 0;
+  const amostras: number[][] = [];
+  for (const p of trechos) for (let i = 1; i < p.length; i++) {
+    const [x0, z0] = p[i - 1], [x1, z1] = p[i], L = Math.hypot(x1 - x0, z1 - z0);
+    if (L < 0.5) continue;
+    ux += x1 - x0; uz += z1 - z0; // o sentido é consistente, soma direto
+    const n = Math.max(1, Math.ceil(L / 50));
+    for (let k = 0; k <= n; k++) amostras.push([x0 + (x1 - x0) * k / n, z0 + (z1 - z0) * k / n]);
+  }
+  const Lu = Math.hypot(ux, uz); if (Lu < 1 || amostras.length < 2) return null;
+  ux /= Lu; uz /= Lu;
+  // Direita do sentido (x, z) neste referencial é (-dz, dx) (conferido no teste).
+  const nx = -uz, nz = ux;
+  const faixas = new Map<number, number[]>();
+  for (const p of amostras) {
+    const t = p[0] * ux + p[1] * uz, sMar = p[0] * nx + p[1] * nz, k = Math.round(t / 50);
+    const atual = faixas.get(k);
+    if (!atual || atual[0] * nx + atual[1] * nz < sMar) faixas.set(k, p);
+  }
+  const fio = Array.from(faixas.entries()).sort((a, b) => a[0] - b[0]).map(([, p]) => [r1(p[0]), r1(p[1])]);
+  if (fio.length < 2) return null;
+  const E = 2000, M = 3000;
+  const ini = fio[0], fim = fio[fio.length - 1];
+  const a = [r1(ini[0] - ux * E), r1(ini[1] - uz * E)], b = [r1(fim[0] + ux * E), r1(fim[1] + uz * E)];
+  return [a, ...fio, b, [r1(b[0] + nx * M), r1(b[1] + nz * M)], [r1(a[0] + nx * M), r1(a[1] + nz * M)]];
 }
