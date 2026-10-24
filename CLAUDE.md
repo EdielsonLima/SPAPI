@@ -227,7 +227,7 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   cadastrar `planta.tour` na config dele; as fotos entram pela tela.
   **Música de fundo** (Edielson, 24/10): `public/audio/quadro-3d-ambiente.mp3`
   ("Elegant Piano", leberch, Pixabay Content License — fonte e termos em
-  `public/audio/LEIA-ME.md`). Toca em loop a 35% ao entrar na tela cheia
+  `public/audio/LEIA-ME.md`). Toca em loop a 70% (faixa normalizada a -16 LUFS) ao entrar na tela cheia
   (navegador só libera áudio após um clique), para ao sair; botão de
   alto-falante liga/desliga a qualquer hora e grava a escolha em
   `localStorage.quadro3d_musica` (`off` = não entra sozinha). Aba escondida

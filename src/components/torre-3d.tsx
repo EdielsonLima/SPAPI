@@ -23,7 +23,7 @@ import PlantaFotos from "@/components/planta-fotos";
 
 // Música de fundo do 3D: faixa e volume (ver public/audio/LEIA-ME.md).
 const MUSICA_URL = "/audio/quadro-3d-ambiente.mp3";
-const MUSICA_VOLUME = 0.35;
+const MUSICA_VOLUME = 0.7;
 const MUSICA_PREF = "quadro3d_musica";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
