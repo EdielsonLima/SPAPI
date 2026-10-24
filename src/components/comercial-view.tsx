@@ -28,8 +28,7 @@ import { MultiSelectFilter } from "@/components/multi-select-filter";
 import { CorretoresView } from "@/components/corretores-view";
 import { TabelaPrecosView } from "@/components/tabela-precos-view";
 import { semVenda } from "@/lib/tabela-precos";
-import { aplicarTabelaComercial, precoDaTabelaComercial } from "@/lib/tabela-comercial";
-import { chaveDoEmpreendimento } from "@/lib/condicoes-pagamento";
+import { aplicarTabelaComercial, precoDaTabelaComercial, tabelaComercialPara } from "@/lib/tabela-comercial";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
@@ -332,7 +331,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     // Situação do Quadro (cor/legenda): estoque do Sienge + permuta pura = Permutante;
     // por cima, a tabela comercial manual do empreendimento (listada = Disponível,
     // não listada e livre no Sienge = Vendido) — src/lib/tabela-comercial.ts.
-    const tabelaComercialDe = (u: UnitRecord) => tabelasComerciais.get(chaveDoEmpreendimento(undefined, u.enterprise));
+    const tabelaComercialDe = (u: UnitRecord) => tabelaComercialPara(u.enterprise, tabelasComerciais).tabela;
     allUnits.forEach(u => { u.situacao = aplicarTabelaComercial(situacaoDaUnidade(u.status, u.permuta), u.unit, tabelaComercialDe(u)); });
     // Preço de tabela (painel) só vale para unidade sem venda; a vendida mostra o
     // contrato. Sem preço no painel, vale o da tabela comercial manual.

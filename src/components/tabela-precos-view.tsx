@@ -26,8 +26,7 @@ import {
   aplicarReajuste, descreverReajuste, lerDecimalBR, lerValorBR, precoPorM2, semVenda, validarReajuste,
   mascararValorBR, completarCentavosBR, type Reajuste,
 } from "@/lib/tabela-precos";
-import { normalizarTabelaComercial, aplicarTabelaComercial, TABELA_COMERCIAL_VAZIA, type TabelaComercial } from "@/lib/tabela-comercial";
-import { chaveDoEmpreendimento } from "@/lib/condicoes-pagamento";
+import { normalizarTabelaComercial, aplicarTabelaComercial, tabelaComercialPara, nomeUnidade, TABELA_COMERCIAL_VAZIA, type TabelaComercial } from "@/lib/tabela-comercial";
 import { situacaoDaUnidade } from "@/lib/situacao-unidade";
 
 // Situação do Quadro a partir do estoque do Sienge (sem permuta: a tela não tem o contrato).
@@ -136,12 +135,63 @@ export function TabelaPrecosView() {
   const tipos = useMemo(() => Array.from(new Set(linhasEmpreendimento.map(l => l.tipo))).sort(), [linhasEmpreendimento]);
   useEffect(() => { if (tipos.length > 0 && tipo && !tipos.includes(tipo)) setTipo(""); }, [tipos, tipo]);
 
+  // ── Tabela comercial manual (do diretor comercial) do empreendimento ──
+  const { chave: chaveEmp, tabela: tcSalva } = useMemo(() => tabelaComercialPara(empreendimento, tabelasComerciais), [empreendimento, tabelasComerciais]);
+  const [tc, setTc] = useState<TabelaComercial>(TABELA_COMERCIAL_VAZIA);
+  const [historicoVersao, setHistoricoVersao] = useState(0); // "Aplicar preços" recarrega o histórico, definido mais abaixo
+  const [tcPrecosTxt, setTcPrecosTxt] = useState<Map<string, string>>(new Map());
+  useEffect(() => { setTc(tcSalva ?? TABELA_COMERCIAL_VAZIA); setTcPrecosTxt(new Map()); }, [tcSalva, empreendimento]);
+  const tcEfetiva = useMemo(() => {
+    const precos = { ...tc.precos };
+    tcPrecosTxt.forEach((txt, unidade) => { const v = lerValorBR(txt.trim()); if (txt.trim() === "") delete precos[unidade]; else if (v !== null && v > 0) precos[unidade] = v; });
+    return normalizarTabelaComercial({ ...tc, precos });
+  }, [tc, tcPrecosTxt]);
+  const tcAlterada = JSON.stringify(tcEfetiva) !== JSON.stringify(tcSalva ?? TABELA_COMERCIAL_VAZIA);
+  const tcExiste = !!tcSalva || tcAlterada;
+  const [salvandoTc, setSalvandoTc] = useState(false);
+  const alternarDisponivel = (unidade: string) => setTc(t => {
+    const u = nomeUnidade(unidade);
+    const disponiveis = t.disponiveis.includes(u) ? t.disponiveis.filter(x => x !== u) : [...t.disponiveis, u];
+    return { ...t, disponiveis };
+  });
+  const salvarTc = async () => {
+    setSalvandoTc(true);
+    try {
+      const r = await fetch("/api/tabela-comercial", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chave: chaveEmp, dados: tcEfetiva }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Falha ao salvar a tabela comercial.");
+      toast.success("Tabela comercial salva. O Quadro e o 3D já usam esta lista.");
+      await recarregarPrecos();
+      setTcPrecosTxt(new Map());
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar.");
+    } finally { setSalvandoTc(false); }
+  };
+  // Leva os preços da tabela comercial para a tabela de preços do painel (com histórico).
+  const aplicarPrecosTc = async () => {
+    const itens = linhasEmpreendimento
+      .filter(l => tcEfetiva.precos[nomeUnidade(l.unidade)] > 0 && tcEfetiva.precos[nomeUnidade(l.unidade)] !== l.preco)
+      .map(l => ({ unitId: l.unitId, enterpriseId: l.enterpriseId, unidade: l.unidade, valor: tcEfetiva.precos[nomeUnidade(l.unidade)] }));
+    if (itens.length === 0) { toast.message("A tabela de preços já tem os valores da tabela comercial."); return; }
+    setSalvandoTc(true);
+    try {
+      const r = await fetch("/api/tabela-precos", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "manual", descricao: `Tabela comercial: ${tcEfetiva.referencia || "manual"}`, itens }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Falha ao aplicar.");
+      toast.success(`${d.alteradas} preço(s) levados da tabela comercial para a tabela de preços.`);
+      await recarregarPrecos();
+      setHistoricoVersao(v => v + 1);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao aplicar.");
+    } finally { setSalvandoTc(false); }
+  };
+
   const linhas = useMemo(() => linhasEmpreendimento.filter(l => {
     if (tipo && l.tipo !== tipo) return false;
-    if (soNaoVendidas && !semVenda(l.status)) return false;
+    if (soNaoVendidas && !semVenda(l.status) && !tcEfetiva.disponiveis.includes(nomeUnidade(l.unidade))) return false;
     if (busca && !l.unidade.toLowerCase().includes(busca.toLowerCase().trim())) return false;
     return true;
-  }), [linhasEmpreendimento, tipo, soNaoVendidas, busca]);
+  }), [linhasEmpreendimento, tipo, soNaoVendidas, busca, tcEfetiva]);
 
   // ── Edição inline (pendente até salvar) ──
   const [pendentes, setPendentes] = useState<Map<number, string>>(new Map());
@@ -203,57 +253,6 @@ export function TabelaPrecosView() {
     .filter(l => selecionadas.has(l.unitId))
     .sort((a, b) => a.unidade.localeCompare(b.unidade, "pt-BR", { numeric: true }));
 
-  // ── Tabela comercial manual (do diretor comercial) do empreendimento ──
-  const chaveEmp = chaveDoEmpreendimento(undefined, empreendimento);
-  const tcSalva = tabelasComerciais.get(chaveEmp) ?? null;
-  const [tc, setTc] = useState<TabelaComercial>(TABELA_COMERCIAL_VAZIA);
-  const [tcPrecosTxt, setTcPrecosTxt] = useState<Map<string, string>>(new Map());
-  useEffect(() => { setTc(tcSalva ?? TABELA_COMERCIAL_VAZIA); setTcPrecosTxt(new Map()); }, [tcSalva, empreendimento]);
-  const tcEfetiva = useMemo(() => {
-    const precos = { ...tc.precos };
-    tcPrecosTxt.forEach((txt, unidade) => { const v = lerValorBR(txt.trim()); if (txt.trim() === "") delete precos[unidade]; else if (v !== null && v > 0) precos[unidade] = v; });
-    return normalizarTabelaComercial({ ...tc, precos });
-  }, [tc, tcPrecosTxt]);
-  const tcAlterada = JSON.stringify(tcEfetiva) !== JSON.stringify(tcSalva ?? TABELA_COMERCIAL_VAZIA);
-  const tcExiste = !!tcSalva || tcAlterada;
-  const [salvandoTc, setSalvandoTc] = useState(false);
-  const alternarDisponivel = (unidade: string) => setTc(t => {
-    const u = unidade.toUpperCase();
-    const disponiveis = t.disponiveis.includes(u) ? t.disponiveis.filter(x => x !== u) : [...t.disponiveis, u];
-    return { ...t, disponiveis };
-  });
-  const salvarTc = async () => {
-    setSalvandoTc(true);
-    try {
-      const r = await fetch("/api/tabela-comercial", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chave: chaveEmp, dados: tcEfetiva }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "Falha ao salvar a tabela comercial.");
-      toast.success("Tabela comercial salva. O Quadro e o 3D já usam esta lista.");
-      await recarregarPrecos();
-      setTcPrecosTxt(new Map());
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao salvar.");
-    } finally { setSalvandoTc(false); }
-  };
-  // Leva os preços da tabela comercial para a tabela de preços do painel (com histórico).
-  const aplicarPrecosTc = async () => {
-    const itens = linhasEmpreendimento
-      .filter(l => tcEfetiva.precos[l.unidade.toUpperCase()] > 0 && tcEfetiva.precos[l.unidade.toUpperCase()] !== l.preco)
-      .map(l => ({ unitId: l.unitId, enterpriseId: l.enterpriseId, unidade: l.unidade, valor: tcEfetiva.precos[l.unidade.toUpperCase()] }));
-    if (itens.length === 0) { toast.message("A tabela de preços já tem os valores da tabela comercial."); return; }
-    setSalvandoTc(true);
-    try {
-      const r = await fetch("/api/tabela-precos", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "manual", descricao: `Tabela comercial: ${tcEfetiva.referencia || "manual"}`, itens }) });
-      const d = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(d.error || "Falha ao aplicar.");
-      toast.success(`${d.alteradas} preço(s) levados da tabela comercial para a tabela de preços.`);
-      await recarregarPrecos();
-      carregarHistorico();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao aplicar.");
-    } finally { setSalvandoTc(false); }
-  };
-
   // ── Ordenação ──
   type Coluna = "unidade" | "tipo" | "pavimento" | "area" | "status" | "preco" | "m2";
   const { sorted, sortProps } = useTableSort<Linha, Coluna>(linhas, {
@@ -267,9 +266,9 @@ export function TabelaPrecosView() {
   }, "unidade");
 
   // ── Indicadores ──
-  const naoVendidas = linhasEmpreendimento.filter(l => semVenda(l.status) && (!tipo || l.tipo === tipo));
+  const naoVendidas = linhasEmpreendimento.filter(l => (tcExiste ? aplicarTabelaComercial(situacaoBase(l.status), l.unidade, tcEfetiva) === "Disponível" || (semVenda(l.status) && !tcExiste) : semVenda(l.status)) && (!tipo || l.tipo === tipo));
   const comPreco = naoVendidas.filter(l => l.preco !== null);
-  const disponiveisComPreco = comPreco.filter(l => l.status === "Disponível");
+  const disponiveisComPreco = comPreco.filter(l => (tcExiste ? aplicarTabelaComercial(situacaoBase(l.status), l.unidade, tcEfetiva) : situacaoBase(l.status)) === "Disponível");
   const somaDisponiveis = disponiveisComPreco.reduce((s, l) => s + (l.preco || 0), 0);
   const areaComPreco = comPreco.reduce((s, l) => s + l.area, 0);
   const m2Medio = areaComPreco ? comPreco.reduce((s, l) => s + (l.preco || 0), 0) / areaComPreco : 0;
@@ -280,7 +279,7 @@ export function TabelaPrecosView() {
     fetch("/api/tabela-precos/historico").then(r => r.ok ? r.json() : null)
       .then(d => setHistorico(d?.historico || [])).catch(() => {});
   }, []);
-  useEffect(() => { carregarHistorico(); }, [carregarHistorico]);
+  useEffect(() => { carregarHistorico(); }, [carregarHistorico, historicoVersao]);
   const idsDoEmpreendimento = useMemo(() => new Set(linhasEmpreendimento.map(l => l.unitId)), [linhasEmpreendimento]);
   const lotes = useMemo(() => {
     const m = new Map<string, RegistroHistorico[]>();
@@ -536,21 +535,21 @@ export function TabelaPrecosView() {
                       {podeEditarPrecos ? (
                         <div className="flex items-center gap-2">
                           <label className="flex items-center gap-1.5 text-xs" title="À venda pela tabela comercial">
-                            <Checkbox checked={tcEfetiva.disponiveis.includes(l.unidade.toUpperCase())} onCheckedChange={() => alternarDisponivel(l.unidade)} aria-label={`${l.unidade} à venda pela tabela comercial`} />
+                            <Checkbox checked={tcEfetiva.disponiveis.includes(nomeUnidade(l.unidade))} onCheckedChange={() => alternarDisponivel(l.unidade)} aria-label={`${l.unidade} à venda pela tabela comercial`} />
                             à venda
                           </label>
                           <InputReais
-                            value={tcPrecosTxt.has(l.unidade.toUpperCase()) ? tcPrecosTxt.get(l.unidade.toUpperCase())! : tc.precos[l.unidade.toUpperCase()] ? numeroBR(tc.precos[l.unidade.toUpperCase()]) : ""}
+                            value={tcPrecosTxt.has(nomeUnidade(l.unidade)) ? tcPrecosTxt.get(nomeUnidade(l.unidade))! : tc.precos[nomeUnidade(l.unidade)] ? numeroBR(tc.precos[nomeUnidade(l.unidade)]) : ""}
                             placeholder="preço da tabela"
-                            onChange={t => setTcPrecosTxt(prev => new Map(prev).set(l.unidade.toUpperCase(), t))}
+                            onChange={t => setTcPrecosTxt(prev => new Map(prev).set(nomeUnidade(l.unidade), t))}
                             aria-label={`Preço da tabela comercial da unidade ${l.unidade}`}
                             className="h-8 w-36 [&_input]:h-8"
                           />
                         </div>
                       ) : (
                         <span className="text-xs tabular-nums">
-                          {tcEfetiva.disponiveis.includes(l.unidade.toUpperCase()) ? "à venda" : tcExiste ? "—" : ""}
-                          {tcEfetiva.precos[l.unidade.toUpperCase()] ? ` · ${formatCurrency(tcEfetiva.precos[l.unidade.toUpperCase()])}` : ""}
+                          {tcEfetiva.disponiveis.includes(nomeUnidade(l.unidade)) ? "à venda" : tcExiste ? "—" : ""}
+                          {tcEfetiva.precos[nomeUnidade(l.unidade)] ? ` · ${formatCurrency(tcEfetiva.precos[nomeUnidade(l.unidade)])}` : ""}
                         </span>
                       )}
                     </TableCell>

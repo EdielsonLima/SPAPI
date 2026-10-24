@@ -10,6 +10,8 @@
 // Vendido e Permutante do Sienge ficam como estão. Preço: o da tabela de
 // preços do painel; sem ele, o `precos[unidade]` daqui.
 
+import { chaveDoEmpreendimento } from "@/lib/condicoes-pagamento";
+
 export interface TabelaComercial {
   referencia: string;               // "Tabela comercial · outubro/2026 (Guberto)"
   disponiveis: string[];            // nomes das unidades como no Sienge ("AP602")
@@ -19,7 +21,20 @@ export interface TabelaComercial {
 
 export const TABELA_COMERCIAL_VAZIA: TabelaComercial = { referencia: "", disponiveis: [], precos: {} };
 
-const nomeUnidade = (u: unknown) => String(u ?? "").trim().toUpperCase();
+// Nome da unidade como chave: só letras e dígitos, sem o prefixo "AP" — no
+// Sienge da Silva Packer a unidade é "102"; em outros cadastros, "AP102".
+export const nomeUnidade = (u: unknown) => String(u ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^AP(?=\d)/, "");
+
+// Acha a tabela comercial de um empreendimento pelo nome do Sienge: chave
+// igual ao slug do nome, ou chave contida nele ("palacio-elizabeth" dentro de
+// "edificio-palacio-elizabeth"). Devolve também a chave a usar ao salvar.
+export function tabelaComercialPara<T>(nomeEmpreendimento: string, mapa: Map<string, T>): { chave: string; tabela: T | null } {
+  const slug = chaveDoEmpreendimento(undefined, nomeEmpreendimento);
+  if (mapa.has(slug)) return { chave: slug, tabela: mapa.get(slug)! };
+  let melhor: string | null = null;
+  for (const k of mapa.keys()) if (k && (slug.includes(k) || k.includes(slug)) && (!melhor || k.length > melhor.length)) melhor = k;
+  return melhor ? { chave: melhor, tabela: mapa.get(melhor)! } : { chave: slug, tabela: null };
+}
 
 export function normalizarTabelaComercial(t: Partial<TabelaComercial> | null | undefined): TabelaComercial {
   const precos: Record<string, number> = {};

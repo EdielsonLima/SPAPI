@@ -238,8 +238,10 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   "Copiar resumo" gera texto para WhatsApp/e-mail. Sem preço de tabela o
   modal avisa e manda cadastrar em Comercial › Tabela de preços.
   **Tabela comercial manual** (Edielson, 24/10; PDF do Guberto, diretor
-  comercial): tabela `tabela_comercial` (chave = nome do Sienge em slug,
-  `chaveDoEmpreendimento`), JSON com `disponiveis` (unidades à venda),
+  comercial): tabela `tabela_comercial` (chave = slug do nome do Sienge ou
+  chave contida nele — `tabelaComercialPara`; unidade sem prefixo "AP" e
+  só dígitos/letras — `nomeUnidade`, porque no Sienge da SP a unidade é
+  "102"), JSON com `disponiveis` (unidades à venda),
   `precos` por unidade, `referencia` e `entrega`. Regra
   (`src/lib/tabela-comercial.ts`, trava `tabela-comercial.test.ts`): listada =
   Disponível; não listada e Disponível/Reservado/Proposta no Sienge = Vendido;
