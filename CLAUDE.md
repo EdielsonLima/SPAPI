@@ -260,9 +260,15 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   escura, sacadas de vidro escuro e as JANELAS das unidades vendidas e
   permutadas (`temDono`) acesas em amarelo quente; as à venda apagadas. O
   vidro (`matVidroJ`) tem `emissive` branco × cor da instância
-  (`onBeforeCompile` multiplica `totalEmissiveRadiance` por `vColor`), com
-  `emissiveIntensity` 1,25 só à noite. `pintar()` cuida das duas versões;
-  seleção/filtro continuam valendo.
+  (`onBeforeCompile` multiplica `totalEmissiveRadiance` por `vColor`) ×
+  `emissiveMap` de "interior" (canvas: centro quente, bordas escuras,
+  cortina), com `emissiveIntensity` 1,15 só à noite. Cada janela tem um
+  fator determinístico (0,55–1; ~12 % apagadas, nunca a primeira da
+  unidade; ~20 % em luz fria; porta da sacada × 0,55) para não virar bloco
+  chapado (Edielson, 24/10: "parece lâmpada lá dentro" no vídeo da AVVA).
+  À noite o render passa pelo `EffectComposer` com `UnrealBloomPass`
+  (0,6 / 0,5 / limiar 0,7) + `OutputPass`; de dia é direto. `pintar()`
+  cuida das duas versões; seleção/filtro continuam valendo.
   **Música de fundo** (Edielson, 24/10): `public/audio/quadro-3d-ambiente.mp3`
   ("Elegant Piano", leberch, Pixabay Content License — fonte e termos em
   `public/audio/LEIA-ME.md`). Toca em loop a 70% (faixa normalizada a -16 LUFS) ao entrar na tela cheia

@@ -12,6 +12,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { useTheme } from "next-themes";
 import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX, Banknote, Moon, Sun } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
@@ -337,7 +341,11 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     const blocos: THREE.Object3D[] = [];
     const matsUnidade = new Map<string, { corpo: THREE.MeshStandardMaterial; sacada: THREE.MeshStandardMaterial; corBase: THREE.Color; sacBase: THREE.Color; opBase: number }>();
     const caixaDe = new Map<string, Bloco>(); // corpo de cada unidade (moldura e etiqueta da seleção)
-    const janelas: { j: Janela; id: string; cor: THREE.Color; acesa: boolean }[] = [];
+    const janelas: { j: Janela; id: string; cor: THREE.Color; acesa: boolean; fator: number; fria: number }[] = [];
+    // Variação por janela (determinística pelo índice): intensidade 0,55–1, ~12 %
+    // apagadas (nunca a primeira da unidade), ~20 % em luz mais fria; a porta
+    // da sacada (sala atrás do guarda-corpo) fica mais suave.
+    const ruido = (n: number) => { const x = Math.sin(n * 12.9898 + 78.233) * 43758.5453; return x - Math.floor(x); };
     const focos = new Map<string, THREE.Vector3>(); // frente de cada unidade (câmera vai até ela)
     const neutroCorpo = new THREE.MeshStandardMaterial({ color: FACHADA.clone(), roughness: 0.8 });
     const neutroSacada = new THREE.MeshStandardMaterial({ color: "#9fb4c2", roughness: 0.2, transparent: true, opacity: 0.55 });
@@ -364,13 +372,33 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         lado.userData.id = u.id; blocos.push(lado);
       });
       const vidro = semSituacao ? VIDRO.clone() : u.apagada ? new THREE.Color("#5b6470") : VIDRO.clone().lerp(cor, 0.5);
-      janelasDaUnidade(indice, total, u.andar, primeiro, cfg).forEach(j => janelas.push({ j, id: u.id, cor: j.aberta ? new THREE.Color("#3a3f45") : vidro, acesa: !semSituacao && temDono(u.situacao) && !j.aberta }));
+      janelasDaUnidade(indice, total, u.andar, primeiro, cfg).forEach((j, nj) => {
+        const k = janelas.length, r1 = ruido(k + 1), r2 = ruido(k + 101);
+        const apagada = nj > 0 && r1 < 0.12;
+        const fator = apagada ? 0.05 : (0.55 + 0.45 * ruido(k + 7)) * (j.porta ? 0.55 : 1);
+        janelas.push({ j, id: u.id, cor: j.aberta ? new THREE.Color("#3a3f45") : vidro, acesa: !semSituacao && temDono(u.situacao) && !j.aberta, fator, fria: r2 < 0.2 ? 0.6 : 0 });
+      });
     });
 
     // Janelas: vidro (cor da situação, escurecida) e moldura clara, instanciados.
     const gJanela = new THREE.BoxGeometry(1, 1, 1);
-    // À noite o vidro emite luz na cor da instância (vColor): janela acesa = amarelo quente.
-    const matVidroJ = new THREE.MeshStandardMaterial({ roughness: 0.12, metalness: 0.35, emissive: "#ffffff", emissiveIntensity: 0 });
+    // À noite o vidro emite luz na cor da instância (vColor) modulada por uma
+    // textura de "interior": centro quente e claro, bordas mais escuras, uma
+    // faixa de cortina — para não virar um retângulo chapado.
+    const texInterior = (() => {
+      const c = document.createElement("canvas"); c.width = 96; c.height = 96;
+      const g = c.getContext("2d")!;
+      const rad = g.createRadialGradient(46, 50, 4, 48, 48, 70);
+      rad.addColorStop(0, "rgb(255,246,222)"); rad.addColorStop(0.45, "rgb(255,214,150)"); rad.addColorStop(1, "rgb(120,78,30)");
+      g.fillStyle = rad; g.fillRect(0, 0, 96, 96);
+      g.fillStyle = "rgba(60,40,20,0.55)"; g.fillRect(0, 0, 96, 9);                 // sanca/cortineiro
+      const cort = g.createLinearGradient(0, 0, 30, 0); cort.addColorStop(0, "rgba(255,255,255,0.22)"); cort.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = cort; g.fillRect(0, 9, 30, 87);                                   // cortina semiaberta
+      g.fillStyle = "rgba(40,25,10,0.35)"; g.fillRect(0, 86, 96, 10);                 // peitoril em sombra
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+    })();
+    descarte.push(texInterior);
+    const matVidroJ = new THREE.MeshStandardMaterial({ roughness: 0.12, metalness: 0.35, emissive: "#ffffff", emissiveIntensity: 0, emissiveMap: texInterior });
     matVidroJ.onBeforeCompile = sh => {
       sh.fragmentShader = sh.fragmentShader.replace("#include <emissivemap_fragment>",
         "#include <emissivemap_fragment>\n#if defined( USE_INSTANCING_COLOR ) || defined( USE_COLOR )\n\ttotalEmissiveRadiance *= vColor;\n#endif");
@@ -457,7 +485,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     // Noite: fachada neutra e escura, sacadas de vidro escuro, janela acesa
     // (vendida/permutada) em amarelo quente, apagada (à venda) em azul-noite.
     const NOITE_FACHADA = FACHADA.clone().multiplyScalar(0.42), NOITE_SACADA = new THREE.Color("#0b1324");
-    const ACESA = new THREE.Color("#ffc78a"), APAGADA = new THREE.Color("#101a2e");
+    const ACESA = new THREE.Color("#ffd39a"), APAGADA = new THREE.Color("#0d1627"), FRIA = new THREE.Color("#e8eeff"), BRANCO = new THREE.Color("#ffffff");
     let noiteAtiva = noiteRef.current;
     const pintar = () => {
       matsUnidade.forEach((m, id) => {
@@ -476,9 +504,10 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
       });
       idDaJanela.forEach((id, k) => {
         if (noiteAtiva) {
-          tmp.copy(janelas[k].acesa ? ACESA : APAGADA);
+          const ja = janelas[k];
+          if (ja.acesa) tmp.copy(ACESA).lerp(FRIA, ja.fria).multiplyScalar(ja.fator); else tmp.copy(APAGADA);
           if (id && fora(id)) tmp.lerp(APAGADA, 0.8);
-          if (id && id === marcada) tmp.lerp(new THREE.Color("#ffffff"), 0.35);
+          if (id && id === marcada) tmp.lerp(BRANCO, 0.35);
         } else {
           tmp.copy(corVidro[k]); if (id && fora(id)) tmp.lerp(cinzaVidro, 0.75);
         }
@@ -530,7 +559,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
       hemi.intensity = v ? 0.45 : escuro ? 1.1 : 1.6;
       sol.color.set(v ? "#8fb0ea" : "#ffffff");
       sol.intensity = v ? 0.22 : escuro ? 0.9 : 1.6;
-      matVidroJ.emissiveIntensity = v ? 1.25 : 0;
+      matVidroJ.emissiveIntensity = v ? 1.15 : 0;
       matVidroJ.roughness = v ? 0.5 : 0.12;
       pintar();
     };
@@ -549,10 +578,19 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
       filtrar: sits => { filtroSit = new Set(sits); pintar(); },
     };
 
+    // Brilho (bloom) só à noite: as janelas acesas ganham halo, como luz de
+    // verdade; de dia o render é direto (mais leve).
+    const composer = new EffectComposer(renderer);
+    composer.setPixelRatio(renderer.getPixelRatio());
+    composer.addPass(new RenderPass(scene, camera));
+    const bloom = new UnrealBloomPass(new THREE.Vector2(largura, altura), 0.6, 0.5, 0.7);
+    composer.addPass(bloom);
+    composer.addPass(new OutputPass());
+    descarte.push({ dispose: () => { bloom.dispose(); composer.dispose(); } });
     const ro = new ResizeObserver(() => {
       const w = el.clientWidth, h = el.clientHeight;
       if (!w || !h) return;
-      renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+      renderer.setSize(w, h); composer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
     });
     ro.observe(el);
     let quadro = 0;
@@ -562,7 +600,8 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         camera.position.lerp(voo.pos, 0.08); controls.target.lerp(voo.alvo, 0.08);
         if (camera.position.distanceTo(voo.pos) < 0.3 && controls.target.distanceTo(voo.alvo) < 0.3) voo = null;
       }
-      controls.update(); renderer.render(scene, camera);
+      controls.update();
+      if (noiteAtiva) composer.render(); else renderer.render(scene, camera);
       const bu = bussola.current;
       if (bu) {
         bu.style.display = norte ? "flex" : "none";
