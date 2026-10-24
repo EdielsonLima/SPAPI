@@ -42,6 +42,9 @@ export interface ConfigTorre {
   local?: LocalEntorno;
   // Planta humanizada do apartamento tipo (botão "Ver planta" no card do 3D).
   planta?: PlantaTipo;
+  // Mês previsto das chaves ("AAAA-MM"), usado pelo modal Condições quando
+  // o empreendimento ainda não tem condições salvas com a data.
+  entrega?: string;
 }
 
 // A imagem é a do final que NÃO é espelhado; os finais em `espelhar` mostram
@@ -176,6 +179,8 @@ export const CONFIG_PALACIO: ConfigTorre = {
     },
     // Fotos dos ambientes: tabela plantas_fotos (chave = local.chave), gerenciadas na tela.
   },
+  // Site: entrega prevista entre 2029 e 2030 (lançamento).
+  entrega: "2029-12",
   local: { chave: "palacio-elizabeth", rua: "2950", numero: 255, ruaFundos: "2970", bbox: [-27.05, -48.665, -26.95, -48.59], site: "https://silvapacker.com.br/empreendimentos/palacio-elizabeth/" },
   base: {
     // Corte: salas comerciais + mezanino até +5,40, 4 garagens, lazer a +16,00.

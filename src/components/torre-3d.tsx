@@ -13,13 +13,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useTheme } from "next-themes";
-import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX } from "lucide-react";
+import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX, Banknote } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import { VERSAO_ENTORNO, type DadosEntorno } from "@/lib/entorno-osm";
 import { AndamentoObraCard } from "@/components/andamento-obra-card";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import PlantaDollhouse from "@/components/planta-dollhouse";
 import PlantaFotos from "@/components/planta-fotos";
+import CondicoesPagamentoModal from "@/components/condicoes-pagamento";
+import { chaveDoEmpreendimento } from "@/lib/condicoes-pagamento";
 
 // Música de fundo do 3D: faixa e volume (ver public/audio/LEIA-ME.md).
 const MUSICA_URL = "/audio/quadro-3d-ambiente.mp3";
@@ -71,8 +73,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   const etiqueta = useRef<HTMLDivElement>(null);
   const bussola = useRef<HTMLDivElement>(null);
   const [plantaAberta, setPlantaAberta] = useState(false);
+  const [condicoesAbertas, setCondicoesAbertas] = useState(false);
   const [abaPlanta, setAbaPlanta] = useState<"planta" | "tour" | "fotos">("planta");
-  useEffect(() => { setPlantaAberta(false); }, [selecionada]); // outra unidade = planta fechada
+  useEffect(() => { setPlantaAberta(false); setCondicoesAbertas(false); }, [selecionada]); // outra unidade = planta/condições fechadas
   const [fonteMapa, setFonteMapa] = useState("");
   const [avisoMapa, setAvisoMapa] = useState(""); // "carregando…" / "indisponível": o mapa não falha calado
   // Filtro da legenda (Edielson, 23/10: tem de funcionar na tela cheia, onde
@@ -678,6 +681,11 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
             {mostrarValores && sel.u.valor > 0 && <div className="flex justify-between"><dt className="text-slate-500">Valor no contrato</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.valor)}</dd></div>}
             {mostrarValores && sel.u.preco > 0 && <div className="flex justify-between"><dt className="text-slate-500">Preço de tabela</dt><dd className="font-semibold tabular-nums">{formatCurrency(sel.u.preco)}</dd></div>}
           </dl>
+          {!temDono(sel.u.situacao) && (
+            <button type="button" onClick={() => setCondicoesAbertas(true)} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700">
+              <Banknote className="h-3.5 w-3.5" /> Valor e condições
+            </button>
+          )}
           {plantaDaUnidade(cfg, sel.u.unit) && (
             <button type="button" onClick={() => setPlantaAberta(true)} className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
               <LayoutGrid className="h-3.5 w-3.5" /> Ver planta
@@ -689,6 +697,17 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
             </button>
           )}
         </div>
+      )}
+      {/* Valor e condições da unidade disponível: preço de tabela, condições do
+          empreendimento (simuláveis; editores salvam o padrão) e fluxo de pagamento. */}
+      {sel && !temDono(sel.u.situacao) && (
+        <Dialog open={condicoesAbertas} onOpenChange={setCondicoesAbertas}>
+          <DialogContent container={cheia ? caixa.current : undefined} className="max-h-[92vh] max-w-5xl gap-3 overflow-y-auto p-5 dark:bg-slate-900">
+            <DialogTitle className="text-base">Apartamento {sel.u.unit} · {sel.u.andar}º andar · {empreendimento}</DialogTitle>
+            <DialogDescription className="text-xs">Valor de tabela, condições de pagamento e fluxo. Os campos podem ser alterados para simular uma proposta.</DialogDescription>
+            <CondicoesPagamentoModal chave={chaveDoEmpreendimento(cfg.local?.chave, empreendimento)} empreendimento={empreendimento} unidade={sel.u.unit} andar={sel.u.andar} posicao={descricaoDaPosicao(sel.indice, sel.total)} area={sel.u.area} preco={sel.u.preco} entregaConfig={cfg.entrega} />
+          </DialogContent>
+        </Dialog>
       )}
       {/* Planta humanizada: abre dentro da área do 3D (não tira da tela cheia).
           Abas: Planta (imagem), Tour 3D (maquete da planta) e Fotos (banco, editável na tela). */}

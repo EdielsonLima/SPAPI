@@ -1375,3 +1375,17 @@ export async function apagarFotoPlanta(id: number): Promise<boolean> {
   const r = await pool.query(`DELETE FROM plantas_fotos WHERE id = $1`, [id]);
   return (r.rowCount ?? 0) > 0;
 }
+
+// ─── Condições de pagamento por empreendimento (Quadro Espelho 3D › Condições) ─
+export async function lerCondicoesPagamento(chave: string): Promise<{ dados: Record<string, unknown>; atualizadoPor: string; atualizadoEm: string } | null> {
+  const { rows } = await pool.query(`SELECT dados, atualizado_por, atualizado_em FROM condicoes_pagamento WHERE chave = $1`, [chave]);
+  if (!rows[0]) return null;
+  return { dados: rows[0].dados, atualizadoPor: rows[0].atualizado_por, atualizadoEm: new Date(rows[0].atualizado_em).toISOString() };
+}
+
+export async function salvarCondicoesPagamento(chave: string, dados: object, por: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO condicoes_pagamento (chave, dados, atualizado_por, atualizado_em) VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (chave) DO UPDATE SET dados = EXCLUDED.dados, atualizado_por = EXCLUDED.atualizado_por, atualizado_em = NOW()`,
+    [chave, JSON.stringify(dados), por]);
+}

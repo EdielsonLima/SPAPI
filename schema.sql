@@ -343,3 +343,14 @@ CREATE TABLE IF NOT EXISTS plantas_fotos (
   criado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_plantas_fotos_chave ON plantas_fotos (chave, ordem, id);
+
+-- ── Condições de pagamento por empreendimento (modal "Condições" do 3D) ─────
+-- dados = JSON com sinalPct, mensaisPct/Qtd, baloesPct/Qtd, chavesPct, saldoQtd,
+-- entrega (AAAA-MM), correcao, observacoes (src/lib/condicoes-pagamento.ts).
+-- Edita quem edita a tabela de preços (TABELA_PRECOS_EMAILS).
+CREATE TABLE IF NOT EXISTS condicoes_pagamento (
+  chave VARCHAR(60) PRIMARY KEY,
+  dados JSONB NOT NULL,
+  atualizado_por TEXT NOT NULL DEFAULT '',
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);

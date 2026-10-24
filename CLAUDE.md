@@ -225,6 +225,18 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   tabela nunca foi usada); apagar tudo não faz o seed voltar.
   Planta de outro empreendimento: rodar o script, marcar os ambientes e
   cadastrar `planta.tour` na config dele; as fotos entram pela tela.
+  **Valor e condições** (Edielson, 24/10; botão verde no card da unidade
+  sem dono): modal com preço de tabela (`u.preco`), R$/m², condições de
+  pagamento do empreendimento e fluxo (quando/quanto). Regras puras em
+  `src/lib/condicoes-pagamento.ts` (trava `condicoes-pagamento.test.ts`):
+  sinal + mensais até as chaves + balões anuais + chaves + saldo (calculado,
+  fecha 100%) em N parcelas após as chaves; mês das chaves vem das condições
+  salvas, senão de `ConfigTorre.entrega` ("2029-12" no Palácio), senão é
+  estimado. Guardadas em `condicoes_pagamento` (chave = `local.chave` ou
+  nome do Sienge em slug) via `/api/condicoes-pagamento`; qualquer um simula
+  na tela, salva quem edita a tabela de preços (`TABELA_PRECOS_EMAILS`).
+  "Copiar resumo" gera texto para WhatsApp/e-mail. Sem preço de tabela o
+  modal avisa e manda cadastrar em Comercial › Tabela de preços.
   **Música de fundo** (Edielson, 24/10): `public/audio/quadro-3d-ambiente.mp3`
   ("Elegant Piano", leberch, Pixabay Content License — fonte e termos em
   `public/audio/LEIA-ME.md`). Toca em loop a 70% (faixa normalizada a -16 LUFS) ao entrar na tela cheia
