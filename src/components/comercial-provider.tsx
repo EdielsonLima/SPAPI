@@ -15,6 +15,7 @@
 //    anos de contas a pagar só para montar a lista). Nenhuma marcada = todas,
 //    então os totais são os mesmos.
 
+import { normalizarTabelaComercial, type TabelaComercial } from "@/lib/tabela-comercial";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { SiengeSalesContract } from "@/types/sienge";
@@ -64,6 +65,8 @@ interface ComercialContextValue {
   toggleInSet: (setter: SetS, name: string) => void;
   // Tabela de preços (painel): unitId do Sienge → preço; quem pode editar.
   precosTabela: Map<number, number>;
+  // Tabela comercial manual (disponíveis + preços do diretor comercial), por chave do empreendimento.
+  tabelasComerciais: Map<string, TabelaComercial>;
   podeEditarPrecos: boolean;
   recarregarPrecos: () => Promise<void>;
 }
@@ -249,6 +252,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
   }, [allCompanyNames]);
 
   const [precosTabela, setPrecosTabela] = useState<Map<number, number>>(new Map());
+  const [tabelasComerciais, setTabelasComerciais] = useState<Map<string, TabelaComercial>>(new Map());
   const [podeEditarPrecos, setPodeEditarPrecos] = useState(false);
   const recarregarPrecos = useCallback(async () => {
     try {
@@ -258,6 +262,12 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
       setPrecosTabela(new Map((d.precos || []).map(p => [p.unitId, p.valor])));
       setPodeEditarPrecos(Boolean(d.podeEditar));
     } catch { /* sem tabela: o quadro só não mostra preço */ }
+    try {
+      const r = await fetch("/api/tabela-comercial");
+      if (!r.ok) return;
+      const d = await r.json() as { tabelas?: Record<string, Partial<TabelaComercial>> };
+      setTabelasComerciais(new Map(Object.entries(d.tabelas || {}).map(([k, v]) => [k, normalizarTabelaComercial(v)])));
+    } catch { /* sem tabela comercial: vale o Sienge */ }
   }, []);
   useEffect(() => { recarregarPrecos(); }, [recarregarPrecos]);
 
@@ -278,7 +288,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
     selectedUnitCustomers, setSelectedUnitCustomers,
     toggleInSet,
-    precosTabela, podeEditarPrecos, recarregarPrecos,
+    precosTabela, tabelasComerciais, podeEditarPrecos, recarregarPrecos,
   };
 
   return <ComercialContext.Provider value={value}>{children}</ComercialContext.Provider>;

@@ -237,6 +237,21 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   na tela, salva quem edita a tabela de preços (`TABELA_PRECOS_EMAILS`).
   "Copiar resumo" gera texto para WhatsApp/e-mail. Sem preço de tabela o
   modal avisa e manda cadastrar em Comercial › Tabela de preços.
+  **Tabela comercial manual** (Edielson, 24/10; PDF do Guberto, diretor
+  comercial): tabela `tabela_comercial` (chave = nome do Sienge em slug,
+  `chaveDoEmpreendimento`), JSON com `disponiveis` (unidades à venda),
+  `precos` por unidade, `referencia` e `entrega`. Regra
+  (`src/lib/tabela-comercial.ts`, trava `tabela-comercial.test.ts`): listada =
+  Disponível; não listada e Disponível/Reservado/Proposta no Sienge = Vendido;
+  Vendido/Permutante do Sienge ficam. Aplicada em `comercial-view.tsx`
+  (Quadro, Espelho, 3D, contagens) e o preço do painel cai no da tabela
+  comercial quando a unidade não tem preço. Edição na tela Tabela de preços
+  (card âmbar + coluna "Tabela comercial", só editores), com "Aplicar preços
+  à tabela de preços" (grava com histórico). Seed único do Palácio em
+  `scripts/dados/tabela-comercial-palacio-2026-10.json` pelo `migrate.js`
+  (12 à venda: 102, 201, 301, 401, 402, 501, 502, 601, 602, 1202, 3102, 3202).
+  Condições reais da mesma tabela em `CONFIG_PALACIO.condicoes` (10% +
+  saldo em 100×, entrega 2030-12) = referência do modal até alguém salvar.
   **Música de fundo** (Edielson, 24/10): `public/audio/quadro-3d-ambiente.mp3`
   ("Elegant Piano", leberch, Pixabay Content License — fonte e termos em
   `public/audio/LEIA-ME.md`). Toca em loop a 70% (faixa normalizada a -16 LUFS) ao entrar na tela cheia

@@ -1,0 +1,28 @@
+{
+  "_fonte": "PALACIO ELIZABETH - TABELA COMERCIAL OUTUBRO 2026.pdf (Guberto, diretor comercial; recebido do Edielson em 24/10/2026). Vermelho = disponível; cinza = vendido. Semeado uma vez pelo scripts/migrate.js na tabela tabela_comercial (chave palacio-elizabeth); depois, quem manda é a tela Tabela de preços.",
+  "chave": "palacio-elizabeth",
+  "dados": {
+    "referencia": "Tabela comercial · outubro/2026 (Guberto)",
+    "entrega": "2030-12",
+    "disponiveis": ["AP102", "AP201", "AP301", "AP401", "AP402", "AP501", "AP502", "AP601", "AP602", "AP1202", "AP3102", "AP3202"],
+    "precos": {
+      "AP102": 4950000,
+      "AP201": 4350000,
+      "AP301": 4350000,
+      "AP401": 4500000,
+      "AP402": 4500000,
+      "AP501": 4500000,
+      "AP502": 4500000,
+      "AP601": 4500000,
+      "AP602": 4500000,
+      "AP701": 4500000,
+      "AP1202": 4750000,
+      "AP3102": 5100000,
+      "AP3202": 5100000
+    }
+  },
+  "condicoes": {
+    "_nota": "Da mesma tabela: 10% de entrada, saldo em 100x; correção CUB/Sinduscon-SC até a entrega, poupança + 1% ao mês depois; 4ª vaga R$ 150.000; comissão 5% sobre valores em dinheiro; mobília das áreas comuns 20 CUBs por unidade. Vai para ConfigTorre.condicoes (src/lib/torre-3d.ts).",
+    "sinalPct": 10, "mensaisPct": 90, "mensaisQtd": 100, "baloesPct": 0, "baloesQtd": 0, "chavesPct": 0, "saldoQtd": 0, "entrega": "2030-12"
+  }
+}

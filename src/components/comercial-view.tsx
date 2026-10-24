@@ -28,6 +28,8 @@ import { MultiSelectFilter } from "@/components/multi-select-filter";
 import { CorretoresView } from "@/components/corretores-view";
 import { TabelaPrecosView } from "@/components/tabela-precos-view";
 import { semVenda } from "@/lib/tabela-precos";
+import { aplicarTabelaComercial, precoDaTabelaComercial } from "@/lib/tabela-comercial";
+import { chaveDoEmpreendimento } from "@/lib/condicoes-pagamento";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
@@ -67,7 +69,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     selectedUnitEnterprises, setSelectedUnitEnterprises,
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
     selectedUnitCustomers, setSelectedUnitCustomers,
-    toggleInSet, precosTabela,
+    toggleInSet, precosTabela, tabelasComerciais,
   } = useComercial();
   // Vendas: contar por unidade (padrão, como no Financeiro da Leven) ou por contrato.
   const [contarPor, setContarPor] = React.useState<"unidades" | "contratos">("unidades");
@@ -327,10 +329,17 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
       const k = `${u.enterprise}||${u.unit}`;
       if (contratoPorUnidade.has(k)) setFichaKey(k);
     };
-    // Situação do Quadro (cor/legenda): estoque do Sienge + permuta pura = Permutante.
-    allUnits.forEach(u => { u.situacao = situacaoDaUnidade(u.status, u.permuta); });
-    // Preço de tabela (painel) só vale para unidade sem venda; a vendida mostra o contrato.
-    const precoTabela = (u: UnitRecord) => (u.unitId != null && semVenda(u.status) ? precosTabela.get(u.unitId) ?? 0 : 0);
+    // Situação do Quadro (cor/legenda): estoque do Sienge + permuta pura = Permutante;
+    // por cima, a tabela comercial manual do empreendimento (listada = Disponível,
+    // não listada e livre no Sienge = Vendido) — src/lib/tabela-comercial.ts.
+    const tabelaComercialDe = (u: UnitRecord) => tabelasComerciais.get(chaveDoEmpreendimento(undefined, u.enterprise));
+    allUnits.forEach(u => { u.situacao = aplicarTabelaComercial(situacaoDaUnidade(u.status, u.permuta), u.unit, tabelaComercialDe(u)); });
+    // Preço de tabela (painel) só vale para unidade sem venda; a vendida mostra o
+    // contrato. Sem preço no painel, vale o da tabela comercial manual.
+    const precoTabela = (u: UnitRecord) => {
+      if (u.unitId == null || !(semVenda(u.status) || u.situacao === "Disponível")) return 0;
+      return precosTabela.get(u.unitId) || precoDaTabelaComercial(u.unit, tabelaComercialDe(u)) || 0;
+    };
 
     // Planilha das unidades vendidas (Vendas › Exportar Excel): uma linha por
     // unidade dos contratos filtrados (respeita Tipo Imóvel) + aba com o

@@ -57,6 +57,24 @@ async function migrate() {
     await pool.query(sql);
     console.log("[migrate] Done — all tables ready.");
 
+    // Seed da tabela comercial do Palácio Elizabeth (PDF do Guberto, out/2026):
+    // entra UMA vez, só enquanto não existe linha para a chave. Depois quem
+    // manda é a tela Tabela de preços › Tabela comercial.
+    try {
+      const arq = path.join(__dirname, "dados", "tabela-comercial-palacio-2026-10.json");
+      if (fs.existsSync(arq)) {
+        const j = JSON.parse(fs.readFileSync(arq, "utf-8"));
+        const { rows } = await pool.query(`SELECT 1 FROM tabela_comercial WHERE chave = $1`, [j.chave]);
+        if (rows.length === 0) {
+          await pool.query(`INSERT INTO tabela_comercial (chave, dados, atualizado_por) VALUES ($1, $2, $3)`,
+            [j.chave, JSON.stringify(j.dados), "seed: tabela comercial out/2026 (Guberto)"]);
+          console.log(`[migrate] tabela_comercial: seed de ${j.chave} (${j.dados.disponiveis.length} disponíveis).`);
+        }
+      }
+    } catch (e) {
+      console.warn("[migrate] tabela_comercial seed:", e.message);
+    }
+
     // Seed único das fotos da planta do Palácio Elizabeth (24/10/2026): os
     // renders em public/modelos/palacio-fotos entram no banco UMA vez (só
     // enquanto a sequência da tabela nunca foi usada). Depois disso quem manda

@@ -19,11 +19,12 @@ interface Props {
   area: number;
   preco: number;            // preço de tabela (0 = sem preço)
   entregaConfig?: string;   // "AAAA-MM" da config do 3D, usado quando não há mês salvo
+  condicoesConfig?: Partial<CondicoesPagamento>; // referência do empreendimento (tabela comercial) enquanto nada foi salvo
 }
 
 type Resposta = { podeEditar: boolean; cadastrada: boolean; condicoes: CondicoesPagamento; atualizadoPor: string | null; atualizadoEm: string | null };
 
-export default function CondicoesPagamentoModal({ chave, empreendimento, unidade, andar, posicao, area, preco, entregaConfig }: Props) {
+export default function CondicoesPagamentoModal({ chave, empreendimento, unidade, andar, posicao, area, preco, entregaConfig, condicoesConfig }: Props) {
   const [base, setBase] = useState<Resposta | null>(null);
   const [c, setC] = useState<CondicoesPagamento | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -39,16 +40,21 @@ export default function CondicoesPagamentoModal({ chave, empreendimento, unidade
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         const j: Resposta = await r.json();
         if (!vivo) return;
-        const cond = { ...j.condicoes, entrega: j.condicoes.entrega || entregaConfig || "" };
-        setBase(j); setC(cond);
+        // Sem condições salvas, vale a referência do empreendimento (tabela comercial) sobre o padrão.
+        const ref = j.cadastrada ? j.condicoes : { ...j.condicoes, ...(condicoesConfig || {}) };
+        const cond = { ...ref, entrega: ref.entrega || entregaConfig || "" };
+        setBase({ ...j, condicoes: ref }); setC(cond);
       } catch (e) {
         if (!vivo) return;
         setErro("Não consegui carregar as condições (" + (e instanceof Error ? e.message : "erro") + "). Mostrando as de referência.");
-        setBase({ podeEditar: false, cadastrada: false, condicoes: CONDICOES_PADRAO, atualizadoPor: null, atualizadoEm: null });
-        setC({ ...CONDICOES_PADRAO, entrega: entregaConfig || "" });
+        const ref = { ...CONDICOES_PADRAO, ...(condicoesConfig || {}) };
+        setBase({ podeEditar: false, cadastrada: false, condicoes: ref, atualizadoPor: null, atualizadoEm: null });
+        setC({ ...ref, entrega: ref.entrega || entregaConfig || "" });
       }
     })();
     return () => { vivo = false; };
+    // condicoesConfig é estático por empreendimento.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chave, entregaConfig]);
 
   const invalido = c ? validarCondicoes(c) : null;
@@ -106,7 +112,7 @@ export default function CondicoesPagamentoModal({ chave, empreendimento, unidade
         <section className="rounded-xl border border-slate-200 p-4 dark:border-slate-700">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="text-sm font-bold">Condições de pagamento</h3>
-            {base.cadastrada ? <span className="text-[10px] text-slate-500">padrão do empreendimento{base.atualizadoPor ? ` · ${base.atualizadoPor.split("@")[0]}` : ""}</span> : <span className="text-[10px] text-amber-700 dark:text-amber-300">valores de referência, não cadastrados</span>}
+            {base.cadastrada ? <span className="text-[10px] text-slate-500">padrão do empreendimento{base.atualizadoPor ? ` · ${base.atualizadoPor.split("@")[0]}` : ""}</span> : <span className="text-[10px] text-amber-700 dark:text-amber-300">{condicoesConfig ? "referência da tabela comercial, ainda não salva" : "valores de referência, não cadastrados"}</span>}
           </div>
           <table className="w-full text-xs">
             <tbody>

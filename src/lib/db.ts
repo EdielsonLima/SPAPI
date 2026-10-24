@@ -1389,3 +1389,17 @@ export async function salvarCondicoesPagamento(chave: string, dados: object, por
      ON CONFLICT (chave) DO UPDATE SET dados = EXCLUDED.dados, atualizado_por = EXCLUDED.atualizado_por, atualizado_em = NOW()`,
     [chave, JSON.stringify(dados), por]);
 }
+
+// ─── Tabela comercial manual por empreendimento (disponíveis + preços do comercial) ─
+export async function lerTabelasComerciais(): Promise<{ chave: string; dados: Record<string, unknown>; atualizadoPor: string; atualizadoEm: string }[]> {
+  const { rows } = await pool.query(`SELECT chave, dados, atualizado_por, atualizado_em FROM tabela_comercial ORDER BY chave`);
+  return rows.map((r: { chave: string; dados: Record<string, unknown>; atualizado_por: string; atualizado_em: Date }) =>
+    ({ chave: r.chave, dados: r.dados, atualizadoPor: r.atualizado_por, atualizadoEm: new Date(r.atualizado_em).toISOString() }));
+}
+
+export async function salvarTabelaComercial(chave: string, dados: object, por: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO tabela_comercial (chave, dados, atualizado_por, atualizado_em) VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (chave) DO UPDATE SET dados = EXCLUDED.dados, atualizado_por = EXCLUDED.atualizado_por, atualizado_em = NOW()`,
+    [chave, JSON.stringify(dados), por]);
+}

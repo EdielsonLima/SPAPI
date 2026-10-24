@@ -9,6 +9,7 @@
 // espelhados, sala e sacada no canto de dentro — as duas sacadas se encontram
 // no meio da frente, como na perspectiva da fachada.
 
+import type { CondicoesPagamento } from "@/lib/condicoes-pagamento";
 import type { LocalEntorno } from "@/lib/entorno-osm";
 
 export interface ConfigTorre {
@@ -45,6 +46,9 @@ export interface ConfigTorre {
   // Mês previsto das chaves ("AAAA-MM"), usado pelo modal Condições quando
   // o empreendimento ainda não tem condições salvas com a data.
   entrega?: string;
+  // Condições de pagamento de referência do empreendimento (tabela comercial),
+  // usadas pelo modal Condições enquanto não há condições salvas no banco.
+  condicoes?: Partial<CondicoesPagamento>;
 }
 
 // A imagem é a do final que NÃO é espelhado; os finais em `espelhar` mostram
@@ -179,8 +183,16 @@ export const CONFIG_PALACIO: ConfigTorre = {
     },
     // Fotos dos ambientes: tabela plantas_fotos (chave = local.chave), gerenciadas na tela.
   },
-  // Site: entrega prevista entre 2029 e 2030 (lançamento).
-  entrega: "2029-12",
+  // Tabela comercial de outubro/2026 (Guberto): previsão de entrega 2030;
+  // 10% de entrada e saldo em 100×; correção CUB/Sinduscon-SC até a entrega,
+  // depois poupança + 1% ao mês; 4ª vaga R$ 150 mil; comissão 5% sobre
+  // valores em dinheiro; mobília das áreas comuns 20 CUBs por unidade.
+  entrega: "2030-12",
+  condicoes: {
+    sinalPct: 10, mensaisPct: 90, mensaisQtd: 100, baloesPct: 0, baloesQtd: 0, chavesPct: 0, saldoQtd: 0, entrega: "2030-12",
+    correcao: "Valores corrigidos até a entrega pelo CUB/Sinduscon-SC; após a entrega, poupança + 1% ao mês.",
+    observacoes: "Tabela comercial de outubro/2026. 4ª vaga de garagem: R$ 150.000,00. Comissão de 5% sobre os valores em dinheiro (descontam-se bens, imóveis e móveis). Mobília das áreas comuns: 20 CUBs por unidade.",
+  },
   local: { chave: "palacio-elizabeth", rua: "2950", numero: 255, ruaFundos: "2970", bbox: [-27.05, -48.665, -26.95, -48.59], site: "https://silvapacker.com.br/empreendimentos/palacio-elizabeth/" },
   base: {
     // Corte: salas comerciais + mezanino até +5,40, 4 garagens, lazer a +16,00.

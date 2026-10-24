@@ -26,6 +26,12 @@ import {
   aplicarReajuste, descreverReajuste, lerDecimalBR, lerValorBR, precoPorM2, semVenda, validarReajuste,
   mascararValorBR, completarCentavosBR, type Reajuste,
 } from "@/lib/tabela-precos";
+import { normalizarTabelaComercial, aplicarTabelaComercial, TABELA_COMERCIAL_VAZIA, type TabelaComercial } from "@/lib/tabela-comercial";
+import { chaveDoEmpreendimento } from "@/lib/condicoes-pagamento";
+import { situacaoDaUnidade } from "@/lib/situacao-unidade";
+
+// Situação do Quadro a partir do estoque do Sienge (sem permuta: a tela não tem o contrato).
+const situacaoBase = (status: string) => situacaoDaUnidade(status, false);
 import { Building2, History, Lock, Percent, Save, Search, Tag, TrendingUp, Undo2, Wand2 } from "lucide-react";
 
 type Linha = {
@@ -93,7 +99,7 @@ function InputReais({ value, onChange, permitirNegativo = false, className = "",
 }
 
 export function TabelaPrecosView() {
-  const { apiUnits, precosTabela, podeEditarPrecos, recarregarPrecos, cubData } = useComercial();
+  const { apiUnits, precosTabela, tabelasComerciais, podeEditarPrecos, recarregarPrecos, cubData } = useComercial();
 
   // ── Filtros ──
   const empreendimentos = useMemo(
@@ -196,6 +202,57 @@ export function TabelaPrecosView() {
   const linhasSelecionadas = linhasEmpreendimento
     .filter(l => selecionadas.has(l.unitId))
     .sort((a, b) => a.unidade.localeCompare(b.unidade, "pt-BR", { numeric: true }));
+
+  // ── Tabela comercial manual (do diretor comercial) do empreendimento ──
+  const chaveEmp = chaveDoEmpreendimento(undefined, empreendimento);
+  const tcSalva = tabelasComerciais.get(chaveEmp) ?? null;
+  const [tc, setTc] = useState<TabelaComercial>(TABELA_COMERCIAL_VAZIA);
+  const [tcPrecosTxt, setTcPrecosTxt] = useState<Map<string, string>>(new Map());
+  useEffect(() => { setTc(tcSalva ?? TABELA_COMERCIAL_VAZIA); setTcPrecosTxt(new Map()); }, [tcSalva, empreendimento]);
+  const tcEfetiva = useMemo(() => {
+    const precos = { ...tc.precos };
+    tcPrecosTxt.forEach((txt, unidade) => { const v = lerValorBR(txt.trim()); if (txt.trim() === "") delete precos[unidade]; else if (v !== null && v > 0) precos[unidade] = v; });
+    return normalizarTabelaComercial({ ...tc, precos });
+  }, [tc, tcPrecosTxt]);
+  const tcAlterada = JSON.stringify(tcEfetiva) !== JSON.stringify(tcSalva ?? TABELA_COMERCIAL_VAZIA);
+  const tcExiste = !!tcSalva || tcAlterada;
+  const [salvandoTc, setSalvandoTc] = useState(false);
+  const alternarDisponivel = (unidade: string) => setTc(t => {
+    const u = unidade.toUpperCase();
+    const disponiveis = t.disponiveis.includes(u) ? t.disponiveis.filter(x => x !== u) : [...t.disponiveis, u];
+    return { ...t, disponiveis };
+  });
+  const salvarTc = async () => {
+    setSalvandoTc(true);
+    try {
+      const r = await fetch("/api/tabela-comercial", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chave: chaveEmp, dados: tcEfetiva }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Falha ao salvar a tabela comercial.");
+      toast.success("Tabela comercial salva. O Quadro e o 3D já usam esta lista.");
+      await recarregarPrecos();
+      setTcPrecosTxt(new Map());
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao salvar.");
+    } finally { setSalvandoTc(false); }
+  };
+  // Leva os preços da tabela comercial para a tabela de preços do painel (com histórico).
+  const aplicarPrecosTc = async () => {
+    const itens = linhasEmpreendimento
+      .filter(l => tcEfetiva.precos[l.unidade.toUpperCase()] > 0 && tcEfetiva.precos[l.unidade.toUpperCase()] !== l.preco)
+      .map(l => ({ unitId: l.unitId, enterpriseId: l.enterpriseId, unidade: l.unidade, valor: tcEfetiva.precos[l.unidade.toUpperCase()] }));
+    if (itens.length === 0) { toast.message("A tabela de preços já tem os valores da tabela comercial."); return; }
+    setSalvandoTc(true);
+    try {
+      const r = await fetch("/api/tabela-precos", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tipo: "manual", descricao: `Tabela comercial: ${tcEfetiva.referencia || "manual"}`, itens }) });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || "Falha ao aplicar.");
+      toast.success(`${d.alteradas} preço(s) levados da tabela comercial para a tabela de preços.`);
+      await recarregarPrecos();
+      carregarHistorico();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao aplicar.");
+    } finally { setSalvandoTc(false); }
+  };
 
   // ── Ordenação ──
   type Coluna = "unidade" | "tipo" | "pavimento" | "area" | "status" | "preco" | "m2";
@@ -383,6 +440,36 @@ export function TabelaPrecosView() {
         <Kpi rotulo="R$/m² médio" valor={m2Medio ? formatCompactCurrency(m2Medio) : "—"} apoio="unidades com preço" />
       </div>
 
+      {/* Tabela comercial manual: a do diretor comercial, por cima do Sienge */}
+      <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 px-4 py-3 dark:border-amber-500/30 dark:bg-amber-500/5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-800/80 dark:text-amber-300/80">Tabela comercial (manual, por cima do Sienge)</div>
+            {podeEditarPrecos ? (
+              <Input value={tc.referencia} onChange={e => setTc(t => ({ ...t, referencia: e.target.value }))} placeholder="Referência (ex.: Tabela comercial · outubro/2026)" className="mt-1 h-8 max-w-md bg-white dark:bg-slate-900" aria-label="Referência da tabela comercial" />
+            ) : (
+              <div className="mt-0.5 text-sm font-semibold">{tcSalva?.referencia || "Nenhuma tabela comercial cadastrada"}</div>
+            )}
+            <div className="mt-1 text-[11px] text-muted-foreground">
+              {tcExiste
+                ? `${tcEfetiva.disponiveis.length} unidade(s) à venda pela tabela · ${Object.keys(tcEfetiva.precos).length} com preço · as demais contam como vendidas no Quadro e no 3D.`
+                : "Marque na coluna \"Tabela comercial\" as unidades à venda e o preço de cada uma; o Quadro e o 3D passam a seguir essa lista."}
+              {tcSalva?.entrega ? ` Entrega: ${tcSalva.entrega.split("-").reverse().join("/")}.` : ""}
+            </div>
+          </div>
+          {podeEditarPrecos && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" disabled={salvandoTc || Object.keys(tcEfetiva.precos).length === 0} onClick={aplicarPrecosTc} title="Grava na tabela de preços do painel os valores da tabela comercial (fica no histórico)">
+                Aplicar preços à tabela de preços
+              </Button>
+              <Button size="sm" disabled={!tcAlterada || salvandoTc} onClick={salvarTc}>
+                <Save className="mr-1.5 h-3.5 w-3.5" />{salvandoTc ? "Salvando..." : "Salvar tabela comercial"}
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Ações */}
       {podeEditarPrecos && (
         <div className="flex flex-wrap items-center gap-2">
@@ -418,6 +505,7 @@ export function TabelaPrecosView() {
                 <SortableHead campo="pavimento" {...sortProps}>Pavimento</SortableHead>
                 <SortableHead campo="area" {...sortProps} className="text-right">Área</SortableHead>
                 <SortableHead campo="status" {...sortProps}>Status</SortableHead>
+                <TableHead>Tabela comercial</TableHead>
                 <SortableHead campo="preco" {...sortProps} className="text-right">Preço de tabela</SortableHead>
                 <SortableHead campo="m2" {...sortProps} className="text-right">R$/m²</SortableHead>
                 <TableHead className="w-10" />
@@ -425,7 +513,7 @@ export function TabelaPrecosView() {
             </TableHeader>
             <TableBody>
               {sorted.length === 0 && (
-                <TableRow><TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">Nenhuma unidade para os filtros atuais.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={10} className="py-8 text-center text-sm text-muted-foreground">Nenhuma unidade para os filtros atuais.</TableCell></TableRow>
               )}
               {sorted.map(l => {
                 const v = valorEfetivo(l);
@@ -440,7 +528,32 @@ export function TabelaPrecosView() {
                     <TableCell className="text-muted-foreground">{l.tipo}</TableCell>
                     <TableCell className="tabular-nums text-muted-foreground">{l.pavimento || "—"}</TableCell>
                     <TableCell className="text-right tabular-nums">{l.area ? `${numeroBR(l.area)} m²` : "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{l.status}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {l.status}
+                      {tcExiste && (() => { const sit = aplicarTabelaComercial(situacaoBase(l.status), l.unidade, tcEfetiva); return sit !== situacaoBase(l.status) ? <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200" title="Pela tabela comercial">{sit} (tabela)</span> : null; })()}
+                    </TableCell>
+                    <TableCell>
+                      {podeEditarPrecos ? (
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1.5 text-xs" title="À venda pela tabela comercial">
+                            <Checkbox checked={tcEfetiva.disponiveis.includes(l.unidade.toUpperCase())} onCheckedChange={() => alternarDisponivel(l.unidade)} aria-label={`${l.unidade} à venda pela tabela comercial`} />
+                            à venda
+                          </label>
+                          <InputReais
+                            value={tcPrecosTxt.has(l.unidade.toUpperCase()) ? tcPrecosTxt.get(l.unidade.toUpperCase())! : tc.precos[l.unidade.toUpperCase()] ? numeroBR(tc.precos[l.unidade.toUpperCase()]) : ""}
+                            placeholder="preço da tabela"
+                            onChange={t => setTcPrecosTxt(prev => new Map(prev).set(l.unidade.toUpperCase(), t))}
+                            aria-label={`Preço da tabela comercial da unidade ${l.unidade}`}
+                            className="h-8 w-36 [&_input]:h-8"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-xs tabular-nums">
+                          {tcEfetiva.disponiveis.includes(l.unidade.toUpperCase()) ? "à venda" : tcExiste ? "—" : ""}
+                          {tcEfetiva.precos[l.unidade.toUpperCase()] ? ` · ${formatCurrency(tcEfetiva.precos[l.unidade.toUpperCase()])}` : ""}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       {podeEditarPrecos ? (
                         <InputReais

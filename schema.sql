@@ -354,3 +354,15 @@ CREATE TABLE IF NOT EXISTS condicoes_pagamento (
   atualizado_por TEXT NOT NULL DEFAULT '',
   atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- ── Tabela comercial manual por empreendimento (Tabela de preços › Tabela comercial) ──
+-- dados = JSON { referencia, disponiveis: ["AP602", …], precos: { "AP602": 4500000, … },
+-- entrega? } (src/lib/tabela-comercial.ts). Manda por cima do Sienge no Quadro/3D:
+-- listada = Disponível; não listada e livre no Sienge = Vendido. Chave = nome do
+-- empreendimento no Sienge em slug (palacio-elizabeth). Edita quem edita preços.
+CREATE TABLE IF NOT EXISTS tabela_comercial (
+  chave VARCHAR(60) PRIMARY KEY,
+  dados JSONB NOT NULL,
+  atualizado_por TEXT NOT NULL DEFAULT '',
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);

@@ -718,7 +718,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           <DialogContent container={cheia ? caixa.current : undefined} className="max-h-[92vh] max-w-5xl gap-3 overflow-y-auto p-5 dark:bg-slate-900">
             <DialogTitle className="text-base">Apartamento {sel.u.unit} · {sel.u.andar}º andar · {empreendimento}</DialogTitle>
             <DialogDescription className="text-xs">Valor de tabela, condições de pagamento e fluxo. Os campos podem ser alterados para simular uma proposta.</DialogDescription>
-            <CondicoesPagamentoModal chave={chaveDoEmpreendimento(cfg.local?.chave, empreendimento)} empreendimento={empreendimento} unidade={sel.u.unit} andar={sel.u.andar} posicao={descricaoDaPosicao(sel.indice, sel.total)} area={sel.u.area} preco={sel.u.preco} entregaConfig={cfg.entrega} />
+            <CondicoesPagamentoModal chave={chaveDoEmpreendimento(cfg.local?.chave, empreendimento)} empreendimento={empreendimento} unidade={sel.u.unit} andar={sel.u.andar} posicao={descricaoDaPosicao(sel.indice, sel.total)} area={sel.u.area} preco={sel.u.preco} entregaConfig={cfg.entrega} condicoesConfig={cfg.condicoes} />
           </DialogContent>
         </Dialog>
       )}

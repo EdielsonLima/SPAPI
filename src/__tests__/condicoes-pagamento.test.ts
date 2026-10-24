@@ -45,10 +45,23 @@ assert.equal(f.aposChaves, 1_000_000);
 // Soma das etapas = preço (sem perder centavos no total).
 assert.equal(f.etapas.reduce((s, e) => s + e.total, 0), 2_000_000);
 
-// Mensais e balões são cortados pelas chaves quando a entrega é perto.
+// Entrega perto (6 meses): mensais e balões seguem depois das chaves; só o que
+// cai até as chaves conta em "até as chaves".
 const perto = fluxoDePagamento(1_000_000, { ...c, entrega: "2027-04" }, hoje); // 6 meses
-assert.equal(perto.etapas.find(e => e.etapa === "mensais")!.parcelas, 6);
-assert.equal(perto.etapas.find(e => e.etapa === "baloes")!.parcelas, 1);
+assert.equal(perto.etapas.find(e => e.etapa === "mensais")!.parcelas, 24);
+assert.equal(perto.etapas.find(e => e.etapa === "mensais")!.rotulo, "Mensais");
+assert.equal(perto.ateChaves, arredTest(100_000 + 6 * arredTest(200_000 / 24) + 100_000)); // sinal + 6 mensais + chaves (balões só em 12 meses)
+assert.equal(perto.aposChaves, arredTest(1_000_000 - perto.ateChaves));
+
+// Palácio Elizabeth (tabela comercial out/2026): 10% de entrada e saldo em 100×.
+const palacio = fluxoDePagamento(4_500_000, { ...CONDICOES_PADRAO, sinalPct: 10, mensaisPct: 90, mensaisQtd: 100, baloesPct: 0, baloesQtd: 0, chavesPct: 0, saldoQtd: 0, entrega: "2030-12" }, hoje);
+assert.deepEqual(palacio.etapas.map(e => e.etapa), ["sinal", "mensais"]);
+assert.equal(palacio.etapas[0].total, 450_000);
+assert.equal(palacio.etapas[1].parcelas, 100);
+assert.equal(palacio.etapas[1].valorParcela, 40_500);
+assert.equal(palacio.etapas[1].fim, "2035-02");
+assert.equal(palacio.ateChaves, 450_000 + 50 * 40_500); // 50 mensais até dez/2030
+assert.equal(palacio.aposChaves, 50 * 40_500);
 
 // Sem entrega cadastrada: estima pelo fim das mensais/balões (mín. 12 meses).
 const est = fluxoDePagamento(1_000_000, { ...CONDICOES_PADRAO, entrega: "" }, hoje);

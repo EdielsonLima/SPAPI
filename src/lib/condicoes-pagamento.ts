@@ -5,6 +5,7 @@
 // Modelo (percentuais do preço de tabela):
 //   sinal       — % no ato
 //   mensais     — % dividido em N parcelas mensais a partir do mês seguinte
+//                 (podem atravessar as chaves: "saldo em 100×")
 //   balões      — % dividido em N parcelas anuais (12, 24, 36… meses)
 //   chaves      — % na entrega das chaves (mês de `entrega`)
 //   saldo       — o que resta (100 − soma), em N parcelas mensais após as chaves
@@ -109,23 +110,27 @@ export function fluxoDePagamento(preco: number, c: CondicoesPagamento, hoje = ne
   const mesesAteChaves = Math.max(1, mesesEntre(base, entrega));
   const etapas: EtapaFluxo[] = [];
   const valor = (pct: number) => arred(preco * pct / 100);
-  if (c.sinalPct > 0) etapas.push({ etapa: "sinal", rotulo: "Sinal (ato)", pct: c.sinalPct, total: valor(c.sinalPct), parcelas: 0, valorParcela: valor(c.sinalPct), inicio: mesMais(base, 0), fim: mesMais(base, 0), periodicidade: "única" });
+  // R$ de cada etapa que cai até o mês das chaves (inclusive).
+  let ateChaves = 0;
+  if (c.sinalPct > 0) { etapas.push({ etapa: "sinal", rotulo: "Sinal (ato)", pct: c.sinalPct, total: valor(c.sinalPct), parcelas: 0, valorParcela: valor(c.sinalPct), inicio: mesMais(base, 0), fim: mesMais(base, 0), periodicidade: "única" }); ateChaves += valor(c.sinalPct); }
   if (c.mensaisPct > 0 && c.mensaisQtd > 0) {
-    const n = Math.min(c.mensaisQtd, mesesAteChaves); // mensais param nas chaves
-    etapas.push({ etapa: "mensais", rotulo: "Mensais até as chaves", pct: c.mensaisPct, total: valor(c.mensaisPct), parcelas: n, valorParcela: arred(valor(c.mensaisPct) / n), inicio: mesMais(base, 1), fim: mesMais(base, n), periodicidade: "mensal" });
+    const n = c.mensaisQtd, vp = arred(valor(c.mensaisPct) / n);
+    etapas.push({ etapa: "mensais", rotulo: n > mesesAteChaves ? "Mensais" : "Mensais até as chaves", pct: c.mensaisPct, total: valor(c.mensaisPct), parcelas: n, valorParcela: vp, inicio: mesMais(base, 1), fim: mesMais(base, n), periodicidade: "mensal" });
+    ateChaves += n <= mesesAteChaves ? valor(c.mensaisPct) : vp * Math.min(n, mesesAteChaves); // todas antes das chaves = total exato (sem arredondar parcela)
   }
   if (c.baloesPct > 0 && c.baloesQtd > 0) {
-    const n = Math.max(1, Math.min(c.baloesQtd, Math.floor(mesesAteChaves / 12)));
-    etapas.push({ etapa: "baloes", rotulo: n === 1 ? "Balão anual" : "Balões anuais", pct: c.baloesPct, total: valor(c.baloesPct), parcelas: n, valorParcela: arred(valor(c.baloesPct) / n), inicio: mesMais(base, 12), fim: mesMais(base, 12 * n), periodicidade: "anual" });
+    const n = c.baloesQtd, vp = arred(valor(c.baloesPct) / n);
+    etapas.push({ etapa: "baloes", rotulo: n === 1 ? "Balão anual" : "Balões anuais", pct: c.baloesPct, total: valor(c.baloesPct), parcelas: n, valorParcela: vp, inicio: mesMais(base, 12), fim: mesMais(base, 12 * n), periodicidade: "anual" });
+    ateChaves += n <= Math.floor(mesesAteChaves / 12) ? valor(c.baloesPct) : vp * Math.min(n, Math.floor(mesesAteChaves / 12));
   }
-  if (c.chavesPct > 0) etapas.push({ etapa: "chaves", rotulo: "Na entrega das chaves", pct: c.chavesPct, total: valor(c.chavesPct), parcelas: 0, valorParcela: valor(c.chavesPct), inicio: entrega, fim: entrega, periodicidade: "única" });
+  if (c.chavesPct > 0) { etapas.push({ etapa: "chaves", rotulo: "Na entrega das chaves", pct: c.chavesPct, total: valor(c.chavesPct), parcelas: 0, valorParcela: valor(c.chavesPct), inicio: entrega, fim: entrega, periodicidade: "única" }); ateChaves += valor(c.chavesPct); }
   const sp = saldoPct(c);
   if (sp > 0) {
     const n = Math.max(1, c.saldoQtd);
-    etapas.push({ etapa: "saldo", rotulo: n === 1 ? "Saldo após as chaves" : "Saldo após as chaves", pct: sp, total: valor(sp), parcelas: n, valorParcela: arred(valor(sp) / n), inicio: mesMais(base, mesesAteChaves + 1), fim: mesMais(base, mesesAteChaves + n), periodicidade: n === 1 ? "única" : "mensal" });
+    etapas.push({ etapa: "saldo", rotulo: "Saldo após as chaves", pct: sp, total: valor(sp), parcelas: n, valorParcela: arred(valor(sp) / n), inicio: mesMais(base, mesesAteChaves + 1), fim: mesMais(base, mesesAteChaves + n), periodicidade: n === 1 ? "única" : "mensal" });
   }
-  const ateChaves = arred(etapas.filter(e => e.etapa !== "saldo").reduce((s, e) => s + e.total, 0));
-  const aposChaves = arred(etapas.filter(e => e.etapa === "saldo").reduce((s, e) => s + e.total, 0));
+  ateChaves = arred(ateChaves);
+  const aposChaves = arred(preco - ateChaves);
   const totalParcelas = etapas.reduce((s, e) => s + (e.parcelas || 1), 0);
   return { preco, etapas, ateChaves, aposChaves, totalParcelas, entrega, entregaEstimada };
 }
