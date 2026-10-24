@@ -140,8 +140,11 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   torre; laterais só garagens; planta humanizada do lazer
   (`public/modelos/palacio-lazer.webp`) deitada na cobertura. Texturas
   desenhadas em canvas, sem arquivo. Pelas fotos da galeria do
-  site (23/10): coroamento com duas cúpulas escuras (uma por apartamento),
-  guarda-corpo do lazer com pilaretes + vidro escuro + floreira na frente, e
+  site (23/10): coroamento pela perspectiva (Edielson, 24/10: as duas cúpulas
+  da foto aérea estavam erradas) = telhado escuro de quatro águas cortado no
+  alto (`telhadoQuatroAguas`), trapeira curva na frente e a casa de máquinas
+  dos fundos levantada acima do telhado com o logo (`/logo-icon.jpg`) nas
+  faces; guarda-corpo do lazer com pilaretes + vidro escuro + floreira na frente, e
   alambrado de 4 m na quadra (`ConfigBase.quadra`).
 - **Medidas pelos projetos do Rodrigo (engenheiro, 23/10, WhatsApp):** cortes
   AA/BB e plantas térreo/mezanino/garagens 1–4 (1/75, mar/2022). Cotas:
@@ -208,7 +211,14 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (`CONFIG_PALACIO.planta`, imagem do site `SIL_ELI_PH_TIPO` em
   `public/modelos/palacio-planta-tipo.webp`), dentro da tela cheia. A imagem
   é o final 01; o 02 sai espelhado. Andares 1–2 do Sienge (7º e 8º
-  diferenciados) mostram a planta tipo com aviso. (5) **Andamento da obra** (anéis no
+  diferenciados) mostram a planta tipo com aviso. Desde 24/10 o diálogo tem
+  abas: **Planta** (imagem), **Tour 3D** (`planta-dollhouse.tsx`: a imagem
+  vira o piso, as paredes vêm de `palacio-planta-tipo.paredes.json` gerado
+  por `scripts/extrair-paredes-planta.py`, ambientes marcados em px em
+  `CONFIG_PALACIO.planta.tour`, final 02 = maquete invertida em x) e
+  **Fotos** (`planta.fotos`, renders em `public/modelos/palacio-fotos/`).
+  Planta de outro empreendimento: rodar o script, marcar os ambientes e
+  cadastrar `planta.tour`/`planta.fotos` na config dele. (5) **Andamento da obra** (anéis no
   rodapé do 3D): `/api/andamento-obra` relê a página do site
   (`local.site`) a cada 6 h e só aceita se achar as 9 etapas
   (`lerAndamentoDoHtml`, trava `andamento-obra.test.ts`); senão vale o
