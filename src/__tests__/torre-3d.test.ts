@@ -42,7 +42,11 @@ assert.ok(Math.max(...zs) > 5 + CONFIG_PALACIO.sacada && Math.min(...zs) < -5 - 
 assert.equal(baseDaTorre(6, CONFIG_PADRAO).altura, 15);
 assert.equal(baseDaTorre(6, CONFIG_PADRAO).contorno.length, 4);
 // Planta humanizada: final 02 é o espelho; andares 1–2 (7º e 8º do projeto) levam a nota.
-assert.deepEqual(plantaDaUnidade(CONFIG_PALACIO, "AP1801"), { url: "/modelos/palacio-planta-tipo.webp", titulo: CONFIG_PALACIO.planta!.titulo, espelhada: false, nota: null });
+assert.deepEqual(plantaDaUnidade(CONFIG_PALACIO, "AP1801"), { url: "/modelos/palacio-planta-tipo.webp", titulo: CONFIG_PALACIO.planta!.titulo, espelhada: false, nota: null, tour: CONFIG_PALACIO.planta!.tour!, fotos: CONFIG_PALACIO.planta!.fotos! });
+// Tour 3D: 15 ambientes dentro da imagem (1720×1288) e 6 fotos.
+assert.equal(CONFIG_PALACIO.planta!.tour!.ambientes.length, 15);
+CONFIG_PALACIO.planta!.tour!.ambientes.forEach(a => { assert.ok(a.caixa[0] < a.caixa[2] && a.caixa[1] < a.caixa[3] && a.caixa[2] <= 1720 && a.caixa[3] <= 1288, a.nome); });
+assert.equal(CONFIG_PALACIO.planta!.fotos!.length, 6);
 assert.equal(plantaDaUnidade(CONFIG_PALACIO, "AP1802")!.espelhada, true);
 assert.ok(plantaDaUnidade(CONFIG_PALACIO, "AP201")!.nota);
 assert.equal(plantaDaUnidade(CONFIG_PADRAO, "AP101"), null);

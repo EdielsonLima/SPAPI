@@ -47,14 +47,30 @@ export interface ConfigTorre {
 // A imagem é a do final que NÃO é espelhado; os finais em `espelhar` mostram
 // a mesma imagem invertida na horizontal. Fora de `andares` (andar do Sienge)
 // a planta aparece com a `nota` (ex.: pavimento diferenciado).
-export interface PlantaTipo { url: string; titulo: string; espelhar?: string[]; andares?: [number, number]; nota?: string }
+export interface PlantaTipo {
+  url: string; titulo: string; espelhar?: string[]; andares?: [number, number]; nota?: string;
+  // Aba "Tour 3D": maquete da planta (planta-dollhouse.tsx). Sem isso, só a imagem.
+  tour?: TourPlanta;
+  // Aba "Fotos": imagens dos ambientes (renders), na ordem de exibição.
+  fotos?: FotoPlanta[];
+}
 
-export function plantaDaUnidade(cfg: ConfigTorre, unidade: string): { url: string; titulo: string; espelhada: boolean; nota: string | null } | null {
+// Retângulo em pixels da imagem da planta: [x0, y0, x1, y1].
+export type CaixaPx = [number, number, number, number];
+export interface TourPlanta {
+  paredes: string;        // json gerado por scripts/extrair-paredes-planta.py
+  pxPorMetro: number;     // escala da imagem
+  ambientes: { nome: string; caixa: CaixaPx; menor?: boolean }[]; // menor = rótulo só ao aproximar
+  vidros?: [number, number, number, number][]; // [x, y, w, h] px: esquadrias de vidro (varanda)
+}
+export interface FotoPlanta { url: string; titulo: string }
+
+export function plantaDaUnidade(cfg: ConfigTorre, unidade: string): { url: string; titulo: string; espelhada: boolean; nota: string | null; tour: TourPlanta | null; fotos: FotoPlanta[] } | null {
   const p = cfg.planta; if (!p) return null;
   const af = andarEFinal(unidade);
   const espelhada = !!af && (p.espelhar || []).includes(af.final);
   const fora = !!af && !!p.andares && (af.andar < p.andares[0] || af.andar > p.andares[1]);
-  return { url: p.url, titulo: p.titulo, espelhada, nota: fora ? p.nota || null : null };
+  return { url: p.url, titulo: p.titulo, espelhada, nota: fora ? p.nota || null : null, tour: p.tour || null, fotos: p.fotos || [] };
 }
 
 // pos = m do centro da janela até a quina de fora (frente/fundos) ou até a
@@ -133,7 +149,43 @@ export const CONFIG_PALACIO: ConfigTorre = {
   // Endereço do carimbo das plantas: Rua 2950 nº 255 e Rua 2970, Centro, BC.
   // Planta humanizada do site (SIL_ELI_PH_TIPO, 23/10): é o final 01 (sacada
   // à direita, no meio da frente); o 02 é o espelho. Sienge 3–36 = tipo 9º–42º.
-  planta: { url: "/modelos/palacio-planta-tipo.webp", titulo: "Planta humanizada · apartamento tipo", espelhar: ["02"], andares: [3, 36], nota: "Este andar é do tipo diferenciado do projeto (7º e 8º pavimentos): a planta mostrada é a do tipo." },
+  planta: {
+    url: "/modelos/palacio-planta-tipo.webp", titulo: "Planta humanizada · apartamento tipo", espelhar: ["02"], andares: [3, 36],
+    nota: "Este andar é do tipo diferenciado do projeto (7º e 8º pavimentos): a planta mostrada é a do tipo.",
+    // Tour 3D: paredes extraídas da imagem (scripts/extrair-paredes-planta.py);
+    // ambientes marcados à mão sobre a imagem (px). Escala: ~80 px por metro
+    // (a planta tem 1720 px para ~21,5 m de frente).
+    tour: {
+      paredes: "/modelos/palacio-planta-tipo.paredes.json", pxPorMetro: 80,
+      ambientes: [
+        { nome: "Suíte master", caixa: [60, 40, 410, 330] },
+        { nome: "Banho master", caixa: [60, 340, 320, 470], menor: true },
+        { nome: "Banho suíte 2", caixa: [420, 40, 560, 280], menor: true },
+        { nome: "Closet suíte 2", caixa: [420, 290, 760, 470], menor: true },
+        { nome: "Suíte 2", caixa: [570, 40, 840, 290] },
+        { nome: "Cozinha e copa", caixa: [870, 40, 1360, 480] },
+        { nome: "Lavabo", caixa: [870, 340, 1030, 470], menor: true },
+        { nome: "Circulação", caixa: [320, 480, 1010, 585], menor: true },
+        { nome: "Suíte 3", caixa: [60, 540, 540, 1000] },
+        { nome: "Banho suíte 3", caixa: [60, 740, 240, 1000], menor: true },
+        { nome: "Suíte 4", caixa: [570, 590, 1000, 1000] },
+        { nome: "Banho suíte 4", caixa: [860, 740, 1000, 1000], menor: true },
+        { nome: "Jantar", caixa: [1010, 600, 1290, 1000] },
+        { nome: "Estar", caixa: [1290, 480, 1660, 1000] },
+        { nome: "Varanda gourmet", caixa: [970, 1000, 1640, 1250] },
+      ],
+      // Esquadrias da varanda (vidro): fechamento entre estar/jantar e varanda, e a fachada da varanda.
+      vidros: [[1000, 996, 450, 8], [975, 1250, 500, 8]],
+    },
+    fotos: [
+      { url: "/modelos/palacio-fotos/01-estar-e-jantar.webp", titulo: "Estar e jantar" },
+      { url: "/modelos/palacio-fotos/02-varanda.webp", titulo: "Varanda gourmet" },
+      { url: "/modelos/palacio-fotos/03-cozinha.webp", titulo: "Cozinha" },
+      { url: "/modelos/palacio-fotos/04-quarto-principal.webp", titulo: "Suíte master" },
+      { url: "/modelos/palacio-fotos/05-quarto.webp", titulo: "Suíte" },
+      { url: "/modelos/palacio-fotos/06-banheiro.webp", titulo: "Banho" },
+    ],
+  },
   local: { chave: "palacio-elizabeth", rua: "2950", numero: 255, ruaFundos: "2970", bbox: [-27.05, -48.665, -26.95, -48.59], site: "https://silvapacker.com.br/empreendimentos/palacio-elizabeth/" },
   base: {
     // Corte: salas comerciais + mezanino até +5,40, 4 garagens, lazer a +16,00.
