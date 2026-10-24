@@ -254,6 +254,15 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (12 à venda: 102, 201, 301, 401, 402, 501, 502, 601, 602, 1202, 3102, 3202).
   Condições reais da mesma tabela em `CONFIG_PALACIO.condicoes` (10% +
   saldo em 100×, entrega 2030-12) = referência do modal até alguém salvar.
+  **Modo noite** (Edielson, 24/10, ideia do vídeo da AVVA): botão lua/sol na
+  barra do 3D (vale na tela cheia; lembrado em `localStorage.quadro3d_noite`).
+  À noite: céu `#060d1f`, hemisfério/sol azulados e fracos, fachada neutra
+  escura, sacadas de vidro escuro e as JANELAS das unidades vendidas e
+  permutadas (`temDono`) acesas em amarelo quente; as à venda apagadas. O
+  vidro (`matVidroJ`) tem `emissive` branco × cor da instância
+  (`onBeforeCompile` multiplica `totalEmissiveRadiance` por `vColor`), com
+  `emissiveIntensity` 1,25 só à noite. `pintar()` cuida das duas versões;
+  seleção/filtro continuam valendo.
   **Música de fundo** (Edielson, 24/10): `public/audio/quadro-3d-ambiente.mp3`
   ("Elegant Piano", leberch, Pixabay Content License — fonte e termos em
   `public/audio/LEIA-ME.md`). Toca em loop a 70% (faixa normalizada a -16 LUFS) ao entrar na tela cheia

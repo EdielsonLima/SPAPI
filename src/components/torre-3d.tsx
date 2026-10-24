@@ -13,7 +13,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useTheme } from "next-themes";
-import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX, Banknote } from "lucide-react";
+import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX, Banknote, Moon, Sun } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import { VERSAO_ENTORNO, type DadosEntorno } from "@/lib/entorno-osm";
 import { AndamentoObraCard } from "@/components/andamento-obra-card";
@@ -69,7 +69,19 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   const escuro = resolvedTheme === "dark";
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [girando, setGirando] = useState(true);
-  const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void; focar: (id: string) => void; filtrar: (sits: string[]) => void } | null>(null);
+  // Modo noturno (Edielson, 24/10, ideia do vídeo da AVVA): céu escuro, cidade
+  // azulada e, em vez das cores de situação, as janelas das unidades vendidas
+  // e permutadas ACESAS em amarelo quente; as à venda ficam apagadas. Alterna
+  // na barra de controles (também na tela cheia) e fica lembrado no navegador.
+  const [noite, setNoite] = useState(false);
+  const noiteRef = useRef(false);
+  useEffect(() => { try { if (localStorage.getItem("quadro3d_noite") === "on") { setNoite(true); noiteRef.current = true; } } catch { /* sem storage */ } }, []);
+  const alternarNoite = () => {
+    const v = !noiteRef.current; noiteRef.current = v; setNoite(v);
+    try { localStorage.setItem("quadro3d_noite", v ? "on" : "off"); } catch { /* sem storage */ }
+    api.current?.noite(v);
+  };
+  const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void; focar: (id: string) => void; filtrar: (sits: string[]) => void; noite: (v: boolean) => void } | null>(null);
   const [espelhoAberto, setEspelhoAberto] = useState(true);
   const etiqueta = useRef<HTMLDivElement>(null);
   const bussola = useRef<HTMLDivElement>(null);
@@ -241,7 +253,8 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     controls.minDistance = 20; controls.maxDistance = cfg.local ? Math.max(topo * 3, 1100) : topo * 3;
     controls.autoRotate = true; controls.autoRotateSpeed = 0.6;
 
-    scene.add(new THREE.HemisphereLight(escuro ? "#475569" : "#ffffff", escuro ? "#1e293b" : "#cbd5e1", escuro ? 1.1 : 1.6));
+    const hemi = new THREE.HemisphereLight(escuro ? "#475569" : "#ffffff", escuro ? "#1e293b" : "#cbd5e1", escuro ? 1.1 : 1.6);
+    scene.add(hemi);
     const sol = new THREE.DirectionalLight("#ffffff", escuro ? 0.9 : 1.6);
     sol.position.set(topo * 0.6, topo * 1.2, topo * 0.8);
     sol.castShadow = true;
@@ -324,7 +337,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     const blocos: THREE.Object3D[] = [];
     const matsUnidade = new Map<string, { corpo: THREE.MeshStandardMaterial; sacada: THREE.MeshStandardMaterial; corBase: THREE.Color; sacBase: THREE.Color; opBase: number }>();
     const caixaDe = new Map<string, Bloco>(); // corpo de cada unidade (moldura e etiqueta da seleção)
-    const janelas: { j: Janela; id: string; cor: THREE.Color }[] = [];
+    const janelas: { j: Janela; id: string; cor: THREE.Color; acesa: boolean }[] = [];
     const focos = new Map<string, THREE.Vector3>(); // frente de cada unidade (câmera vai até ela)
     const neutroCorpo = new THREE.MeshStandardMaterial({ color: FACHADA.clone(), roughness: 0.8 });
     const neutroSacada = new THREE.MeshStandardMaterial({ color: "#9fb4c2", roughness: 0.2, transparent: true, opacity: 0.55 });
@@ -351,12 +364,17 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         lado.userData.id = u.id; blocos.push(lado);
       });
       const vidro = semSituacao ? VIDRO.clone() : u.apagada ? new THREE.Color("#5b6470") : VIDRO.clone().lerp(cor, 0.5);
-      janelasDaUnidade(indice, total, u.andar, primeiro, cfg).forEach(j => janelas.push({ j, id: u.id, cor: j.aberta ? new THREE.Color("#3a3f45") : vidro }));
+      janelasDaUnidade(indice, total, u.andar, primeiro, cfg).forEach(j => janelas.push({ j, id: u.id, cor: j.aberta ? new THREE.Color("#3a3f45") : vidro, acesa: !semSituacao && temDono(u.situacao) && !j.aberta }));
     });
 
     // Janelas: vidro (cor da situação, escurecida) e moldura clara, instanciados.
     const gJanela = new THREE.BoxGeometry(1, 1, 1);
-    const matVidroJ = new THREE.MeshStandardMaterial({ roughness: 0.12, metalness: 0.35 });
+    // À noite o vidro emite luz na cor da instância (vColor): janela acesa = amarelo quente.
+    const matVidroJ = new THREE.MeshStandardMaterial({ roughness: 0.12, metalness: 0.35, emissive: "#ffffff", emissiveIntensity: 0 });
+    matVidroJ.onBeforeCompile = sh => {
+      sh.fragmentShader = sh.fragmentShader.replace("#include <emissivemap_fragment>",
+        "#include <emissivemap_fragment>\n#if defined( USE_INSTANCING_COLOR ) || defined( USE_COLOR )\n\ttotalEmissiveRadiance *= vColor;\n#endif");
+    };
     descarte.push(gJanela, matVidroJ);
     const vidros = new THREE.InstancedMesh(gJanela, matVidroJ, janelas.length);
     const molduras = new THREE.InstancedMesh(gJanela, mats.clara, janelas.length);
@@ -436,18 +454,34 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     // cliquei"): a unidade fica na cor cheia, com moldura que pulsa e etiqueta
     // com o número; as demais esmaecem para o tom da fachada.
     const CINZA = FACHADA.clone(), cinzaVidro = new THREE.Color("#8b97a3"), tmp = new THREE.Color();
+    // Noite: fachada neutra e escura, sacadas de vidro escuro, janela acesa
+    // (vendida/permutada) em amarelo quente, apagada (à venda) em azul-noite.
+    const NOITE_FACHADA = FACHADA.clone().multiplyScalar(0.42), NOITE_SACADA = new THREE.Color("#0b1324");
+    const ACESA = new THREE.Color("#ffc78a"), APAGADA = new THREE.Color("#101a2e");
+    let noiteAtiva = noiteRef.current;
     const pintar = () => {
       matsUnidade.forEach((m, id) => {
         const apaga = fora(id);
-        m.corpo.color.copy(m.corBase); if (apaga) m.corpo.color.lerp(CINZA, 0.8);
-        m.sacada.color.copy(m.sacBase); if (apaga) m.sacada.color.lerp(CINZA, 0.8);
-        m.sacada.opacity = apaga ? 0.35 : m.opBase;
+        if (noiteAtiva) {
+          m.corpo.color.copy(NOITE_FACHADA); if (apaga) m.corpo.color.multiplyScalar(0.6);
+          m.sacada.color.copy(NOITE_SACADA); m.sacada.opacity = apaga ? 0.3 : 0.5;
+        } else {
+          m.corpo.color.copy(m.corBase); if (apaga) m.corpo.color.lerp(CINZA, 0.8);
+          m.sacada.color.copy(m.sacBase); if (apaga) m.sacada.color.lerp(CINZA, 0.8);
+          m.sacada.opacity = apaga ? 0.35 : m.opBase;
+        }
         const on = id === sobre || id === marcada;
         m.corpo.emissive.set(on ? (id === marcada ? "#ffffff" : "#94a3b8") : "#000000");
         m.corpo.emissiveIntensity = id === marcada ? 0.25 : 0.25;
       });
       idDaJanela.forEach((id, k) => {
-        tmp.copy(corVidro[k]); if (id && fora(id)) tmp.lerp(cinzaVidro, 0.75);
+        if (noiteAtiva) {
+          tmp.copy(janelas[k].acesa ? ACESA : APAGADA);
+          if (id && fora(id)) tmp.lerp(APAGADA, 0.8);
+          if (id && id === marcada) tmp.lerp(new THREE.Color("#ffffff"), 0.35);
+        } else {
+          tmp.copy(corVidro[k]); if (id && fora(id)) tmp.lerp(cinzaVidro, 0.75);
+        }
         vidros.setColorAt(k, tmp);
       });
       if (vidros.instanceColor) vidros.instanceColor.needsUpdate = true;
@@ -486,7 +520,23 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     let voo: { pos: THREE.Vector3; alvo: THREE.Vector3 } | null = null;
     const cancelarVoo = () => { voo = null; };
     controls.addEventListener("start", cancelarVoo);
+    const fundoDia = new THREE.Color(escuro ? "#0f172a" : "#dbeafe"), fundoNoite = new THREE.Color("#060d1f");
+    const aplicarNoite = (v: boolean) => {
+      noiteAtiva = v;
+      (scene.background as THREE.Color).copy(v ? fundoNoite : fundoDia);
+      if (scene.fog) (scene.fog as THREE.Fog).color.copy(scene.background as THREE.Color);
+      hemi.color.set(v ? "#1e3a8a" : escuro ? "#475569" : "#ffffff");
+      hemi.groundColor.set(v ? "#050a16" : escuro ? "#1e293b" : "#cbd5e1");
+      hemi.intensity = v ? 0.45 : escuro ? 1.1 : 1.6;
+      sol.color.set(v ? "#8fb0ea" : "#ffffff");
+      sol.intensity = v ? 0.22 : escuro ? 0.9 : 1.6;
+      matVidroJ.emissiveIntensity = v ? 1.25 : 0;
+      matVidroJ.roughness = v ? 0.5 : 0.12;
+      pintar();
+    };
+    if (noiteRef.current) aplicarNoite(true);
     api.current = {
+      noite: aplicarNoite,
       resetar: () => { voo = { pos: posInicial.clone(), alvo: alvo.clone() }; },
       focar: id => {
         const f = focos.get(id); if (!f) return;
@@ -665,6 +715,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         </button>
         <button type="button" onClick={() => { setSelecionada(null); api.current?.resetar(); }} title="Voltar à vista inicial" className={`${botao} w-8`}>
           <Home className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={alternarNoite} title={noite ? "Modo dia (cores por situação)" : "Modo noite: janelas acesas = vendidas ou permutadas"} className={`${botao} w-8 ${noite ? "!bg-indigo-50 !border-indigo-200 !text-indigo-700" : ""}`}>
+          {noite ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
         {musica && (
           <input type="range" min={0.05} max={1} step={0.05} value={volume} onChange={e => mudarVolume(Number(e.target.value))} aria-label="Volume da música" title={`Volume ${Math.round(volume * 100)}%`}
