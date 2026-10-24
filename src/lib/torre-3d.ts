@@ -51,8 +51,6 @@ export interface PlantaTipo {
   url: string; titulo: string; espelhar?: string[]; andares?: [number, number]; nota?: string;
   // Aba "Tour 3D": maquete da planta (planta-dollhouse.tsx). Sem isso, só a imagem.
   tour?: TourPlanta;
-  // Aba "Fotos": imagens dos ambientes (renders), na ordem de exibição.
-  fotos?: FotoPlanta[];
 }
 
 // Retângulo em pixels da imagem da planta: [x0, y0, x1, y1].
@@ -63,14 +61,13 @@ export interface TourPlanta {
   ambientes: { nome: string; caixa: CaixaPx; menor?: boolean }[]; // menor = rótulo só ao aproximar
   vidros?: [number, number, number, number][]; // [x, y, w, h] px: esquadrias de vidro (varanda)
 }
-export interface FotoPlanta { url: string; titulo: string }
 
-export function plantaDaUnidade(cfg: ConfigTorre, unidade: string): { url: string; titulo: string; espelhada: boolean; nota: string | null; tour: TourPlanta | null; fotos: FotoPlanta[] } | null {
+export function plantaDaUnidade(cfg: ConfigTorre, unidade: string): { url: string; titulo: string; espelhada: boolean; nota: string | null; tour: TourPlanta | null } | null {
   const p = cfg.planta; if (!p) return null;
   const af = andarEFinal(unidade);
   const espelhada = !!af && (p.espelhar || []).includes(af.final);
   const fora = !!af && !!p.andares && (af.andar < p.andares[0] || af.andar > p.andares[1]);
-  return { url: p.url, titulo: p.titulo, espelhada, nota: fora ? p.nota || null : null, tour: p.tour || null, fotos: p.fotos || [] };
+  return { url: p.url, titulo: p.titulo, espelhada, nota: fora ? p.nota || null : null, tour: p.tour || null };
 }
 
 // pos = m do centro da janela até a quina de fora (frente/fundos) ou até a
@@ -177,14 +174,7 @@ export const CONFIG_PALACIO: ConfigTorre = {
       // Esquadrias da varanda (vidro): fechamento entre estar/jantar e varanda, e a fachada da varanda.
       vidros: [[1000, 996, 450, 8], [975, 1250, 500, 8]],
     },
-    fotos: [
-      { url: "/modelos/palacio-fotos/01-estar-e-jantar.webp", titulo: "Estar e jantar" },
-      { url: "/modelos/palacio-fotos/02-varanda.webp", titulo: "Varanda gourmet" },
-      { url: "/modelos/palacio-fotos/03-cozinha.webp", titulo: "Cozinha" },
-      { url: "/modelos/palacio-fotos/04-quarto-principal.webp", titulo: "Suíte master" },
-      { url: "/modelos/palacio-fotos/05-quarto.webp", titulo: "Suíte" },
-      { url: "/modelos/palacio-fotos/06-banheiro.webp", titulo: "Banho" },
-    ],
+    // Fotos dos ambientes: tabela plantas_fotos (chave = local.chave), gerenciadas na tela.
   },
   local: { chave: "palacio-elizabeth", rua: "2950", numero: 255, ruaFundos: "2970", bbox: [-27.05, -48.665, -26.95, -48.59], site: "https://silvapacker.com.br/empreendimentos/palacio-elizabeth/" },
   base: {

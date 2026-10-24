@@ -201,8 +201,8 @@ export function materiaisDoPredio(tx: Texturas): Materiais {
     portao: std({ map: tx.portao, roughness: 0.4, metalness: 0.5 }),
     guarda: new THREE.MeshStandardMaterial({ color: "#5b6b78", transparent: true, opacity: 0.55, roughness: 0.05, metalness: 0.3 }),
     verde: std({ color: "#4d7a43", roughness: 0.95 }),
-    // Telhado do coroamento (perspectiva do site): telha escura, fosca.
-    telha: std({ color: "#3a3835", roughness: 0.92, metalness: 0.05 }),
+    // Abóbadas do coroamento (perspectiva do site): cobertura escura, fosca.
+    telha: std({ color: "#3a3835", roughness: 0.9, metalness: 0.08 }),
     alambrado: new THREE.MeshStandardMaterial({ map: tx.alambrado, transparent: true, depthWrite: false, side: THREE.DoubleSide, roughness: 0.6 }),
     telhado: std({ color: "#d9d2c5" }),
   };
@@ -400,20 +400,4 @@ export function montarRua(base: ConfigBase, add: (o: THREE.Object3D) => void, de
     const t = new THREE.Mesh(gTronco, vaso); t.position.set(x, 1.3, zf + 1.4); add(t);
     const c = new THREE.Mesh(gCopa, copa); c.position.set(x, 2.5, zf + 1.4); c.castShadow = true; add(c);
   }
-}
-
-// Telhado de quatro águas com o topo cortado (mansarda): base (lb × pb) no
-// y = 0 e topo (lt × pt) no y = h, centrados. Normais por face (sem suavizar).
-export function telhadoQuatroAguas(lb: number, pb: number, lt: number, pt: number, h: number): THREE.BufferGeometry {
-  const a = lb / 2, b = pb / 2, c = lt / 2, d = pt / 2;
-  const B = [[-a, 0, b], [a, 0, b], [a, 0, -b], [-a, 0, -b]];   // base: frente-esq, frente-dir, fundos-dir, fundos-esq
-  const T = [[-c, h, d], [c, h, d], [c, h, -d], [-c, h, -d]];
-  const tri: number[] = [];
-  const quad = (p: number[], q: number[], r: number[], s: number[]) => { tri.push(...p, ...q, ...r, ...p, ...r, ...s); };
-  for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; quad(B[i], B[j], T[j], T[i]); } // águas (sentido anti-horário visto de fora)
-  quad(T[0], T[1], T[2], T[3]); // topo
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.Float32BufferAttribute(tri, 3));
-  g.computeVertexNormals();
-  return g;
 }

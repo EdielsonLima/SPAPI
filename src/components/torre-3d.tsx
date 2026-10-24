@@ -19,11 +19,12 @@ import { VERSAO_ENTORNO, type DadosEntorno } from "@/lib/entorno-osm";
 import { AndamentoObraCard } from "@/components/andamento-obra-card";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import PlantaDollhouse from "@/components/planta-dollhouse";
+import PlantaFotos from "@/components/planta-fotos";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
   configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, plantaDaUnidade, type Bloco, type Janela,
 } from "@/lib/torre-3d";
-import { criarTexturas, materiaisDoPredio, caixaUV, montarBase, montarLazer, montarRua, montarQuadra, telhadoQuatroAguas } from "@/components/torre-3d-predio";
+import { criarTexturas, materiaisDoPredio, caixaUV, montarBase, montarLazer, montarRua, montarQuadra } from "@/components/torre-3d-predio";
 
 export interface Unidade3D {
   id: string;
@@ -66,7 +67,6 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   const bussola = useRef<HTMLDivElement>(null);
   const [plantaAberta, setPlantaAberta] = useState(false);
   const [abaPlanta, setAbaPlanta] = useState<"planta" | "tour" | "fotos">("planta");
-  const [foto, setFoto] = useState(0);
   useEffect(() => { setPlantaAberta(false); }, [selecionada]); // outra unidade = planta fechada
   const [fonteMapa, setFonteMapa] = useState("");
   const [avisoMapa, setAvisoMapa] = useState(""); // "carregando…" / "indisponível": o mapa não falha calado
@@ -314,40 +314,38 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
       [-1, 1].forEach(sx => caixa({ x: sx * (n.largura / 2 - 0.3), y: (yTorre + topo + 7) / 2, z: zc - n.fundo / 2 + 0.1, w: 0.9, h: topo + 7 - yTorre, d: 0.9 }, mats.mosaico));
       caixa({ x: 0, y: topo + 7.4, z: zc, w: n.largura + 0.8, h: 0.8, d: n.fundo + 1.2 }, mats.clara);
     }
-    // Coroamento (perspectiva do site): cornija e platibanda claras, telhado
-    // escuro de quatro águas cortado no alto (mansarda), trapeira curva na
-    // frente e, nos fundos, a casa de máquinas levantada acima do telhado com o
-    // logo da construtora nas faces, como na perspectiva.
+    // Coroamento (perspectiva da fachada, Edielson 24/10): cornija e platibanda
+    // claras; no meio da frente, sobre a prumada das sacadas, a torre branca
+    // com o logo da construtora na face da frente; de cada lado dela, um
+    // telhado curvo escuro (abóbada com eixo frente-fundos) até a quina.
     caixa({ x: 0, y: topo + 0.6, z: 0, w: L + 1.6, h: 1.2, d: P + 1.6 }, mats.clara);
     caixa({ x: 0, y: topo + 2.4, z: 0, w: L + 0.4, h: 2.4, d: P + 0.4 }, mats.fachada);
     [-1, 1].forEach(sx => caixa({ x: sx * (L / 2 - 1.5), y: topo + 2.4, z: P / 2 + 0.25, w: 2.4, h: 2.4, d: 0.2 }, mats.mosaico));
     caixa({ x: 0, y: topo + 3.9, z: 0, w: L + 1.2, h: 0.6, d: P + 1.2 }, mats.clara);
-    const yTelha = topo + 4.2, hTelha = 5.4, recuo = 3.2;
-    const telhado = new THREE.Mesh(telhadoQuatroAguas(L + 0.8, P + 0.8, L - 2 * recuo, P - 2 * recuo, hTelha), mats.telha);
-    telhado.position.y = yTelha; telhado.castShadow = true; telhado.receiveShadow = true; add(telhado);
-    caixa({ x: 0, y: yTelha + hTelha + 0.12, z: 0, w: L - 2 * recuo + 0.3, h: 0.24, d: P - 2 * recuo + 0.3 }, mats.clara); // laje de cima
-    // Trapeira (água-furtada) centrada na frente, com a cobertura curva.
-    caixa({ x: 0, y: yTelha + 1.3, z: P / 2 - 1.1, w: 7.2, h: 2.6, d: 3.4 }, mats.clara);
-    const gTrapeira = new THREE.CylinderGeometry(1, 1, 1, 24, 1, false, 0, Math.PI); descarte.push(gTrapeira);
-    const trapeira = new THREE.Mesh(gTrapeira, mats.telha);
-    trapeira.rotation.z = Math.PI / 2; trapeira.scale.set(1.7, 7.6, 1.7); trapeira.position.set(0, yTelha + 2.6, P / 2 - 1.1);
-    trapeira.castShadow = true; grupo.add(trapeira);
-    if (cfg.nucleo) {
-      const n = cfg.nucleo, zc = -P / 2 - n.fundo / 2 + 0.2;
-      const y0 = topo + 7.8, y1 = yTelha + hTelha + 3.4;
-      caixa({ x: 0, y: (y0 + y1) / 2, z: zc, w: n.largura + 0.8, h: y1 - y0, d: n.fundo + 1.2 }, mats.clara);
-      caixa({ x: 0, y: y1 + 0.25, z: zc, w: n.largura + 1.6, h: 0.5, d: n.fundo + 2 }, mats.clara); // cornija
-      const texLogo = new THREE.TextureLoader().load("/logo-icon.jpg"); texLogo.colorSpace = THREE.SRGBColorSpace; descarte.push(texLogo);
-      const matLogo = new THREE.MeshStandardMaterial({ map: texLogo, roughness: 0.6 }); descarte.push(matLogo);
-      const gLogo = new THREE.PlaneGeometry(2.6, 4.2); descarte.push(gLogo);
-      const yLogo = y1 - 2.6;
-      const faces: [number, number, number, number][] = [
-        [0, yLogo, zc - n.fundo / 2 - 0.62, Math.PI],          // fundos
-        [n.largura / 2 + 0.42, yLogo, zc, Math.PI / 2],         // lateral direita
-        [-(n.largura / 2 + 0.42), yLogo, zc, -Math.PI / 2],     // lateral esquerda
-      ];
-      faces.forEach(([x, y, z, ry]) => { const m = new THREE.Mesh(gLogo, matLogo); m.position.set(x, y, z); m.rotation.y = ry; grupo.add(m); });
-    }
+    const yTelha = topo + 4.2;
+    // Torre central: largura da prumada das sacadas, da frente das sacadas até
+    // o meio do prédio, subindo ~2 pavimentos acima da platibanda.
+    const wTorre = (cfg.larguraSacada ?? 7) + 1.6, dTorre = P / 2 + cfg.sacada + 1.5, zTorre = P / 2 + cfg.sacada - dTorre / 2;
+    const yTopoTorre = yTelha + 8.6;
+    caixa({ x: 0, y: (topo + yTopoTorre) / 2, z: zTorre, w: wTorre, h: yTopoTorre - topo, d: dTorre }, mats.clara);
+    caixa({ x: 0, y: yTelha - 0.4, z: zTorre, w: wTorre + 2.2, h: 1.1, d: dTorre + 2.2 }, mats.clara);   // entablamento do frontão
+    caixa({ x: 0, y: yTopoTorre + 0.25, z: zTorre, w: wTorre + 1.0, h: 0.5, d: dTorre + 1.0 }, mats.clara); // cornija de cima
+    const texLogo = new THREE.TextureLoader().load("/logo-icon.jpg"); texLogo.colorSpace = THREE.SRGBColorSpace; descarte.push(texLogo);
+    const matLogo = new THREE.MeshStandardMaterial({ map: texLogo, roughness: 0.6 }); descarte.push(matLogo);
+    const gLogo = new THREE.PlaneGeometry(wTorre * 0.56, wTorre * 0.56 * 1.6); descarte.push(gLogo);
+    const logo = new THREE.Mesh(gLogo, matLogo);
+    logo.position.set(0, yTopoTorre - wTorre * 0.56 * 0.8 - 1.0, zTorre + dTorre / 2 + 0.03);
+    grupo.add(logo);
+    // Abóbadas: meia-cana (raio 1) deitada com o eixo em z; escala = meia
+    // largura × altura da curva × comprimento.
+    const gAbobada = new THREE.CylinderGeometry(1, 1, 1, 32, 1, false, 0, Math.PI);
+    gAbobada.rotateZ(Math.PI / 2); gAbobada.rotateY(Math.PI / 2); descarte.push(gAbobada);
+    [-1, 1].forEach(sx => {
+      const x0 = wTorre / 2 - 0.2, x1 = L / 2 + 0.3, wv = x1 - x0;
+      const a = new THREE.Mesh(gAbobada, mats.telha);
+      a.scale.set(wv / 2, 4.2, P + 0.6); a.position.set(sx * (x0 + wv / 2), yTelha, 0);
+      a.castShadow = true; a.receiveShadow = true; grupo.add(a);
+    });
 
     // Interação: passar o mouse acende, clicar seleciona.
     const ray = new THREE.Raycaster();
@@ -625,15 +623,14 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         </div>
       )}
       {/* Planta humanizada: abre dentro da área do 3D (não tira da tela cheia).
-          Abas: Planta (imagem), Tour 3D (maquete da planta) e Fotos (renders). */}
+          Abas: Planta (imagem), Tour 3D (maquete da planta) e Fotos (banco, editável na tela). */}
       {sel && (() => {
         const pl = plantaDaUnidade(cfg, sel.u.unit);
         if (!pl) return null;
         const abas: { id: "planta" | "tour" | "fotos"; rotulo: string }[] = [{ id: "planta", rotulo: "Planta" }];
         if (pl.tour) abas.push({ id: "tour", rotulo: "Tour 3D" });
-        if (pl.fotos.length) abas.push({ id: "fotos", rotulo: `Fotos (${pl.fotos.length})` });
+        if (cfg.local?.chave) abas.push({ id: "fotos", rotulo: "Fotos" });
         const aba = abas.some(a => a.id === abaPlanta) ? abaPlanta : "planta";
-        const f = pl.fotos.length ? pl.fotos[((foto % pl.fotos.length) + pl.fotos.length) % pl.fotos.length] : null;
         return (
           <Dialog open={plantaAberta} onOpenChange={setPlantaAberta}>
             <DialogContent container={cheia ? caixa.current : undefined} className="max-w-5xl gap-3 p-5 dark:bg-slate-900">
@@ -655,23 +652,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
                 {pl.nota && <p className="text-[11px] text-amber-700 dark:text-amber-300/80">{pl.nota}</p>}
               </>)}
               {aba === "tour" && pl.tour && <PlantaDollhouse imagem={pl.url} tour={pl.tour} espelhada={pl.espelhada} escuro={escuro} />}
-              {aba === "fotos" && f && (
-                <div className="flex flex-col gap-2">
-                  <div className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={f.url} alt={f.titulo} className="max-h-[62vh] w-full rounded-xl bg-slate-100 object-contain dark:bg-slate-800" />
-                    <button type="button" onClick={() => setFoto(v => v - 1)} aria-label="Foto anterior" className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full bg-black/45 px-3 py-1.5 text-lg leading-none text-white hover:bg-black/65">&lsaquo;</button>
-                    <button type="button" onClick={() => setFoto(v => v + 1)} aria-label="Próxima foto" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full bg-black/45 px-3 py-1.5 text-lg leading-none text-white hover:bg-black/65">&rsaquo;</button>
-                  </div>
-                  <div className="flex items-center justify-between text-xs"><span className="font-semibold">{f.titulo}</span><span className="tabular-nums text-slate-500">{pl.fotos.indexOf(f) + 1} / {pl.fotos.length}</span></div>
-                  <div className="flex gap-2 overflow-x-auto pb-1">
-                    {pl.fotos.map((x, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img key={x.url} src={x.url} alt={x.titulo} title={x.titulo} onClick={() => setFoto(i)} className={`h-14 w-20 shrink-0 cursor-pointer rounded-md object-cover ${x === f ? "ring-2 ring-amber-500" : "opacity-70 hover:opacity-100"}`} />
-                    ))}
-                  </div>
-                </div>
-              )}
+              {aba === "fotos" && cfg.local?.chave && <PlantaFotos chave={cfg.local.chave} />}
               <p className="text-[10px] text-slate-500">Imagem ilustrativa. Móveis e decoração não fazem parte do imóvel.</p>
             </DialogContent>
           </Dialog>

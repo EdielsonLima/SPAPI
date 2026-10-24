@@ -1321,3 +1321,57 @@ export async function listarHistoricoPrecos(opts: { unitId?: number; limite?: nu
   );
   return rows;
 }
+
+// ─── Fotos das plantas (Quadro Espelho 3D › Ver planta › Fotos) ──────────────
+export interface FotoPlantaMeta { id: number; titulo: string; ordem: number; tamanho: number; mime: string }
+
+export async function listarFotosPlanta(chave: string): Promise<FotoPlantaMeta[]> {
+  const { rows } = await pool.query(
+    `SELECT id, titulo, ordem, tamanho, mime FROM plantas_fotos WHERE chave = $1 ORDER BY ordem, id`, [chave]);
+  return rows;
+}
+
+export async function obterFotoPlanta(id: number): Promise<{ mime: string; dados: Buffer } | null> {
+  const { rows } = await pool.query(`SELECT mime, dados FROM plantas_fotos WHERE id = $1`, [id]);
+  return rows[0] || null;
+}
+
+export async function inserirFotoPlanta(chave: string, titulo: string, mime: string, dados: Buffer): Promise<FotoPlantaMeta> {
+  const { rows } = await pool.query(
+    `INSERT INTO plantas_fotos (chave, titulo, ordem, mime, tamanho, dados)
+     VALUES ($1, $2, (SELECT COALESCE(MAX(ordem), 0) + 1 FROM plantas_fotos WHERE chave = $1::varchar), $3, $4, $5)
+     RETURNING id, titulo, ordem, tamanho, mime`,
+    [chave, titulo, mime, dados.length, dados]);
+  return rows[0];
+}
+
+export async function atualizarFotoPlanta(id: number, campos: { titulo?: string }): Promise<void> {
+  if (campos.titulo !== undefined) await pool.query(`UPDATE plantas_fotos SET titulo = $2 WHERE id = $1`, [id, campos.titulo]);
+}
+
+// Troca de lugar com a vizinha (−1 = antes, +1 = depois) dentro do mesmo empreendimento.
+export async function moverFotoPlanta(id: number, direcao: -1 | 1): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query(`SELECT id, chave FROM plantas_fotos WHERE id = $1`, [id]);
+    if (!rows[0]) { await client.query("ROLLBACK"); return; }
+    const { rows: lista } = await client.query(`SELECT id FROM plantas_fotos WHERE chave = $1 ORDER BY ordem, id FOR UPDATE`, [rows[0].chave]);
+    const ids: number[] = lista.map((r: { id: number }) => r.id);
+    const i = ids.indexOf(id), j = i + direcao;
+    if (i < 0 || j < 0 || j >= ids.length) { await client.query("ROLLBACK"); return; }
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    // Renumera a sequência inteira (1..n): a ordem fica sempre consistente.
+    for (let k = 0; k < ids.length; k++) await client.query(`UPDATE plantas_fotos SET ordem = $2 WHERE id = $1`, [ids[k], k + 1]);
+    await client.query("COMMIT");
+  } catch (e) {
+    await client.query("ROLLBACK"); throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function apagarFotoPlanta(id: number): Promise<boolean> {
+  const r = await pool.query(`DELETE FROM plantas_fotos WHERE id = $1`, [id]);
+  return (r.rowCount ?? 0) > 0;
+}

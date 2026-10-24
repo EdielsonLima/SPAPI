@@ -140,11 +140,12 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   torre; laterais só garagens; planta humanizada do lazer
   (`public/modelos/palacio-lazer.webp`) deitada na cobertura. Texturas
   desenhadas em canvas, sem arquivo. Pelas fotos da galeria do
-  site (23/10): coroamento pela perspectiva (Edielson, 24/10: as duas cúpulas
-  da foto aérea estavam erradas) = telhado escuro de quatro águas cortado no
-  alto (`telhadoQuatroAguas`), trapeira curva na frente e a casa de máquinas
-  dos fundos levantada acima do telhado com o logo (`/logo-icon.jpg`) nas
-  faces; guarda-corpo do lazer com pilaretes + vidro escuro + floreira na frente, e
+  site (23/10): coroamento pela perspectiva da fachada (Edielson, 24/10: as
+  duas cúpulas da foto aérea estavam erradas, e não há nada nos fundos) =
+  torre branca no meio da frente, sobre a prumada das sacadas, subindo ~2
+  pavimentos acima da platibanda com o logo (`/logo-icon.jpg`) na face da
+  frente, e de cada lado dela uma abóbada escura (meia-cana com eixo
+  frente-fundos) até a quina; guarda-corpo do lazer com pilaretes + vidro escuro + floreira na frente, e
   alambrado de 4 m na quadra (`ConfigBase.quadra`).
 - **Medidas pelos projetos do Rodrigo (engenheiro, 23/10, WhatsApp):** cortes
   AA/BB e plantas térreo/mezanino/garagens 1–4 (1/75, mar/2022). Cotas:
@@ -216,9 +217,14 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   vira o piso, as paredes vêm de `palacio-planta-tipo.paredes.json` gerado
   por `scripts/extrair-paredes-planta.py`, ambientes marcados em px em
   `CONFIG_PALACIO.planta.tour`, final 02 = maquete invertida em x) e
-  **Fotos** (`planta.fotos`, renders em `public/modelos/palacio-fotos/`).
+  **Fotos** (`planta-fotos.tsx`): ficam na tabela `plantas_fotos` do banco
+  (chave = `local.chave`), gerenciadas na própria aba por qualquer usuário
+  logado (enviar JPG/PNG/WebP até 8 MB, renomear, mover, apagar) via
+  `/api/plantas/fotos`. Os 6 renders de `public/modelos/palacio-fotos/`
+  entram UMA vez pelo `scripts/migrate.js` (só enquanto a sequência da
+  tabela nunca foi usada); apagar tudo não faz o seed voltar.
   Planta de outro empreendimento: rodar o script, marcar os ambientes e
-  cadastrar `planta.tour`/`planta.fotos` na config dele. (5) **Andamento da obra** (anéis no
+  cadastrar `planta.tour` na config dele; as fotos entram pela tela. (5) **Andamento da obra** (anéis no
   rodapé do 3D): `/api/andamento-obra` relê a página do site
   (`local.site`) a cada 6 h e só aceita se achar as 9 etapas
   (`lerAndamentoDoHtml`, trava `andamento-obra.test.ts`); senão vale o

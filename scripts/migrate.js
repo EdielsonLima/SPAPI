@@ -57,6 +57,30 @@ async function migrate() {
     await pool.query(sql);
     console.log("[migrate] Done — all tables ready.");
 
+    // Seed único das fotos da planta do Palácio Elizabeth (24/10/2026): os
+    // renders em public/modelos/palacio-fotos entram no banco UMA vez (só
+    // enquanto a sequência da tabela nunca foi usada). Depois disso quem manda
+    // é a tela: apagar tudo não faz o seed voltar.
+    try {
+      const { rows } = await pool.query(`SELECT is_called FROM plantas_fotos_id_seq`);
+      if (rows.length && !rows[0].is_called) {
+        const dir = path.join(__dirname, "..", "public", "modelos", "palacio-fotos");
+        const arquivos = fs.existsSync(dir) ? fs.readdirSync(dir).filter(a => /\.(webp|jpe?g|png)$/i.test(a)).sort() : [];
+        const mime = a => /\.webp$/i.test(a) ? "image/webp" : /\.png$/i.test(a) ? "image/png" : "image/jpeg";
+        const titulo = a => { const b = a.replace(/\.[a-z0-9]+$/i, "").replace(/^\d+[-_ ]*/, "").replace(/[-_]+/g, " ").trim(); return b ? b.charAt(0).toUpperCase() + b.slice(1) : "Foto"; };
+        let ordem = 0;
+        for (const a of arquivos) {
+          const dados = fs.readFileSync(path.join(dir, a));
+          await pool.query(
+            `INSERT INTO plantas_fotos (chave, titulo, ordem, mime, tamanho, dados) VALUES ($1, $2, $3, $4, $5, $6)`,
+            ["palacio-elizabeth", titulo(a), ++ordem, mime(a), dados.length, dados]);
+        }
+        console.log(`[migrate] plantas_fotos: seed de ${arquivos.length} foto(s) do Palácio Elizabeth.`);
+      }
+    } catch (e) {
+      console.warn("[migrate] plantas_fotos seed:", e.message);
+    }
+
     // Migration: ensure dre_excel_supplementary has month column in PK
     try {
       const { rows } = await pool.query(`

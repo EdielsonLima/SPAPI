@@ -328,3 +328,18 @@ CREATE TABLE IF NOT EXISTS conferencia_titulos (
   PRIMARY KEY (tipo, company_id, bill_id, installment_id)
 );
 CREATE INDEX IF NOT EXISTS idx_conferencia_tipo_status ON conferencia_titulos (tipo, status);
+
+-- ── Fotos das plantas (aba "Fotos" do "Ver planta" no Quadro Espelho 3D) ────
+-- Gerenciadas na própria tela (enviar, renomear, ordenar, apagar).
+-- chave = empreendimento (ConfigTorre.local.chave, ex.: palacio-elizabeth).
+CREATE TABLE IF NOT EXISTS plantas_fotos (
+  id SERIAL PRIMARY KEY,
+  chave VARCHAR(60) NOT NULL,
+  titulo VARCHAR(120) NOT NULL DEFAULT '',
+  ordem INTEGER NOT NULL DEFAULT 0,
+  mime VARCHAR(40) NOT NULL,
+  tamanho INTEGER NOT NULL,
+  dados BYTEA NOT NULL,
+  criado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_plantas_fotos_chave ON plantas_fotos (chave, ordem, id);
