@@ -36,9 +36,11 @@ export async function POST(request: NextRequest) {
   try { form = await request.formData(); } catch { return NextResponse.json({ error: "Envio inválido" }, { status: 400 }); }
   const chave = String(form.get("chave") || "");
   if (!CHAVE_OK.test(chave)) return NextResponse.json({ error: "chave inválida" }, { status: 400 });
-  const arquivos = form.getAll("fotos").filter((f): f is File => f instanceof File);
+  // Sem `instanceof File`: o global File só existe a partir do Node 20 e a
+  // produção roda Node 18 (dava ReferenceError = HTTP 500 em todo envio).
+  const arquivos = form.getAll("fotos").filter((f): f is File => typeof f !== "string" && typeof (f as File).arrayBuffer === "function");
   if (!arquivos.length) return NextResponse.json({ error: "Nenhuma foto enviada" }, { status: 400 });
-  if (arquivos.length > 20) return NextResponse.json({ error: "No máximo 20 fotos por envio" }, { status: 400 });
+  if (arquivos.length > 40) return NextResponse.json({ error: "No máximo 40 fotos por envio" }, { status: 400 });
   const recusadas: string[] = [];
   const salvas = [];
   for (const f of arquivos) {
