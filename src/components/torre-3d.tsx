@@ -25,8 +25,9 @@ import { chaveDoEmpreendimento } from "@/lib/condicoes-pagamento";
 
 // Música de fundo do 3D: faixa e volume (ver public/audio/LEIA-ME.md).
 const MUSICA_URL = "/audio/quadro-3d-ambiente.mp3";
-const MUSICA_VOLUME = 0.7;
+const MUSICA_VOLUME = 0.7; // padrão; o controle ao lado do botão guarda o escolhido
 const MUSICA_PREF = "quadro3d_musica";
+const MUSICA_VOL_PREF = "quadro3d_volume";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
   configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, plantaDaUnidade, type Bloco, type Janela,
@@ -117,6 +118,14 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   // qualquer hora e a escolha fica lembrada no navegador. Sair da tela cheia
   // para a música; aba escondida pausa e volta ao reaparecer.
   const [musica, setMusica] = useState(false);
+  const [volume, setVolume] = useState(MUSICA_VOLUME);
+  const volumeRef = useRef(MUSICA_VOLUME);
+  useEffect(() => { try { const v = Number(localStorage.getItem(MUSICA_VOL_PREF)); if (v > 0 && v <= 1) { setVolume(v); volumeRef.current = v; } } catch { /* sem storage */ } }, []);
+  const mudarVolume = (v: number) => {
+    v = Math.min(1, Math.max(0.05, v)); setVolume(v); volumeRef.current = v;
+    try { localStorage.setItem(MUSICA_VOL_PREF, String(v)); } catch { /* sem storage */ }
+    const a = audio.current; if (a && tocando.current) { if (fadeAtual.current) cancelAnimationFrame(fadeAtual.current); a.volume = v; }
+  };
   const audio = useRef<HTMLAudioElement | null>(null);
   const fadeAtual = useRef<number | null>(null);
   const tocando = useRef(false);
@@ -135,7 +144,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     let a = audio.current;
     if (!a) { a = new Audio(MUSICA_URL); a.loop = true; a.preload = "auto"; audio.current = a; }
     a.volume = 0;
-    a.play().then(() => { tocando.current = true; setMusica(true); fade(a!, MUSICA_VOLUME, 1800); }).catch(() => { tocando.current = false; setMusica(false); });
+    a.play().then(() => { tocando.current = true; setMusica(true); fade(a!, volumeRef.current, 1800); }).catch(() => { tocando.current = false; setMusica(false); });
   };
   const pararMusica = () => {
     const a = audio.current;
@@ -657,7 +666,11 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         <button type="button" onClick={() => { setSelecionada(null); api.current?.resetar(); }} title="Voltar à vista inicial" className={`${botao} w-8`}>
           <Home className="h-4 w-4" />
         </button>
-        <button type="button" onClick={alternarMusica} title={musica ? "Silenciar a música de fundo" : "Música de fundo (Elegant Piano, leberch · Pixabay)"} className={`${botao} w-8 ${musica ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
+        {musica && (
+          <input type="range" min={0.05} max={1} step={0.05} value={volume} onChange={e => mudarVolume(Number(e.target.value))} aria-label="Volume da música" title={`Volume ${Math.round(volume * 100)}%`}
+            className="h-8 w-20 cursor-pointer accent-blue-600" />
+        )}
+        <button type="button" onClick={alternarMusica} title={musica ? `Tocando a ${Math.round(volume * 100)}% · clique para silenciar` : "Música de fundo (Elegant Piano, leberch · Pixabay)"} className={`${botao} w-8 ${musica ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
           {musica ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
         </button>
         <button type="button" onClick={alternarTelaCheia} title={cheia ? "Sair da tela cheia (Esc)" : "Tela cheia"} className={`${botao} px-2.5 text-xs font-semibold`}>
