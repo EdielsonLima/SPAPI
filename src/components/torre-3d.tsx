@@ -13,13 +13,18 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { useTheme } from "next-themes";
-import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid } from "lucide-react";
+import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import { VERSAO_ENTORNO, type DadosEntorno } from "@/lib/entorno-osm";
 import { AndamentoObraCard } from "@/components/andamento-obra-card";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import PlantaDollhouse from "@/components/planta-dollhouse";
 import PlantaFotos from "@/components/planta-fotos";
+
+// Música de fundo do 3D: faixa e volume (ver public/audio/LEIA-ME.md).
+const MUSICA_URL = "/audio/quadro-3d-ambiente.mp3";
+const MUSICA_VOLUME = 0.35;
+const MUSICA_PREF = "quadro3d_musica";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
   configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, plantaDaUnidade, type Bloco, type Janela,
@@ -101,6 +106,66 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     if (el?.requestFullscreen) el.requestFullscreen().catch(() => setCheiaFixa(true));
     else setCheiaFixa(true);
   };
+
+  // Música de fundo (Edielson, 24/10): instrumental de biblioteca com licença
+  // livre para uso comercial (public/audio/LEIA-ME.md). O navegador só toca
+  // áudio depois de um clique, então ela entra ao abrir a tela cheia (que é o
+  // modo de apresentar), com fade; o botão de alto-falante liga/desliga a
+  // qualquer hora e a escolha fica lembrada no navegador. Sair da tela cheia
+  // para a música; aba escondida pausa e volta ao reaparecer.
+  const [musica, setMusica] = useState(false);
+  const audio = useRef<HTMLAudioElement | null>(null);
+  const fadeAtual = useRef<number | null>(null);
+  const tocando = useRef(false);
+  const fade = (a: HTMLAudioElement, alvo: number, ms: number, fim?: () => void) => {
+    if (fadeAtual.current) cancelAnimationFrame(fadeAtual.current);
+    const de = a.volume, t0 = performance.now();
+    const passo = (t: number) => {
+      const k = Math.min(1, (t - t0) / ms);
+      a.volume = de + (alvo - de) * k;
+      if (k < 1) fadeAtual.current = requestAnimationFrame(passo); else { fadeAtual.current = null; fim?.(); }
+    };
+    fadeAtual.current = requestAnimationFrame(passo);
+  };
+  const tocarMusica = () => {
+    if (tocando.current) return;
+    let a = audio.current;
+    if (!a) { a = new Audio(MUSICA_URL); a.loop = true; a.preload = "auto"; audio.current = a; }
+    a.volume = 0;
+    a.play().then(() => { tocando.current = true; setMusica(true); fade(a!, MUSICA_VOLUME, 1800); }).catch(() => { tocando.current = false; setMusica(false); });
+  };
+  const pararMusica = () => {
+    const a = audio.current;
+    tocando.current = false; setMusica(false);
+    if (a && !a.paused) fade(a, 0, 700, () => a.pause());
+  };
+  const alternarMusica = () => {
+    const ligar = !tocando.current;
+    try { localStorage.setItem(MUSICA_PREF, ligar ? "on" : "off"); } catch { /* sem storage */ }
+    if (ligar) tocarMusica(); else pararMusica();
+  };
+  useEffect(() => {
+    let pref = "on";
+    try { pref = localStorage.getItem(MUSICA_PREF) || "on"; } catch { /* sem storage */ }
+    if (cheia && pref !== "off") tocarMusica();
+    if (!cheia) pararMusica();
+    // tocar/parar são estáveis o bastante: só dependem de refs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cheia]);
+  useEffect(() => {
+    let pausadaPelaAba = false;
+    const vis = () => {
+      const a = audio.current; if (!a) return;
+      if (document.hidden) { if (tocando.current && !a.paused) { a.pause(); pausadaPelaAba = true; } }
+      else if (pausadaPelaAba) { pausadaPelaAba = false; a.play().catch(() => {}); }
+    };
+    document.addEventListener("visibilitychange", vis);
+    return () => {
+      document.removeEventListener("visibilitychange", vis);
+      if (fadeAtual.current) cancelAnimationFrame(fadeAtual.current);
+      const a = audio.current; if (a) { a.pause(); a.src = ""; audio.current = null; }
+    };
+  }, []);
 
   const cfg = useMemo(() => configDoEmpreendimento(empreendimento), [empreendimento]);
   // Layout: finais de cada andar na ordem da frente.
@@ -588,6 +653,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         </button>
         <button type="button" onClick={() => { setSelecionada(null); api.current?.resetar(); }} title="Voltar à vista inicial" className={`${botao} w-8`}>
           <Home className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={alternarMusica} title={musica ? "Silenciar a música de fundo" : "Música de fundo (Elegant Piano, leberch · Pixabay)"} className={`${botao} w-8 ${musica ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
+          {musica ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
         </button>
         <button type="button" onClick={alternarTelaCheia} title={cheia ? "Sair da tela cheia (Esc)" : "Tela cheia"} className={`${botao} px-2.5 text-xs font-semibold`}>
           {cheia ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}{cheia ? "Sair" : "Tela cheia"}

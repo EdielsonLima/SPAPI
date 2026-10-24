@@ -224,7 +224,14 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   entram UMA vez pelo `scripts/migrate.js` (só enquanto a sequência da
   tabela nunca foi usada); apagar tudo não faz o seed voltar.
   Planta de outro empreendimento: rodar o script, marcar os ambientes e
-  cadastrar `planta.tour` na config dele; as fotos entram pela tela. (5) **Andamento da obra** (anéis no
+  cadastrar `planta.tour` na config dele; as fotos entram pela tela.
+  **Música de fundo** (Edielson, 24/10): `public/audio/quadro-3d-ambiente.mp3`
+  ("Elegant Piano", leberch, Pixabay Content License — fonte e termos em
+  `public/audio/LEIA-ME.md`). Toca em loop a 35% ao entrar na tela cheia
+  (navegador só libera áudio após um clique), para ao sair; botão de
+  alto-falante liga/desliga a qualquer hora e grava a escolha em
+  `localStorage.quadro3d_musica` (`off` = não entra sozinha). Aba escondida
+  pausa e volta. Trocar a faixa = trocar o arquivo e o LEIA-ME. (5) **Andamento da obra** (anéis no
   rodapé do 3D): `/api/andamento-obra` relê a página do site
   (`local.site`) a cada 6 h e só aceita se achar as 9 etapas
   (`lerAndamentoDoHtml`, trava `andamento-obra.test.ts`); senão vale o
