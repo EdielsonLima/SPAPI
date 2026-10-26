@@ -17,13 +17,15 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { useTheme } from "next-themes";
-import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX, Banknote, Moon, Sun } from "lucide-react";
+import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX, Banknote, Moon, Sun, BarChart3 } from "lucide-react";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import { VERSAO_ENTORNO, type DadosEntorno } from "@/lib/entorno-osm";
 import { AndamentoObraCard } from "@/components/andamento-obra-card";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import PlantaDollhouse from "@/components/planta-dollhouse";
 import PlantaFotos from "@/components/planta-fotos";
+import Resumo3D from "@/components/resumo-3d";
+import { resumoVendas } from "@/lib/resumo-vendas";
 import CondicoesPagamentoModal from "@/components/condicoes-pagamento";
 import { chaveDoEmpreendimento } from "@/lib/condicoes-pagamento";
 
@@ -73,6 +75,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   const escuro = resolvedTheme === "dark";
   const [selecionada, setSelecionada] = useState<string | null>(null);
   const [girando, setGirando] = useState(true);
+  // Cards de resumo no topo (Edielson, 26/10): só aparecem pelo botão.
+  const [resumo, setResumo] = useState(false);
+  const numeros = useMemo(() => resumoVendas(unidades), [unidades]);
   // Modo noturno (Edielson, 24/10, ideia do vídeo da AVVA): céu escuro, cidade
   // azulada e, em vez das cores de situação, as janelas das unidades vendidas
   // e permutadas ACESAS em amarelo quente; as à venda ficam apagadas. Alterna
@@ -747,6 +752,14 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         </svg>
       </div>
       {(fonteMapa || avisoMapa) && <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] text-slate-500/80">{avisoMapa || fonteMapa}</span>}
+      {/* Resumo do empreendimento (botão da barra): cards no topo, entre a legenda e os controles */}
+      {resumo && (
+        <div className="pointer-events-none absolute left-[252px] right-[372px] top-3 z-10 max-md:left-2 max-md:right-2 max-md:top-14">
+          <div className="pointer-events-auto">
+            <Resumo3D r={numeros} filtro={filtro} onFiltrar={alternarFiltro} compacto={!cheia} />
+          </div>
+        </div>
+      )}
       {/* Controles */}
       <div className="absolute right-3 top-3 flex gap-1.5">
         <button type="button" onClick={() => setGirando(g => !g)} title={girando ? "Parar de girar" : "Girar"} className={`${botao} w-8 ${girando ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
@@ -754,6 +767,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         </button>
         <button type="button" onClick={() => { setSelecionada(null); api.current?.resetar(); }} title="Voltar à vista inicial" className={`${botao} w-8`}>
           <Home className="h-4 w-4" />
+        </button>
+        <button type="button" onClick={() => setResumo(v => !v)} aria-pressed={resumo} title={resumo ? "Esconder o resumo" : "Resumo: unidades, vendas, VGV, ticket e R$/m²"} className={`${botao} w-8 ${resumo ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
+          <BarChart3 className="h-4 w-4" />
         </button>
         <button type="button" onClick={alternarNoite} title={noite ? "Modo dia (cores por situação)" : "Modo noite: janelas acesas = vendidas ou permutadas"} className={`${botao} w-8 ${noite ? "!bg-indigo-50 !border-indigo-200 !text-indigo-700" : ""}`}>
           {noite ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}

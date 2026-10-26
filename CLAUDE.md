@@ -254,6 +254,16 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (12 à venda: 102, 201, 301, 401, 402, 501, 502, 601, 602, 1202, 3102, 3202).
   Condições reais da mesma tabela em `CONFIG_PALACIO.condicoes` (10% +
   saldo em 100×, entrega 2030-12) = referência do modal até alguém salvar.
+  **Resumo** (Edielson, 26/10; botão de gráfico na barra, também na tela
+  cheia, desligado por padrão): cards no topo (`resumo-3d.tsx`, números em
+  `src/lib/resumo-vendas.ts`, trava `resumo-vendas.test.ts`): Unidades (%
+  comercializadas), Vendidas, Disponíveis (estoque à tabela), Permuta, VGV
+  vendido, Ticket médio e R$/m² vendido (com R$/m² da tabela). **VGV, ticket e
+  m² só com situação "Vendido"** (permuta e vendido por terceiros ficam fora
+  do R$, mas contam nas quantidades); só contratos com valor; m² só das que
+  têm valor e área. Clicar em Vendidas/Disponíveis/Permuta liga o filtro da
+  legenda. Os R$ aparecem independentemente do botão "Valores" (o Resumo é
+  uma ação explícita do usuário).
   **Modo noite** (Edielson, 24/10, ideia do vídeo da AVVA): botão lua/sol na
   barra do 3D (vale na tela cheia; lembrado em `localStorage.quadro3d_noite`).
   À noite: céu `#060d1f`, hemisfério/sol azulados e fracos, fachada neutra
