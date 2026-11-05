@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { SessionProvider } from "@/components/session-provider";
 import { CompanyProvider } from "@/lib/company-context";
+import { PresencaPortal } from "@/components/presenca-portal";
 
 export default function AuthenticatedLayout({
   children,
@@ -10,6 +11,7 @@ export default function AuthenticatedLayout({
 }) {
   return (
     <SessionProvider>
+      <PresencaPortal />
       <CompanyProvider>
       <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
         {/* Sidebar - hidden on mobile */}
