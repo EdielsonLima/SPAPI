@@ -73,22 +73,37 @@
   body {
     @apply bg-background text-foreground;
   }
-  .recharts-wrapper svg *:focus,
-  .recharts-wrapper svg *:focus-visible,
-  .recharts-wrapper svg rect:focus,
-  .recharts-wrapper svg rect:focus-visible {
-    outline: none !important;
-    stroke: none !important;
-    stroke-width: 0 !important;
-  }
-  .recharts-tooltip-cursor,
-  .recharts-bar-cursor {
-    fill: rgba(0, 0, 0, 0.05) !important;
-    stroke: none !important;
-  }
-  .recharts-wrapper svg rect[stroke="#000"],
-  .recharts-wrapper svg rect[stroke="black"] {
-    stroke: none !important;
-    stroke-width: 0 !important;
-  }
+}
+
+/* ---- Gráficos (Recharts) — FORA do @layer de propósito ----
+   Dentro de @layer base o Tailwind só emite a regra se achar o seletor no
+   código-fonte; .recharts-wrapper é classe de biblioteca (só existe em tempo de
+   execução), então as regras antigas nunca chegavam ao CSS compilado e o anel
+   preto de foco continuava em produção (visto em 06/11/2026). */
+/* Recharts 3 dá tabindex ao próprio <svg> (accessibilityLayer): ao clicar numa
+   barra o navegador desenhava um contorno preto de foco na área do gráfico
+   (Edielson, 06/11/2026). A regra antiga só cobria os filhos do svg. */
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-visible,
+.recharts-wrapper svg:focus,
+.recharts-wrapper svg:focus-visible,
+.recharts-wrapper [tabindex]:focus,
+.recharts-wrapper [tabindex]:focus-visible,
+.recharts-wrapper svg *:focus,
+.recharts-wrapper svg *:focus-visible,
+.recharts-wrapper svg rect:focus,
+.recharts-wrapper svg rect:focus-visible {
+  outline: none !important;
+  stroke: none !important;
+  stroke-width: 0 !important;
+}
+.recharts-tooltip-cursor,
+.recharts-bar-cursor {
+  fill: rgba(0, 0, 0, 0.05) !important;
+  stroke: none !important;
+}
+.recharts-wrapper svg rect[stroke="#000"],
+.recharts-wrapper svg rect[stroke="black"] {
+  stroke: none !important;
+  stroke-width: 0 !important;
 }
