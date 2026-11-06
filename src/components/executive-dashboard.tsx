@@ -2484,7 +2484,7 @@ export function ExecutiveDashboard() {
   };
 
   return (
-    <div className={isCpCrTab ? "flex flex-col gap-3 md:h-[calc(100vh-7rem)] md:min-h-[600px]" : "space-y-6 p-1"}>
+    <div className="flex flex-col gap-3 md:h-[calc(100vh-7rem)] md:min-h-[600px]">
       {/* Refresh progress modal */}
       {refreshing && refreshSteps.length > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
@@ -2607,7 +2607,7 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "saldos"
-                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                  ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -2650,7 +2650,7 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "comparativo"
-                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                  ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
                   : "text-slate-500 hover:text-slate-700"
               }`}
               title="Comparar períodos (ex.: 1º sem 2026 vs 2025)"
@@ -3009,117 +3009,38 @@ export function ExecutiveDashboard() {
 
       {/* Budget Tab Content */}
       {activeTab === "orcamento" && (
-        <div className="space-y-6">
-          {/* CUB Info Bar */}
-          {cubData && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-sm rounded-2xl p-5 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">CUB SC (Mês Atual)</p>
-                  <p className="text-2xl font-bold text-white tabular-nums">{formatCurrency(cubData.currentValue)}</p>
-                </div>
-                <div className="p-3 bg-slate-700/50 rounded-xl relative overflow-hidden">
-                  <div className="absolute inset-0 bg-blue-500/10" />
-                  <Building2 className="h-5 w-5 text-blue-400 relative z-10" />
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-sm rounded-2xl p-5 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Variação no Mês</p>
-                  <div className="flex items-center gap-3">
-                    <p className="text-2xl font-bold text-white tabular-nums">{Math.abs(cubData.monthlyVariation).toFixed(2)}%</p>
-                    <div className={`flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded-md ${
-                      cubData.monthlyVariation > 0 ? "bg-emerald-500/20 text-emerald-400" :
-                      cubData.monthlyVariation < 0 ? "bg-rose-500/20 text-rose-400" : "bg-slate-700 text-slate-300"
-                    }`}>
-                      {cubData.monthlyVariation > 0 ? <TrendingUp className="h-3 w-3 mr-1" /> :
-                       cubData.monthlyVariation < 0 ? <TrendingDown className="h-3 w-3 mr-1" /> : null}
-                      {cubData.monthlyVariation > 0 ? "ALTA" : cubData.monthlyVariation < 0 ? "BAIXA" : "NEUTRO"}
-                    </div>
-                  </div>
-                </div>
-                <div className="p-3 bg-slate-700/50 rounded-xl relative overflow-hidden">
-                  <div className="absolute inset-0 bg-emerald-500/10" />
-                  <BarChart3 className="h-5 w-5 text-emerald-400 relative z-10" />
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 border border-slate-700 shadow-sm rounded-2xl p-5 flex items-center justify-between">
-                <div>
-                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-1">Variação Ano ({currentYear})</p>
-                  <div className="flex items-center gap-3">
-                    <p className="text-2xl font-bold text-white tabular-nums">{Math.abs(cubData.yearlyAccumulated).toFixed(2)}%</p>
-                    <div className={`flex items-center text-[11px] font-bold px-1.5 py-0.5 rounded-md ${
-                      cubData.yearlyAccumulated > 0 ? "bg-emerald-500/20 text-emerald-400" :
-                      cubData.yearlyAccumulated < 0 ? "bg-rose-500/20 text-rose-400" : "bg-slate-700 text-slate-300"
-                    }`}>
-                      {cubData.yearlyAccumulated > 0 ? <TrendingUp className="h-3 w-3 mr-1" /> :
-                       cubData.yearlyAccumulated < 0 ? <TrendingDown className="h-3 w-3 mr-1" /> : null}
-                      {cubData.yearlyAccumulated > 0 ? "ALTA" : cubData.yearlyAccumulated < 0 ? "BAIXA" : "NEUTRO"}
-                    </div>
-                  </div>
-                </div>
-                <div className="p-3 bg-slate-700/50 rounded-xl relative overflow-hidden">
-                  <div className="absolute inset-0 bg-violet-500/10" />
-                  <TrendingUp className="h-5 w-5 text-violet-400 relative z-10" />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Card className="border border-blue-100 bg-gradient-to-b from-blue-50 to-white shadow-[0_8px_30px_rgb(59,130,246,0.06)] rounded-2xl overflow-hidden relative group hover:shadow-[0_8px_30px_rgb(59,130,246,0.12)] transition-all duration-300">
-              <CardContent className="pt-6 pb-6 px-7">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-bold text-blue-600/80 uppercase tracking-widest">Orçamento Total</p>
-                    <p className="text-3xl font-black text-blue-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalBudget)}</p>
-                    <p className="text-[11px] font-medium text-blue-900/40 mt-1.5 leading-tight max-w-[220px]">
-                      Só obras ativas
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white shadow-sm ring-1 ring-blue-100 rounded-xl">
-                    <Banknote className="h-6 w-6 text-blue-500" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border border-emerald-100 bg-gradient-to-b from-emerald-50 to-white shadow-[0_8px_30px_rgb(16,185,129,0.06)] rounded-2xl overflow-hidden relative group hover:shadow-[0_8px_30px_rgb(16,185,129,0.12)] transition-all duration-300">
-              <CardContent className="pt-6 pb-6 px-7">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Custo Realizado</p>
-                    <p className="text-3xl font-black text-emerald-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalRealized)}</p>
-                    <p className="text-[11px] font-medium text-emerald-900/40 mt-1.5 leading-tight max-w-[220px]">
-                      Só obras ativas
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white shadow-sm ring-1 ring-emerald-100 rounded-xl">
-                    <CheckCircle className="h-6 w-6 text-emerald-500" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border border-amber-100 bg-gradient-to-b from-amber-50 to-white shadow-[0_8px_30px_rgb(245,158,11,0.06)] rounded-2xl overflow-hidden relative group hover:shadow-[0_8px_30px_rgb(245,158,11,0.12)] transition-all duration-300">
-              <CardContent className="pt-6 pb-5 px-7">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-bold text-amber-600/80 uppercase tracking-widest">Saldo a Realizar</p>
-                    <p className="text-3xl font-black text-amber-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalToRealize)}</p>
-                    <p className="text-[11px] font-medium text-amber-900/40 mt-1.5 leading-tight max-w-[220px]">
-                      Só obras ativas, sem saldos negativos
-                    </p>
-                  </div>
-                  <div className="p-3 bg-white shadow-sm ring-1 ring-amber-100 rounded-xl">
-                    <Clock className="h-6 w-6 text-amber-500" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+        <div className="flex-1 min-h-0 flex flex-col gap-3">
+          {/* CUB e totais numa linha só, no padrão do Portal (tela única, 06/11/2026) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3 shrink-0">
+            {cubData && (<>
+              <CardPainel
+                rotulo="CUB SC (mês atual)"
+                valor={formatCurrency(cubData.currentValue)}
+                sub={cubData.currentMonth ? `referência ${cubData.currentMonth}` : "Sinduscon SC"}
+                cor="bg-slate-500"
+              />
+              <CardPainel
+                rotulo="Variação no mês"
+                valor={`${cubData.monthlyVariation > 0 ? "+" : ""}${cubData.monthlyVariation.toFixed(2)}%`}
+                sub={cubData.monthlyVariation > 0 ? "alta" : cubData.monthlyVariation < 0 ? "baixa" : "estável"}
+                cor={cubData.monthlyVariation > 0 ? "bg-emerald-500" : cubData.monthlyVariation < 0 ? "bg-rose-500" : "bg-slate-400"}
+                corValor={cubData.monthlyVariation > 0 ? "text-emerald-700 dark:text-emerald-400" : cubData.monthlyVariation < 0 ? "text-rose-600 dark:text-rose-400" : undefined}
+              />
+              <CardPainel
+                rotulo={`Variação ano (${currentYear})`}
+                valor={`${cubData.yearlyAccumulated > 0 ? "+" : ""}${cubData.yearlyAccumulated.toFixed(2)}%`}
+                sub={cubData.yearlyAccumulated > 0 ? "acumulado em alta" : cubData.yearlyAccumulated < 0 ? "acumulado em baixa" : "estável"}
+                cor={cubData.yearlyAccumulated > 0 ? "bg-emerald-500" : cubData.yearlyAccumulated < 0 ? "bg-rose-500" : "bg-slate-400"}
+                corValor={cubData.yearlyAccumulated > 0 ? "text-emerald-700 dark:text-emerald-400" : cubData.yearlyAccumulated < 0 ? "text-rose-600 dark:text-rose-400" : undefined}
+              />
+            </>)}
+            <CardPainel rotulo="Orçamento Total" valor={formatCurrency(budgetTotals.totalBudget)} sub="só obras ativas" cor="bg-blue-500" />
+            <CardPainel rotulo="Custo Realizado" valor={formatCurrency(budgetTotals.totalRealized)} sub="só obras ativas" cor="bg-emerald-500" />
+            <CardPainel rotulo="Saldo a Realizar" valor={formatCurrency(budgetTotals.totalToRealize)} sub="só obras ativas, sem saldos negativos" cor="bg-amber-500" />
           </div>
 
-          {/* Budget Table */}
-          <Card className="border border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden mt-2">
+          {/* Budget Table — rola por dentro do card se não couber */}
+          <Card className="flex-1 min-h-0 overflow-y-auto border border-slate-200 dark:border-slate-700 dark:bg-slate-900 shadow-none rounded-2xl">
             <CardContent className="p-0">
               {budgetData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
@@ -4024,56 +3945,15 @@ export function ExecutiveDashboard() {
         const fluxoProjetado30d = saldoTotal + aReceber7d - aPagar7d;
 
         return (
-          <div className="space-y-6">
-            {/* Row 1: Main KPIs */}
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-              {/* Saldo Bancário */}
-              <div className="relative rounded-2xl p-4 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200/60 dark:border-indigo-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("saldos")}>
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-600" />
-                <p className="text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Saldo Bancário</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(saldoTotal)}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">hoje</p>
-              </div>
-
-              {/* A Pagar 7d */}
-              <div className="relative rounded-2xl p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("a-pagar")}>
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
-                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">A Pagar 7 dias</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(aPagar7d)}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">total: {formatCurrency(totalAPagar)}</p>
-              </div>
-
-              {/* A Receber 7d */}
-              <div className="relative rounded-2xl p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("a-receber")}>
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
-                <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">A Receber 7 dias</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(aReceber7d)}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">total: {formatCurrency(totalAReceber)}</p>
-              </div>
-
-              {/* Vencidas */}
-              <div className="relative rounded-2xl p-4 bg-red-50 dark:bg-red-950/40 border border-red-200/60 dark:border-red-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("atrasadas")}>
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-red-400 to-rose-500" />
-                <p className="text-[10px] font-semibold text-red-600 dark:text-red-300/70 uppercase tracking-wider mb-1">Contas Vencidas</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(totalAtrasadas)}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{filteredAtrasadas.length} parcelas</p>
-              </div>
-
-              {/* Inadimplência */}
-              <div className="relative rounded-2xl p-4 bg-orange-50 dark:bg-orange-950/40 border border-orange-200/60 dark:border-orange-800/40 overflow-hidden cursor-pointer hover:-translate-y-0.5 transition-all" onClick={() => switchTab("inadimplencia")}>
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-orange-400 to-amber-500" />
-                <p className="text-[10px] font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wider mb-1">Inadimplência</p>
-                <p className="text-lg font-black tabular-nums text-slate-800 dark:text-slate-100">{pctInadimplencia.toFixed(1)}%</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">{formatCurrency(totalInadimplencia)}</p>
-              </div>
-
-              {/* Fluxo Projetado */}
-              <div className={`relative rounded-2xl p-4 ${fluxoProjetado30d >= 0 ? "bg-sky-50 dark:bg-sky-950/40 border-sky-200/60 dark:border-sky-800/40" : "bg-red-50 dark:bg-red-950/40 border-red-200/60 dark:border-red-800/40"} border overflow-hidden`}>
-                <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${fluxoProjetado30d >= 0 ? "from-sky-500 to-blue-500" : "from-red-400 to-rose-500"}`} />
-                <p className="text-[10px] font-semibold text-sky-600 dark:text-sky-400 uppercase tracking-wider mb-1">Fluxo 7 dias</p>
-                <p className={`text-lg font-black tabular-nums ${fluxoProjetado30d >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-300/70"}`}>{formatCurrency(fluxoProjetado30d)}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">saldo + receber - pagar</p>
-              </div>
+          <div className="flex-1 min-h-0 flex flex-col gap-3">
+            {/* Row 1: Main KPIs — cards no padrão do Portal; clique leva à aba */}
+            <div className="grid grid-cols-2 md:grid-cols-3 2xl:grid-cols-6 gap-3 shrink-0">
+              <CardPainel rotulo="Saldo Bancário" valor={formatCurrency(saldoTotal)} sub="hoje · clique para ver os saldos" cor="bg-indigo-500" onClick={() => switchTab("saldos")} />
+              <CardPainel rotulo="A Pagar 7 dias" valor={formatCurrency(aPagar7d)} sub={`total: ${formatCurrency(totalAPagar)}`} cor="bg-amber-500" onClick={() => { setSection("cp"); switchTab("a-pagar"); }} />
+              <CardPainel rotulo="A Receber 7 dias" valor={formatCurrency(aReceber7d)} sub={`total: ${formatCurrency(totalAReceber)}`} cor="bg-emerald-500" onClick={() => { setSection("cr"); switchTab("a-receber"); }} />
+              <CardPainel rotulo="Contas Vencidas" valor={formatCurrency(totalAtrasadas)} sub={`${filteredAtrasadas.length} parcelas`} cor="bg-red-500" corValor={totalAtrasadas > 0 ? "text-red-600 dark:text-red-300/80" : undefined} onClick={() => { setSection("cp"); switchTab("atrasadas"); }} />
+              <CardPainel rotulo="Inadimplência" valor={`${pctInadimplencia.toFixed(1)}%`} sub={formatCurrency(totalInadimplencia)} cor="bg-orange-500" onClick={() => { setSection("cr"); switchTab("inadimplencia"); }} />
+              <CardPainel rotulo="Fluxo 7 dias" valor={formatCurrency(fluxoProjetado30d)} sub="saldo + receber − pagar" cor={fluxoProjetado30d >= 0 ? "bg-sky-500" : "bg-red-500"} corValor={fluxoProjetado30d < 0 ? "text-red-600 dark:text-red-300/80" : undefined} />
             </div>
 
             {/* Row 2+3: Fluxo de Caixa + Insights */}
@@ -4094,11 +3974,11 @@ export function ExecutiveDashboard() {
               }
               return (
                 <>
-                  <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
-                    <CardHeader className="pb-2">
+                  <Card className="flex-1 min-h-0 flex flex-col border border-slate-200 dark:border-slate-700 shadow-none rounded-2xl bg-white dark:bg-slate-900">
+                    <CardHeader className="pb-1 pt-4 px-5 shrink-0">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
-                          <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Fluxo de Caixa Projetado — Próximos {fluxoPeriodo} dias</CardTitle>
+                          <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Fluxo de Caixa Projetado — Próximos {fluxoPeriodo} dias</CardTitle>
                           <CardDescription className="text-xs text-slate-500">Saldo atual + recebimentos previstos - pagamentos previstos</CardDescription>
                         </div>
                         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
@@ -4108,7 +3988,7 @@ export function ExecutiveDashboard() {
                               onClick={() => setFluxoPeriodo(p)}
                               className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                                 fluxoPeriodo === p
-                                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                                  ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
                                   : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                               }`}
                             >
@@ -4117,17 +3997,17 @@ export function ExecutiveDashboard() {
                           ))}
                         </div>
                         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                          <button onClick={() => setFluxoView("projetado")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "projetado" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                          <button onClick={() => setFluxoView("projetado")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "projetado" ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
                             Projetado
                           </button>
-                          <button onClick={() => setFluxoView("entradas-saidas")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "entradas-saidas" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                          <button onClick={() => setFluxoView("entradas-saidas")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "entradas-saidas" ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
                             Entradas x Saídas
                           </button>
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="h-[350px]">
+                    <CardContent className="flex-1 min-h-0 px-3 pb-3">
+                      <div className="h-full">
                         {fluxoView === "projetado" ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <AreaChart data={days} margin={{ left: 10, right: 10, top: 10, bottom: 5 }}>
@@ -4246,42 +4126,51 @@ export function ExecutiveDashboard() {
                   </Card>
 
                   {/* Insight cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 shrink-0">
               {/* Pico mínimo */}
               {(() => {
                 const minDay = days.reduce((min, d) => d.projetado < min.projetado ? d : min, days[0]);
                 const isNegative = minDay.projetado < 0;
                 return (
-                  <div className={`rounded-2xl p-4 border ${isNegative ? "bg-red-50 dark:bg-red-950/30 border-red-200/60 dark:border-red-800/40" : "bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-800/40"}`}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Ponto Crítico</p>
-                    <p className={`text-lg font-black tabular-nums ${isNegative ? "text-red-600 dark:text-red-300/70" : "text-amber-700 dark:text-amber-400"}`}>{formatCurrency(minDay.projetado)}</p>
-                    <p className="text-[10px] text-slate-400">em {minDay.label} — menor saldo projetado</p>
-                  </div>
+                  <CardPainel
+                    rotulo="Ponto Crítico"
+                    valor={formatCurrency(minDay.projetado)}
+                    sub={`em ${minDay.label} — menor saldo projetado`}
+                    cor={isNegative ? "bg-red-500" : "bg-amber-500"}
+                    corValor={isNegative ? "text-red-600 dark:text-red-300/80" : "text-amber-700 dark:text-amber-400"}
+                  />
                 );
               })()}
 
               {/* Cobertura */}
               {(() => {
                 const diasCobertura = aPagar30d > 0 ? Math.floor((saldoTotal / aPagar30d) * 30) : 999;
+                const tom = diasCobertura < 15 ? "red" : diasCobertura < 30 ? "amber" : "emerald";
                 return (
-                  <div className={`rounded-2xl p-4 border ${diasCobertura < 15 ? "bg-red-50 dark:bg-red-950/30 border-red-200/60 dark:border-red-800/40" : diasCobertura < 30 ? "bg-amber-50 dark:bg-amber-950/30 border-amber-200/60 dark:border-amber-800/40" : "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200/60 dark:border-emerald-800/40"}`}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Cobertura de Caixa</p>
-                    <p className={`text-lg font-black tabular-nums ${diasCobertura < 15 ? "text-red-600 dark:text-red-300/70" : diasCobertura < 30 ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}`}>
-                      {diasCobertura > 365 ? "+365" : diasCobertura} dias
-                    </p>
-                    <p className="text-[10px] text-slate-400">saldo atual cobre pagamentos por este período</p>
-                  </div>
+                  <CardPainel
+                    rotulo="Cobertura de Caixa"
+                    valor={`${diasCobertura > 365 ? "+365" : diasCobertura} dias`}
+                    sub="saldo atual cobre pagamentos por este período"
+                    cor={tom === "red" ? "bg-red-500" : tom === "amber" ? "bg-amber-500" : "bg-emerald-500"}
+                    corValor={tom === "red" ? "text-red-600 dark:text-red-300/80" : tom === "amber" ? "text-amber-700 dark:text-amber-400" : "text-emerald-700 dark:text-emerald-400"}
+                  />
                 );
               })()}
 
               {/* Saldo final projetado */}
-              <div className={`rounded-2xl p-4 border ${days[days.length - 1]?.projetado >= 0 ? "bg-sky-50 dark:bg-sky-950/30 border-sky-200/60 dark:border-sky-800/40" : "bg-red-50 dark:bg-red-950/30 border-red-200/60 dark:border-red-800/40"}`}>
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Saldo em {fluxoPeriodo} dias</p>
-                <p className={`text-lg font-black tabular-nums ${days[days.length - 1]?.projetado >= 0 ? "text-sky-700 dark:text-sky-400" : "text-red-600 dark:text-red-300/70"}`}>
-                  {formatCurrency(days[days.length - 1]?.projetado || 0)}
-                </p>
-                <p className="text-[10px] text-slate-400">projeção para {days[days.length - 1]?.label}</p>
-              </div>
+              {(() => {
+                const ultimo = days[days.length - 1];
+                const positivo = (ultimo?.projetado ?? 0) >= 0;
+                return (
+                  <CardPainel
+                    rotulo={`Saldo em ${fluxoPeriodo} dias`}
+                    valor={formatCurrency(ultimo?.projetado || 0)}
+                    sub={`projeção para ${ultimo?.label ?? "-"}`}
+                    cor={positivo ? "bg-sky-500" : "bg-red-500"}
+                    corValor={positivo ? "text-sky-700 dark:text-sky-400" : "text-red-600 dark:text-red-300/80"}
+                  />
+                );
+              })()}
             </div>
                 </>
               );
@@ -4291,6 +4180,7 @@ export function ExecutiveDashboard() {
       })()}
 
       {activeTab === "dre" && (
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         <DreTab
           outcomeItems={consistentItems}
           incomeItems={consistentIncome}
@@ -4302,9 +4192,11 @@ export function ExecutiveDashboard() {
           refreshKey={refreshKey}
           dataSource="excel"
         />
+        </div>
       )}
 
       {activeTab === "dre-api" && (
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         <DreTab
           outcomeItems={consistentItems}
           incomeItems={consistentIncome}
@@ -4316,12 +4208,13 @@ export function ExecutiveDashboard() {
           refreshKey={refreshKey}
           dataSource="api"
         />
+        </div>
       )}
 
       {/* ══════ SALDOS BANCÁRIOS TAB ══════ */}
       {/* ══════ SALDOS BANCÁRIOS TAB ══════ */}
       {activeTab === "saldos" && (
-        <div className="space-y-6">
+        <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
           {loadingBankAccounts ? (
             <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -4671,7 +4564,7 @@ export function ExecutiveDashboard() {
                         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                           <button
                             onClick={() => setSaldosMonth("last7")}
-                            className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === "last7" ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                            className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === "last7" ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                           >
                             7 dias
                           </button>
@@ -4689,7 +4582,7 @@ export function ExecutiveDashboard() {
                                 <button
                                   key={m}
                                   onClick={() => setSaldosMonth(m)}
-                                  className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === m ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                  className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === m ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                                 >
                                   {label}
                                 </button>
@@ -4704,7 +4597,7 @@ export function ExecutiveDashboard() {
                             <span className="text-[10px] text-slate-400 px-1">vs</span>
                             <button
                               onClick={() => setSaldosCompareMonth(null)}
-                              className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${!saldosCompareMonth ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                              className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${!saldosCompareMonth ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
                             >
                               —
                             </button>
@@ -5044,7 +4937,7 @@ export function ExecutiveDashboard() {
         const totLucratividade = totRecebido > 0 ? (totSaldo / totRecebido) * 100 : 0;
 
         return (
-          <div className="space-y-6">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
             {/* Filtros próprios da aba Resumo foram removidos em 2026-05-09:
                 Total Pago/Recebido agora usa exatamente paidSum/receivedSum
                 das paginas Contas Pagas/Recebidas. Filtros de Tipo Op. sao
@@ -5187,11 +5080,14 @@ export function ExecutiveDashboard() {
 
       {/* ══════ INDICADORES DE MERCADO TAB ══════ */}
       {activeTab === "indicadores" && (
-        <IndicadoresTab />
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          <IndicadoresTab />
+        </div>
       )}
 
       {/* ══════ COMPARATIVO TAB ══════ */}
       {activeTab === "comparativo" && (
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         <ComparativoTab
           incomeItems={consistentIncomeForRecebidas}
           outcomeItems={consistentItemsForPagas}
@@ -5200,28 +5096,64 @@ export function ExecutiveDashboard() {
           isHolding={isHolding}
           currentYear={currentYear}
         />
+        </div>
       )}
 
       {/* ══════ CALENDÁRIO DE PAGAMENTOS TAB ══════ */}
       {activeTab === "calendario-pagamento" && (
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         <CalendarioPagamentoTab
           itemsAPagar={itemsAPagar}
           allOutcomeItems={consistentItems}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
         />
+        </div>
       )}
 
       {/* ══════ CALENDÁRIO DE RECEBIMENTOS TAB ══════ */}
       {activeTab === "calendario-recebimento" && (
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
         <CalendarioRecebimentoTab
           itemsAReceber={itemsAReceber}
           allIncomeItems={consistentIncomeCR}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
         />
+        </div>
       )}
 
+    </div>
+  );
+}
+
+// Card do painel no padrão visual Silva Packer (Portal/Pedidos): borda fina,
+// sem sombra nem ícone colorido, ponto de estado antes do rótulo e valor em
+// fonte fluida que nunca é cortado. Usado nas abas Geral e Orçamento; os cards
+// das abas CP/CR têm o mesmo desenho inline (com clique/active próprios).
+function CardPainel({ rotulo, valor, sub, cor, corValor, onClick }: {
+  rotulo: string;
+  valor: string;
+  sub?: string;
+  cor: string;        // classe do ponto, ex.: "bg-blue-500"
+  corValor?: string;  // classe de cor do valor (padrão: tinta)
+  onClick?: () => void;
+}) {
+  const clicavel = Boolean(onClick);
+  return (
+    <div
+      role={clicavel ? "button" : undefined}
+      tabIndex={clicavel ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={clicavel ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick?.(); } } : undefined}
+      className={`rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 min-w-0 ${clicavel ? "cursor-pointer hover:border-slate-400 dark:hover:border-slate-500 transition-colors" : ""}`}
+    >
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cor}`} />
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 truncate">{rotulo}</p>
+      </div>
+      <p className={`mt-1.5 font-semibold tabular-nums whitespace-nowrap leading-tight text-[clamp(1rem,1.15vw,1.5rem)] ${corValor || "text-slate-900 dark:text-slate-50"}`}>{valor}</p>
+      {sub && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 truncate">{sub}</p>}
     </div>
   );
 }

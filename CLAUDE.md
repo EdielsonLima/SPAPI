@@ -343,6 +343,14 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
 - Cards "Vence Hoje/7/15/30" ligam `selectedDuePeriods`; o total limpa.
   Detalhamentos (Credores/Clientes, Atrasadas, Inadimplentes) abrem em `Dialog`
   (`semFechar`, o card tem o próprio X) em vez de empurrar a tela.
+- **Demais abas (06/11, "Geral também"):** a raiz do painel é sempre
+  `flex flex-col md:h-[calc(100vh-7rem)]`. **Geral**: 6 cards + Fluxo de Caixa
+  (`flex-1`) + 3 cards de insight cabem na janela. **Orçamento**: CUB e totais numa
+  linha de 6 cards; a tabela rola dentro do card se precisar. **DRE, Saldos, Resumo,
+  Indicadores, Comparativo e Calendários**: moldura fixa (cabeçalho, seções e
+  filtros não saem do lugar) e o conteúdo rola dentro de `flex-1 min-h-0
+  overflow-y-auto` — tabelas longas não cabem numa tela, então a rolagem é interna,
+  nunca da página. Cards dessas abas usam `CardPainel` (fim do arquivo).
 - Rodar local: `.env.local` (gerado do env do serviço `spapi` no EasyPanel, com banco
   Docker `spapi-sp-db` na porta 5447 e login `admin-local`); `node scripts/migrate.js`
   com `DATABASE_URL` exportada. Primeira carga puxa 10 anos do Sienge (~3 min).
