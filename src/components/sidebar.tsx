@@ -64,14 +64,16 @@ const menuItems: MenuItem[] = [
     icon: <LayoutDashboard className="h-5 w-5" />,
   },
   {
+    // Edielson, 06/11/2026: saiu de dentro do Financeiro e virou item de
+    // primeiro nível, logo abaixo do Dashboard (é a tela mais usada).
+    label: "Painel Executivo",
+    href: "/financeiro/painel-executivo",
+    icon: <BarChart3 className="h-5 w-5" />,
+  },
+  {
     label: "Financeiro",
     icon: <DollarSign className="h-5 w-5" />,
     children: [
-      {
-        label: "Painel Executivo",
-        href: "/financeiro/painel-executivo",
-        icon: <BarChart3 className="h-4 w-4" />,
-      },
       {
         label: "Contas a Pagar",
         href: "/financeiro/contas-pagar",
@@ -199,7 +201,9 @@ const menuItems: MenuItem[] = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [openSubmenus, setOpenSubmenus] = useState<string[]>(["Financeiro"]);
+  // Todos os grupos nascem fechados (Edielson, 06/11/2026: "Financeiro sempre
+  // fechado, igual o Comercial"); o useEffect abaixo abre só o da rota atual.
+  const [openSubmenus, setOpenSubmenus] = useState<string[]>([]);
   const [overdueCount, setOverdueCount] = useState(0);
   const pathname = usePathname();
 
