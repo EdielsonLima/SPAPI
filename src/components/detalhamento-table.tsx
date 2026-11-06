@@ -96,8 +96,11 @@ export function DetalhamentoTable({
   const alignCls = (a?: string) => a === "right" ? "text-right" : a === "center" ? "text-center" : "text-left";
 
   return (
-    <Card className="border-0 shadow-sm mt-6">
-      <CardHeader className="pb-3">
+    // Dentro do modal (Painel): cabeçalho fixo com o botão de fechar sempre à
+    // vista e só a lista rolando (Edielson, 06/11/2026). Card em coluna flex;
+    // o CardContent é quem rola e o <thead> fica preso no topo.
+    <Card className="border-0 shadow-none flex flex-col min-h-0">
+      <CardHeader className="pb-3 shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-lg text-slate-800 dark:text-slate-100">{title}</CardTitle>
@@ -108,11 +111,13 @@ export function DetalhamentoTable({
           <Button variant="ghost" size="sm" onClick={onClose}><X className="h-4 w-4" /></Button>
         </div>
       </CardHeader>
-      <CardContent className="px-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-slate-50/80 dark:bg-slate-800/50">
+      <CardContent className="px-0 flex-1 min-h-0 overflow-auto">
+        <div className="min-w-full">
+          {/* containerClassName: o Table embrulha a tabela num div overflow-auto, que
+              anularia o sticky do thead; aqui quem rola é o CardContent. */}
+          <Table containerClassName="overflow-visible">
+            <TableHeader className="sticky top-0 z-10 bg-white dark:bg-slate-900">
+              <TableRow className="bg-slate-50 dark:bg-slate-800">
                 <TableHead className="w-10" />
                 <TableHead className="cursor-pointer select-none hover:text-slate-700" onClick={() => toggleSort("counterpart", "asc")}>
                   <div className="flex items-center gap-1">{counterpartLabel} <SortIcon field="counterpart" /></div>

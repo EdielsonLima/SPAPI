@@ -2482,7 +2482,9 @@ export function ExecutiveDashboard() {
           : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500"
     }`;
   const todosAnosAtivos = selectedYears.size === 0 || (availableYears.length > 0 && availableYears.every(y => selectedYears.has(y)));
-  const modalTabelaClass = "max-w-[min(1400px,94vw)] max-h-[90vh] overflow-y-auto p-2 sm:rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700";
+  // Modal em coluna flex, sem rolagem própria: quem rola é a lista dentro do
+  // card, para o cabeçalho (título + X) e os títulos da tabela ficarem fixos.
+  const modalTabelaClass = "max-w-[min(1400px,94vw)] max-h-[90vh] p-0 overflow-hidden flex flex-col sm:rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700";
   const exportarPdfAPagar = () => {
     const now = new Date();
     const fmtNow = `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
@@ -3522,8 +3524,8 @@ export function ExecutiveDashboard() {
         <DialogContent semFechar className={modalTabelaClass}>
           <DialogTitle className="sr-only">Contas em atraso</DialogTitle>
       {showOverdueTable && activeTab === "atrasadas" && (
-        <Card className="border-0 shadow-none">
-          <CardHeader className="pb-3">
+        <Card className="border-0 shadow-none flex flex-col min-h-0">
+          <CardHeader className="pb-3 shrink-0">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg text-slate-800">Detalhamento de Contas em Atraso</CardTitle>
@@ -3536,11 +3538,11 @@ export function ExecutiveDashboard() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="px-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/80">
+          <CardContent className="px-0 flex-1 min-h-0 overflow-auto">
+            <div className="min-w-full">
+              <Table containerClassName="overflow-visible">
+                <TableHeader className="sticky top-0 z-10 bg-white dark:bg-slate-900">
+                  <TableRow className="bg-slate-50 dark:bg-slate-800">
                     <TableHead className="w-10" />
                     <TableHead
                       className="cursor-pointer select-none hover:text-slate-700"
@@ -3715,8 +3717,8 @@ export function ExecutiveDashboard() {
           : delinquentsByClient;
         const visibleParcels = visibleDelinquents.reduce((s, c) => s + c.installments, 0);
         return (
-        <Card className="border-0 shadow-none">
-          <CardHeader className="pb-3">
+        <Card className="border-0 shadow-none flex flex-col min-h-0">
+          <CardHeader className="pb-3 shrink-0">
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-lg text-slate-800">Detalhamento de Inadimplencia</CardTitle>
@@ -3764,11 +3766,11 @@ export function ExecutiveDashboard() {
               </div>
             )}
           </CardHeader>
-          <CardContent className="px-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/80">
+          <CardContent className="px-0 flex-1 min-h-0 overflow-auto">
+            <div className="min-w-full">
+              <Table containerClassName="overflow-visible">
+                <TableHeader className="sticky top-0 z-10 bg-white dark:bg-slate-900">
+                  <TableRow className="bg-slate-50 dark:bg-slate-800">
                     <TableHead className="w-10" />
                     <TableHead
                       className="cursor-pointer select-none hover:text-slate-700"
