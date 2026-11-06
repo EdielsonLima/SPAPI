@@ -38,26 +38,28 @@
     --radius: 0.5rem;
   }
 
+  /* Modo escuro neutro (06/11/2026): preto suave #111113, sem o toque
+     avermelhado da tinta — o carmim fica só na marca e no estado ativo. */
   .dark {
-    --background: 350 20% 6%;
-    --foreground: 350 20% 94%;
-    --card: 350 16% 9%;
-    --card-foreground: 350 20% 94%;
-    --popover: 350 18% 8%;
-    --popover-foreground: 350 20% 94%;
-    --primary: 350 72% 55%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 350 12% 13%;
-    --secondary-foreground: 350 20% 94%;
-    --muted: 350 12% 13%;
-    --muted-foreground: 350 12% 70%;
-    --accent: 350 12% 13%;
-    --accent-foreground: 350 20% 94%;
+    --background: 240 6% 7%;        /* #111113 */
+    --foreground: 0 0% 95%;
+    --card: 240 6% 10%;             /* #18181b */
+    --card-foreground: 0 0% 95%;
+    --popover: 240 6% 9%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 352 78% 58%;         /* carmim um pouco mais claro para ler no escuro */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 5% 15%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 240 5% 15%;
+    --muted-foreground: 240 5% 68%;
+    --accent: 240 5% 15%;
+    --accent-foreground: 0 0% 95%;
     --destructive: 0 63% 50%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 350 12% 22%;
-    --input: 350 12% 22%;
-    --ring: 350 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5% 20%;           /* #303033 */
+    --input: 240 5% 20%;
+    --ring: 352 78% 58%;
     --chart-1: 350 72% 55%;
     --chart-2: 160 60% 50%;
     --chart-3: 30 80% 60%;
@@ -106,4 +108,17 @@
 .recharts-wrapper svg rect[stroke="black"] {
   stroke: none !important;
   stroke-width: 0 !important;
+}
+
+/* Chip/pílula marcada em carmim. No escuro o carmim de TEXTO é mais claro
+   (--primary 58 %) para ler sobre o fundo preto, mas como FUNDO com texto
+   branco caía a 4:1 — o chip marcado usa o carmim do tema claro (06/11/2026). */
+.chip-ativo {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+  color: #fff;
+}
+.dark .chip-ativo {
+  background-color: hsl(350 72% 46%);
+  border-color: hsl(350 72% 46%);
 }

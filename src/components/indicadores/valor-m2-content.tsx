@@ -47,15 +47,15 @@ function CustomTooltip({
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shadow-lg text-xs">
       <p className="font-semibold text-slate-700 dark:text-slate-200">
-        {p.cidade} <span className="text-slate-400">({p.uf})</span>
+        {p.cidade} <span className="text-slate-500 dark:text-slate-400">({p.uf})</span>
       </p>
       <p className="tabular-nums text-slate-800 dark:text-slate-100">{brl(p.valor_m2)}/m²</p>
       {variacao !== null && (
         <p
           className={
             variacaoPositiva
-              ? "tabular-nums text-emerald-600 dark:text-emerald-400"
-              : "tabular-nums text-rose-600 dark:text-rose-400"
+              ? "tabular-nums text-emerald-700 dark:text-emerald-400"
+              : "tabular-nums text-rose-700 dark:text-rose-400"
           }
         >
           {pctBr(variacao)} em 12 meses
@@ -197,7 +197,7 @@ export function ValorM2Content({
         <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-slate-400" />
+              <Building2 className="h-4 w-4 text-slate-500 dark:text-slate-400" />
               <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 R$/m² por cidade
               </h3>
@@ -211,8 +211,8 @@ export function ValorM2Content({
                 onClick={() => setChartLayout("barras")}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                   chartLayout === "barras"
-                    ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                    ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
                 title="Barras horizontais"
               >
@@ -224,8 +224,8 @@ export function ValorM2Content({
                 onClick={() => setChartLayout("colunas")}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                   chartLayout === "colunas"
-                    ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+                    ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
                 title="Colunas verticais"
               >
@@ -235,7 +235,7 @@ export function ValorM2Content({
             </div>
           </div>
           {chartData.length === 0 ? (
-            <div className="flex items-center justify-center h-64 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500">
+            <div className="flex items-center justify-center h-64 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400">
               Sem dados. Clique em <strong className="mx-1">Atualizar Valor m²</strong> para carregar.
             </div>
           ) : chartLayout === "barras" ? (
@@ -382,7 +382,7 @@ export function ValorM2Content({
                         </td>
                         <td className="py-2 px-4 text-slate-800 dark:text-slate-200 font-medium">
                           <span className="inline-flex items-center gap-1.5">
-                            <MapPin className="h-3 w-3 text-slate-400" />
+                            <MapPin className="h-3 w-3 text-slate-500 dark:text-slate-400" />
                             {r.cidade}
                           </span>
                         </td>
@@ -392,13 +392,13 @@ export function ValorM2Content({
                         </td>
                         <td className="py-2 px-4 text-right">
                           {variacao === null ? (
-                            <span className="text-slate-400">—</span>
+                            <span className="text-slate-500 dark:text-slate-400">—</span>
                           ) : (
                             <span
                               className={`inline-flex items-center gap-1 tabular-nums font-semibold ${
                                 positiva
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : "text-rose-600 dark:text-rose-400"
+                                  ? "text-emerald-700 dark:text-emerald-400"
+                                  : "text-rose-700 dark:text-rose-400"
                               }`}
                             >
                               <TrendingUp

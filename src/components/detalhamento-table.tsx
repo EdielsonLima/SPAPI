@@ -47,7 +47,7 @@ interface Group {
 
 const ACCENT = {
   blue: { total: "text-blue-600 dark:text-blue-300/80", badge: "bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300/70" },
-  emerald: { total: "text-emerald-600 dark:text-emerald-300/80", badge: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300/70" },
+  emerald: { total: "text-emerald-700 dark:text-emerald-300/80", badge: "bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300/70" },
 };
 
 export function DetalhamentoTable({
@@ -104,7 +104,7 @@ export function DetalhamentoTable({
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="text-lg text-slate-800 dark:text-slate-100">{title}</CardTitle>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               {groups.length} {groups.length === 1 ? counterpartLabel.toLowerCase() : plural} · {items.length} {countLabel.toLowerCase()}
             </p>
           </div>
@@ -144,7 +144,7 @@ export function DetalhamentoTable({
                       onClick={() => setExpanded(prev => { const n = new Set(prev); if (n.has(g.key)) n.delete(g.key); else n.add(g.key); return n; })}
                     >
                       <TableCell className="w-10 pl-4">
-                        {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                        {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
                       </TableCell>
                       <TableCell className="font-medium text-slate-800 dark:text-slate-200">{g.key}</TableCell>
                       <TableCell className="text-center">
@@ -165,7 +165,7 @@ export function DetalhamentoTable({
                           <div className="px-8 py-3 overflow-x-auto">
                             <table className="w-full text-sm">
                               <thead>
-                                <tr className="text-xs text-slate-400 uppercase tracking-wider">
+                                <tr className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                   {detailColumns.map((c, i) => (
                                     <th key={i} className={`py-2 font-semibold ${alignCls(c.align)}`}>{c.label}</th>
                                   ))}
@@ -194,7 +194,7 @@ export function DetalhamentoTable({
           </Table>
         </div>
         <div className="flex items-center justify-between px-6 pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">
-          <div className="flex gap-6 text-sm text-slate-500">
+          <div className="flex gap-6 text-sm text-slate-500 dark:text-slate-400">
             <span><strong className="text-slate-700 dark:text-slate-200">{groups.length}</strong> {plural}</span>
             <span><strong className="text-slate-700 dark:text-slate-200">{items.length}</strong> {countLabel.toLowerCase()}</span>
           </div>

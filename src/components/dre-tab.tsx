@@ -582,8 +582,8 @@ export function DreTab({
       <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
         <CardContent className="py-16 text-center">
           <BarChart3 className="h-12 w-12 mx-auto mb-4 text-slate-300" />
-          <h3 className="text-lg font-semibold text-slate-600 mb-2">DRE nao configurado</h3>
-          <p className="text-sm text-slate-400 mb-4">
+          <h3 className="text-lg font-semibold text-slate-600 mb-2 dark:text-slate-300">DRE nao configurado</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
             Configure as contas do plano financeiro para cada categoria do DRE.
           </p>
           <Button
@@ -658,8 +658,8 @@ export function DreTab({
           {/* Toggle */}
           <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2 min-w-0">
-              <BarChart3 className="h-4 w-4 text-slate-400 shrink-0" />
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">DRE <span className="text-xs font-normal text-slate-400 ml-1">Demonstração do Resultado</span></h3>
+              <BarChart3 className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">DRE <span className="text-xs font-normal text-slate-500 dark:text-slate-400 ml-1">Demonstração do Resultado</span></h3>
             </div>
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
@@ -668,8 +668,8 @@ export function DreTab({
                   className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                     dreMode === "simples"
                       ? "bg-white dark:bg-slate-700 text-primary"
-                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                  }`}
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  } dark:text-slate-400`}
                 >
                   DRE Simples
                 </button>
@@ -678,8 +678,8 @@ export function DreTab({
                   className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                     dreMode === "completa"
                       ? "bg-white dark:bg-slate-700 text-primary"
-                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                  }`}
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  } dark:text-slate-400`}
                 >
                   DRE Completa
                 </button>
@@ -694,8 +694,8 @@ export function DreTab({
                   title="Lê o Excel local (DEMOSTRATIVO RESULTADO COMPLETO.xlsx) e atualiza o DRE no banco. Só funciona quando o servidor tem acesso ao arquivo."
                 >
                   {syncingExcel
-                    ? <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />
-                    : <RefreshCw className="h-4 w-4 text-slate-400" />}
+                    ? <Loader2 className="h-4 w-4 text-slate-500 dark:text-slate-400 animate-spin" />
+                    : <RefreshCw className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
                   Sync DRE
                 </Button>
               )}
@@ -705,7 +705,7 @@ export function DreTab({
                 className="gap-1.5 text-xs font-medium h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-none"
                 onClick={() => window.open("/cadastros/dre", "_blank")}
               >
-                <Settings className="h-4 w-4 text-slate-400" />
+                <Settings className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                 Configurar
               </Button>
             </div>
@@ -715,13 +715,13 @@ export function DreTab({
             /* ══════ DRE COMPLETA: Monthly columns ══════ */
             (() => {
               if (loadingMonthly) return (
-                <div className="flex items-center justify-center py-12 gap-2 text-slate-500">
+                <div className="flex items-center justify-center py-12 gap-2 text-slate-500 dark:text-slate-400">
                   <Loader2 className="h-5 w-5 animate-spin" />
                   <span className="text-sm">Carregando dados mensais...</span>
                 </div>
               );
               if (!monthlyData) return (
-                <div className="py-12 text-center text-sm text-slate-400">
+                <div className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
                   Nenhum dado mensal disponivel para o periodo selecionado.
                 </div>
               );
@@ -868,7 +868,7 @@ export function DreTab({
                                     {v !== 0 ? fmtVal(v) : ""}
                                     {variation !== null && v !== 0 && (
                                       <div className={`text-[10px] font-medium leading-tight mt-0.5 ${
-                                        variation > 0 ? "text-emerald-600 dark:text-emerald-400" : variation < 0 ? "text-red-500 dark:text-red-400" : "text-slate-400 dark:text-slate-500"
+                                        variation > 0 ? "text-emerald-700 dark:text-emerald-400" : variation < 0 ? "text-red-500 dark:text-red-400" : "text-slate-400 dark:text-slate-500"
                                       }`}>
                                         {fmtPct(variation)}
                                       </div>
@@ -968,8 +968,8 @@ export function DreTab({
                       {canExpand && (
                         <div className="p-1">
                           {isExpanded
-                            ? <ChevronDown className="h-4 w-4 text-slate-500" />
-                            : <ChevronRight className="h-4 w-4 text-slate-400" />
+                            ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                            : <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                           }
                         </div>
                       )}
@@ -1025,8 +1025,8 @@ export function DreTab({
                                 <span className="w-6 flex items-center justify-center">
                                   {hasDetails && (
                                     isAccountExpanded
-                                      ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                                      : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                                      ? <ChevronDown className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                                      : <ChevronRight className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
                                   )}
                                 </span>
                                 <span className="text-[12px] font-medium text-slate-600 dark:text-slate-300 pl-3 flex items-center min-w-0">
@@ -1065,8 +1065,8 @@ export function DreTab({
                                         <span className="w-6 flex items-center justify-center">
                                           {hasTx && (
                                             isDetailExpanded
-                                              ? <ChevronDown className="h-3 w-3 text-slate-400" />
-                                              : <ChevronRight className="h-3 w-3 text-slate-400" />
+                                              ? <ChevronDown className="h-3 w-3 text-slate-500 dark:text-slate-400" />
+                                              : <ChevronRight className="h-3 w-3 text-slate-500 dark:text-slate-400" />
                                           )}
                                         </span>
                                         <div className="flex items-center pl-10 pr-4 min-w-0">
@@ -1146,8 +1146,8 @@ export function DreTab({
               {receitaOperacional !== 0 && (
                 <div className="w-full xl:w-[420px] flex-shrink-0 self-start rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 sticky top-24">
                   <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-                    <Lightbulb className="h-4 w-4 text-slate-400 shrink-0" />
-                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Insights da DRE <span className="text-xs font-normal text-slate-400 block mt-0.5">Análise Automática</span></h3>
+                    <Lightbulb className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
+                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Insights da DRE <span className="text-xs font-normal text-slate-500 dark:text-slate-400 block mt-0.5">Análise Automática</span></h3>
                   </div>
                   <div className="px-4 py-4 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
                     {(() => {

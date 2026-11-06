@@ -168,7 +168,7 @@ function FactorInput({
 
   return (
     <div className="flex items-center justify-center gap-1.5">
-      <span className="text-[13px] font-medium text-slate-700 tabular-nums w-10 text-right">
+      <span className="text-[13px] font-medium text-slate-700 tabular-nums w-10 text-right dark:text-slate-200">
         {local.toFixed(2)}
       </span>
       <div className="flex flex-col">
@@ -176,7 +176,7 @@ function FactorInput({
           type="button"
           onClick={() => adjust(FACTOR_STEP)}
           disabled={saving || local >= FACTOR_MAX}
-          className="text-slate-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none p-0.5"
+          className="text-slate-500 dark:text-slate-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none p-0.5"
           aria-label="Aumentar fator"
         >
           <ChevronUp className="h-3 w-3" strokeWidth={3} />
@@ -185,7 +185,7 @@ function FactorInput({
           type="button"
           onClick={() => adjust(-FACTOR_STEP)}
           disabled={saving || local <= FACTOR_MIN}
-          className="text-slate-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none p-0.5"
+          className="text-slate-500 dark:text-slate-400 hover:text-blue-600 disabled:opacity-30 disabled:cursor-not-allowed transition-colors leading-none p-0.5"
           aria-label="Diminuir fator"
         >
           <ChevronDown className="h-3 w-3" strokeWidth={3} />
@@ -2204,7 +2204,7 @@ export function ExecutiveDashboard() {
         label: "Empresas",
         value: String(new Set(filteredPagas.map(i => i.companyName)).size),
         subtitle: "com pagamentos",
-        icon: <Building2 className="h-7 w-7 text-slate-500" />,
+        icon: <Building2 className="h-7 w-7 text-slate-500 dark:text-slate-400" />,
         iconBg: "bg-slate-100",
         gradient: "from-slate-500 to-slate-600",
       },
@@ -2323,7 +2323,7 @@ export function ExecutiveDashboard() {
         label: "Empresas",
         value: String(new Set(filteredRecebidas.map(i => i.companyName)).size),
         subtitle: "com recebimentos",
-        icon: <Building2 className="h-7 w-7 text-slate-500" />,
+        icon: <Building2 className="h-7 w-7 text-slate-500 dark:text-slate-400" />,
         iconBg: "bg-slate-100",
         gradient: "from-slate-500 to-slate-600",
       },
@@ -2471,13 +2471,13 @@ export function ExecutiveDashboard() {
     });
     setSelectedDays(new Set());
   };
-  const subTabClass = "gap-1.5 px-3.5 h-7 rounded-full text-xs font-medium text-slate-500 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-primary dark:data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:font-semibold transition-all";
+  const subTabClass = "gap-1.5 px-3.5 h-7 rounded-full text-xs font-medium text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-primary dark:data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:font-semibold transition-all";
   const chipClass = (ativo: boolean, fraco = false) =>
     `h-7 min-w-[2.6rem] px-2.5 rounded-lg border text-xs font-medium tabular-nums transition-colors select-none ${
       ativo
-        ? "bg-primary border-primary text-white"
+        ? "chip-ativo"
         : fraco
-          ? "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600"
+          ? "bg-transparent border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:border-slate-400 dark:hover:border-slate-500"
           : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500"
     }`;
   // "Todos" alterna (Edielson, 06/11/2026): um clique marca todos, o próximo
@@ -2547,7 +2547,7 @@ export function ExecutiveDashboard() {
                   </div>
                   {s.detail && (
                     <span className={`text-xs tabular-nums shrink-0 ${
-                      s.status === "done" ? "text-emerald-600 dark:text-emerald-400" :
+                      s.status === "done" ? "text-emerald-700 dark:text-emerald-400" :
                       s.status === "error" ? "text-red-500" : "text-slate-400"
                     }`}>{s.detail}</span>
                   )}
@@ -2569,7 +2569,7 @@ export function ExecutiveDashboard() {
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "visao-geral"
                   ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <LayoutGrid className="h-3.5 w-3.5" />
@@ -2582,8 +2582,8 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 section === "cp" && !["orcamento", "dre", "saldos", "visao-geral"].includes(activeTab)
-                  ? "bg-white dark:bg-slate-700 text-red-600 dark:text-red-400 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-red-600 dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <ArrowUpRight className="h-3.5 w-3.5" />
@@ -2596,8 +2596,8 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 section === "cr" && ["a-receber", "recebidas", "inadimplencia"].includes(activeTab)
-                  ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-emerald-700 dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <ArrowDownLeft className="h-3.5 w-3.5" />
@@ -2611,8 +2611,8 @@ export function ExecutiveDashboard() {
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                   activeTab === "orcamento"
-                    ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700"
+                    ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-white shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                 }`}
               >
                 <Ruler className="h-3.5 w-3.5" />
@@ -2626,8 +2626,8 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "dre"
-                  ? "bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-teal-700 dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <BarChart3 className="h-3.5 w-3.5" />
@@ -2644,8 +2644,8 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "saldos"
-                  ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <Landmark className="h-3.5 w-3.5" />
@@ -2658,8 +2658,8 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "resumo"
-                  ? "bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-cyan-700 dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
             >
               <FileText className="h-3.5 w-3.5" />
@@ -2672,8 +2672,8 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "indicadores"
-                  ? "bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-amber-700 dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
               title="CUB-SC, CDI, IPCA, IGP-M e INCC"
             >
@@ -2687,8 +2687,8 @@ export function ExecutiveDashboard() {
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                 activeTab === "comparativo"
-                  ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm"
+                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
               title="Comparar períodos (ex.: 1º sem 2026 vs 2025)"
             >
@@ -2703,7 +2703,7 @@ export function ExecutiveDashboard() {
             if (!ts) return null;
             const d = new Date(ts);
             const formatted = `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} às ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-            return <span className="text-xs text-slate-400">Atualizado em {formatted}</span>;
+            return <span className="text-xs text-slate-500 dark:text-slate-400">Atualizado em {formatted}</span>;
           })()}
           <Button
             variant="outline"
@@ -3009,7 +3009,7 @@ export function ExecutiveDashboard() {
                 setSelectedYears(new Set(defaultYrs));
               }
             }}
-            className="text-slate-400 px-2"
+            className="text-slate-500 dark:text-slate-400 px-2"
           >
             <X className="h-4 w-4" />
           </Button>
@@ -3020,19 +3020,19 @@ export function ExecutiveDashboard() {
           ano/mês/trimestre, acumulando; "Todos" volta ao conjunto inteiro. */}
       {isCpCrTab && (
         <div className="flex items-center gap-1.5 flex-wrap rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shrink-0">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Ano</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 mr-1.5">Ano</span>
           {availableYears.map(y => (
             <button key={y} type="button" onClick={() => escolherAno(y)} className={chipClass(selectedYears.has(y))} title="Clique marca ou desmarca este ano (vai acumulando)">{y}</button>
           ))}
           <button type="button" onClick={alternarTodosAnos} className={chipClass(todosAnosAtivos, true)} title={todosAnosMarcados ? "Desmarca todos os anos" : "Marca todos os anos"}>Todos</button>
           <span className="mx-2 h-5 w-px bg-slate-200 dark:bg-slate-700" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Mês</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 mr-1.5">Mês</span>
           {MONTH_OPTIONS.map((m, idx) => (
             <button key={m} type="button" onClick={() => escolherMes(m)} className={chipClass(selectedMonths.has(m), !availableMonths.includes(m))} title={`${MONTH_NAMES[m]} · clique marca ou desmarca (vai acumulando)`}>{(MONTH_LABELS[idx] || m).toLowerCase()}</button>
           ))}
           <button type="button" onClick={alternarTodosMeses} className={chipClass(todosMesesAtivos, true)} title={todosMesesMarcados ? "Desmarca todos os meses" : "Marca todos os meses"}>Todos</button>
           <span className="mx-2 h-5 w-px bg-slate-200 dark:bg-slate-700" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Trim</span>
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 mr-1.5">Trim</span>
           {TRIMESTRES.map(t => (
             <button key={t.rotulo} type="button" onClick={() => escolherTrimestre(t.meses)} className={chipClass(t.meses.every(m => selectedMonths.has(m)))} title={`${t.titulo} · clique marca ou desmarca os 3 meses (vai acumulando)`}>{t.rotulo}</button>
           ))}
@@ -3066,14 +3066,14 @@ export function ExecutiveDashboard() {
                 valor={`${cubData.monthlyVariation > 0 ? "+" : ""}${cubData.monthlyVariation.toFixed(2)}%`}
                 sub={cubData.monthlyVariation > 0 ? "alta" : cubData.monthlyVariation < 0 ? "baixa" : "estável"}
                 cor={cubData.monthlyVariation > 0 ? "bg-emerald-500" : cubData.monthlyVariation < 0 ? "bg-rose-500" : "bg-slate-400"}
-                corValor={cubData.monthlyVariation > 0 ? "text-emerald-700 dark:text-emerald-400" : cubData.monthlyVariation < 0 ? "text-rose-600 dark:text-rose-400" : undefined}
+                corValor={cubData.monthlyVariation > 0 ? "text-emerald-700 dark:text-emerald-400" : cubData.monthlyVariation < 0 ? "text-rose-700 dark:text-rose-400" : undefined}
               />
               <CardPainel
                 rotulo={`Variação ano (${currentYear})`}
                 valor={`${cubData.yearlyAccumulated > 0 ? "+" : ""}${cubData.yearlyAccumulated.toFixed(2)}%`}
                 sub={cubData.yearlyAccumulated > 0 ? "acumulado em alta" : cubData.yearlyAccumulated < 0 ? "acumulado em baixa" : "estável"}
                 cor={cubData.yearlyAccumulated > 0 ? "bg-emerald-500" : cubData.yearlyAccumulated < 0 ? "bg-rose-500" : "bg-slate-400"}
-                corValor={cubData.yearlyAccumulated > 0 ? "text-emerald-700 dark:text-emerald-400" : cubData.yearlyAccumulated < 0 ? "text-rose-600 dark:text-rose-400" : undefined}
+                corValor={cubData.yearlyAccumulated > 0 ? "text-emerald-700 dark:text-emerald-400" : cubData.yearlyAccumulated < 0 ? "text-rose-700 dark:text-rose-400" : undefined}
               />
             </>)}
             <CardPainel rotulo="Orçamento Total" valor={formatCurrency(budgetTotals.totalBudget)} sub="só obras ativas" cor="bg-blue-500" />
@@ -3085,7 +3085,7 @@ export function ExecutiveDashboard() {
           <Card className="flex-1 min-h-0 overflow-y-auto border border-slate-200 dark:border-slate-700 dark:bg-slate-900 shadow-none rounded-2xl">
             <CardContent className="p-0">
               {budgetData.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                <div className="flex flex-col items-center justify-center py-16 text-slate-500 dark:text-slate-400">
                   <Ruler className="h-12 w-12 mb-3 text-slate-300 dark:text-slate-600" />
                   <p className="text-sm font-medium">Nenhum empreendimento configurado</p>
                   <p className="text-xs mt-1">Configure os empreendimentos em Configuracoes → Empreendimentos</p>
@@ -3149,7 +3149,7 @@ export function ExecutiveDashboard() {
                                 {row.percentReal.toFixed(1)}%
                               </span>
                             </TableCell>
-                            <TableCell className={`text-right tabular-nums text-[13px] font-bold ${row.toRealize < 0 ? (isFinalizada ? "text-rose-400 dark:text-red-300/70" : "text-rose-600 dark:text-red-400") : (isFinalizada ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100")}`}>
+                            <TableCell className={`text-right tabular-nums text-[13px] font-bold ${row.toRealize < 0 ? (isFinalizada ? "text-rose-400 dark:text-red-300/70" : "text-rose-700 dark:text-red-400") : (isFinalizada ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100")}`}>
                               {row.toRealize < 0 && <TrendingDown className="inline h-3.5 w-3.5 mr-1" />}
                               {formatCurrency(row.toRealize)}
                             </TableCell>
@@ -3160,7 +3160,7 @@ export function ExecutiveDashboard() {
                                   FINALIZADA
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-500/30">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-300 dark:ring-emerald-500/30">
                                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                                   ATIVA
                                 </span>
@@ -3215,7 +3215,7 @@ export function ExecutiveDashboard() {
                 <div
                   className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-medium ${
                     kpi.trend >= 0
-                      ? "text-emerald-600 bg-emerald-50 dark:text-emerald-300/80 dark:bg-emerald-950/40"
+                      ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300/80 dark:bg-emerald-950/40"
                       : "text-red-600 bg-red-50 dark:text-red-300/70 dark:bg-red-950/40"
                   }`}
                 >
@@ -3226,7 +3226,7 @@ export function ExecutiveDashboard() {
                   )}
                   {kpi.trend >= 0 ? "+" : ""}{kpi.trend.toFixed(1)}%
                 </div>
-                <span className="text-[11px] text-slate-400">{kpi.trendLabel}</span>
+                <span className="text-[11px] text-slate-500 dark:text-slate-400">{kpi.trendLabel}</span>
               </div>
             )}
           </div>
@@ -3254,7 +3254,7 @@ export function ExecutiveDashboard() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Por Empresa</CardTitle>
-                <CardDescription className="text-xs text-slate-400">
+                <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
                   {seriesLabel} por empresa/obra · clique numa barra para filtrar
                 </CardDescription>
               </div>
@@ -3271,7 +3271,7 @@ export function ExecutiveDashboard() {
                   <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} horizontal={false} />
                   <XAxis
                     type="number"
-                    tick={{ fontSize: 10, fill: "#94a3b8" }}
+                    tick={{ fontSize: 10, fill: chartColors.mutedText }}
                     tickFormatter={formatCompactCurrency}
                     axisLine={false}
                     tickLine={false}
@@ -3279,7 +3279,7 @@ export function ExecutiveDashboard() {
                   <YAxis
                     type="category"
                     dataKey="name"
-                    tick={{ fontSize: 11, fill: "#64748b" }}
+                    tick={{ fontSize: 11, fill: chartColors.mutedText }}
                     width={140}
                     axisLine={false}
                     tickLine={false}
@@ -3309,7 +3309,7 @@ export function ExecutiveDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex h-full items-center justify-center text-slate-400 text-sm">
+              <div className="flex h-full items-center justify-center text-slate-500 dark:text-slate-400 text-sm">
                 Sem dados para o periodo selecionado
               </div>
             )}
@@ -3329,7 +3329,7 @@ export function ExecutiveDashboard() {
                     </span>
                   )}
                 </CardTitle>
-                <CardDescription className="text-xs text-slate-400">
+                <CardDescription className="text-xs text-slate-500 dark:text-slate-400">
                   {seriesLabel} por {chartView === "mensal" ? "mês · clique numa barra para filtrar o mês" : chartView === "diario" ? "dia" : "ano · clique numa barra para filtrar o ano"}
                 </CardDescription>
               </div>
@@ -3344,18 +3344,18 @@ export function ExecutiveDashboard() {
           </CardHeader>
           <CardContent className="flex-1 min-h-0 px-3 pb-3">
             {chartView === "diario" && (selectedYears.size !== 1 || selectedMonths.size !== 1) ? (
-              <div className="flex h-full items-center justify-center text-slate-400 text-sm text-center px-6">
+              <div className="flex h-full items-center justify-center text-slate-500 dark:text-slate-400 text-sm text-center px-6">
                 <div className="space-y-2">
                   <p className="font-medium">Para ver a visão Diária, ajuste os filtros:</p>
                   <ul className="text-xs space-y-1 inline-block text-left">
-                    <li className={selectedYears.size === 1 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                    <li className={selectedYears.size === 1 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}>
                       {selectedYears.size === 1 ? "✓" : "✗"} Anos: <strong>{selectedYears.size}</strong> selecionado(s) · precisa ser <strong>1</strong>
                     </li>
-                    <li className={selectedMonths.size === 1 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                    <li className={selectedMonths.size === 1 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}>
                       {selectedMonths.size === 1 ? "✓" : "✗"} Meses: <strong>{selectedMonths.size}</strong> selecionado(s) · precisa ser <strong>1</strong>
                     </li>
                   </ul>
-                  <p className="text-xs text-slate-400">Use os filtros <strong>Anos</strong> e <strong>Meses</strong> no topo da aba</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Use os filtros <strong>Anos</strong> e <strong>Meses</strong> no topo da aba</p>
                 </div>
               </div>
             ) : (
@@ -3364,12 +3364,12 @@ export function ExecutiveDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} vertical={false} />
                 <XAxis
                   dataKey="month"
-                  tick={{ fontSize: 12, fill: "#94a3b8" }}
+                  tick={{ fontSize: 12, fill: chartColors.mutedText }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: "#94a3b8" }}
+                  tick={{ fontSize: 11, fill: chartColors.mutedText }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={formatCompactCurrency}
@@ -3541,8 +3541,8 @@ export function ExecutiveDashboard() {
           <CardHeader className="pb-3 shrink-0">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg text-slate-800">Detalhamento de Contas em Atraso</CardTitle>
-                <p className="text-sm text-slate-400 mt-1">
+                <CardTitle className="text-lg text-slate-800 dark:text-slate-100">Detalhamento de Contas em Atraso</CardTitle>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                   {overdueByCreditor.length} credores - {filteredAtrasadas.length} parcelas em atraso
                 </p>
               </div>
@@ -3621,9 +3621,9 @@ export function ExecutiveDashboard() {
                           }}
                         >
                           <TableCell className="w-10 pl-4">
-                            {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                            {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
                           </TableCell>
-                          <TableCell className="font-medium text-slate-800">
+                          <TableCell className="font-medium text-slate-800 dark:text-slate-100">
                             {creditor.creditorName}
                           </TableCell>
                           <TableCell className="text-center">
@@ -3639,7 +3639,7 @@ export function ExecutiveDashboard() {
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               {creditor.companies.map(c => (
-                                <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{c}</span>
+                                <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full dark:text-slate-300">{c}</span>
                               ))}
                             </div>
                           </TableCell>
@@ -3653,7 +3653,7 @@ export function ExecutiveDashboard() {
                               <div className="px-8 py-3">
                                 <table className="w-full text-sm">
                                   <thead>
-                                    <tr className="text-xs text-slate-400 uppercase tracking-wider">
+                                    <tr className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                       <th className="text-left py-2 font-semibold">Titulo</th>
                                       <th className="text-left py-2 font-semibold">Documento</th>
                                       <th className="text-left py-2 font-semibold">Vencimento</th>
@@ -3669,9 +3669,9 @@ export function ExecutiveDashboard() {
                                       .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
                                       .map((item, idx) => (
                                         <tr key={`${item.billId}-${item.installmentId}-${idx}`} className="border-t border-slate-100">
-                                          <td className="py-2 text-slate-600">{item.billId}/{item.installmentId}</td>
-                                          <td className="py-2 text-slate-600">{item.documentNumber || "-"}</td>
-                                          <td className="py-2 text-slate-600">{formatDate(item.dueDate)}</td>
+                                          <td className="py-2 text-slate-600 dark:text-slate-300">{item.billId}/{item.installmentId}</td>
+                                          <td className="py-2 text-slate-600 dark:text-slate-300">{item.documentNumber || "-"}</td>
+                                          <td className="py-2 text-slate-600 dark:text-slate-300">{formatDate(item.dueDate)}</td>
                                           <td className="py-2 text-center">
                                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                               daysDiff(item.dueDate) > 90 ? "bg-red-100 text-red-700" :
@@ -3681,10 +3681,10 @@ export function ExecutiveDashboard() {
                                               {daysDiff(item.dueDate)}d
                                             </span>
                                           </td>
-                                          <td className="py-2 text-right tabular-nums text-slate-600">{formatCurrency(item.originalAmount)}</td>
+                                          <td className="py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(item.originalAmount)}</td>
                                           <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70">{formatCurrency(effectiveAmount(item))}</td>
-                                          <td className="py-2 text-slate-600 text-xs">{item.companyName}</td>
-                                          <td className="py-2 text-slate-600 text-xs">{item.projectName}</td>
+                                          <td className="py-2 text-slate-600 text-xs dark:text-slate-300">{item.companyName}</td>
+                                          <td className="py-2 text-slate-600 text-xs dark:text-slate-300">{item.projectName}</td>
                                         </tr>
                                       ))}
                                   </tbody>
@@ -3701,9 +3701,9 @@ export function ExecutiveDashboard() {
             </div>
             {/* Footer totals */}
             <div className="flex items-center justify-between px-6 pt-4 mt-2 border-t border-slate-100">
-              <div className="flex gap-6 text-sm text-slate-500">
-                <span><strong className="text-slate-700">{overdueByCreditor.length}</strong> credores</span>
-                <span><strong className="text-slate-700">{filteredAtrasadas.length}</strong> parcelas</span>
+              <div className="flex gap-6 text-sm text-slate-500 dark:text-slate-400">
+                <span><strong className="text-slate-700 dark:text-slate-200">{overdueByCreditor.length}</strong> credores</span>
+                <span><strong className="text-slate-700 dark:text-slate-200">{filteredAtrasadas.length}</strong> parcelas</span>
               </div>
               <div className="text-sm font-bold text-red-600 dark:text-red-300/70">
                 Total: {formatCurrency(filteredAtrasadas.reduce((s, i) => s + effectiveAmount(i), 0))}
@@ -3734,10 +3734,10 @@ export function ExecutiveDashboard() {
           <CardHeader className="pb-3 shrink-0">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg text-slate-800">Detalhamento de Inadimplencia</CardTitle>
-                <p className="text-sm text-slate-400 mt-1">
+                <CardTitle className="text-lg text-slate-800 dark:text-slate-100">Detalhamento de Inadimplencia</CardTitle>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                   {visibleDelinquents.length} clientes inadimplentes - {visibleParcels} parcelas em atraso
-                  {delinquentCompanyFilter && <span className="ml-2 text-orange-600 font-medium">· filtrado por {delinquentCompanyFilter}</span>}
+                  {delinquentCompanyFilter && <span className="ml-2 text-orange-700 font-medium">· filtrado por {delinquentCompanyFilter}</span>}
                 </p>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setShowDelinquentTable(false)}>
@@ -3752,9 +3752,9 @@ export function ExecutiveDashboard() {
                   onClick={() => setDelinquentCompanyFilter(null)}
                   className={`text-[11px] font-semibold px-3 py-1 rounded-full transition-colors ${
                     delinquentCompanyFilter === null
-                      ? "bg-primary text-white"
+                      ? "chip-ativo"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
+                  } dark:text-slate-300`}
                 >
                   Todas ({delinquentsByClient.length})
                 </button>
@@ -3768,9 +3768,9 @@ export function ExecutiveDashboard() {
                       onClick={() => setDelinquentCompanyFilter(isActive ? null : co)}
                       className={`text-[11px] font-semibold px-3 py-1 rounded-full transition-colors ${
                         isActive
-                          ? "bg-primary text-white"
+                          ? "chip-ativo"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
+                      } dark:text-slate-300`}
                     >
                       {co} ({count})
                     </button>
@@ -3855,9 +3855,9 @@ export function ExecutiveDashboard() {
                           }}
                         >
                           <TableCell className="w-10 pl-4">
-                            {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
+                            {isExpanded ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />}
                           </TableCell>
-                          <TableCell className="font-medium text-slate-800">
+                          <TableCell className="font-medium text-slate-800 dark:text-slate-100">
                             {client.clientName}
                           </TableCell>
                           <TableCell className="text-center">
@@ -3873,7 +3873,7 @@ export function ExecutiveDashboard() {
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               {client.companies.map(c => (
-                                <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">{c}</span>
+                                <span key={c} className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full dark:text-slate-300">{c}</span>
                               ))}
                             </div>
                           </TableCell>
@@ -3887,7 +3887,7 @@ export function ExecutiveDashboard() {
                               <div className="px-8 py-3">
                                 <table className="w-full text-sm">
                                   <thead>
-                                    <tr className="text-xs text-slate-400 uppercase tracking-wider">
+                                    <tr className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                       <th className="text-left py-2 font-semibold">Titulo</th>
                                       <th className="text-left py-2 font-semibold">Documento</th>
                                       <th className="text-left py-2 font-semibold">Vencimento</th>
@@ -3905,9 +3905,9 @@ export function ExecutiveDashboard() {
                                       .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
                                       .map((item, idx) => (
                                         <tr key={`${item.billId}-${item.installmentId}-${idx}`} className="border-t border-slate-100">
-                                          <td className="py-2 text-slate-600">{item.billId}/{item.installmentId}</td>
-                                          <td className="py-2 text-slate-600">{item.documentNumber || "-"}</td>
-                                          <td className="py-2 text-slate-600">{formatDate(item.dueDate)}</td>
+                                          <td className="py-2 text-slate-600 dark:text-slate-300">{item.billId}/{item.installmentId}</td>
+                                          <td className="py-2 text-slate-600 dark:text-slate-300">{item.documentNumber || "-"}</td>
+                                          <td className="py-2 text-slate-600 dark:text-slate-300">{formatDate(item.dueDate)}</td>
                                           <td className="py-2 text-center">
                                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
                                               daysDiff(item.dueDate) > 90 ? "bg-red-100 text-red-700" :
@@ -3917,12 +3917,12 @@ export function ExecutiveDashboard() {
                                               {daysDiff(item.dueDate)}d
                                             </span>
                                           </td>
-                                          <td className="py-2 text-right tabular-nums text-slate-600">{formatCurrency(item.originalAmount)}</td>
-                                          <td className="py-2 text-right tabular-nums text-slate-800">{formatCurrency(item.correctedBalanceAmount)}</td>
+                                          <td className="py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">{formatCurrency(item.originalAmount)}</td>
+                                          <td className="py-2 text-right tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(item.correctedBalanceAmount)}</td>
                                           <td className="py-2 text-right tabular-nums text-red-600 dark:text-red-300/70">{formatCurrency(calcEncargos(item))}</td>
-                                          <td className="py-2 text-right tabular-nums text-slate-500">{formatCurrency(item.discountAmount || 0)}</td>
+                                          <td className="py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">{formatCurrency(item.discountAmount || 0)}</td>
                                           <td className="py-2 text-right tabular-nums font-semibold text-red-600 dark:text-red-300/70 pr-8">{formatCurrency(effectiveAmount(item) + calcEncargos(item))}</td>
-                                          <td className="py-2 text-slate-600 text-xs pl-4">{item.projectName}</td>
+                                          <td className="py-2 text-slate-600 text-xs pl-4 dark:text-slate-300">{item.projectName}</td>
                                         </tr>
                                       ))}
                                   </tbody>
@@ -3939,9 +3939,9 @@ export function ExecutiveDashboard() {
             </div>
             {/* Footer totals */}
             <div className="flex items-center justify-between px-6 pt-4 mt-2 border-t border-slate-100">
-              <div className="flex gap-6 text-sm text-slate-500">
-                <span><strong className="text-slate-700">{visibleDelinquents.length}</strong> clientes</span>
-                <span><strong className="text-slate-700">{visibleParcels}</strong> parcelas</span>
+              <div className="flex gap-6 text-sm text-slate-500 dark:text-slate-400">
+                <span><strong className="text-slate-700 dark:text-slate-200">{visibleDelinquents.length}</strong> clientes</span>
+                <span><strong className="text-slate-700 dark:text-slate-200">{visibleParcels}</strong> parcelas</span>
               </div>
               <div className="text-sm font-bold text-red-600 dark:text-red-300/70">
                 Total: {formatCurrency(visibleDelinquents.reduce((s, c) => s + c.totalOverdue, 0))}
@@ -4020,7 +4020,7 @@ export function ExecutiveDashboard() {
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
                           <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Fluxo de Caixa Projetado — Próximos {fluxoPeriodo} dias</CardTitle>
-                          <CardDescription className="text-xs text-slate-500">Saldo atual + recebimentos previstos - pagamentos previstos</CardDescription>
+                          <CardDescription className="text-xs text-slate-500 dark:text-slate-400">Saldo atual + recebimentos previstos - pagamentos previstos</CardDescription>
                         </div>
                         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                           {[30, 60, 90, 120, 180, 365].map(p => (
@@ -4029,8 +4029,8 @@ export function ExecutiveDashboard() {
                               onClick={() => setFluxoPeriodo(p)}
                               className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                                 fluxoPeriodo === p
-                                  ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
-                                  : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                  ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm"
+                                  : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                               }`}
                             >
                               {p <= 90 ? `${p}d` : p === 120 ? "4m" : p === 180 ? "6m" : "1a"}
@@ -4038,10 +4038,10 @@ export function ExecutiveDashboard() {
                           ))}
                         </div>
                         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                          <button onClick={() => setFluxoView("projetado")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "projetado" ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                          <button onClick={() => setFluxoView("projetado")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "projetado" ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}>
                             Projetado
                           </button>
-                          <button onClick={() => setFluxoView("entradas-saidas")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "entradas-saidas" ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}>
+                          <button onClick={() => setFluxoView("entradas-saidas")} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${fluxoView === "entradas-saidas" ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}>
                             Entradas x Saídas
                           </button>
                         </div>
@@ -4069,9 +4069,9 @@ export function ExecutiveDashboard() {
                                 return (
                                   <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-3 text-xs">
                                     <div className="font-semibold mb-1.5">{d.date?.split("-").reverse().join("/")}</div>
-                                    <div className="flex justify-between gap-4"><span className="text-slate-500">Saldo atual:</span><span>{formatCurrency(d.saldo)}</span></div>
-                                    <div className="flex justify-between gap-4"><span className="text-emerald-500">+ Recebimentos:</span><span className="text-emerald-600">{formatCurrency(d.receber)}</span></div>
-                                    <div className="flex justify-between gap-4"><span className="text-amber-500">- Pagamentos:</span><span className="text-amber-600">{formatCurrency(d.pagar)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className="text-slate-500 dark:text-slate-400">Saldo atual:</span><span>{formatCurrency(d.saldo)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className="text-emerald-500">+ Recebimentos:</span><span className="text-emerald-700">{formatCurrency(d.receber)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className="text-amber-500">- Pagamentos:</span><span className="text-amber-700">{formatCurrency(d.pagar)}</span></div>
                                     <div className="flex justify-between gap-4 pt-1 border-t mt-1"><span className="font-semibold">Projetado:</span><span className={`font-bold ${d.projetado >= 0 ? "text-indigo-600" : "text-red-400"}`}>{formatCurrency(d.projetado)}</span></div>
                                     {(() => {
                                       const idx = days.findIndex(dd => dd.date === d.date);
@@ -4081,7 +4081,7 @@ export function ExecutiveDashboard() {
                                         const varPct = prev !== 0 ? (varAbs / prev) * 100 : 0;
                                         return (
                                           <div className="flex justify-between gap-4 mt-0.5">
-                                            <span className="text-slate-400">Var. dia:</span>
+                                            <span className="text-slate-500 dark:text-slate-400">Var. dia:</span>
                                             <span className={`font-medium ${varAbs >= 0 ? "text-emerald-500" : "text-red-400"}`}>
                                               {varAbs >= 0 ? "+" : ""}{formatCompactCurrency(varAbs)} ({varAbs >= 0 ? "+" : ""}{varPct.toFixed(1)}%)
                                             </span>
@@ -4148,9 +4148,9 @@ export function ExecutiveDashboard() {
                                 return (
                                   <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg p-3 text-xs">
                                     <div className="font-semibold mb-1.5">{d.date?.split("-").reverse().join("/")}</div>
-                                    <div className="flex justify-between gap-4"><span className="text-emerald-500">Recebimentos:</span><span className="font-semibold text-emerald-600">{formatCurrency(d.recDia)}</span></div>
-                                    <div className="flex justify-between gap-4"><span className="text-amber-500">Pagamentos:</span><span className="font-semibold text-amber-600">{formatCurrency(d.pagDia)}</span></div>
-                                    <div className="flex justify-between gap-4"><span className={d.recDia - d.pagDia >= 0 ? "text-emerald-500" : "text-red-400"}>Resultado dia:</span><span className={`font-semibold ${d.recDia - d.pagDia >= 0 ? "text-emerald-600" : "text-red-400"}`}>{formatCurrency(d.recDia - d.pagDia)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className="text-emerald-500">Recebimentos:</span><span className="font-semibold text-emerald-700">{formatCurrency(d.recDia)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className="text-amber-500">Pagamentos:</span><span className="font-semibold text-amber-700">{formatCurrency(d.pagDia)}</span></div>
+                                    <div className="flex justify-between gap-4"><span className={d.recDia - d.pagDia >= 0 ? "text-emerald-500" : "text-red-400"}>Resultado dia:</span><span className={`font-semibold ${d.recDia - d.pagDia >= 0 ? "text-emerald-700" : "text-red-400"}`}>{formatCurrency(d.recDia - d.pagDia)}</span></div>
                                     <div className="flex justify-between gap-4 pt-1 border-t mt-1"><span className="font-semibold">Saldo projetado:</span><span className={`font-bold ${d.projetado >= 0 ? "text-indigo-600" : "text-red-400"}`}>{formatCurrency(d.projetado)}</span></div>
                                   </div>
                                 );
@@ -4257,7 +4257,7 @@ export function ExecutiveDashboard() {
       {activeTab === "saldos" && (
         <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
           {loadingBankAccounts ? (
-            <div className="flex items-center justify-center py-20 gap-2 text-slate-500">
+            <div className="flex items-center justify-center py-20 gap-2 text-slate-500 dark:text-slate-400">
               <Loader2 className="h-5 w-5 animate-spin" />
               <span className="text-sm">Carregando saldos bancarios...</span>
             </div>
@@ -4339,7 +4339,7 @@ export function ExecutiveDashboard() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-7 text-xs text-slate-500"
+                    className="h-7 text-xs text-slate-500 dark:text-slate-400"
                     onClick={() => {
                       if (!window.confirm("Tem certeza que deseja resetar o filtro de contas para o padrão? Suas seleções atuais serão perdidas.")) return;
                       localStorage.removeItem("dashboard_saldos_accounts_v2");
@@ -4371,7 +4371,7 @@ export function ExecutiveDashboard() {
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                         {filteredAccounts.length} contas em {companies.length} empresas
                         {selectedBankAccounts.size > 0 && selectedBankAccounts.size < allAccountNums.length && (
-                          <span className="ml-1 text-slate-400">({allAccountNums.length - selectedBankAccounts.size} excluídas)</span>
+                          <span className="ml-1 text-slate-500 dark:text-slate-400">({allAccountNums.length - selectedBankAccounts.size} excluídas)</span>
                         )}
                       </p>
                     </CardContent>
@@ -4418,7 +4418,7 @@ export function ExecutiveDashboard() {
                   <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Contas por Empresa</CardTitle>
-                      <CardDescription className="text-xs text-slate-500">Clique na empresa para ver as contas</CardDescription>
+                      <CardDescription className="text-xs text-slate-500 dark:text-slate-400">Clique na empresa para ver as contas</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
                       <Table>
@@ -4464,14 +4464,14 @@ export function ExecutiveDashboard() {
                                 >
                                   <TableCell className="w-[40px] px-2">
                                     {isCompanyExpanded
-                                      ? <ChevronDown className="h-4 w-4 text-slate-400" />
-                                      : <ChevronRight className="h-4 w-4 text-slate-400" />
+                                      ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                      : <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                                     }
                                   </TableCell>
                                   <TableCell className="text-sm font-semibold text-slate-700 dark:text-slate-200">
                                     {company.companyName}
                                   </TableCell>
-                                  <TableCell className={`text-sm font-bold text-right tabular-nums ${companyTotal >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-300/60"}`}>
+                                  <TableCell className={`text-sm font-bold text-right tabular-nums ${companyTotal >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-300/60"}`}>
                                     {formatCurrency(companyTotal)}
                                   </TableCell>
                                 </TableRow>
@@ -4496,12 +4496,12 @@ export function ExecutiveDashboard() {
                                       >
                                         <TableCell className="w-[40px] px-2 pl-6">
                                           {isBankExpanded
-                                            ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
-                                            : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                                            ? <ChevronDown className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                                            : <ChevronRight className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
                                           }
                                         </TableCell>
                                         <TableCell className="text-xs font-semibold text-slate-600 dark:text-slate-300 pl-6">
-                                          <Landmark className="h-3.5 w-3.5 inline-block mr-1.5 text-slate-400" />
+                                          <Landmark className="h-3.5 w-3.5 inline-block mr-1.5 text-slate-500 dark:text-slate-400" />
                                           {bankName}
                                           <Badge variant="secondary" className="ml-2 text-[10px] px-1">{bankAccts.length}</Badge>
                                         </TableCell>
@@ -4600,14 +4600,14 @@ export function ExecutiveDashboard() {
                             return d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
                           })()}
                         </CardTitle>
-                        <CardDescription className="text-xs text-slate-500">Saldo dia a dia das contas selecionadas</CardDescription>
+                        <CardDescription className="text-xs text-slate-500 dark:text-slate-400">Saldo dia a dia das contas selecionadas</CardDescription>
                       </div>
                       <div className="flex items-center gap-2">
                         {/* Month selector */}
                         <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                           <button
                             onClick={() => setSaldosMonth("last7")}
-                            className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === "last7" ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                            className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === "last7" ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                           >
                             7 dias
                           </button>
@@ -4625,7 +4625,7 @@ export function ExecutiveDashboard() {
                                 <button
                                   key={m}
                                   onClick={() => setSaldosMonth(m)}
-                                  className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === m ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                  className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosMonth === m ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                                 >
                                   {label}
                                 </button>
@@ -4637,10 +4637,10 @@ export function ExecutiveDashboard() {
                         {/* Compare selector */}
                         {saldosMonth !== "last7" && (
                           <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                            <span className="text-[10px] text-slate-400 px-1">vs</span>
+                            <span className="text-[10px] text-slate-600 dark:text-slate-400 px-1">vs</span>
                             <button
                               onClick={() => setSaldosCompareMonth(null)}
-                              className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${!saldosCompareMonth ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                              className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${!saldosCompareMonth ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                             >
                               —
                             </button>
@@ -4658,7 +4658,7 @@ export function ExecutiveDashboard() {
                                   <button
                                     key={m}
                                     onClick={() => setSaldosCompareMonth(m)}
-                                    className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosCompareMonth === m ? "bg-white dark:bg-slate-700 text-orange-600 dark:text-orange-400 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                                    className={`px-2 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosCompareMonth === m ? "bg-white dark:bg-slate-700 text-orange-700 dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                                   >
                                     {label}
                                   </button>
@@ -4671,10 +4671,10 @@ export function ExecutiveDashboard() {
                       {lineData.length > 1 && (
                         <div className="flex items-center gap-3">
                           <div className="text-right">
-                            <div className="text-[10px] text-slate-400 uppercase tracking-wider">Variação no mês</div>
+                            <div className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-wider">Variação no mês</div>
                             <div className="flex items-center gap-1.5 justify-end">
-                              <span className="text-xs text-slate-500">{formatCompactCurrency(firstVal)}</span>
-                              <span className="text-xs text-slate-400">→</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">{formatCompactCurrency(firstVal)}</span>
+                              <span className="text-xs text-slate-500 dark:text-slate-400">→</span>
                               <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{formatCompactCurrency(lastVal)}</span>
                             </div>
                           </div>
@@ -4692,7 +4692,7 @@ export function ExecutiveDashboard() {
                   </CardHeader>
                   <CardContent>
                     {loadingDaily ? (
-                      <div className="flex items-center justify-center py-16 gap-2 text-slate-500">
+                      <div className="flex items-center justify-center py-16 gap-2 text-slate-500 dark:text-slate-400">
                         <Loader2 className="h-5 w-5 animate-spin" />
                         <span className="text-sm">Carregando evolução diária...</span>
                       </div>
@@ -4778,16 +4778,16 @@ export function ExecutiveDashboard() {
                                         {data.fullDate?.split("-").reverse().join("/")}
                                       </div>
                                       <div className="flex justify-between gap-4 mb-1">
-                                        <span className="text-slate-500">Saldo:</span>
+                                        <span className="text-slate-500 dark:text-slate-400">Saldo:</span>
                                         <span className="font-bold text-slate-800 dark:text-slate-100">{formatCurrency(data.total)}</span>
                                       </div>
                                       <div className="flex justify-between gap-4 mb-1">
-                                        <span className="text-slate-500">Dia anterior:</span>
+                                        <span className="text-slate-500 dark:text-slate-400">Dia anterior:</span>
                                         <span className="text-slate-600 dark:text-slate-400">{formatCurrency(data.prevTotal)}</span>
                                       </div>
                                       <div className="flex justify-between gap-4 pt-1 border-t border-slate-100 dark:border-slate-700">
-                                        <span className="text-slate-500">Variação:</span>
-                                        <span className={`font-semibold ${isUp ? "text-emerald-600" : "text-red-400"}`}>
+                                        <span className="text-slate-500 dark:text-slate-400">Variação:</span>
+                                        <span className={`font-semibold ${isUp ? "text-emerald-700" : "text-red-400"}`}>
                                           {isUp ? "+" : ""}{formatCurrency(dayVar)} ({isUp ? "+" : ""}{dayVarPct.toFixed(1)}%)
                                         </span>
                                       </div>
@@ -4797,7 +4797,7 @@ export function ExecutiveDashboard() {
                                         return (
                                           <div className="flex justify-between gap-4 pt-1 border-t border-slate-100 dark:border-slate-700 mt-1">
                                             <span className="text-amber-500">vs comparação:</span>
-                                            <span className={`font-semibold ${diff >= 0 ? "text-emerald-600" : "text-red-400"}`}>
+                                            <span className={`font-semibold ${diff >= 0 ? "text-emerald-700" : "text-red-400"}`}>
                                               {diff >= 0 ? "+" : ""}{formatCompactCurrency(diff)} ({diff >= 0 ? "+" : ""}{diffPct.toFixed(1)}%)
                                             </span>
                                           </div>
@@ -4833,7 +4833,7 @@ export function ExecutiveDashboard() {
                         </div>
                       );
                     })() : (
-                      <p className="text-sm text-slate-400 text-center py-12">Dados diários não disponíveis</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-12">Dados diários não disponíveis</p>
                     )}
                   </CardContent>
                 </Card>
@@ -5050,8 +5050,8 @@ export function ExecutiveDashboard() {
                                 {co.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-xs font-semibold text-right tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(co.totalRecebido)}</TableCell>
-                            <TableCell className="text-xs font-semibold text-right tabular-nums text-amber-600 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
+                            <TableCell className="text-xs font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(co.totalRecebido)}</TableCell>
+                            <TableCell className="text-xs font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
                             <TableCell className={`text-xs font-bold text-right tabular-nums ${lucroRealizado >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
                               {formatCurrency(lucroRealizado)}
                             </TableCell>
@@ -5059,7 +5059,7 @@ export function ExecutiveDashboard() {
                             <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{co.valorEstoque > 0 ? formatCurrency(co.valorEstoque) : "-"}</TableCell>
                             <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{lucroPotencial > 0 ? formatCurrency(lucroPotencial) : "-"}</TableCell>
                             <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">{co.qtDisp > 0 ? co.qtDisp : "-"}</TableCell>
-                            <TableCell className="text-xs text-center tabular-nums text-slate-500">{co.qtResTec > 0 ? co.qtResTec : "-"}</TableCell>
+                            <TableCell className="text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">{co.qtResTec > 0 ? co.qtResTec : "-"}</TableCell>
                             <TableCell className="text-xs text-right tabular-nums">
                               <div className="flex items-center justify-end gap-2">
                                 <div className="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -5068,7 +5068,7 @@ export function ExecutiveDashboard() {
                                     style={{ width: `${Math.min(100, Math.max(0, lucratividade))}%` }}
                                   />
                                 </div>
-                                <span className={`font-semibold ${lucratividade >= 50 ? "text-emerald-600 dark:text-emerald-400" : lucratividade >= 20 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-300/70"}`}>
+                                <span className={`font-semibold ${lucratividade >= 50 ? "text-emerald-700 dark:text-emerald-400" : lucratividade >= 20 ? "text-amber-700 dark:text-amber-400" : "text-red-600 dark:text-red-300/70"}`}>
                                   {lucratividade.toFixed(1)}%
                                 </span>
                               </div>

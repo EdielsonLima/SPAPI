@@ -120,7 +120,7 @@ export function MultiSelectFilter({
       <PopoverContent className="w-80 p-0" align="end">
         <div className="p-3 border-b">
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500 dark:text-slate-400" />
             <input
               ref={inputRef}
               type="text"
@@ -176,13 +176,13 @@ export function MultiSelectFilter({
                 {allSelected && <span className="text-white text-[10px] font-bold">✓</span>}
               </div>
               <span>{allSelected ? "Desmarcar tudo" : "Selecionar tudo"}</span>
-              <span className="ml-auto text-xs text-slate-400">{allOptions.length}</span>
+              <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">{allOptions.length}</span>
             </div>
           </div>
         )}
         <div className="max-h-[280px] overflow-y-auto p-1">
           {filtered.length === 0 ? (
-            <p className="text-sm text-slate-400 text-center py-4">Nenhum resultado</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">Nenhum resultado</p>
           ) : (
             filtered.map(name => (
               <label
@@ -195,7 +195,7 @@ export function MultiSelectFilter({
                 />
                 <div className="min-w-0 flex-1">
                   <span className="truncate block">{getLabel(name)}</span>
-                  {subtitleFn && <span className="text-[10px] text-slate-400 truncate block">{subtitleFn(name)}</span>}
+                  {subtitleFn && <span className="text-[10px] text-slate-500 dark:text-slate-400 truncate block">{subtitleFn(name)}</span>}
                 </div>
               </label>
             ))
@@ -207,7 +207,7 @@ export function MultiSelectFilter({
               variant="ghost"
               size="sm"
               onClick={onClear}
-              className="flex-1 text-slate-500 gap-2"
+              className="flex-1 text-slate-500 gap-2 dark:text-slate-400"
             >
               <X className="h-3.5 w-3.5" />
               Limpar ({selected.size})
@@ -236,21 +236,21 @@ export function CustomTooltip({ active, payload, label }: any) {
   const pct = payload[0]?.payload?.pct;
   return (
     <div className="bg-white/95 backdrop-blur-sm rounded-xl border border-slate-200 shadow-xl p-4 text-sm min-w-[180px]">
-      <p className="font-semibold text-slate-700 mb-2">{label}</p>
+      <p className="font-semibold text-slate-700 mb-2 dark:text-slate-200">{label}</p>
       {payload.map((entry: { color: string; name: string; value: number }, idx: number) => (
         <div key={idx} className="flex items-center justify-between gap-4 mt-1">
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-slate-500">{entry.name}</span>
+            <span className="text-slate-500 dark:text-slate-400">{entry.name}</span>
           </div>
-          <span className="font-semibold text-slate-700 tabular-nums">
+          <span className="font-semibold text-slate-700 tabular-nums dark:text-slate-200">
             {formatCurrency(entry.value)}
           </span>
         </div>
       ))}
       {pct !== null && pct !== undefined && (
         <div className="flex items-center justify-between gap-4 mt-2 pt-2 border-t border-slate-100">
-          <span className="text-slate-400">Variacao</span>
+          <span className="text-slate-500 dark:text-slate-400">Variacao</span>
           <span className={`font-semibold tabular-nums ${pct >= 0 ? "text-red-500 dark:text-red-300/70" : "text-emerald-500 dark:text-emerald-400"}`}>
             {pct >= 0 ? "+" : ""}{pct.toFixed(1)}%
           </span>

@@ -363,6 +363,15 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   claro (`bg-slate-50 dark:bg-slate-800`, texto cinza em caixa alta — nunca o escuro
   `bg-slate-800 text-slate-100`), seletores ativos em carmim. Tela de carregamento idem.
   Ao criar card novo no painel, use `CardPainel` ou copie essas classes.
+- **Modo escuro neutro (Edielson, 06/11: "esse meio marrom não está bonito"):** o `slate`
+  quente vale só nos tons 50–200 (papel); de 300 para cima é cinza neutro (zinc), com
+  950 = `#111113` ("um preto, mas não absoluto"). Tokens `.dark` em `globals.css` são
+  neutros (`--background 240 6% 7%`). Contraste mínimo 4,5:1 em todo texto, nos dois
+  temas: pílula ativa no escuro tem texto branco (`dark:text-white`), pílula inativa é
+  `text-slate-600 dark:text-slate-400`, chip "fraco" é `text-slate-500 dark:text-slate-400`,
+  eixos dos gráficos usam `chartColors.mutedText`. Há uma auditoria por JS (razão de
+  contraste de cada texto contra o fundo) — rodar nos dois temas antes de subir mudança
+  de cor; nenhum elemento abaixo de 4,5:1 em 06/11.
 - Rodar local: `.env.local` (gerado do env do serviço `spapi` no EasyPanel, com banco
   Docker `spapi-sp-db` na porta 5447 e login `admin-local`); `node scripts/migrate.js`
   com `DATABASE_URL` exportada. Primeira carga puxa 10 anos do Sienge (~3 min).

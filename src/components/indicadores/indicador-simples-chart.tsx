@@ -64,8 +64,8 @@ function CustomTooltip({
         <p
           className={
             diff >= 0
-              ? "tabular-nums text-emerald-600 dark:text-emerald-400"
-              : "tabular-nums text-rose-600 dark:text-rose-400"
+              ? "tabular-nums text-emerald-700 dark:text-emerald-400"
+              : "tabular-nums text-rose-700 dark:text-rose-400"
           }
         >
           {diff >= 0 ? "+" : ""}
@@ -89,7 +89,7 @@ export function IndicadorSimplesChart({
 }) {
   if (data.length === 0) {
     return (
-      <div className="flex items-center justify-center h-64 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500">
+      <div className="flex items-center justify-center h-64 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400">
         Sem dados.
       </div>
     );

@@ -1784,7 +1784,7 @@ export function ContasTable({ mode, title, subtitle, dataSource = "outcome" }: C
               )}
 
               {hasActiveFilters && (
-                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-slate-500 hover:text-slate-700">
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white">
                   <X className="h-4 w-4 mr-1" /> Limpar
                 </Button>
               )}

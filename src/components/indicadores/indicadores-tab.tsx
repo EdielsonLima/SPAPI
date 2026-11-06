@@ -122,7 +122,7 @@ export function IndicadoresTab() {
   ];
   // Mesmas pílulas das sub-abas do Painel Executivo: ativa em carmim, sem cor por indicador.
   const subTabClass =
-    "gap-1.5 px-3.5 h-7 rounded-full text-xs font-medium text-slate-500 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-primary dark:data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:font-semibold transition-all";
+    "gap-1.5 px-3.5 h-7 rounded-full text-xs font-medium text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-primary dark:data-[state=active]:text-white data-[state=active]:shadow-sm data-[state=active]:font-semibold transition-all";
 
   return (
     <div className="space-y-6">
@@ -147,8 +147,8 @@ export function IndicadoresTab() {
 
       {loading && !data && (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
-          <span className="ml-2 text-sm text-slate-500">Carregando indicadores…</span>
+          <Loader2 className="h-6 w-6 animate-spin text-slate-500 dark:text-slate-400" />
+          <span className="ml-2 text-sm text-slate-500 dark:text-slate-400">Carregando indicadores…</span>
         </div>
       )}
 

@@ -81,14 +81,14 @@ function pctDelta(a: number, b: number): number | null {
 function DeltaBadge({ a, b, goodWhenUp = true }: { a: number; b: number; goodWhenUp?: boolean }) {
   const p = pctDelta(a, b);
   if (p === null) {
-    return <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-400"><Minus className="h-3 w-3" /> —</span>;
+    return <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400"><Minus className="h-3 w-3" /> —</span>;
   }
   const up = p >= 0;
   const good = goodWhenUp ? up : !up;
   const cls = Math.abs(p) < 0.05
     ? "text-slate-400 bg-slate-100 dark:bg-slate-800"
     : good
-      ? "text-emerald-600 bg-emerald-50 dark:text-emerald-300/80 dark:bg-emerald-950/40"
+      ? "text-emerald-700 bg-emerald-50 dark:text-emerald-300/80 dark:bg-emerald-950/40"
       : "text-red-600 bg-red-50 dark:text-red-300/70 dark:bg-red-950/40";
   return (
     <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-bold ${cls}`}>
@@ -266,7 +266,7 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
           <div className="flex flex-wrap items-center gap-3">
             <div>
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Comparativo de Períodos</p>
-              <p className="text-xs text-slate-400">{labelA} <span className="text-slate-300">vs</span> {labelB}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">{labelA} <span className="text-slate-300">vs</span> {labelB}</p>
             </div>
             <div className="flex-1" />
             <select
@@ -281,7 +281,7 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
                 <button
                   key={b.key}
                   onClick={() => setPeriodType(b.key)}
-                  className={`px-3 h-7 text-[11px] font-semibold rounded-md transition-all ${periodType === b.key ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}
+                  className={`px-3 h-7 text-[11px] font-semibold rounded-md transition-all ${periodType === b.key ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                 >
                   {b.label}
                 </button>
@@ -292,7 +292,7 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
                 <select value={cStart} onChange={e => setCStart(e.target.value)} className="h-9 px-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                   {ALL_MONTHS.map(m => <option key={m} value={m}>{MONTH_NAMES[m]}</option>)}
                 </select>
-                <span className="text-slate-400 text-xs">até</span>
+                <span className="text-slate-500 dark:text-slate-400 text-xs">até</span>
                 <select value={cEnd} onChange={e => setCEnd(e.target.value)} className="h-9 px-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
                   {ALL_MONTHS.map(m => <option key={m} value={m}>{MONTH_NAMES[m]}</option>)}
                 </select>
@@ -336,7 +336,7 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Evolução mensal — {chartMetric === "recebido" ? "Recebido" : chartMetric === "pago" ? "Pago" : "Lucro Realizado"}</p>
               <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                 {(["lucro", "recebido", "pago"] as const).map(mt => (
-                  <button key={mt} onClick={() => setChartMetric(mt)} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${chartMetric === mt ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}>
+                  <button key={mt} onClick={() => setChartMetric(mt)} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${chartMetric === mt ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}>
                     {mt === "lucro" ? "Lucro" : mt === "recebido" ? "Receb." : "Pago"}
                   </button>
                 ))}
@@ -365,14 +365,14 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
         </h3>
         {isHolding ? (
           <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
-            <CardContent className="p-6 text-center text-sm text-slate-500">
+            <CardContent className="p-6 text-center text-sm text-slate-500 dark:text-slate-400">
               A DRE é consolidada de todas as empresas e <strong>exclui a Holding</strong> — indisponível no modo Holding.
             </CardContent>
           </Card>
         ) : (
           <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
             <CardContent className="p-4">
-              <p className="text-[11px] text-slate-400 mb-3">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-3">
                 A DRE é sempre <strong>todas as empresas</strong> (exclui Holding) e ignora o filtro de empresa.
                 {dreLoading && <span className="ml-2 text-primary">Carregando…</span>}
                 {dreError && <span className="ml-2 text-red-500">Sem dados de DRE para os anos selecionados.</span>}

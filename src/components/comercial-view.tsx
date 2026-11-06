@@ -1927,19 +1927,19 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
               <div className="inline-flex items-center p-0.5 bg-slate-100/80 rounded-lg border border-slate-200/50 shadow-inner">
                 <button
                   onClick={() => setQuadroView("espelho")}
-                  className={`px-3 h-7 text-xs font-bold rounded-md transition-all ${quadroView === "espelho" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
+                  className={`px-3 h-7 text-xs font-bold rounded-md transition-all ${quadroView === "espelho" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                 >
                   Espelho (Torre)
                 </button>
                 <button
                   onClick={() => setQuadroView("3d")}
-                  className={`px-3 h-7 text-xs font-bold rounded-md transition-all ml-0.5 ${quadroView === "3d" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
+                  className={`px-3 h-7 text-xs font-bold rounded-md transition-all ml-0.5 ${quadroView === "3d" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                 >
                   3D
                 </button>
                 <button
                   onClick={() => setQuadroView("grade")}
-                  className={`px-3 h-7 text-xs font-bold rounded-md transition-all ml-0.5 ${quadroView === "grade" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-500 hover:text-slate-700"}`}
+                  className={`px-3 h-7 text-xs font-bold rounded-md transition-all ml-0.5 ${quadroView === "grade" ? "bg-white text-blue-700 shadow-sm border border-slate-200/50" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
                 >
                   Grade
                 </button>

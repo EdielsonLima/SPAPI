@@ -205,7 +205,7 @@ export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedC
               variant="outline"
               size="icon"
               onClick={() => { setCurrentMonth(shiftMonth(currentMonth, -1)); setSelectedDay(null); }}
-              className="h-8 w-8 shadow-none text-slate-500 hover:text-primary"
+              className="h-8 w-8 shadow-none text-slate-500 hover:text-primary dark:text-slate-400"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
@@ -219,7 +219,7 @@ export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedC
               variant="outline"
               size="icon"
               onClick={() => { setCurrentMonth(shiftMonth(currentMonth, 1)); setSelectedDay(null); }}
-              className="h-8 w-8 shadow-none text-slate-500 hover:text-primary"
+              className="h-8 w-8 shadow-none text-slate-500 hover:text-primary dark:text-slate-400"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -227,7 +227,7 @@ export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedC
               variant="ghost"
               size="sm"
               onClick={() => { setCurrentMonth(getCurrentMonthKey()); setSelectedDay(null); }}
-              className="text-xs h-8 text-slate-500 hover:text-primary"
+              className="text-xs h-8 text-slate-500 hover:text-primary dark:text-slate-400"
             >
               Hoje
             </Button>
@@ -249,10 +249,10 @@ export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedC
         {/* Calendário */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col min-h-0">
           <div className="flex items-center gap-2 mb-2 flex-shrink-0">
-            <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
+            <CalendarDays className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
             <div>
               <h3 className="text-sm font-semibold leading-tight text-slate-800 dark:text-slate-100">Calendário de Pagamentos</h3>
-              <p className="text-xs text-slate-400">Clique em um dia para filtrar</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Clique em um dia para filtrar</p>
             </div>
           </div>
           {totalCount === 0 ? (
@@ -284,7 +284,7 @@ export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedC
                         cell.isOutside
                           ? "border-transparent bg-slate-100/50 dark:bg-slate-800/40 text-slate-400/40 cursor-default"
                           : isSelected
-                            ? "border-primary bg-primary text-white cursor-pointer"
+                            ? "border-primary chip-ativo cursor-pointer"
                             : isToday
                               ? "border-slate-200 dark:border-slate-700 ring-1 ring-primary cursor-pointer"
                               : hasValue
@@ -330,25 +330,25 @@ export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedC
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2 gap-2 flex-shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-              <List className="h-4 w-4 text-slate-400 shrink-0" />
+              <List className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
               <div className="min-w-0">
                 <h3 className="text-sm font-semibold truncate leading-tight text-slate-800 dark:text-slate-100">
                   {selectedDay ? `Pagamentos de ${selectedDayLabel}` : "Todos os pagamentos do mês"}
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-slate-500 dark:text-slate-400">
                   {visibleItems.length} {visibleItems.length === 1 ? "credor" : "credores"}
                 </p>
               </div>
             </div>
             {selectedDay && (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedDay(null)} className="text-xs flex-shrink-0 h-7 text-slate-500 hover:text-primary">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedDay(null)} className="text-xs flex-shrink-0 h-7 text-slate-500 hover:text-primary dark:text-slate-400">
                 Limpar
               </Button>
             )}
           </div>
           {/* Busca por credor */}
           <div className="relative mb-2 flex-shrink-0">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 dark:text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={search}
@@ -360,7 +360,7 @@ export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedC
               <button
                 type="button"
                 onClick={() => setSearch("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 title="Limpar busca"
               >
                 <X className="w-3.5 h-3.5" />

@@ -112,11 +112,11 @@ function TooltipComparativo({
       ) : (
         <>
           <div className="mt-2 grid grid-cols-[1fr_auto_auto] gap-x-3 gap-y-1 items-baseline">
-            <span className="text-[10px] uppercase tracking-wider text-slate-400" />
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 text-right">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400" />
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">
               no mes
             </span>
-            <span className="text-[10px] uppercase tracking-wider text-slate-400 text-right">
+            <span className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">
               acumulado
             </span>
 
@@ -135,7 +135,7 @@ function TooltipComparativo({
                   className={cn(
                     "text-xs tabular-nums text-right",
                     mensal !== null && mensal < 0
-                      ? "text-emerald-600 dark:text-emerald-400"
+                      ? "text-emerald-700 dark:text-emerald-400"
                       : "text-slate-600 dark:text-slate-300"
                   )}
                 >
@@ -151,7 +151,7 @@ function TooltipComparativo({
           {modo === "base100" && (
             <div className="mt-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-x-3 gap-y-0.5">
               {linhas.map(({ serie, acumulado }) => (
-                <span key={serie.slug} className="text-[10px] text-slate-400 tabular-nums">
+                <span key={serie.slug} className="text-[10px] text-slate-500 dark:text-slate-400 tabular-nums">
                   {serie.nome} base 100 ={" "}
                   {(100 * (1 + acumulado / 100)).toLocaleString("pt-BR", {
                     minimumFractionDigits: 2,
@@ -247,7 +247,7 @@ export function CompararContent({
                 className={cn(
                   "flex items-center gap-2 rounded-full border px-3.5 h-9 text-sm font-medium transition-colors",
                   ativo
-                    ? "bg-primary border-primary text-white"
+                    ? "chip-ativo"
                     : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-400 dark:hover:border-slate-500"
                 )}
               >
@@ -268,7 +268,7 @@ export function CompararContent({
 
       {series.length === 0 || meses.length === 0 ? (
         <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
-          <CardContent className="py-12 text-center text-sm text-slate-500">
+          <CardContent className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
             Os indicadores selecionados nao tem meses em comum para comparar.
           </CardContent>
         </Card>
@@ -296,7 +296,7 @@ export function CompararContent({
                       </p>
                     </div>
                     {idx === 0 && series.length > 1 && (
-                      <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                      <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
                         maior alta
                       </span>
                     )}
@@ -327,7 +327,7 @@ export function CompararContent({
                   <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                     {MODOS.find((m) => m.id === modo)?.rotulo}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     {MODOS.find((m) => m.id === modo)?.ajuda}
                   </p>
                 </div>
@@ -339,7 +339,7 @@ export function CompararContent({
                       className={cn(
                         "px-3 h-7 rounded-md text-xs font-medium transition-colors",
                         modo === m.id
-                          ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
+                          ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm"
                           : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                       )}
                     >
@@ -419,7 +419,7 @@ export function CompararContent({
                         className={cn(
                           "px-2.5 h-7 rounded-md text-xs font-medium transition-colors",
                           refEfetiva === s.slug
-                            ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
+                            ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm"
                             : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                         )}
                       >
@@ -455,7 +455,7 @@ export function CompararContent({
                         <span
                           className={cn(
                             "text-sm font-semibold tabular-nums",
-                            acima ? "text-rose-600 dark:text-rose-400" : abaixo ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500"
+                            acima ? "text-rose-700 dark:text-rose-400" : abaixo ? "text-emerald-700 dark:text-emerald-400" : "text-slate-500"
                           )}
                         >
                           {pctSinal(s.diferenca).replace("%", " p.p.")}
@@ -503,7 +503,7 @@ export function CompararContent({
                               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.cor }} />
                               <span className="font-medium text-slate-800 dark:text-slate-100">{s.nome}</span>
                             </div>
-                            <span className="text-[11px] text-slate-400">{s.descricao}</span>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400">{s.descricao}</span>
                           </td>
                           <td className="py-2.5 px-3 text-right tabular-nums font-semibold text-slate-800 dark:text-slate-100">
                             {pctSinal(s.acumulado)}
@@ -515,7 +515,7 @@ export function CompararContent({
                             {s.maiorAlta ? (
                               <>
                                 {pctSinal(s.maiorAlta.variacao)}
-                                <span className="text-[11px] text-slate-400">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400">
                                   {" "}
                                   {s.maiorAlta.mes.toString().padStart(2, "0")}/{String(s.maiorAlta.ano).slice(-2)}
                                 </span>
@@ -528,7 +528,7 @@ export function CompararContent({
                             {s.maiorQueda ? (
                               <>
                                 {pctSinal(s.maiorQueda.variacao)}
-                                <span className="text-[11px] text-slate-400">
+                                <span className="text-[11px] text-slate-500 dark:text-slate-400">
                                   {" "}
                                   {s.maiorQueda.mes.toString().padStart(2, "0")}/{String(s.maiorQueda.ano).slice(-2)}
                                 </span>
@@ -545,7 +545,7 @@ export function CompararContent({
                   </tbody>
                 </table>
               </div>
-              <p className="mt-3 text-[11px] text-slate-400">
+              <p className="mt-3 text-[11px] text-slate-500 dark:text-slate-400">
                 Acumulado composto — (1+i₁)·(1+i₂)·… −1. Somar as variacoes daria um numero maior
                 que o real.
               </p>
