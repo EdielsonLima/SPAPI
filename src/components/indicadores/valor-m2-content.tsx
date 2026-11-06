@@ -136,7 +136,7 @@ export function ValorM2Content({
             href="https://myside.com.br/guia-imoveis/metro-quadrado-mais-caro-brasil"
             target="_blank"
             rel="noreferrer"
-            className="text-blue-600 dark:text-blue-400 hover:underline"
+            className="text-primary hover:underline"
           >
             myside.com.br
           </a>
@@ -193,25 +193,25 @@ export function ValorM2Content({
         />
       </div>
 
-      <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+      <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
         <CardContent className="p-4 space-y-4">
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+              <Building2 className="h-4 w-4 text-slate-400" />
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                 R$/m² por cidade
               </h3>
               <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 ({rows.length} cidades)
               </span>
             </div>
-            <div className="inline-flex items-center rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-0.5">
+            <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
               <button
                 type="button"
                 onClick={() => setChartLayout("barras")}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                   chartLayout === "barras"
-                    ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-sm"
+                    ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
                 title="Barras horizontais"
@@ -222,9 +222,9 @@ export function ValorM2Content({
               <button
                 type="button"
                 onClick={() => setChartLayout("colunas")}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                   chartLayout === "colunas"
-                    ? "bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 shadow-sm"
+                    ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
                 title="Colunas verticais"
@@ -348,12 +348,12 @@ export function ValorM2Content({
         </CardContent>
       </Card>
 
-      <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+      <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none overflow-hidden">
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 bg-slate-50/60 dark:bg-slate-800/40">
+                <tr className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
                   <th className="text-left font-semibold py-2.5 px-4 w-12">#</th>
                   <th className="text-left font-semibold py-2.5 px-4">Cidade</th>
                   <th className="text-left font-semibold py-2.5 px-4 w-16">UF</th>
@@ -375,7 +375,7 @@ export function ValorM2Content({
                     return (
                       <tr
                         key={`${r.cidade}-${r.uf}`}
-                        className="border-b border-slate-100 dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors"
+                        className="border-b border-slate-100 dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                       >
                         <td className="py-2 px-4 text-xs tabular-nums text-slate-500 dark:text-slate-400">
                           {r.posicao}º

@@ -2,17 +2,22 @@ import { cn } from "@/lib/utils";
 
 type Tone = "default" | "accent" | "success" | "warning" | "danger";
 
-const TONE_CLASSES: Record<Tone, string> = {
-  default:
-    "border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900",
-  accent:
-    "border-blue-300 dark:border-blue-700/60 bg-blue-50/70 dark:bg-blue-950/30",
-  success:
-    "border-emerald-300 dark:border-emerald-700/60 bg-emerald-50/70 dark:bg-emerald-950/30",
-  warning:
-    "border-amber-300 dark:border-amber-700/60 bg-amber-50/70 dark:bg-amber-950/30",
-  danger:
-    "border-rose-300 dark:border-rose-700/60 bg-rose-50/70 dark:bg-rose-950/30",
+/** Padrão Silva Packer: o card é sempre branco com borda fina; a cor semântica
+ *  fica só no ponto antes do rótulo e, no caso negativo, na cor do valor. */
+const TONE_DOT: Record<Tone, string> = {
+  default: "bg-slate-300 dark:bg-slate-600",
+  accent: "bg-blue-500",
+  success: "bg-emerald-500",
+  warning: "bg-amber-500",
+  danger: "bg-red-500",
+};
+
+const TONE_VALUE: Record<Tone, string> = {
+  default: "text-slate-900 dark:text-slate-50",
+  accent: "text-slate-900 dark:text-slate-50",
+  success: "text-slate-900 dark:text-slate-50",
+  warning: "text-slate-900 dark:text-slate-50",
+  danger: "text-red-600 dark:text-red-300/80",
 };
 
 export function KpiCard({
@@ -27,20 +32,23 @@ export function KpiCard({
   tone?: Tone;
 }) {
   return (
-    <div
-      className={cn(
-        "rounded-2xl border p-4 shadow-sm transition-colors",
-        TONE_CLASSES[tone]
-      )}
-    >
-      <p className="text-[0.7rem] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-semibold">
-        {label}
-      </p>
-      <p className="mt-1.5 text-2xl font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+    <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 min-w-0">
+      <div className="flex items-center gap-1.5 min-w-0">
+        <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", TONE_DOT[tone])} />
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+          {label}
+        </p>
+      </div>
+      <p
+        className={cn(
+          "mt-1.5 text-2xl font-semibold tabular-nums whitespace-nowrap leading-tight",
+          TONE_VALUE[tone]
+        )}
+      >
         {value}
       </p>
       {hint && (
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>
+        <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">{hint}</p>
       )}
     </div>
   );

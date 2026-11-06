@@ -26,6 +26,14 @@ const MONTH_NAMES: Record<string, string> = {
 };
 const ALL_MONTHS = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"];
 
+// Cor do ponto antes do rótulo de cada card de caixa (só aparência, padrão CardPainel).
+const CASH_DOT: Record<string, string> = {
+  rec: "bg-emerald-500",
+  pag: "bg-red-500",
+  luc: "bg-blue-500",
+  ven: "bg-amber-500",
+};
+
 // Mesma lista de op types excluídos por padrão do "Total Pago" (contas-table.tsx /
 // executive-dashboard.tsx) — Sienge "(por Credor) Sintético" não soma esses.
 const PAID_EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
@@ -253,11 +261,11 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
   return (
     <div className="space-y-5">
       {/* ─── Seletor de período ─── */}
-      <Card className="border-0 shadow-sm">
+      <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
         <CardContent className="p-4">
           <div className="flex flex-wrap items-center gap-3">
             <div>
-              <p className="text-base font-extrabold text-slate-800 dark:text-slate-100">Comparativo de Períodos</p>
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Comparativo de Períodos</p>
               <p className="text-xs text-slate-400">{labelA} <span className="text-slate-300">vs</span> {labelB}</p>
             </div>
             <div className="flex-1" />
@@ -268,12 +276,12 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
             >
               {years.map(y => <option key={y} value={y}>{y} vs {y - 1}</option>)}
             </select>
-            <div className="inline-flex items-center p-0.5 bg-slate-100/80 dark:bg-slate-800 rounded-lg border border-slate-200/60 shadow-inner">
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
               {periodBtns.map(b => (
                 <button
                   key={b.key}
                   onClick={() => setPeriodType(b.key)}
-                  className={`px-3 h-8 text-xs font-bold rounded-md transition-all ${periodType === b.key ? "bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                  className={`px-3 h-7 text-[11px] font-semibold rounded-md transition-all ${periodType === b.key ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}
                 >
                   {b.label}
                 </button>
@@ -296,21 +304,25 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
 
       {/* ─── Bloco 1: Realizado (Caixa) ─── */}
       <div>
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-emerald-700 dark:text-emerald-300 mb-3 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border-l-[3px] border-emerald-500 rounded-r-md">
+        <h3 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 mb-3">
+          <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-emerald-500" />
           Realizado (Caixa)
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {cashCards.map(c => (
-            <Card key={c.key} className="border-0 shadow-sm">
+            <Card key={c.key} className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
               <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">{c.label}</p>
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${CASH_DOT[c.key] || "bg-slate-400"}`} />
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">{c.label}</p>
+                  </div>
                   <DeltaBadge a={c.a} b={c.b} goodWhenUp={c.goodWhenUp} />
                 </div>
-                <p className="text-xl xl:text-2xl font-bold text-slate-800 dark:text-slate-50 mt-2 tabular-nums">{formatCurrency(c.a)}</p>
+                <p className={`text-xl xl:text-2xl font-semibold tabular-nums whitespace-nowrap leading-tight mt-2 ${c.a < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-900 dark:text-slate-50"}`}>{formatCurrency(c.a)}</p>
                 <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
-                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">{labelB}</p>
-                  <p className="text-base font-bold tabular-nums text-slate-600 dark:text-slate-300 mt-0.5">{formatCurrency(c.b)}</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">{labelB}</p>
+                  <p className="text-base font-semibold tabular-nums whitespace-nowrap text-slate-600 dark:text-slate-300 mt-0.5">{formatCurrency(c.b)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -318,13 +330,13 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
         </div>
 
         {/* Gráfico mensal A vs B */}
-        <Card className="border-0 shadow-sm mt-4">
+        <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none mt-4">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-bold text-slate-700 dark:text-slate-200">Evolução mensal — {chartMetric === "recebido" ? "Recebido" : chartMetric === "pago" ? "Pago" : "Lucro Realizado"}</p>
-              <div className="inline-flex items-center p-0.5 bg-slate-100/80 dark:bg-slate-800 rounded-lg border border-slate-200/60">
+              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Evolução mensal — {chartMetric === "recebido" ? "Recebido" : chartMetric === "pago" ? "Pago" : "Lucro Realizado"}</p>
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                 {(["lucro", "recebido", "pago"] as const).map(mt => (
-                  <button key={mt} onClick={() => setChartMetric(mt)} className={`px-2.5 h-7 text-xs font-bold rounded-md ${chartMetric === mt ? "bg-white dark:bg-slate-700 text-indigo-700 dark:text-indigo-300 shadow-sm" : "text-slate-500"}`}>
+                  <button key={mt} onClick={() => setChartMetric(mt)} className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${chartMetric === mt ? "bg-white dark:bg-slate-700 text-primary shadow-sm" : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"}`}>
                     {mt === "lucro" ? "Lucro" : mt === "recebido" ? "Receb." : "Pago"}
                   </button>
                 ))}
@@ -347,27 +359,28 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
 
       {/* ─── Bloco 2: DRE (Contábil) ─── */}
       <div>
-        <h3 className="text-[11px] font-bold uppercase tracking-widest text-violet-700 dark:text-violet-300 mb-3 px-3 py-1.5 bg-violet-50 dark:bg-violet-950/40 border-l-[3px] border-violet-500 rounded-r-md">
+        <h3 className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 mb-3">
+          <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-violet-500" />
           DRE (Contábil)
         </h3>
         {isHolding ? (
-          <Card className="border-0 shadow-sm">
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
             <CardContent className="p-6 text-center text-sm text-slate-500">
               A DRE é consolidada de todas as empresas e <strong>exclui a Holding</strong> — indisponível no modo Holding.
             </CardContent>
           </Card>
         ) : (
-          <Card className="border-0 shadow-sm">
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
             <CardContent className="p-4">
               <p className="text-[11px] text-slate-400 mb-3">
                 A DRE é sempre <strong>todas as empresas</strong> (exclui Holding) e ignora o filtro de empresa.
-                {dreLoading && <span className="ml-2 text-indigo-500">Carregando…</span>}
+                {dreLoading && <span className="ml-2 text-primary">Carregando…</span>}
                 {dreError && <span className="ml-2 text-red-500">Sem dados de DRE para os anos selecionados.</span>}
               </p>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-200 dark:border-slate-700">
+                    <tr className="bg-slate-50 dark:bg-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                       <th className="text-left font-semibold py-2 px-2">Linha</th>
                       <th className="text-right font-semibold py-2 px-2">{labelB}</th>
                       <th className="text-right font-semibold py-2 px-2">{labelA}</th>
@@ -376,10 +389,10 @@ export function ComparativoTab({ incomeItems, outcomeItems, salesContracts, sele
                   </thead>
                   <tbody>
                     {dreRows.map(r => (
-                      <tr key={r.label} className={`border-b border-slate-100 dark:border-slate-800 last:border-b-0 ${r.bold ? "bg-slate-50/60 dark:bg-slate-800/40" : ""}`}>
-                        <td className={`py-2 px-2 ${r.bold ? "font-bold text-slate-800 dark:text-slate-100" : "text-slate-600 dark:text-slate-300"}`}>{r.label}</td>
-                        <td className={`py-2 px-2 text-right tabular-nums text-slate-500 dark:text-slate-400`}>{formatCurrency(r.b)}</td>
-                        <td className={`py-2 px-2 text-right tabular-nums ${r.bold ? "font-bold" : ""} ${r.a < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-800 dark:text-slate-200"}`}>{formatCurrency(r.a)}</td>
+                      <tr key={r.label} className={`border-b border-slate-100 dark:border-slate-800 last:border-b-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 ${r.bold ? "bg-slate-50/60 dark:bg-slate-800/40" : ""}`}>
+                        <td className={`py-2 px-2 ${r.bold ? "font-semibold text-slate-900 dark:text-slate-50" : "text-slate-600 dark:text-slate-300"}`}>{r.label}</td>
+                        <td className={`py-2 px-2 text-right tabular-nums whitespace-nowrap text-slate-500 dark:text-slate-400`}>{formatCurrency(r.b)}</td>
+                        <td className={`py-2 px-2 text-right tabular-nums whitespace-nowrap ${r.bold ? "font-semibold" : ""} ${r.a < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-900 dark:text-slate-50"}`}>{formatCurrency(r.a)}</td>
                         <td className="py-2 px-2 text-right"><DeltaBadge a={r.a} b={r.b} goodWhenUp={r.goodWhenUp} /></td>
                       </tr>
                     ))}

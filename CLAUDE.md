@@ -355,6 +355,14 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   filtros não saem do lugar) e o conteúdo rola dentro de `flex-1 min-h-0
   overflow-y-auto` — tabelas longas não cabem numa tela, então a rolagem é interna,
   nunca da página. Cards dessas abas usam `CardPainel` (fim do arquivo).
+- **Visual minimalista em TODAS as abas (Edielson, 06/11, "pode fazer em todas"):**
+  DRE (`dre-tab.tsx`), Saldos, Resumo, Indicadores (`indicadores/*`), Comparativo
+  (`comparativo-tab.tsx`) e Calendários (`calendario-*-tab.tsx`) seguem o mesmo padrão:
+  card branco com borda fina e sem sombra, sem degradê, sem card colorido (a cor vai
+  para o ponto antes do rótulo e, quando faz sentido, para o valor), cabeçalho de tabela
+  claro (`bg-slate-50 dark:bg-slate-800`, texto cinza em caixa alta — nunca o escuro
+  `bg-slate-800 text-slate-100`), seletores ativos em carmim. Tela de carregamento idem.
+  Ao criar card novo no painel, use `CardPainel` ou copie essas classes.
 - Rodar local: `.env.local` (gerado do env do serviço `spapi` no EasyPanel, com banco
   Docker `spapi-sp-db` na porta 5447 e login `admin-local`); `node scripts/migrate.js`
   com `DATABASE_URL` exportada. Primeira carga puxa 10 anos do Sienge (~3 min).

@@ -104,20 +104,23 @@ export function IndicadoresTab() {
     });
   }, [data, load]);
 
-  const TABS: { value: SubTab; label: string; color: string }[] = [
-    { value: "cub", label: "CUB", color: "border-blue-500 text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30" },
-    { value: "cdi", label: "CDI", color: "border-emerald-500 text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30" },
-    { value: "ipca", label: "IPCA", color: "border-amber-500 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30" },
-    { value: "igpm", label: "IGP-M", color: "border-violet-500 text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30" },
-    { value: "incc", label: "INCC", color: "border-orange-500 text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/30" },
-    { value: "valorm2", label: "Valor m²", color: "border-rose-500 text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30" },
-    { value: "comparar", label: "Comparar", color: "border-slate-800 dark:border-slate-200 text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-800" },
+  const TABS: { value: SubTab; label: string }[] = [
+    { value: "cub", label: "CUB" },
+    { value: "cdi", label: "CDI" },
+    { value: "ipca", label: "IPCA" },
+    { value: "igpm", label: "IGP-M" },
+    { value: "incc", label: "INCC" },
+    { value: "valorm2", label: "Valor m²" },
+    { value: "comparar", label: "Comparar" },
   ];
+  // Mesmas pílulas das sub-abas do Painel Executivo: ativa em carmim, sem cor por indicador.
+  const subTabClass =
+    "gap-1.5 px-3.5 h-7 rounded-full text-xs font-medium text-slate-500 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-primary dark:data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:font-semibold transition-all";
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+        <h2 className="text-xl font-semibold tracking-tight text-slate-900 dark:text-slate-50">
           Indicadores de Mercado
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400">
@@ -126,17 +129,9 @@ export function IndicadoresTab() {
       </div>
 
       <Tabs value={active} onValueChange={(v) => setActive(v as SubTab)}>
-        <TabsList className="h-11 bg-transparent p-0 gap-1 border-b border-slate-200 dark:border-slate-700 w-full justify-start rounded-none">
+        <TabsList className="h-auto min-h-[2.25rem] flex-wrap justify-start bg-slate-100 dark:bg-slate-800 rounded-full p-1 gap-0.5">
           {TABS.map((t) => (
-            <TabsTrigger
-              key={t.value}
-              value={t.value}
-              className={`gap-2 px-4 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${
-                active === t.value
-                  ? `${t.color} font-semibold`
-                  : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"
-              }`}
-            >
+            <TabsTrigger key={t.value} value={t.value} className={subTabClass}>
               {t.label}
             </TabsTrigger>
           ))}
@@ -151,8 +146,9 @@ export function IndicadoresTab() {
       )}
 
       {error && !data && (
-        <div className="rounded-2xl border border-rose-300 dark:border-rose-700/60 bg-rose-50 dark:bg-rose-950/30 p-4 text-sm text-rose-700 dark:text-rose-300">
-          Erro ao carregar indicadores: {error}
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 text-sm text-red-600 dark:text-red-300/80">
+          <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-red-500" />
+          <span>Erro ao carregar indicadores: {error}</span>
         </div>
       )}
 

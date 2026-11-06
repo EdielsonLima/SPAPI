@@ -79,7 +79,7 @@ export function PctIndicadorContent({
             href={urlFonte}
             target="_blank"
             rel="noreferrer"
-            className="text-blue-600 dark:text-blue-400 hover:underline"
+            className="text-primary hover:underline"
           >
             {descricaoFonte}
           </a>
@@ -114,7 +114,7 @@ export function PctIndicadorContent({
         />
       </div>
 
-      <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+      <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
         <CardContent className="p-4">
           <IndicadorSimplesChart data={chartData} format="pct" color={color} height={320} />
         </CardContent>

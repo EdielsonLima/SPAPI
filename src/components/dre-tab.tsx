@@ -93,12 +93,14 @@ const DRE_LINES: DreLineConfig[] = [
   { key: "variacao_caixa", label: "VARIACAO DE CAIXA", type: "calculated", number: 14 },
 ];
 
+// Padrão visual Silva Packer (06/11/2026): card branco com borda fina; a cor
+// de cada KPI fica só no ponto antes do rótulo.
 const KPI_LINES = [
-  { key: "lucro_bruto", label: "Lucro Bruto", gradient: "from-emerald-500 to-teal-600", bg: "bg-emerald-50 dark:bg-emerald-950/40", iconBg: "bg-emerald-100 dark:bg-emerald-900/50", textColor: "text-emerald-700 dark:text-emerald-300" },
-  { key: "lucro_operacional", label: "Lucro Operacional", gradient: "from-blue-500 to-indigo-600", bg: "bg-blue-50 dark:bg-blue-950/40", iconBg: "bg-blue-100 dark:bg-blue-900/50", textColor: "text-blue-700 dark:text-blue-300" },
-  { key: "lucro_liquido", label: "Lucro Liquido", gradient: "from-violet-500 to-purple-600", bg: "bg-violet-50 dark:bg-violet-950/40", iconBg: "bg-violet-100 dark:bg-violet-900/50", textColor: "text-violet-700 dark:text-violet-300" },
-  { key: "saldo", label: "Saldo", gradient: "from-amber-500 to-orange-600", bg: "bg-amber-50 dark:bg-amber-950/40", iconBg: "bg-amber-100 dark:bg-amber-900/50", textColor: "text-amber-700 dark:text-amber-300" },
-  { key: "variacao_caixa", label: "Variacao de Caixa", gradient: "from-rose-500 to-pink-600", bg: "bg-rose-50 dark:bg-rose-950/40", iconBg: "bg-rose-100 dark:bg-rose-900/50", textColor: "text-rose-700 dark:text-rose-300" },
+  { key: "lucro_bruto", label: "Lucro Bruto", dot: "bg-emerald-500" },
+  { key: "lucro_operacional", label: "Lucro Operacional", dot: "bg-blue-500" },
+  { key: "lucro_liquido", label: "Lucro Liquido", dot: "bg-violet-500" },
+  { key: "saldo", label: "Saldo", dot: "bg-amber-500" },
+  { key: "variacao_caixa", label: "Variacao de Caixa", dot: "bg-rose-500" },
 ];
 
 const MONTH_NAMES: Record<string, string> = {
@@ -577,7 +579,7 @@ export function DreTab({
 
   if (!dreData || Object.keys(dreMappings).length === 0) {
     return (
-      <Card className="border-0 shadow-sm">
+      <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
         <CardContent className="py-16 text-center">
           <BarChart3 className="h-12 w-12 mx-auto mb-4 text-slate-300" />
           <h3 className="text-lg font-semibold text-slate-600 mb-2">DRE nao configurado</h3>
@@ -610,9 +612,9 @@ export function DreTab({
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       {/* KPI Cards - top highlight row */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {KPI_LINES.map(kpi => {
           const value = calculated[kpi.key] || 0;
           const margin = getMargin(value);
@@ -621,62 +623,62 @@ export function DreTab({
           return (
             <div
               key={kpi.key}
-              className={`relative rounded-2xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] border border-white/60 dark:border-white/5 ${kpi.bg} overflow-hidden transition-all duration-300 hover:shadow-[0_8px_30px_rgb(0,0,0,0.1)] dark:hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] hover:-translate-y-1`}
+              className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 min-w-0"
             >
-              {/* Decorative top gradient line */}
-              <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${kpi.gradient}`} />
-
-              <div className="flex items-center justify-between mb-4 mt-1">
-                <span className={`text-xs font-semibold uppercase tracking-wider ${kpi.textColor}`}>
-                  {kpi.label}
-                </span>
-                <Badge variant="outline" className={`text-xs px-2 py-0.5 font-medium rounded-full shadow-sm ${
+              <div className="flex items-center justify-between gap-2 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${kpi.dot}`} />
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 truncate">
+                    {kpi.label}
+                  </p>
+                </div>
+                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 font-medium rounded-full shrink-0 tabular-nums ${
                   isPositive
-                    ? `${kpi.iconBg} border-current/20 ${kpi.textColor}`
-                    : "bg-red-50/80 dark:bg-red-950/50 border-red-200/50 dark:border-red-800/50 text-red-700 dark:text-red-300/60"
+                    ? "border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400"
+                    : "border-red-200 dark:border-red-800 text-red-600 dark:text-red-300/80"
                 }`}>
-                  {isPositive ? <TrendingUp className="h-3.5 w-3.5 mr-1" /> : <TrendingDown className="h-3.5 w-3.5 mr-1" />}
+                  {isPositive ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
                   {margin}
                 </Badge>
               </div>
-              <div className="text-2xl font-black tabular-nums tracking-tight text-slate-800 dark:text-slate-100">
+              <p className={`mt-1.5 text-xl font-semibold tabular-nums whitespace-nowrap leading-tight ${
+                isPositive ? "text-slate-900 dark:text-slate-50" : "text-red-600 dark:text-red-300/80"
+              }`}>
                 {formatCurrency(Math.abs(value))}
-                {!isPositive && <span className="text-sm font-bold text-red-500 dark:text-red-300/60 ml-1">-</span>}
-              </div>
+                {!isPositive && <span className="text-sm ml-1">-</span>}
+              </p>
             </div>
           );
         })}
       </div>
 
       {/* DRE Table - full width */}
-      <Card className="border border-slate-200/60 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.2)] rounded-2xl overflow-hidden dark:bg-slate-900">
+      <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none overflow-hidden">
         <CardContent className="p-0">
           {/* Toggle */}
-          <div className="flex items-center justify-between px-6 py-4 bg-white/50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
-                <BarChart3 className="h-5 w-5 text-slate-600 dark:text-slate-300" />
-              </div>
-              <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight">DRE <span className="text-slate-400 dark:text-slate-500 font-medium ml-1">Demonstração do Resultado</span></h3>
+          <div className="flex items-center justify-between flex-wrap gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-2 min-w-0">
+              <BarChart3 className="h-4 w-4 text-slate-400 shrink-0" />
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">DRE <span className="text-xs font-normal text-slate-400 ml-1">Demonstração do Resultado</span></h3>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                 <button
                   onClick={() => setDreMode("simples")}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                     dreMode === "simples"
-                      ? "bg-white text-slate-800 shadow-[0_2px_8px_rgb(0,0,0,0.08)]"
-                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                      ? "bg-white dark:bg-slate-700 text-primary"
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                   }`}
                 >
                   DRE Simples
                 </button>
                 <button
                   onClick={() => setDreMode("completa")}
-                  className={`px-4 py-2 text-xs font-bold rounded-lg transition-all duration-300 ${
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${
                     dreMode === "completa"
-                      ? "bg-white text-slate-800 shadow-[0_2px_8px_rgb(0,0,0,0.08)]"
-                      : "text-slate-500 hover:text-slate-700 hover:bg-slate-200/50"
+                      ? "bg-white dark:bg-slate-700 text-primary"
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
                   }`}
                 >
                   DRE Completa
@@ -686,24 +688,24 @@ export function DreTab({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="gap-2 text-xs font-medium h-9 rounded-xl bg-white border-slate-200 hover:bg-slate-50 shadow-sm transition-all"
+                  className="gap-1.5 text-xs font-medium h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-none"
                   onClick={handleSyncExcel}
                   disabled={syncingExcel}
                   title="Lê o Excel local (DEMOSTRATIVO RESULTADO COMPLETO.xlsx) e atualiza o DRE no banco. Só funciona quando o servidor tem acesso ao arquivo."
                 >
                   {syncingExcel
-                    ? <Loader2 className="h-4 w-4 text-slate-500 animate-spin" />
-                    : <RefreshCw className="h-4 w-4 text-slate-500" />}
+                    ? <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />
+                    : <RefreshCw className="h-4 w-4 text-slate-400" />}
                   Sync DRE
                 </Button>
               )}
               <Button
                 variant="outline"
                 size="sm"
-                className="gap-2 text-xs font-medium h-9 rounded-xl bg-white border-slate-200 hover:bg-slate-50 shadow-sm transition-all"
+                className="gap-1.5 text-xs font-medium h-8 rounded-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 shadow-none"
                 onClick={() => window.open("/cadastros/dre", "_blank")}
               >
-                <Settings className="h-4 w-4 text-slate-500" />
+                <Settings className="h-4 w-4 text-slate-400" />
                 Configurar
               </Button>
             </div>
@@ -789,23 +791,23 @@ export function DreTab({
               const colWidth = `${Math.max(90, Math.floor(700 / monthCols.length))}px`;
 
               return (
-                <div className="overflow-x-auto rounded-xl border border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900 shadow-sm m-6">
+                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 m-5">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-slate-800 text-white">
-                        <th className="text-left px-5 py-3.5 font-semibold sticky left-0 bg-slate-800 min-w-[220px] uppercase tracking-wider text-[11px] border-b border-slate-700">CONTA</th>
+                      <tr className="bg-slate-50 dark:bg-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                        <th className="text-left px-5 py-3 font-semibold sticky left-0 bg-slate-50 dark:bg-slate-800 min-w-[220px] border-b border-slate-200 dark:border-slate-700">CONTA</th>
                         {monthCols.map(m => {
                           const [month, year] = m.split("/");
                           return (
-                            <th key={m} className="text-right px-4 py-3.5 font-semibold uppercase tracking-wider text-[11px] border-b border-slate-700" style={{ minWidth: colWidth }}>
+                            <th key={m} className="text-right px-4 py-3 font-semibold border-b border-slate-200 dark:border-slate-700" style={{ minWidth: colWidth }}>
                               {MONTH_NAMES[month]}-{year}
                             </th>
                           );
                         })}
-                        <th className="text-right px-5 py-3.5 font-bold min-w-[120px] uppercase tracking-wider text-[11px] border-b border-slate-700">Total</th>
+                        <th className="text-right px-5 py-3 font-semibold min-w-[120px] border-b border-slate-200 dark:border-slate-700">Total</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100/80 dark:divide-slate-800/60">
+                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {DRE_LINES.map((line) => {
                         const isCalc = line.type === "calculated";
                         const total = getLineTotal(line);
@@ -820,24 +822,19 @@ export function DreTab({
                             <tr
                               className={`${
                                 isCalc
-                                  ? total < 0
-                                    ? "bg-red-50/40 dark:bg-red-950/30 relative font-semibold"
-                                    : "bg-emerald-50/40 dark:bg-emerald-950/30 relative font-semibold"
-                                  : "bg-white dark:bg-transparent hover:bg-slate-50/80 dark:hover:bg-slate-800/40"
+                                  ? "bg-slate-50 dark:bg-slate-800/60 font-semibold"
+                                  : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                               } ${canExpand ? "cursor-pointer transition-colors" : ""}`}
                               onClick={canExpand ? () => toggleExpand(line.key) : undefined}
                             >
-                              <td className={`px-5 py-3.5 sticky left-0 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] ${
+                              <td className={`px-5 py-3 sticky left-0 border-r border-slate-100 dark:border-slate-800 ${
                                 isCalc
-                                  ? total < 0 ? "bg-red-50 dark:bg-red-950/40" : "bg-emerald-50 dark:bg-emerald-950/40"
+                                  ? "bg-slate-50 dark:bg-slate-800"
                                   : "bg-white dark:bg-slate-900"
                               }`}>
-                                {isCalc && (
-                                  <div className={`absolute left-0 top-0 bottom-0 w-[4px] ${total < 0 ? "bg-red-400 dark:bg-red-500/70" : "bg-emerald-400 dark:bg-emerald-500/70"}`} />
-                                )}
                                 <div className="flex items-center gap-1.5 ">
                                   {canExpand && (
-                                    <div className={`p-1 rounded-md transition-colors flex-shrink-0 ${isExpanded ? "bg-slate-200/60 dark:bg-slate-700/60" : "hover:bg-slate-200/60 dark:hover:bg-slate-700/60"}`}>
+                                    <div className="p-1 flex-shrink-0">
                                       {isExpanded
                                         ? <ChevronDown className="h-3.5 w-3.5 text-slate-500 dark:text-slate-300" />
                                         : <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-400" />
@@ -845,10 +842,13 @@ export function DreTab({
                                     </div>
                                   )}
                                   {!canExpand && !isCalc && <div className="w-[20px]" />}
+                                  {isCalc && (
+                                    <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${total < 0 ? "bg-red-500" : "bg-emerald-500"}`} />
+                                  )}
                                   <span className={`text-[13px] ${
                                     isCalc
-                                      ? total < 0 ? "font-bold text-red-800 dark:text-red-300" : "font-bold text-emerald-800 dark:text-emerald-300"
-                                      : "font-semibold text-slate-700 dark:text-slate-200 tracking-tight"
+                                      ? "font-semibold text-slate-900 dark:text-slate-50"
+                                      : "font-medium text-slate-700 dark:text-slate-200"
                                   }`}>
                                     {line.label}
                                   </span>
@@ -860,10 +860,10 @@ export function DreTab({
                                 const prevV = prev ? getLineMonthVal(line, prev) : 0;
                                 const variation = prev ? calcVariation(v, prevV) : null;
                                 return (
-                                  <td key={m} className={`text-right px-4 py-3.5 text-[13px] tabular-nums ${
+                                  <td key={m} className={`text-right px-4 py-3 text-[13px] tabular-nums ${
                                     isCalc
-                                      ? v < 0 ? "text-red-700 dark:text-red-300 font-semibold" : "text-emerald-700 dark:text-emerald-300 font-semibold"
-                                      : v < 0 ? "text-red-600 dark:text-red-300/70 font-medium" : "text-slate-700 dark:text-slate-300 font-medium"
+                                      ? v < 0 ? "text-red-600 dark:text-red-300/80 font-semibold" : "text-emerald-700 dark:text-emerald-400 font-semibold"
+                                      : v < 0 ? "text-red-600 dark:text-red-300/80 font-medium" : "text-slate-700 dark:text-slate-300 font-medium"
                                   }`}>
                                     {v !== 0 ? fmtVal(v) : ""}
                                     {variation !== null && v !== 0 && (
@@ -876,10 +876,10 @@ export function DreTab({
                                   </td>
                                 );
                               })}
-                              <td className={`text-right px-5 py-3.5 font-bold text-[14px] tabular-nums ${
+                              <td className={`text-right px-5 py-3 font-semibold text-[13px] tabular-nums ${
                                 isCalc
-                                  ? total < 0 ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"
-                                  : total < 0 ? "text-red-600 dark:text-red-300/70" : "text-slate-800 dark:text-slate-200"
+                                  ? total < 0 ? "text-red-600 dark:text-red-300/80" : "text-emerald-700 dark:text-emerald-400"
+                                  : total < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-900 dark:text-slate-50"
                               }`}>
                                 {fmtVal(total)}
                               </td>
@@ -888,10 +888,10 @@ export function DreTab({
                             {isExpanded && lineAccounts.map(([fcId, acctData]) => {
                               const acctTotal = Object.values(acctData.months).reduce((s, v) => s + v, 0);
                               return (
-                                <tr key={fcId} className="bg-slate-50/80 dark:bg-slate-800/30 border-t border-slate-100/80 dark:border-slate-700/60">
-                                  <td className="px-5 py-2.5 pl-11 sticky left-0 bg-slate-50 dark:bg-slate-800/60 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.05)] border-l-[3px] border-l-slate-200/80 dark:border-l-slate-700/60">
+                                <tr key={fcId} className="bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                  <td className="px-5 py-2.5 pl-11 sticky left-0 bg-white dark:bg-slate-900 border-r border-slate-100 dark:border-slate-800">
                                     <div className="flex items-center text-[12px] font-medium text-slate-600 dark:text-slate-300">
-                                      <span className="text-slate-400 dark:text-slate-400 font-mono text-[11px] mr-2 bg-white dark:bg-slate-800 py-0.5 px-1.5 rounded-md border border-slate-200/60 dark:border-slate-700/60 shadow-sm">{fcId}</span>
+                                      <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px] mr-2 bg-slate-50 dark:bg-slate-800 py-0.5 px-1.5 rounded-md border border-slate-200 dark:border-slate-700">{fcId}</span>
                                       {acctData.name}
                                     </div>
                                   </td>
@@ -902,7 +902,7 @@ export function DreTab({
                                     const variation = prev ? calcVariation(v, prevV) : null;
                                     return (
                                       <td key={m} className={`text-right px-4 py-2.5 text-[12px] tabular-nums ${
-                                        v < 0 ? "text-red-500 dark:text-red-300/70 font-medium" : "text-slate-600 dark:text-slate-300"
+                                        v < 0 ? "text-red-600 dark:text-red-300/80 font-medium" : "text-slate-600 dark:text-slate-300"
                                       }`}>
                                         {v !== 0 ? fmtVal(v) : ""}
                                         {variation !== null && v !== 0 && (
@@ -916,7 +916,7 @@ export function DreTab({
                                     );
                                   })}
                                   <td className={`text-right px-5 py-2.5 font-semibold text-[13px] tabular-nums ${
-                                    acctTotal < 0 ? "text-red-600 dark:text-red-300/70" : "text-slate-700 dark:text-slate-300"
+                                    acctTotal < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-700 dark:text-slate-300"
                                   }`}>
                                     {fmtVal(acctTotal)}
                                   </td>
@@ -933,18 +933,18 @@ export function DreTab({
             })()
           ) : (
             /* ══════ DRE SIMPLES: Original view ══════ */
-            <div className="mx-6 my-4 flex flex-col xl:flex-row items-start gap-6">
+            <div className="mx-5 my-4 flex flex-col xl:flex-row items-start gap-5">
               {/* Table */}
-              <div className="border border-slate-200/80 dark:border-slate-700/80 rounded-2xl overflow-hidden flex-grow shadow-[0_4px_20px_rgb(0,0,0,0.03)] dark:shadow-[0_4px_20px_rgb(0,0,0,0.2)] bg-white dark:bg-slate-900 w-full max-w-4xl">
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex-grow bg-white dark:bg-slate-900 w-full max-w-4xl">
               {/* Table Header */}
-          <div className="grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 bg-slate-800 text-[11px] font-bold text-white uppercase tracking-widest">
+          <div className="grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <span className="w-8" />
             <span>Conta</span>
             <span className="text-right">Realizado</span>
           </div>
 
           {/* Table Body */}
-          <div className="divide-y divide-slate-200/80 dark:divide-slate-700/80">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {DRE_LINES.map(line => {
               const value = getValue(line);
               const isCalculated = line.type === "calculated";
@@ -957,52 +957,51 @@ export function DreTab({
                 <React.Fragment key={line.key}>
                   {/* Level 1: DRE Category Row */}
                   <div
-                    className={`grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 transition-all duration-200 ${
+                    className={`grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 transition-colors ${
                       isCalculated
-                        ? value < 0
-                          ? "bg-red-50/60 dark:bg-red-950/30 relative font-semibold border-l-4 border-l-red-400 dark:border-l-red-500/50"
-                          : "bg-emerald-50/60 dark:bg-emerald-950/30 relative font-semibold border-l-4 border-l-emerald-400 dark:border-l-emerald-500/50"
-                        : "bg-white dark:bg-slate-900 hover:bg-slate-50/80 dark:hover:bg-slate-800/80 border-l-4 border-l-transparent"
+                        ? "bg-slate-50 dark:bg-slate-800/60 font-semibold"
+                        : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                     } ${canExpand ? "cursor-pointer" : ""}`}
                     onClick={canExpand ? () => toggleExpand(line.key) : undefined}
                   >
                     <span className="w-8 flex items-center justify-center">
                       {canExpand && (
-                        <div className={`p-1 rounded-md transition-colors ${isExpanded ? "bg-slate-200/60" : "hover:bg-slate-200/60"}`}>
-                          {isExpanded 
+                        <div className="p-1">
+                          {isExpanded
                             ? <ChevronDown className="h-4 w-4 text-slate-500" />
                             : <ChevronRight className="h-4 w-4 text-slate-400" />
                           }
                         </div>
                       )}
+                      {isCalculated && (
+                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${value < 0 ? "bg-red-500" : "bg-emerald-500"}`} />
+                      )}
                     </span>
                     <span className={`text-[13px] flex items-center min-w-0 ${
                       isCalculated
-                        ? value < 0
-                          ? "font-bold text-red-800 dark:text-red-300/70"
-                          : "font-bold text-emerald-800 dark:text-emerald-300"
-                        : "font-semibold text-slate-700 dark:text-slate-200 tracking-tight"
+                        ? "font-semibold text-slate-900 dark:text-slate-50"
+                        : "font-medium text-slate-700 dark:text-slate-200"
                     }`}>
                       <span className="truncate pr-3">{line.label}</span>
                       <span className="flex-grow border-b-2 border-dotted border-slate-300/60 dark:border-slate-600/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                     </span>
-                    <span className={`text-[14px] text-right tabular-nums ${
+                    <span className={`text-[14px] text-right tabular-nums whitespace-nowrap ${
                       isCalculated
                         ? value < 0
-                          ? "font-bold text-red-700 dark:text-red-300/70"
-                          : "font-bold text-emerald-700 dark:text-emerald-300"
+                          ? "font-semibold text-red-600 dark:text-red-300/80"
+                          : "font-semibold text-emerald-700 dark:text-emerald-400"
                         : value < 0
-                          ? "font-semibold text-red-600 dark:text-red-300/60"
-                          : "font-semibold text-slate-800 dark:text-slate-200"
+                          ? "font-medium text-red-600 dark:text-red-300/80"
+                          : "font-medium text-slate-900 dark:text-slate-50"
                     }`}>
                       {formatCurrency(Math.abs(value))}
-                      {value < 0 && <span className="text-xs ml-0.5 font-bold text-red-500 dark:text-red-300/60">-</span>}
+                      {value < 0 && <span className="text-xs ml-0.5">-</span>}
                     </span>
                   </div>
 
                   {/* Level 2: Sub-accounts (financial categories) */}
                   {isExpanded && hasAccounts && (
-                    <div className="bg-white dark:bg-slate-900 border-l-4 border-l-slate-200 dark:border-l-slate-600">
+                    <div className="bg-white dark:bg-slate-900 border-l-2 border-l-slate-200 dark:border-l-slate-700">
                       {Object.entries(categoryAccounts)
                         .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
                         .map(([fcId, acct]) => {
@@ -1018,8 +1017,8 @@ export function DreTab({
                             <React.Fragment key={fcId}>
                               {/* Level 2 row */}
                               <div
-                                className={`grid grid-cols-[auto_1fr_60px_180px] items-center px-5 py-2 transition-colors border-b border-slate-100 last:border-b-0 ${
-                                  hasDetails ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" : ""
+                                className={`grid grid-cols-[auto_1fr_60px_180px] items-center px-5 py-2 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-b-0 ${
+                                  hasDetails ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" : ""
                                 }`}
                                 onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
                               >
@@ -1032,7 +1031,7 @@ export function DreTab({
                                 </span>
                                 <span className="text-[12px] font-medium text-slate-600 dark:text-slate-300 pl-3 flex items-center min-w-0">
                                   <span className="truncate pr-3">
-                                    <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px] mr-2 bg-slate-100 dark:bg-slate-800 py-0.5 px-1.5 rounded-md border border-slate-200/60 dark:border-slate-700">{fcId}</span>
+                                    <span className="text-slate-400 dark:text-slate-500 font-mono text-[11px] mr-2 bg-slate-50 dark:bg-slate-800 py-0.5 px-1.5 rounded-md border border-slate-200 dark:border-slate-700">{fcId}</span>
                                     {acct.name}
                                   </span>
                                   <span className="flex-grow border-b-2 border-dotted border-slate-300/60 dark:border-slate-600/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
@@ -1040,8 +1039,8 @@ export function DreTab({
                                 <span className="text-[11px] text-right tabular-nums text-slate-400 dark:text-slate-500 font-medium">
                                   {pct >= 0.1 ? `${pct.toFixed(1)}%` : "<0.1%"}
                                 </span>
-                                <span className={`text-[12px] text-right tabular-nums ${
-                                  acct.amount < 0 ? "text-red-600 dark:text-red-300/60 font-semibold" : "text-slate-700 dark:text-slate-200 font-semibold"
+                                <span className={`text-[12px] text-right tabular-nums whitespace-nowrap ${
+                                  acct.amount < 0 ? "text-red-600 dark:text-red-300/80 font-semibold" : "text-slate-700 dark:text-slate-200 font-semibold"
                                 }`}>
                                   {formatCurrency(Math.abs(acct.amount))}
                                   {acct.amount < 0 && <span className="ml-0.5">-</span>}
@@ -1050,7 +1049,7 @@ export function DreTab({
 
                               {/* Level 3: Details (creditor/client) */}
                               {isAccountExpanded && hasDetails && (
-                                <div className="bg-white dark:bg-slate-950 py-1 border-y border-slate-100 dark:border-slate-800">
+                                <div className="bg-white dark:bg-slate-900 py-1 border-y border-slate-100 dark:border-slate-800">
                                   {Object.entries(acct.details)
                                     .sort((a, b) => Math.abs(b[1].amount) - Math.abs(a[1].amount))
                                     .map(([detailKey, detail]) => {
@@ -1060,7 +1059,7 @@ export function DreTab({
                                       return (
                                       <React.Fragment key={detailKey}>
                                       <div
-                                        className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 ${hasTx ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/80" : ""}`}
+                                        className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 ${hasTx ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" : ""}`}
                                         onClick={hasTx ? () => toggleDetailExpand(detailExpandKey) : undefined}
                                       >
                                         <span className="w-6 flex items-center justify-center">
@@ -1078,8 +1077,8 @@ export function DreTab({
                                           {hasTx && <span className="text-[9px] text-slate-400 dark:text-slate-500 mr-2 flex-shrink-0">{detail.transactions.length}x</span>}
                                           <span className="flex-grow border-b-2 border-dotted border-slate-300/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                                         </div>
-                                        <span className={`text-[11px] text-right tabular-nums font-medium ${
-                                          detail.amount < 0 ? "text-red-500 dark:text-red-300/60" : "text-slate-600 dark:text-slate-400"
+                                        <span className={`text-[11px] text-right tabular-nums font-medium whitespace-nowrap ${
+                                          detail.amount < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-600 dark:text-slate-400"
                                         }`}>
                                           {formatCurrency(Math.abs(detail.amount))}
                                           {detail.amount < 0 && <span className="ml-0.5">-</span>}
@@ -1088,7 +1087,7 @@ export function DreTab({
 
                                       {/* Level 4: Individual transactions */}
                                       {isDetailExpanded && hasTx && (
-                                        <div className="bg-slate-50 dark:bg-slate-900/80 py-0.5 border-y border-slate-100 dark:border-slate-800">
+                                        <div className="bg-slate-50 dark:bg-slate-800/40 py-0.5 border-y border-slate-100 dark:border-slate-800">
                                           {detail.transactions
                                             .sort((a, b) => a.paymentDate.localeCompare(b.paymentDate))
                                             .map((tx, txIdx) => (
@@ -1099,11 +1098,11 @@ export function DreTab({
                                               >
                                                 <span className="w-6" />
                                                 <div className="flex items-center pl-14 pr-4 min-w-0 gap-2">
-                                                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-slate-700 flex-shrink-0">
+                                                  <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 flex-shrink-0">
                                                     {tx.paymentDate ? tx.paymentDate.split("-").reverse().join("/") : "-"}
                                                   </span>
                                                   {tx.documentType && (
-                                                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-slate-700 flex-shrink-0">
+                                                    <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-white dark:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 flex-shrink-0">
                                                       {tx.documentType}
                                                     </span>
                                                   )}
@@ -1117,8 +1116,8 @@ export function DreTab({
                                                   )}
                                                   <span className="flex-grow border-b border-dotted border-slate-300/40 opacity-40 relative top-[2px] min-w-[10px]"></span>
                                                 </div>
-                                                <span className={`text-[10px] text-right tabular-nums font-medium ${
-                                                  tx.amount < 0 ? "text-red-400" : "text-slate-500 dark:text-slate-500"
+                                                <span className={`text-[10px] text-right tabular-nums font-medium whitespace-nowrap ${
+                                                  tx.amount < 0 ? "text-red-600 dark:text-red-300/80" : "text-slate-500 dark:text-slate-400"
                                                 }`}>
                                                   {formatCurrency(Math.abs(tx.amount))}
                                                   {tx.amount < 0 && <span className="ml-0.5">-</span>}
@@ -1145,14 +1144,12 @@ export function DreTab({
 
               {/* ══════ INSIGHTS CONTABEIS (Side Panel in DRE Simples) ══════ */}
               {receitaOperacional !== 0 && (
-                <div className="w-full xl:w-[420px] flex-shrink-0 self-start border border-slate-200/80 dark:border-slate-700/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.25)] rounded-2xl overflow-hidden bg-white dark:bg-slate-900 sticky top-24">
-                  <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-amber-50 to-white dark:from-amber-950/40 dark:to-slate-900 border-b border-amber-100/50 dark:border-amber-900/40">
-                    <div className="p-2 bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-300 rounded-lg shadow-sm">
-                      <Lightbulb className="h-5 w-5" />
-                    </div>
-                    <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight">Insights da DRE <span className="text-slate-400 dark:text-slate-500 font-medium ml-1 block text-xs mt-0.5">Análise Automática</span></h3>
+                <div className="w-full xl:w-[420px] flex-shrink-0 self-start rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 sticky top-24">
+                  <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+                    <Lightbulb className="h-4 w-4 text-slate-400 shrink-0" />
+                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Insights da DRE <span className="text-xs font-normal text-slate-400 block mt-0.5">Análise Automática</span></h3>
                   </div>
-                  <div className="px-5 py-5 space-y-3 bg-white/50 dark:bg-slate-900/40 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
+                  <div className="px-4 py-4 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
                     {(() => {
                       const rec = receitaOperacional;
                       const lb = calculated.lucro_bruto || 0;
@@ -1235,15 +1232,11 @@ export function DreTab({
                       }
 
                       return insights.map((insight, i) => (
-                        <div key={i} className={`flex items-start gap-3.5 p-4 rounded-xl text-[13px] border shadow-sm transition-all hover:shadow-md ${
-                          insight.icon === "check" ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-100/80 dark:border-emerald-900/40 text-emerald-900 dark:text-emerald-200" :
-                          insight.icon === "alert" ? "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/50 dark:border-amber-900/40 text-amber-900 dark:text-amber-200" :
-                          "bg-blue-50/70 dark:bg-blue-950/30 border-blue-100/80 dark:border-blue-900/40 text-blue-900 dark:text-blue-200"
-                        }`}>
+                        <div key={i} className="flex items-start gap-3 p-3 rounded-xl text-[13px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
                           {insight.icon === "check" && <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-500 dark:text-emerald-400" />}
                           {insight.icon === "alert" && <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-500 dark:text-amber-400" />}
                           {insight.icon === "info" && <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />}
-                          <span className="leading-relaxed font-medium">{insight.text}</span>
+                          <span className="leading-relaxed">{insight.text}</span>
                         </div>
                       ));
                     })()}

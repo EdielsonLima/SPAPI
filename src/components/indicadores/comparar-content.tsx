@@ -238,16 +238,15 @@ export function CompararContent({
                 onClick={() => alternar(d.slug)}
                 title={d.descricao}
                 className={cn(
-                  "flex items-center gap-2 rounded-full border px-3.5 h-9 text-sm font-medium transition-all",
+                  "flex items-center gap-2 rounded-full border px-3.5 h-9 text-sm font-medium transition-colors",
                   ativo
-                    ? "border-transparent text-white shadow-sm"
-                    : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-300 dark:hover:border-slate-600"
+                    ? "bg-primary border-primary text-white"
+                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500 hover:border-slate-400 dark:hover:border-slate-500"
                 )}
-                style={ativo ? { backgroundColor: d.cor } : undefined}
               >
                 <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: ativo ? "rgba(255,255,255,0.85)" : d.cor }}
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: d.cor }}
                 />
                 {d.nome}
               </button>
@@ -261,7 +260,7 @@ export function CompararContent({
       </div>
 
       {series.length === 0 || meses.length === 0 ? (
-        <Card>
+        <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
           <CardContent className="py-12 text-center text-sm text-slate-500">
             Os indicadores selecionados nao tem meses em comum para comparar.
           </CardContent>
@@ -280,26 +279,28 @@ export function CompararContent({
               .map((s, idx) => (
                 <div
                   key={s.slug}
-                  className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 shadow-sm"
-                  style={{ borderTopColor: s.cor, borderTopWidth: 3 }}
+                  className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 min-w-0"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[0.7rem] uppercase tracking-widest font-semibold text-slate-500 dark:text-slate-400">
-                      {s.nome}
-                    </p>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: s.cor }} />
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                        {s.nome}
+                      </p>
+                    </div>
                     {idx === 0 && series.length > 1 && (
                       <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
                         maior alta
                       </span>
                     )}
                   </div>
-                  <p className="mt-1.5 text-2xl font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                  <p className="mt-1.5 text-2xl font-semibold tabular-nums whitespace-nowrap leading-tight text-slate-900 dark:text-slate-50">
                     {pctSinal(s.acumulado)}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
                     no periodo · media {pctSinal(s.mediaMensal)}/mes
                   </p>
-                  <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                     R$ 100 mil viram <strong className="text-slate-700 dark:text-slate-200">{brl(s.valorCorrigido)}</strong>
                   </p>
                 </div>
@@ -307,14 +308,14 @@ export function CompararContent({
           </div>
 
           {/* Grafico */}
-          <Card>
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
             <CardContent className="pt-5">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <div>
-                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                     {MODOS.find((m) => m.id === modo)?.rotulo}
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-400">
                     {MODOS.find((m) => m.id === modo)?.ajuda}
                   </p>
                 </div>
@@ -326,7 +327,7 @@ export function CompararContent({
                       className={cn(
                         "px-3 h-7 rounded-md text-xs font-medium transition-colors",
                         modo === m.id
-                          ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                          ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
                           : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                       )}
                     >
@@ -392,10 +393,10 @@ export function CompararContent({
 
           {/* Diferenca contra a referencia */}
           {series.length > 1 && serieRef && (
-            <Card>
+            <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
               <CardContent className="pt-5 space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                     Diferenca contra
                   </h3>
                   <div className="flex items-center gap-1 rounded-lg bg-slate-100 dark:bg-slate-800 p-1">
@@ -406,7 +407,7 @@ export function CompararContent({
                         className={cn(
                           "px-2.5 h-7 rounded-md text-xs font-medium transition-colors",
                           refEfetiva === s.slug
-                            ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                            ? "bg-white dark:bg-slate-700 text-primary shadow-sm"
                             : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
                         )}
                       >
@@ -463,29 +464,29 @@ export function CompararContent({
           )}
 
           {/* Tabela */}
-          <Card>
+          <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
             <CardContent className="pt-5">
-              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
+              <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100 mb-3">
                 Resumo do periodo
               </h3>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="border-b border-slate-200 dark:border-slate-700">
-                    <tr className="text-[11px] uppercase tracking-wider text-slate-500">
-                      <th className="text-left font-semibold py-2 pr-4">Indicador</th>
+                  <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                    <tr className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      <th className="text-left font-semibold py-2 px-3">Indicador</th>
                       <th className="text-right font-semibold py-2 px-3">Acumulado</th>
                       <th className="text-right font-semibold py-2 px-3">Media/mes</th>
                       <th className="text-right font-semibold py-2 px-3">Maior alta</th>
                       <th className="text-right font-semibold py-2 px-3">Menor variacao</th>
-                      <th className="text-right font-semibold py-2 pl-3">R$ 100 mil viram</th>
+                      <th className="text-right font-semibold py-2 px-3">R$ 100 mil viram</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[...series]
                       .sort((a, b) => b.acumulado - a.acumulado)
                       .map((s) => (
-                        <tr key={s.slug} className="border-b border-slate-100 dark:border-slate-800/70">
-                          <td className="py-2.5 pr-4">
+                        <tr key={s.slug} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="py-2.5 px-3">
                             <div className="flex items-center gap-2">
                               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.cor }} />
                               <span className="font-medium text-slate-800 dark:text-slate-100">{s.nome}</span>
@@ -524,7 +525,7 @@ export function CompararContent({
                               "—"
                             )}
                           </td>
-                          <td className="py-2.5 pl-3 text-right tabular-nums text-slate-700 dark:text-slate-200">
+                          <td className="py-2.5 px-3 text-right tabular-nums text-slate-700 dark:text-slate-200">
                             {brl(s.valorCorrigido)}
                           </td>
                         </tr>

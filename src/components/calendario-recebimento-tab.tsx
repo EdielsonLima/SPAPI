@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays, List, Star, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, List, Search, X } from "lucide-react";
 import { formatCurrency, effectiveOpenAmount } from "@/lib/dashboard-utils";
 import { Button } from "@/components/ui/button";
 import { SiengeIncome } from "@/types/sienge";
@@ -201,19 +201,19 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
   return (
     <div className="flex flex-col gap-2 h-[calc(100dvh-300px)] min-h-[480px]">
       {/* Header com navegação de mês + total */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 flex-shrink-0">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 px-4 py-2.5 flex-shrink-0">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="icon"
               onClick={() => { setCurrentMonth(shiftMonth(currentMonth, -1)); setSelectedDay(null); }}
-              className="h-8 w-8"
+              className="h-8 w-8 shadow-none text-slate-500 hover:text-primary"
             >
               <ChevronLeft className="w-4 h-4" />
             </Button>
             <div className="min-w-[150px] text-center">
-              <h2 className="text-base font-bold tracking-tight capitalize leading-tight text-slate-800 dark:text-slate-100">
+              <h2 className="text-base font-semibold tracking-tight capitalize leading-tight text-slate-800 dark:text-slate-100">
                 {monthLabel}
               </h2>
               <p className="text-[11px] text-slate-500 dark:text-slate-400">{totalCount} parcela(s)</p>
@@ -222,7 +222,7 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
               variant="outline"
               size="icon"
               onClick={() => { setCurrentMonth(shiftMonth(currentMonth, 1)); setSelectedDay(null); }}
-              className="h-8 w-8"
+              className="h-8 w-8 shadow-none text-slate-500 hover:text-primary"
             >
               <ChevronRight className="w-4 h-4" />
             </Button>
@@ -230,14 +230,17 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
               variant="ghost"
               size="sm"
               onClick={() => { setCurrentMonth(getCurrentMonthKey()); setSelectedDay(null); }}
-              className="text-xs h-8"
+              className="text-xs h-8 text-slate-500 hover:text-primary"
             >
               Hoje
             </Button>
           </div>
           <div className="text-right">
-            <p className="text-[10px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">Total do mês</p>
-            <p className="text-xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 leading-tight tabular-nums">
+            <div className="flex items-center justify-end gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-emerald-500" />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Total do mês</p>
+            </div>
+            <p className="mt-1 text-xl font-semibold tabular-nums whitespace-nowrap leading-tight text-slate-900 dark:text-slate-50">
               {formatCurrency(totalAmount)}
             </p>
           </div>
@@ -247,14 +250,12 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
       {/* Grid + Side panel */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-3 flex-1 min-h-0">
         {/* Calendário */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col min-h-0">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col min-h-0">
           <div className="flex items-center gap-2 mb-2 flex-shrink-0">
-            <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center">
-              <CalendarDays className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            </div>
+            <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
             <div>
-              <h3 className="text-xs font-semibold leading-tight text-slate-800 dark:text-slate-200">Calendário de Recebimentos</h3>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">Clique em um dia para filtrar</p>
+              <h3 className="text-sm font-semibold leading-tight text-slate-800 dark:text-slate-100">Calendário de Recebimentos</h3>
+              <p className="text-xs text-slate-400">Clique em um dia para filtrar</p>
             </div>
           </div>
           {totalCount === 0 ? (
@@ -276,35 +277,33 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
                   const isToday = cell.date === todayStr;
                   const intensity = maxDayAmount > 0 && cell.amount > 0 ? cell.amount / maxDayAmount : 0;
                   const hasValue = cell.amount > 0;
-                  const opacity = 0.1 + intensity * 0.45;
+                  const opacity = 0.06 + intensity * 0.2;
                   return (
                     <button
                       key={i}
                       onClick={() => handleDayClick(cell.date, cell.isOutside, cell.amount)}
                       disabled={cell.isOutside || cell.amount === 0}
-                      className={`relative min-h-0 rounded-md border p-1.5 text-left transition-all overflow-hidden ${
+                      className={`relative min-h-0 rounded-md border p-1.5 text-left transition-colors overflow-hidden ${
                         cell.isOutside
                           ? "border-transparent bg-slate-100/50 dark:bg-slate-800/40 text-slate-400/40 cursor-default"
                           : isSelected
-                            ? "border-violet-500 ring-2 ring-violet-500/40 cursor-pointer"
+                            ? "border-primary bg-primary text-white cursor-pointer"
                             : isToday
-                              ? "border-amber-400 dark:border-amber-500 ring-1 ring-amber-300/50 dark:ring-amber-500/30 cursor-pointer"
+                              ? "border-slate-200 dark:border-slate-700 ring-1 ring-primary cursor-pointer"
                               : hasValue
-                                ? "border-slate-200 dark:border-slate-700 hover:border-emerald-400 hover:shadow-md cursor-pointer"
+                                ? "border-slate-200 dark:border-slate-700 hover:border-slate-400 dark:hover:border-slate-500 cursor-pointer"
                                 : "border-slate-200/50 dark:border-slate-700/50 text-slate-400/60 cursor-default"
                       }`}
                       style={
-                        isSelected
-                          ? { backgroundColor: "rgba(139, 92, 246, 0.55)" }
-                          : hasValue
-                            ? { backgroundColor: `rgba(16, 185, 129, ${opacity})` }
-                            : undefined
+                        !isSelected && hasValue
+                          ? { backgroundColor: `rgba(16, 185, 129, ${opacity})` }
+                          : undefined
                       }
                     >
-                      <div className={`text-[11px] font-bold leading-none flex items-center gap-0.5 ${isSelected ? "text-white" : "text-slate-700 dark:text-slate-200"}`}>
+                      <div className={`text-[11px] font-semibold leading-none flex items-center gap-1 ${isSelected ? "text-white" : "text-slate-700 dark:text-slate-200"}`}>
                         {cell.day}
                         {isToday && !cell.isOutside && (
-                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400 flex-shrink-0" />
+                          <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isSelected ? "bg-white" : "bg-primary"}`} />
                         )}
                       </div>
                       {hasValue && (
@@ -331,23 +330,21 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
         </div>
 
         {/* Side panel */}
-        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col min-h-0">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col min-h-0">
           <div className="flex items-center justify-between mb-2 gap-2 flex-shrink-0">
             <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center flex-shrink-0">
-                <List className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              </div>
+              <List className="h-4 w-4 text-slate-400 shrink-0" />
               <div className="min-w-0">
-                <h3 className="text-xs font-semibold truncate leading-tight text-slate-800 dark:text-slate-200">
+                <h3 className="text-sm font-semibold truncate leading-tight text-slate-800 dark:text-slate-100">
                   {selectedDay ? `Recebimentos de ${selectedDayLabel}` : "Todos os recebimentos do mês"}
                 </h3>
-                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-400">
                   {visibleItems.length} {visibleItems.length === 1 ? "cliente" : "clientes"}
                 </p>
               </div>
             </div>
             {selectedDay && (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedDay(null)} className="text-xs flex-shrink-0 h-7">
+              <Button variant="ghost" size="sm" onClick={() => setSelectedDay(null)} className="text-xs flex-shrink-0 h-7 text-slate-500 hover:text-primary">
                 Limpar
               </Button>
             )}
@@ -360,7 +357,7 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar cliente, documento ou empresa..."
-              className="w-full h-8 pl-8 pr-8 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400"
+              className="w-full h-8 pl-8 pr-8 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary"
             />
             {search && (
               <button
@@ -379,16 +376,16 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
             ) : (
               <div className="space-y-3">
                 {groupedByDay.map((group) => (
-                  <div key={group.date} className="rounded-lg border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <div className="flex items-center justify-between bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-200/40 dark:border-emerald-800/30 px-3 py-2">
+                  <div key={group.date} className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-3 py-2">
                       <div className="flex items-center gap-2">
-                        <CalendarDays className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{group.label}</span>
-                        <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                        <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-emerald-500" />
+                        <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{group.label}</span>
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400">
                           ({group.items.length} {group.items.length === 1 ? "cliente" : "clientes"})
                         </span>
                       </div>
-                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+                      <span className="text-xs font-semibold tabular-nums whitespace-nowrap text-slate-900 dark:text-slate-50">
                         {formatCurrency(group.total)}
                       </span>
                     </div>
@@ -400,7 +397,7 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
                               <button
                                 type="button"
                                 onClick={() => setSelectedItem(item.raw)}
-                                className="text-xs font-medium text-emerald-700 dark:text-emerald-300 hover:underline hover:text-emerald-900 dark:hover:text-emerald-200 text-left break-words cursor-pointer"
+                                className="text-xs font-medium text-slate-800 dark:text-slate-100 hover:underline hover:text-primary dark:hover:text-primary text-left break-words cursor-pointer"
                                 title={`Ver detalhes de ${item.client}`}
                               >
                                 {item.client}

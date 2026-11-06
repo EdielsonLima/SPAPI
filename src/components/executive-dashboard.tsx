@@ -2057,14 +2057,13 @@ export function ExecutiveDashboard() {
         {/* Modal centralizado */}
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="relative w-full max-w-md mx-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700/60 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-            {/* Top gradient bar */}
-            <div className="h-1.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+            {/* Barra do topo em carmim (padrão SP, sem degradê) */}
+            <div className="h-1.5 bg-primary" />
 
             <div className="p-8 flex flex-col items-center text-center">
               {/* Spinner animado em camadas */}
               <div className="relative mb-6">
-                <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/20 to-indigo-500/20 blur-xl animate-pulse" />
-                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40 flex items-center justify-center border border-blue-200/60 dark:border-blue-800/40">
+                <div className="relative w-20 h-20 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center border border-slate-200 dark:border-slate-700">
                   <Loader2 className="h-10 w-10 animate-spin text-blue-500" strokeWidth={2.5} />
                 </div>
               </div>
@@ -3094,8 +3093,8 @@ export function ExecutiveDashboard() {
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader className="bg-slate-800 text-slate-100 sticky top-0 z-10">
-                      <TableRow className="hover:bg-slate-800 border-b border-slate-700">
+                    <TableHeader className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
+                      <TableRow className="hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                         {[
                           { field: "companyName", label: "Empreendimento", align: "left", widthClass: "px-6" },
                           { field: "factor", label: "Fator", align: "center", widthClass: "w-20" },
@@ -3108,7 +3107,7 @@ export function ExecutiveDashboard() {
                           <TableHead
                             key={col.field}
                             onClick={() => toggleBudgetSort(col.field)}
-                            className={`font-bold text-[11px] text-slate-200 uppercase tracking-widest h-11 cursor-pointer hover:bg-slate-700 transition-colors select-none ${col.widthClass} ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"}`}
+                            className={`font-semibold text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-wider h-10 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors select-none ${col.widthClass} ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"}`}
                           >
                             <span className={`inline-flex items-center gap-1 ${col.align === "right" ? "justify-end w-full" : col.align === "center" ? "justify-center w-full" : ""}`}>
                               {col.label}
@@ -3753,7 +3752,7 @@ export function ExecutiveDashboard() {
                   onClick={() => setDelinquentCompanyFilter(null)}
                   className={`text-[11px] font-semibold px-3 py-1 rounded-full transition-colors ${
                     delinquentCompanyFilter === null
-                      ? "bg-orange-500 text-white shadow-sm"
+                      ? "bg-primary text-white"
                       : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                   }`}
                 >
@@ -3769,7 +3768,7 @@ export function ExecutiveDashboard() {
                       onClick={() => setDelinquentCompanyFilter(isActive ? null : co)}
                       className={`text-[11px] font-semibold px-3 py-1 rounded-full transition-colors ${
                         isActive
-                          ? "bg-orange-500 text-white shadow-sm"
+                          ? "bg-primary text-white"
                           : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                       }`}
                     >
@@ -4360,17 +4359,19 @@ export function ExecutiveDashboard() {
 
                 {/* KPI Card */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                  <Card className="relative border-indigo-200/60 dark:border-indigo-800/40 bg-indigo-50 dark:bg-indigo-950/40 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-2xl overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-indigo-500 to-violet-600" />
-                    <CardContent className="p-5 pt-6">
-                      <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">Saldo Total</p>
-                      <p className={`text-3xl font-black tabular-nums ${grandTotal >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-300/70"}`}>
+                  <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl">
+                    <CardContent className="px-5 py-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 rounded-full shrink-0 bg-indigo-500" />
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Saldo Total</p>
+                      </div>
+                      <p className={`mt-1.5 text-2xl font-semibold tabular-nums leading-tight ${grandTotal >= 0 ? "text-slate-900 dark:text-slate-50" : "text-red-600 dark:text-red-300/80"}`}>
                         {formatCurrency(grandTotal)}
                       </p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                         {filteredAccounts.length} contas em {companies.length} empresas
                         {selectedBankAccounts.size > 0 && selectedBankAccounts.size < allAccountNums.length && (
-                          <span className="ml-1 text-indigo-500">({allAccountNums.length - selectedBankAccounts.size} excluídas)</span>
+                          <span className="ml-1 text-slate-400">({allAccountNums.length - selectedBankAccounts.size} excluídas)</span>
                         )}
                       </p>
                     </CardContent>
@@ -4379,9 +4380,9 @@ export function ExecutiveDashboard() {
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                   {/* Bar Chart */}
-                  <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                  <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Saldo por Empresa</CardTitle>
+                      <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Saldo por Empresa</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="h-[400px]">
@@ -4414,18 +4415,18 @@ export function ExecutiveDashboard() {
                   </Card>
 
                   {/* Table */}
-                  <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                  <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">Contas por Empresa</CardTitle>
+                      <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Contas por Empresa</CardTitle>
                       <CardDescription className="text-xs text-slate-500">Clique na empresa para ver as contas</CardDescription>
                     </CardHeader>
                     <CardContent className="p-0">
                       <Table>
-                        <TableHeader className="bg-slate-800 text-slate-100">
+                        <TableHeader className="bg-slate-50 dark:bg-slate-800">
                           <TableRow>
-                            <TableHead className="text-slate-200 text-xs w-[40px]" />
-                            <TableHead className="text-slate-200 text-xs">Empresa</TableHead>
-                            <TableHead className="text-slate-200 text-xs text-right">Saldo Atual</TableHead>
+                            <TableHead className="w-[40px]" />
+                            <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Empresa</TableHead>
+                            <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Saldo Atual</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -4531,10 +4532,10 @@ export function ExecutiveDashboard() {
                             );
                           })}
                           {/* Total row */}
-                          <TableRow className="bg-indigo-50 dark:bg-indigo-950/40 border-t-2 border-indigo-200 dark:border-indigo-800">
+                          <TableRow className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700">
                             <TableCell />
-                            <TableCell className="text-sm font-bold text-indigo-700 dark:text-indigo-300">Total</TableCell>
-                            <TableCell className="text-sm font-black text-right tabular-nums text-indigo-700 dark:text-indigo-300">
+                            <TableCell className="text-sm font-semibold text-slate-900 dark:text-slate-50">Total</TableCell>
+                            <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-900 dark:text-slate-50">
                               {formatCurrency(grandTotal)}
                             </TableCell>
                           </TableRow>
@@ -4588,11 +4589,11 @@ export function ExecutiveDashboard() {
                   const isPositiveVar = varAbs >= 0;
 
                   return (
-                <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+                <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl">
                   <CardHeader className="pb-2">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
-                        <CardTitle className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                        <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                           Evolução do Saldo — {saldosMonth === "last7" ? "Últimos 7 dias" : (() => {
                             const [y, m] = saldosMonth.split("-");
                             const d = new Date(parseInt(y), parseInt(m) - 1);
@@ -4987,35 +4988,19 @@ export function ExecutiveDashboard() {
                 CP/CR sem o usuario ter que sincronizar dois filtros. */}
 
             {/* KPI Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="relative rounded-2xl p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/60 dark:border-emerald-800/40 overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-emerald-500 to-teal-500" />
-                <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider mb-1">Total Recebido</p>
-                <p className="text-xl font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(totRecebido)}</p>
-              </div>
-              <div className="relative rounded-2xl p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200/60 dark:border-amber-800/40 overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-500 to-orange-500" />
-                <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider mb-1">Total Pago</p>
-                <p className="text-xl font-black tabular-nums text-slate-800 dark:text-slate-100">{formatCurrency(totPago)}</p>
-              </div>
-              <div className={`relative rounded-2xl p-4 ${totSaldo >= 0 ? "bg-blue-50 dark:bg-blue-950/40 border-blue-200/60 dark:border-blue-800/40" : "bg-red-50 dark:bg-red-950/40 border-red-200/60 dark:border-red-800/40"} border overflow-hidden`}>
-                <div className={`absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r ${totSaldo >= 0 ? "from-blue-500 to-indigo-500" : "from-red-400 to-rose-500"}`} />
-                <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wider mb-1">Saldo</p>
-                <p className={`text-xl font-black tabular-nums ${totSaldo >= 0 ? "text-slate-800 dark:text-slate-100" : "text-red-600 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</p>
-              </div>
-              <div className="relative rounded-2xl p-4 bg-violet-50 dark:bg-violet-950/40 border border-violet-200/60 dark:border-violet-800/40 overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-violet-500 to-purple-500" />
-                <p className="text-[10px] font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wider mb-1">Lucratividade</p>
-                <p className="text-xl font-black tabular-nums text-slate-800 dark:text-slate-100">{totLucratividade.toFixed(2)}%</p>
-              </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <CardPainel rotulo="Total Recebido" valor={formatCurrency(totRecebido)} cor="bg-emerald-500" />
+              <CardPainel rotulo="Total Pago" valor={formatCurrency(totPago)} cor="bg-amber-500" />
+              <CardPainel rotulo="Saldo" valor={formatCurrency(totSaldo)} cor={totSaldo >= 0 ? "bg-blue-500" : "bg-red-500"} corValor={totSaldo < 0 ? "text-red-600 dark:text-red-300/80" : undefined} />
+              <CardPainel rotulo="Lucratividade" valor={`${totLucratividade.toFixed(2)}%`} cor="bg-violet-500" />
             </div>
 
             {/* Table */}
-            <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900 overflow-hidden">
+            <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader className="bg-slate-800 text-slate-100 sticky top-0 z-10">
+                    <TableHeader className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
                       <TableRow>
                         {[
                           { field: "companyName", label: "Empresa", align: "left", minW: "180px", sticky: true },
@@ -5032,11 +5017,11 @@ export function ExecutiveDashboard() {
                         ].map(col => (
                           <TableHead
                             key={col.field}
-                            className={`text-[11px] font-bold cursor-pointer hover:bg-slate-700 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-800 z-20" : ""}`}
+                            className={`text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" : ""}`}
                             style={{ minWidth: col.minW }}
                             onClick={() => toggleResumoSort(col.field)}
                           >
-                            <span className="inline-flex items-center gap-1 text-slate-200">
+                            <span className="inline-flex items-center gap-1">
                               {col.label}
                               {resumoSort.field === col.field ? (
                                 resumoSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -5092,24 +5077,24 @@ export function ExecutiveDashboard() {
                         );
                       })}
                       {/* Total Row */}
-                      <TableRow className="bg-slate-100 dark:bg-slate-800 border-t-2 border-slate-300 dark:border-slate-600 font-bold">
-                        <TableCell className="text-sm font-bold text-slate-800 dark:text-slate-100 sticky left-0 bg-slate-100 dark:bg-slate-800 z-10">Total</TableCell>
+                      <TableRow className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 font-semibold">
+                        <TableCell className="text-sm font-semibold text-slate-800 dark:text-slate-100 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10">Total</TableCell>
                         <TableCell />
-                        <TableCell className="text-sm font-black text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(totRecebido)}</TableCell>
-                        <TableCell className="text-sm font-black text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(totPago)}</TableCell>
-                        <TableCell className={`text-sm font-black text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</TableCell>
-                        <TableCell className="text-sm font-black text-right tabular-nums text-slate-700 dark:text-slate-300">
+                        <TableCell className="text-sm font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(totRecebido)}</TableCell>
+                        <TableCell className="text-sm font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(totPago)}</TableCell>
+                        <TableCell className={`text-sm font-semibold text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</TableCell>
+                        <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">
                           {formatCurrency(sorted.reduce((s, c) => s + c.totalAReceber, 0))}
                         </TableCell>
-                        <TableCell className="text-sm font-black text-right tabular-nums text-slate-700 dark:text-slate-300">
+                        <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">
                           {formatCurrency(sorted.reduce((s, c) => s + c.valorEstoque, 0))}
                         </TableCell>
-                        <TableCell className="text-sm font-black text-right tabular-nums text-slate-700 dark:text-slate-300">
+                        <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">
                           {formatCurrency(sorted.reduce((s, c) => s + c.totalAReceber + c.valorEstoque, 0))}
                         </TableCell>
                         <TableCell className="text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDisp, 0)}</TableCell>
                         <TableCell className="text-sm font-bold text-center tabular-nums text-slate-600 dark:text-slate-400">{sorted.reduce((s, c) => s + c.qtResTec, 0)}</TableCell>
-                        <TableCell className="text-sm font-black text-right tabular-nums text-violet-700 dark:text-violet-400">{totLucratividade.toFixed(2)}%</TableCell>
+                        <TableCell className="text-sm font-semibold text-right tabular-nums text-violet-700 dark:text-violet-400">{totLucratividade.toFixed(2)}%</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>

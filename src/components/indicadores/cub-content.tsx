@@ -166,7 +166,7 @@ export function CubContent({
             href="https://myside.com.br/guia-balneario-camboriu/cub-sc"
             target="_blank"
             rel="noreferrer"
-            className="text-blue-600 dark:text-blue-400 hover:underline"
+            className="text-primary hover:underline"
           >
             myside.com.br
           </a>
@@ -212,11 +212,11 @@ export function CubContent({
         />
       </div>
 
-      <Card className="border-slate-200/60 dark:border-slate-700/60 dark:bg-slate-900">
+      <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
         <CardContent className="p-4 space-y-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                 Mês inicial
               </span>
               <div className="flex items-center gap-1">
@@ -241,7 +241,7 @@ export function CubContent({
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                 Janela (meses)
               </span>
               <div className="flex items-center gap-1">
@@ -275,7 +275,7 @@ export function CubContent({
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
                 Atalhos
               </span>
               <div className="flex flex-wrap gap-1">
