@@ -2433,22 +2433,44 @@ export function ExecutiveDashboard() {
   // gráficos esticando no que sobrar. Carlos Humberto usa o Power BI assim.
   const CP_CR_TABS: MainTab[] = ["a-pagar", "pagas", "atrasadas", "a-receber", "recebidas", "inadimplencia"];
   const isCpCrTab = CP_CR_TABS.includes(activeTab);
-  const multiClick = (e: React.MouseEvent) => e.ctrlKey || e.metaKey || e.shiftKey;
-  // Clique simples = só aquele ano; Ctrl/Shift+clique = soma ao que já está.
-  const escolherAno = (y: string, e: React.MouseEvent) => {
-    if (multiClick(e)) toggleInSet(setSelectedYears, y);
-    else setSelectedYears(new Set([y]));
+  // Período em botões que ACUMULAM (Edielson, 06/11/2026: "vai clicando, vai
+  // selecionando; clica de novo, tira"): cada clique marca ou desmarca aquele
+  // ano/mês/trimestre, sem precisar de Ctrl. "Todos" volta ao conjunto inteiro.
+  const escolherAno = (y: string) => {
+    setSelectedYears(prev => {
+      const next = new Set(prev);
+      if (next.has(y)) next.delete(y); else next.add(y);
+      // Desmarcou o último ano visível → sem filtro de ano (= todos), em vez de
+      // sobrar um conjunto só com anos que esta aba nem mostra.
+      if (!availableYears.some(a => next.has(a))) return new Set();
+      return next;
+    });
     setSelectedDays(new Set());
   };
-  // Clique simples = só aquele mês (de novo = todos); Ctrl/Shift+clique = soma.
-  const escolherMes = (m: string, e?: React.MouseEvent) => {
-    if (e && multiClick(e)) toggleInSet(setSelectedMonths, m);
-    else setSelectedMonths(prev => (prev.size === 1 && prev.has(m)) ? new Set() : new Set([m]));
+  const escolherMes = (m: string) => {
+    toggleInSet(setSelectedMonths, m);
     setSelectedDays(new Set());
   };
   const aoClicarEmpresa = (nome: string) => {
     if (!nome) return;
     setDrillCompany(prev => prev === nome ? null : nome);
+  };
+  // Trimestres (Edielson, 06/11/2026): clique marca os 3 meses; se o trimestre
+  // já estava inteiro marcado, desmarca os 3. Acumula com o que já está.
+  const TRIMESTRES = [
+    { rotulo: "1T", meses: ["01", "02", "03"], titulo: "1º trimestre · jan a mar" },
+    { rotulo: "2T", meses: ["04", "05", "06"], titulo: "2º trimestre · abr a jun" },
+    { rotulo: "3T", meses: ["07", "08", "09"], titulo: "3º trimestre · jul a set" },
+    { rotulo: "4T", meses: ["10", "11", "12"], titulo: "4º trimestre · out a dez" },
+  ];
+  const escolherTrimestre = (meses: string[]) => {
+    setSelectedMonths(prev => {
+      const next = new Set(prev);
+      if (meses.every(m => next.has(m))) meses.forEach(m => next.delete(m));
+      else meses.forEach(m => next.add(m));
+      return next;
+    });
+    setSelectedDays(new Set());
   };
   const subTabClass = "gap-1.5 px-3.5 h-7 rounded-full text-xs font-medium text-slate-500 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-primary dark:data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:font-semibold transition-all";
   const chipClass = (ativo: boolean, fraco = false) =>
@@ -2459,7 +2481,7 @@ export function ExecutiveDashboard() {
           ? "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600"
           : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500"
     }`;
-  const todosAnosAtivos = availableYears.length > 0 && availableYears.every(y => selectedYears.has(y));
+  const todosAnosAtivos = selectedYears.size === 0 || (availableYears.length > 0 && availableYears.every(y => selectedYears.has(y)));
   const modalTabelaClass = "max-w-[min(1400px,94vw)] max-h-[90vh] overflow-y-auto p-2 sm:rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700";
   const exportarPdfAPagar = () => {
     const now = new Date();
@@ -2979,21 +3001,26 @@ export function ExecutiveDashboard() {
         </div>}
       </div>
 
-      {/* Período em botões, como no Power BI: clique escolhe o ano/mês;
-          Ctrl (ou Shift) + clique soma; "Todos" volta ao conjunto inteiro. */}
+      {/* Período em botões, como no Power BI: cada clique marca ou desmarca o
+          ano/mês/trimestre, acumulando; "Todos" volta ao conjunto inteiro. */}
       {isCpCrTab && (
         <div className="flex items-center gap-1.5 flex-wrap rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shrink-0">
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Ano</span>
           {availableYears.map(y => (
-            <button key={y} type="button" onClick={(e) => escolherAno(y, e)} className={chipClass(selectedYears.has(y))} title="Clique: só este ano · Ctrl+clique: soma">{y}</button>
+            <button key={y} type="button" onClick={() => escolherAno(y)} className={chipClass(selectedYears.has(y))} title="Clique marca ou desmarca este ano (vai acumulando)">{y}</button>
           ))}
           <button type="button" onClick={() => { setSelectedYears(new Set(availableYears)); setSelectedDays(new Set()); }} className={chipClass(todosAnosAtivos, true)}>Todos</button>
           <span className="mx-2 h-5 w-px bg-slate-200 dark:bg-slate-700" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Mês</span>
           {MONTH_OPTIONS.map((m, idx) => (
-            <button key={m} type="button" onClick={(e) => escolherMes(m, e)} className={chipClass(selectedMonths.has(m), !availableMonths.includes(m))} title={`${MONTH_NAMES[m]} · clique: só este mês · Ctrl+clique: soma`}>{(MONTH_LABELS[idx] || m).toLowerCase()}</button>
+            <button key={m} type="button" onClick={() => escolherMes(m)} className={chipClass(selectedMonths.has(m), !availableMonths.includes(m))} title={`${MONTH_NAMES[m]} · clique marca ou desmarca (vai acumulando)`}>{(MONTH_LABELS[idx] || m).toLowerCase()}</button>
           ))}
           <button type="button" onClick={() => { setSelectedMonths(new Set()); setSelectedDays(new Set()); }} className={chipClass(selectedMonths.size === 0, true)}>Todos</button>
+          <span className="mx-2 h-5 w-px bg-slate-200 dark:bg-slate-700" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Trim</span>
+          {TRIMESTRES.map(t => (
+            <button key={t.rotulo} type="button" onClick={() => escolherTrimestre(t.meses)} className={chipClass(t.meses.every(m => selectedMonths.has(m)))} title={`${t.titulo} · clique marca ou desmarca os 3 meses (vai acumulando)`}>{t.rotulo}</button>
+          ))}
           {(drillCompany || selectedMonths.size > 0 || selectedDuePeriods.size > 0) && (
             <button
               type="button"
@@ -3347,8 +3374,7 @@ export function ExecutiveDashboard() {
                       const m = mesDoRotulo(rotulo);
                       if (m) escolherMes(m);
                     } else if (chartView === "anual" && /^\d{4}$/.test(rotulo)) {
-                      setSelectedYears(prev => (prev.size === 1 && prev.has(rotulo)) ? new Set(availableYears) : new Set([rotulo]));
-                      setSelectedDays(new Set());
+                      escolherAno(rotulo);
                     }
                   }}
                 >
