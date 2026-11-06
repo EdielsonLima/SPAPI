@@ -367,6 +367,11 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
 - Formula do A Realizar: `budget - realized`
 - Formula do % Realizado: `(realized / budget) * 100`
 - Ordenacao: empresas Finalizadas sempre no final
+- **Cards do topo (Orçamento Total, Custo Realizado, Saldo a Realizar) somam só
+  empresas/obras Ativas** (Edielson, 06/11/2026). As finalizadas (Tesla, Hannover)
+  continuam na tabela, esmaecidas, mas fora dos três totais (`budgetTotals`).
+  Saldo a Realizar segue sem contar saldo negativo. Trava: Test 13 de
+  `src/__tests__/budget-calculations.test.ts`.
 
 ## DRE - Regras Criticas (Validado em 2026-03-17)
 
