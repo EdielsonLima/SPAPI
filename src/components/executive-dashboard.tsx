@@ -2481,7 +2481,21 @@ export function ExecutiveDashboard() {
           ? "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600"
           : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500"
     }`;
-  const todosAnosAtivos = selectedYears.size === 0 || (availableYears.length > 0 && availableYears.every(y => selectedYears.has(y)));
+  // "Todos" alterna (Edielson, 06/11/2026): um clique marca todos, o próximo
+  // desmarca todos. Nenhum marcado = sem filtro = mostra tudo, por isso o
+  // "Todos" fica aceso nos dois estados (todos marcados ou nenhum).
+  const todosAnosMarcados = availableYears.length > 0 && availableYears.every(y => selectedYears.has(y));
+  const todosAnosAtivos = selectedYears.size === 0 || todosAnosMarcados;
+  const alternarTodosAnos = () => {
+    setSelectedYears(todosAnosMarcados ? new Set() : new Set(availableYears));
+    setSelectedDays(new Set());
+  };
+  const todosMesesMarcados = MONTH_OPTIONS.every(m => selectedMonths.has(m));
+  const todosMesesAtivos = selectedMonths.size === 0 || todosMesesMarcados;
+  const alternarTodosMeses = () => {
+    setSelectedMonths(todosMesesMarcados ? new Set() : new Set(MONTH_OPTIONS));
+    setSelectedDays(new Set());
+  };
   // Modal em coluna flex, sem rolagem própria: quem rola é a lista dentro do
   // card, para o cabeçalho (título + X) e os títulos da tabela ficarem fixos.
   const modalTabelaClass = "max-w-[min(1400px,94vw)] max-h-[90vh] p-0 overflow-hidden flex flex-col sm:rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700";
@@ -3011,13 +3025,13 @@ export function ExecutiveDashboard() {
           {availableYears.map(y => (
             <button key={y} type="button" onClick={() => escolherAno(y)} className={chipClass(selectedYears.has(y))} title="Clique marca ou desmarca este ano (vai acumulando)">{y}</button>
           ))}
-          <button type="button" onClick={() => { setSelectedYears(new Set(availableYears)); setSelectedDays(new Set()); }} className={chipClass(todosAnosAtivos, true)}>Todos</button>
+          <button type="button" onClick={alternarTodosAnos} className={chipClass(todosAnosAtivos, true)} title={todosAnosMarcados ? "Desmarca todos os anos" : "Marca todos os anos"}>Todos</button>
           <span className="mx-2 h-5 w-px bg-slate-200 dark:bg-slate-700" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Mês</span>
           {MONTH_OPTIONS.map((m, idx) => (
             <button key={m} type="button" onClick={() => escolherMes(m)} className={chipClass(selectedMonths.has(m), !availableMonths.includes(m))} title={`${MONTH_NAMES[m]} · clique marca ou desmarca (vai acumulando)`}>{(MONTH_LABELS[idx] || m).toLowerCase()}</button>
           ))}
-          <button type="button" onClick={() => { setSelectedMonths(new Set()); setSelectedDays(new Set()); }} className={chipClass(selectedMonths.size === 0, true)}>Todos</button>
+          <button type="button" onClick={alternarTodosMeses} className={chipClass(todosMesesAtivos, true)} title={todosMesesMarcados ? "Desmarca todos os meses" : "Marca todos os meses"}>Todos</button>
           <span className="mx-2 h-5 w-px bg-slate-200 dark:bg-slate-700" />
           <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Trim</span>
           {TRIMESTRES.map(t => (

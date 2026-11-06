@@ -333,8 +333,10 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
 - **Período em botões** (`isCpCrTab`): anos de `availableYears` e os 12 meses
   (`MONTH_OPTIONS`; mês sem dado fica esmaecido) e os trimestres 1T–4T (`TRIMESTRES`,
   pedido do Edielson em 06/11). **Cada clique marca ou desmarca, acumulando** (Edielson:
-  "vai clicando, vai selecionando; clica de novo, tira"), sem Ctrl; "Todos" volta ao
-  conjunto inteiro. Desmarcar o último ano visível zera o filtro de ano (= todos). Os dropdowns Anos/Meses continuam só nas demais abas
+  "vai clicando, vai selecionando; clica de novo, tira"), sem Ctrl. **"Todos" alterna**:
+  marca todos, e o clique seguinte desmarca todos; nenhum marcado = sem filtro (mostra
+  tudo), e o "Todos" fica aceso nos dois estados. Desmarcar o último ano visível zera
+  o filtro de ano (= todos). Os dropdowns Anos/Meses continuam só nas demais abas
   (Geral, Saldos, Resumo, DRE…). Mesmo estado `selectedYears`/`selectedMonths`.
 - **Filtro cruzado**: `drillCompany` (clique na barra de "Por Empresa") entra em
   `applyFilters`, `filtrarPagas`/`filtrarRecebidas`; os gráficos usam variantes
