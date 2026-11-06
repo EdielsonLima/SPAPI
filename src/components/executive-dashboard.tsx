@@ -1362,10 +1362,14 @@ export function ExecutiveDashboard() {
   }, [cubData, companySettings, consistentItemsForPagas, selectedCompanies]);
   // ▲▲▲ END VALIDATED — Budget vs Realizado ▲▲▲
 
+  // Cards do topo = só empresas/obras ATIVAS (Edielson, 06/11/2026): as
+  // finalizadas continuam na tabela, mas ficam fora dos três totais.
+  // Saldo a Realizar já era só das ativas e sem saldo negativo; agora o
+  // Orçamento Total e o Custo Realizado seguem o mesmo recorte.
   const budgetTotals = useMemo(() => {
     const activeRows = budgetData.filter(r => r.status === "Ativa");
-    const totalBudget = budgetData.reduce((s, r) => s + r.budget, 0);
-    const totalRealized = budgetData.reduce((s, r) => s + r.realized, 0);
+    const totalBudget = activeRows.reduce((s, r) => s + r.budget, 0);
+    const totalRealized = activeRows.reduce((s, r) => s + r.realized, 0);
     const totalToRealize = activeRows.reduce((s, r) => s + Math.max(0, r.toRealize), 0);
     return { totalBudget, totalRealized, totalToRealize };
   }, [budgetData]);
@@ -2906,6 +2910,9 @@ export function ExecutiveDashboard() {
                   <div>
                     <p className="text-xs font-bold text-blue-600/80 uppercase tracking-widest">Orçamento Total</p>
                     <p className="text-3xl font-black text-blue-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalBudget)}</p>
+                    <p className="text-[11px] font-medium text-blue-900/40 mt-1.5 leading-tight max-w-[220px]">
+                      Só obras ativas
+                    </p>
                   </div>
                   <div className="p-3 bg-white shadow-sm ring-1 ring-blue-100 rounded-xl">
                     <Banknote className="h-6 w-6 text-blue-500" />
@@ -2919,6 +2926,9 @@ export function ExecutiveDashboard() {
                   <div>
                     <p className="text-xs font-bold text-emerald-600/80 uppercase tracking-widest">Custo Realizado</p>
                     <p className="text-3xl font-black text-emerald-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalRealized)}</p>
+                    <p className="text-[11px] font-medium text-emerald-900/40 mt-1.5 leading-tight max-w-[220px]">
+                      Só obras ativas
+                    </p>
                   </div>
                   <div className="p-3 bg-white shadow-sm ring-1 ring-emerald-100 rounded-xl">
                     <CheckCircle className="h-6 w-6 text-emerald-500" />
@@ -2933,7 +2943,7 @@ export function ExecutiveDashboard() {
                     <p className="text-xs font-bold text-amber-600/80 uppercase tracking-widest">Saldo a Realizar</p>
                     <p className="text-3xl font-black text-amber-950 mt-2 tabular-nums tracking-tight">{formatCurrency(budgetTotals.totalToRealize)}</p>
                     <p className="text-[11px] font-medium text-amber-900/40 mt-1.5 leading-tight max-w-[220px]">
-                      Não contabiliza obras finalizadas nem saldos negativos
+                      Só obras ativas, sem saldos negativos
                     </p>
                   </div>
                   <div className="p-3 bg-white shadow-sm ring-1 ring-amber-100 rounded-xl">

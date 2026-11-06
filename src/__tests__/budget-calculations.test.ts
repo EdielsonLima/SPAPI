@@ -299,6 +299,53 @@ assert("Segunda posição é Ativa", sorted[1].companyStatus === "Ativa");
 assert("Última posição é Finalizada", sorted[2].companyStatus === "Finalizada");
 assert("Ativas ordenadas por budget desc", sorted[0].budget > sorted[1].budget);
 
+// ─── Test 13: Cards do topo só com obras ATIVAS (Edielson, 06/11/2026) ─────
+// Deve espelhar `budgetTotals` em executive-dashboard.tsx: Orçamento Total,
+// Custo Realizado e Saldo a Realizar somam só as linhas "Ativa"; as
+// finalizadas seguem na tabela, mas fora dos três cards. Saldo a Realizar
+// continua sem contar saldo negativo. Números = tela de 06/11/2026.
+
+console.log("\n=== Test 13: Cards do topo só com obras ativas ===");
+
+type LinhaOrcamento = { budget: number; realized: number; toRealize: number; status: "Ativa" | "Finalizada" };
+
+function computeBudgetTotals(rows: LinhaOrcamento[]) {
+  const activeRows = rows.filter(r => r.status === "Ativa");
+  const totalBudget = activeRows.reduce((s, r) => s + r.budget, 0);
+  const totalRealized = activeRows.reduce((s, r) => s + r.realized, 0);
+  const totalToRealize = activeRows.reduce((s, r) => s + Math.max(0, r.toRealize), 0);
+  return { totalBudget, totalRealized, totalToRealize };
+}
+
+const linha = (budget: number, realized: number, status: "Ativa" | "Finalizada"): LinhaOrcamento =>
+  ({ budget, realized, toRealize: budget - realized, status });
+
+const tela0611: LinhaOrcamento[] = [
+  linha(108798228.00, 39156840.85, "Ativa"),      // PALACIO ELIZABETH
+  linha(104864997.60, 98466692.64, "Ativa"),      // EDIFICIO 135 JARDINS
+  linha(76663259.84, 11277320.34, "Ativa"),       // DOMUS
+  linha(57571074.00, 15644286.60, "Ativa"),       // ROZZA
+  linha(49958370.00, 6569283.17, "Ativa"),        // TETRA
+  linha(48530988.00, 19374869.14, "Ativa"),       // SERENITY
+  linha(54430833.60, 48881632.89, "Finalizada"),  // TESLA RESIDENCIAL
+  linha(24741288.00, 27072183.31, "Finalizada"),  // RESIDENCIAL HANNOVER (saldo negativo)
+];
+
+const totais = computeBudgetTotals(tela0611);
+assertClose("Orçamento Total = só ativas = 446.386.917,44", totais.totalBudget, 446386917.44);
+assertClose("Custo Realizado = só ativas = 190.489.292,74", totais.totalRealized, 190489292.74);
+assertClose("Saldo a Realizar = só ativas = 255.897.624,70", totais.totalToRealize, 255897624.70);
+assert("Orçamento Total NÃO inclui Tesla + Hannover (525.559.039,04)",
+  Math.abs(totais.totalBudget - 525559039.04) > 1);
+
+const soFinalizadas = computeBudgetTotals(tela0611.filter(r => r.status === "Finalizada"));
+assertClose("Só finalizadas selecionadas → cards zerados (orçamento)", soFinalizadas.totalBudget, 0);
+assertClose("Só finalizadas selecionadas → cards zerados (realizado)", soFinalizadas.totalRealized, 0);
+
+const comNegativaAtiva = computeBudgetTotals([linha(100, 120, "Ativa"), linha(100, 40, "Ativa")]);
+assertClose("Saldo a Realizar ignora saldo negativo de ativa: 0 + 60", comNegativaAtiva.totalToRealize, 60);
+assertClose("Orçamento/Realizado não clipam: 200 e 160", comNegativaAtiva.totalBudget + comNegativaAtiva.totalRealized, 360);
+
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
 console.log(`\n${"=".repeat(50)}`);
