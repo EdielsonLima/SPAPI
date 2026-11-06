@@ -15,7 +15,7 @@ import {
 import { ArrowDown, ArrowUp, Minus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { brl } from "@/lib/indicadores/fmt";
-import type { CubIndicadorRow, PctIndicadorRow } from "@/lib/db";
+import type { CubIndicadorRow, M2BcRow, PctIndicadorRow } from "@/lib/db";
 import {
   INDICADORES_COMPARAVEIS,
   JANELA_MESES,
@@ -31,6 +31,8 @@ import {
   type SlugComparavel,
 } from "@/lib/indicadores/comparativo";
 import { cn } from "@/lib/utils";
+
+const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 const MODOS: { id: ModoComparativo; rotulo: string; ajuda: string }[] = [
   { id: "base100", rotulo: "Evolucao (base 100)", ajuda: "Todos partem de 100 — a distancia entre as linhas e a diferenca real de rendimento" },
@@ -179,12 +181,15 @@ export function CompararContent({
   ipca,
   igpm,
   incc,
+  m2bc,
 }: {
   cub: CubIndicadorRow[];
   cdi: PctIndicadorRow[];
   ipca: PctIndicadorRow[];
   igpm: PctIndicadorRow[];
   incc: PctIndicadorRow[];
+  /** m² de Balneário Camboriú (FipeZAP); vazio enquanto não sincronizou. */
+  m2bc: M2BcRow[];
 }) {
   // CUB x INCC ja vem marcado: e a comparacao que motivou a tela (custo de obra
   // medido em SC contra o indice nacional).
@@ -192,7 +197,9 @@ export function CompararContent({
   const [modo, setModo] = useState<ModoComparativo>("base100");
   const [referencia, setReferencia] = useState<SlugComparavel>("cub");
 
-  const pct = useMemo(() => ({ cdi, ipca, igpm, incc }), [cdi, ipca, igpm, incc]);
+  const pct = useMemo(() => ({ cdi, ipca, igpm, incc, m2bc }), [cdi, ipca, igpm, incc, m2bc]);
+  // Último preço conhecido do m² de BC, para o card mostrar o R$ além da variação.
+  const ultimoM2Bc = useMemo(() => [...m2bc].reverse().find((r) => r.valor_m2 !== null) ?? null, [m2bc]);
 
   const { series, meses } = useMemo(
     () => montarComparativo(selecionados, cub, pct),
@@ -303,6 +310,11 @@ export function CompararContent({
                   <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                     R$ 100 mil viram <strong className="text-slate-700 dark:text-slate-200">{brl(s.valorCorrigido)}</strong>
                   </p>
+                  {s.slug === "m2bc" && ultimoM2Bc?.valor_m2 != null && (
+                    <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                      m² a <strong className="text-slate-700 dark:text-slate-200">{brl(ultimoM2Bc.valor_m2)}</strong> em {MESES_CURTOS[ultimoM2Bc.mes - 1]}/{String(ultimoM2Bc.ano).slice(-2)} · FipeZAP
+                    </p>
+                  )}
                 </div>
               ))}
           </div>

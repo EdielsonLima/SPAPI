@@ -5,6 +5,7 @@ import {
   getIndicadoresCub,
   getIndicadoresDebit,
   getIndicadoresValorM2,
+  getIndicadoresM2Bc,
   type CubIndicadorRow,
   type PctIndicadorRow,
   type ValorM2Row,
@@ -115,13 +116,14 @@ export async function GET() {
   }
 
   try {
-    const [cubRows, cdiRows, ipcaRows, igpmRows, inccRows, valorM2Rows] = await Promise.all([
+    const [cubRows, cdiRows, ipcaRows, igpmRows, inccRows, valorM2Rows, m2BcRows] = await Promise.all([
       getIndicadoresCub(),
       getIndicadoresDebit("cdi"),
       getIndicadoresDebit("ipca"),
       getIndicadoresDebit("igpm"),
       getIndicadoresDebit("incc"),
       getIndicadoresValorM2(),
+      getIndicadoresM2Bc(),
     ]);
 
     const cubAtu = maxAtualizadoEm(cubRows);
@@ -130,6 +132,7 @@ export async function GET() {
     const igpmAtu = maxAtualizadoEm(igpmRows);
     const inccAtu = maxAtualizadoEm(inccRows);
     const valorM2Atu = maxAtualizadoEm(valorM2Rows);
+    const m2BcAtu = maxAtualizadoEm(m2BcRows);
 
     return NextResponse.json({
       cub: {
@@ -167,6 +170,12 @@ export async function GET() {
         kpis: buildValorM2Kpis(valorM2Rows),
         atualizadoEm: valorM2Atu,
         stale: isStale(valorM2Atu ?? undefined),
+      },
+      // m² de Balneário Camboriú (FipeZAP) — só para o Comparar
+      m2bc: {
+        rows: m2BcRows,
+        atualizadoEm: m2BcAtu,
+        stale: isStale(m2BcAtu ?? undefined),
       },
     });
   } catch (err) {

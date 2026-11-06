@@ -958,6 +958,91 @@ export async function upsertIndicadoresCub(
   }
 }
 
+// ── m² de Balneário Camboriú (FipeZAP) ────────────────────────────────────────
+// Série mensal para o Comparar dos Indicadores (Edielson, 06/11/2026). Mesmo
+// formato dos índices percentuais (PctIndicadorRow) + índice e R$/m².
+export type M2BcRow = PctIndicadorRow & {
+  indice: number | null;
+  valor_m2: number | null;
+};
+
+let m2BcPronta = false;
+async function ensureM2Bc() {
+  if (m2BcPronta) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS indices_m2_bc (
+      id                SERIAL PRIMARY KEY,
+      ano               INT NOT NULL,
+      mes               INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+      indice            NUMERIC(12,4),
+      variacao_pct      NUMERIC(8,4) NOT NULL,
+      acumulado_12m_pct NUMERIC(8,4),
+      valor_m2          NUMERIC(18,2),
+      atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE(ano, mes)
+    )`);
+  m2BcPronta = true;
+}
+
+export async function getIndicadoresM2Bc(): Promise<M2BcRow[]> {
+  await ensureM2Bc();
+  const { rows } = await pool.query(
+    `SELECT ano, mes, indice, variacao_pct, acumulado_12m_pct, valor_m2, atualizado_em
+       FROM indices_m2_bc
+       ORDER BY ano, mes`
+  );
+  return rows.map((r: Record<string, unknown>) => ({
+    ano: Number(r.ano),
+    mes: Number(r.mes),
+    indice: toNumOrNull(r.indice),
+    variacao_pct: toNum(r.variacao_pct),
+    acumulado_12m_pct: toNumOrNull(r.acumulado_12m_pct),
+    valor_m2: toNumOrNull(r.valor_m2),
+    atualizado_em: r.atualizado_em instanceof Date
+      ? r.atualizado_em.toISOString()
+      : String(r.atualizado_em ?? ""),
+  }));
+}
+
+export async function upsertIndicadoresM2Bc(
+  rows: {
+    ano: number;
+    mes: number;
+    indice: number | null;
+    variacao_pct: number;
+    acumulado_12m_pct: number | null;
+    valor_m2: number | null;
+  }[]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  await ensureM2Bc();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    for (const r of rows) {
+      await client.query(
+        `INSERT INTO indices_m2_bc
+           (ano, mes, indice, variacao_pct, acumulado_12m_pct, valor_m2, atualizado_em)
+         VALUES ($1,$2,$3,$4,$5,$6,NOW())
+         ON CONFLICT (ano, mes) DO UPDATE SET
+           indice = EXCLUDED.indice,
+           variacao_pct = EXCLUDED.variacao_pct,
+           acumulado_12m_pct = EXCLUDED.acumulado_12m_pct,
+           valor_m2 = EXCLUDED.valor_m2,
+           atualizado_em = NOW()`,
+        [r.ano, r.mes, r.indice, r.variacao_pct, r.acumulado_12m_pct, r.valor_m2]
+      );
+    }
+    await client.query("COMMIT");
+    return rows.length;
+  } catch (err) {
+    await client.query("ROLLBACK");
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 export type ValorM2Row = {
   cidade: string;
   uf: string;

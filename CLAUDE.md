@@ -367,6 +367,25 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Docker `spapi-sp-db` na porta 5447 e login `admin-local`); `node scripts/migrate.js`
   com `DATABASE_URL` exportada. Primeira carga puxa 10 anos do Sienge (~3 min).
 
+## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
+
+- Pedido: "comparar o CUB-SC com o m² de Balneário Camboriú". A aba "Valor m²" só guarda
+  uma foto por cidade (`indices_valor_m2`, myside), sem histórico — não serve para série.
+- Fonte da série mensal: planilha pública do FipeZAP
+  (`downloads.fipe.org.br/indices/fipezap/fipezap-serieshistoricas.xlsx`, ~4,6 MB, uma aba
+  por cidade). Leitor em `src/lib/indicadores/fipezap-scraper.ts` (exceljs, import dinâmico):
+  bloco "Imóveis residenciais › Venda", coluna Total de Número-índice, Var. mensal,
+  Var. 12 meses e Preço médio (R$/m²). Variações vêm como fração (×100 ao gravar). Preço =
+  média móvel trimestral (nota da Fipe). Dados de jan/2018 em diante.
+- Tabela `indices_m2_bc` (ano, mes, indice, variacao_pct, acumulado_12m_pct, valor_m2),
+  criada sob demanda (`ensureM2Bc` em `db.ts`) e no `schema.sql`. Sync:
+  `POST /api/indicadores/sync {indicador:"m2bc"}` (automático quando a aba Indicadores abre
+  e o dado tem mais de 7 dias ou não existe). `GET /api/indicadores` devolve `m2bc`.
+- No Comparar é o slug `m2bc` ("m² Balneário Camboriú", rosa) em `INDICADORES_COMPARAVEIS`;
+  entra pelo mesmo `pct[slug]` dos índices percentuais. O card mostra também o R$/m² do
+  último mês. Conferido 06/11: 106 meses, out/26 = R$ 15.325/m², 12 m = +3,14 %.
+- Outra cidade = chamar `fetchFipezapRows("Nome da aba")`; o leitor acha a aba sem acento.
+
 ## Controle de Orçamento por Empresa (Criado em 2026-04-16)
 
 - Campo `controla_orcamento` (BOOLEAN) na tabela `company_settings` (default FALSE)

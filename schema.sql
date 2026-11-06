@@ -308,6 +308,21 @@ CREATE TABLE IF NOT EXISTS indices_valor_m2 (
   UNIQUE(cidade, uf)
 );
 
+-- m² de Balneário Camboriú (FipeZAP, série mensal) — para comparar com o CUB-SC
+-- no Comparar dos Indicadores (Edielson, 06/11/2026). Também é criada sob
+-- demanda em db.ts (ensureM2Bc), como as tabelas da Tabela de Preços.
+CREATE TABLE IF NOT EXISTS indices_m2_bc (
+  id                SERIAL PRIMARY KEY,
+  ano               INT NOT NULL,
+  mes               INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+  indice            NUMERIC(12,4),
+  variacao_pct      NUMERIC(8,4) NOT NULL,
+  acumulado_12m_pct NUMERIC(8,4),
+  valor_m2          NUMERIC(18,2),
+  atualizado_em     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(ano, mes)
+);
+
 -- ── Conferência de títulos (mutirão CP/CR com o financeiro) ─────────────────
 -- Guarda a DECISÃO tomada sobre cada parcela vencida / inadimplente.
 -- Não apaga nada no Sienge: é o registro de que o título já foi conferido e

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { CubIndicadorRow, PctIndicadorRow, ValorM2Row } from "@/lib/db";
+import type { CubIndicadorRow, M2BcRow, PctIndicadorRow, ValorM2Row } from "@/lib/db";
 import { CubContent, type CubKpis } from "./cub-content";
 import { PctIndicadorContent, type PctKpis } from "./pct-indicador-content";
 import { ValorM2Content, type ValorM2Kpis } from "./valor-m2-content";
@@ -46,6 +46,12 @@ type ApiResponse = {
     atualizadoEm: string | null;
     stale: boolean;
   };
+  /** m² de Balneário Camboriú (FipeZAP), só para o Comparar. */
+  m2bc?: {
+    rows: M2BcRow[];
+    atualizadoEm: string | null;
+    stale: boolean;
+  };
 };
 
 type SubTab = "cub" | "cdi" | "ipca" | "igpm" | "incc" | "valorm2" | "comparar";
@@ -82,13 +88,14 @@ export function IndicadoresTab() {
     if (!data || autoSyncRan.current) return;
     autoSyncRan.current = true;
 
-    const targets: SubTab[] = [];
+    const targets: string[] = [];
     if (data.cub.stale) targets.push("cub");
     if (data.cdi.stale) targets.push("cdi");
     if (data.ipca.stale) targets.push("ipca");
     if (data.igpm.stale) targets.push("igpm");
     if (data.incc.stale) targets.push("incc");
     if (data.valorM2.stale) targets.push("valorm2");
+    if (!data.m2bc || data.m2bc.stale) targets.push("m2bc");
     if (targets.length === 0) return;
 
     Promise.allSettled(
@@ -223,6 +230,7 @@ export function IndicadoresTab() {
           ipca={data.ipca.rows}
           igpm={data.igpm.rows}
           incc={data.incc.rows}
+          m2bc={data.m2bc?.rows ?? []}
         />
       )}
       {data && active === "valorm2" && (

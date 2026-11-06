@@ -15,7 +15,7 @@ import type { CubIndicadorRow, PctIndicadorRow } from "@/lib/db";
 
 export const JANELA_MESES = 12;
 
-export type SlugComparavel = "cub" | "cdi" | "ipca" | "igpm" | "incc";
+export type SlugComparavel = "cub" | "cdi" | "ipca" | "igpm" | "incc" | "m2bc";
 
 export interface DefinicaoIndicador {
   slug: SlugComparavel;
@@ -31,6 +31,9 @@ export const INDICADORES_COMPARAVEIS: DefinicaoIndicador[] = [
   { slug: "igpm", nome: "IGP-M", cor: "#8b5cf6", descricao: "Índice usado em reajuste de aluguel" },
   { slug: "ipca", nome: "IPCA", cor: "#f59e0b", descricao: "Inflação oficial ao consumidor" },
   { slug: "cdi", nome: "CDI", cor: "#10b981", descricao: "Custo do dinheiro / rendimento de caixa" },
+  // Edielson, 06/11/2026: "comparar o CUB-SC com o m² de Balneário Camboriú".
+  // Série mensal do FipeZAP (venda residencial, preço médio móvel trimestral).
+  { slug: "m2bc", nome: "m² Balneário Camboriú", cor: "#ec4899", descricao: "Preço de venda do m² residencial em BC (FipeZAP)" },
 ];
 
 /** Um mês da série, já normalizado. */
