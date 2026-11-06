@@ -13,6 +13,13 @@ const config: Config = {
         sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
       },
       colors: {
+        // Padrão visual Silva Packer (mesmos tokens do Portal, GED, Metas e
+        // Pedidos, 06/11/2026): o "slate" (cinza frio) vira o cinza quente da
+        // marca (tinta/papel). Só muda a tonalidade; as classes ficam iguais.
+        slate: {
+          50: "#fbf8f8", 100: "#f6f0f1", 200: "#ece2e4", 300: "#d9cacd", 400: "#a8959a",
+          500: "#7e6b70", 600: "#6e5a5e", 700: "#54434a", 800: "#3a2c31", 900: "#251a1d", 950: "#160e10",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {

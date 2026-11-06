@@ -313,6 +313,40 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (`next.config.mjs`); as rotas `/api/sienge/purchase-*` e
   `/api/arrival-confirmations` continuam no código.
 
+## Painel Executivo CP/CR — tela única e interação Power BI (Edielson, 06/11/2026)
+
+Motivo: Carlos Humberto (Silva Packer) passa a usar o painel todo dia e vem de anos no
+Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tudo).
+
+- **Padrão visual Silva Packer** (mesmo do Portal, GED, Metas e Pedidos): `slate` virou
+  cinza quente em `tailwind.config.ts`, fundo papel/tinta/bordas em `globals.css`
+  (`--background 0 25% 98%`, `--border 348 20% 91%`), títulos 600/-0.02em. Carmim
+  (`primary`) só para estado ativo (chip, pílula, card filtrado). Vale no app todo.
+- **Abas CP/CR** (`a-pagar`, `pagas`, `atrasadas`, `a-receber`, `recebidas`,
+  `inadimplencia`) ocupam exatamente a janela: raiz `md:h-[calc(100vh-7rem)]`
+  (header 64 px + padding 48 px), gráficos em `flex-1 min-h-0` com
+  `ResponsiveContainer height="100%"`. Sem barra de rolagem a 100% de zoom com a
+  sidebar aberta (1920×~950). Nada de altura fixa nos gráficos dessas abas.
+- **Cards**: borda fina, sem sombra/ícone, ponto de estado; valor em
+  `text-[clamp(1rem,1.15vw,1.5rem)] whitespace-nowrap` — nunca `truncate`.
+  Grade `grid-cols-2 md:grid-cols-3 2xl:grid-cols-N` (N = nº de cards; mapa `colsXl`).
+- **Período em botões** (`isCpCrTab`): anos de `availableYears` e os 12 meses
+  (`MONTH_OPTIONS`; mês sem dado fica esmaecido). Clique = só aquele; Ctrl/Shift+clique
+  = soma; "Todos". Os dropdowns Anos/Meses continuam só nas demais abas
+  (Geral, Saldos, Resumo, DRE…). Mesmo estado `selectedYears`/`selectedMonths`.
+- **Filtro cruzado**: `drillCompany` (clique na barra de "Por Empresa") entra em
+  `applyFilters`, `filtrarPagas`/`filtrarRecebidas`; os gráficos usam variantes
+  `{ semDrill }` (Por Empresa mostra todas as barras, a clicada em cor cheia) e
+  `{ semMes }` / `itemsPagasSemMes` + `matchesPaymentYearOnly` (Evolução Mensal mostra
+  os 12 meses, o escolhido em cor cheia, os outros em `dimBar`). KPIs e tabelas
+  continuam saindo de `filteredX` — as fórmulas validadas não mudaram.
+- Cards "Vence Hoje/7/15/30" ligam `selectedDuePeriods`; o total limpa.
+  Detalhamentos (Credores/Clientes, Atrasadas, Inadimplentes) abrem em `Dialog`
+  (`semFechar`, o card tem o próprio X) em vez de empurrar a tela.
+- Rodar local: `.env.local` (gerado do env do serviço `spapi` no EasyPanel, com banco
+  Docker `spapi-sp-db` na porta 5447 e login `admin-local`); `node scripts/migrate.js`
+  com `DATABASE_URL` exportada. Primeira carga puxa 10 anos do Sienge (~3 min).
+
 ## Controle de Orçamento por Empresa (Criado em 2026-04-16)
 
 - Campo `controla_orcamento` (BOOLEAN) na tabela `company_settings` (default FALSE)

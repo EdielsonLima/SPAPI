@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useTheme } from "next-themes";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 // Select removed - year filter now uses MultiSelectFilter
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -255,6 +256,11 @@ export function ExecutiveDashboard() {
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
   const [chartView, setChartView] = useState<ChartView>("mensal");
+  // Filtro cruzado ao estilo Power BI (Edielson, 06/11/2026): clicar numa
+  // empresa no gráfico "Por Empresa" restringe cards, gráfico mensal e
+  // detalhes àquela empresa (as outras barras ficam esmaecidas); clicar de
+  // novo, ou em "limpar", volta à seleção do filtro Empresas.
+  const [drillCompany, setDrillCompany] = useState<string | null>(null);
   const [showDelinquentTable, setShowDelinquentTable] = useState(false);
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [delinquentSort, setDelinquentSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
@@ -839,6 +845,15 @@ export function ExecutiveDashboard() {
     return true;
   }, [selectedYears, selectedMonths, selectedDays, todayStr]);
 
+  // Só o ano (sem mês/dia): alimenta o gráfico mensal no modo de destaque,
+  // em que os 12 meses continuam visíveis e o mês escolhido fica em cor cheia.
+  const matchesPaymentYearOnly = useCallback((paymentDate?: string) => {
+    if (!paymentDate) return false;
+    if (paymentDate > todayStr) return false;
+    if (selectedYears.size > 0 && !selectedYears.has(paymentDate.substring(0, 4))) return false;
+    return true;
+  }, [selectedYears, todayStr]);
+
   // Soma de pagamentos filtrada por tipo de operação e ano do pagamento.
   // Pareia Adiantamento+Estorno (mesma data, valores opostos) e exclui ambos —
   // Sienge cancela esses pares do Líquido. Sem pareamento, EXCLUDED_OP filtra
@@ -976,10 +991,17 @@ export function ExecutiveDashboard() {
   }, [consistentIncomeCR]);
 
   // === Apply filters to items (works for both Outcome and Income) ===
-  const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string; companyId?: number; billId?: number; installmentId?: number }>(list: T[]): T[] => {
+  // opts.semDrill: ignora a empresa clicada no gráfico (o filtro Empresas
+  // continua valendo) — usado pelo gráfico "Por Empresa", que precisa mostrar
+  // todas as barras para destacar a escolhida. opts.semMes: ignora mês/dia —
+  // usado pelo gráfico mensal pelo mesmo motivo.
+  const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string; companyId?: number; billId?: number; installmentId?: number }>(list: T[], opts: { semDrill?: boolean; semMes?: boolean } = {}): T[] => {
     let result = list;
     if (selectedCompanies.size > 0) {
       result = result.filter(i => selectedCompanies.has(i.companyName));
+    }
+    if (drillCompany && !opts.semDrill) {
+      result = result.filter(i => i.companyName === drillCompany);
     }
     if (selectedDocTypes.size > 0) {
       result = result.filter(i =>
@@ -990,17 +1012,17 @@ export function ExecutiveDashboard() {
     if (selectedYears.size > 0) {
       result = result.filter(i => i.dueDate && selectedYears.has(i.dueDate.substring(0, 4)));
     }
-    if (selectedMonths.size > 0) {
+    if (selectedMonths.size > 0 && !opts.semMes) {
       result = result.filter(i => i.dueDate && selectedMonths.has(i.dueDate.substring(5, 7)));
     }
-    if (selectedDays.size > 0) {
+    if (selectedDays.size > 0 && !opts.semMes) {
       result = result.filter(i => i.dueDate && selectedDays.has(i.dueDate.substring(8, 10)));
     }
     if (duePeriodMaxDate) {
       result = result.filter(i => i.dueDate && i.dueDate <= duePeriodMaxDate);
     }
     return result;
-  }, [selectedCompanies, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate]);
+  }, [selectedCompanies, drillCompany, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate]);
 
   // === Filtered item sets ===
   const itemsAPagar = useMemo(() =>
@@ -1237,6 +1259,17 @@ export function ExecutiveDashboard() {
       )
     ), [consistentItemsForPagas, selectedOpTypes, matchesSelectedPaymentDate]);
 
+  // Mesma lista, só com o filtro de ano (sem mês/dia): gráfico mensal de Pagas
+  // no modo de destaque (ver matchesPaymentYearOnly).
+  const itemsPagasSemMes = useMemo(() =>
+    consistentItemsForPagas.filter(i =>
+      (i.payments || []).some(p =>
+        p.netAmount > 0 &&
+        (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
+        matchesPaymentYearOnly(p.paymentDate)
+      )
+    ), [consistentItemsForPagas, selectedOpTypes, matchesPaymentYearOnly]);
+
   // === CR Filtered item sets ===
   const itemsAReceber = useMemo(() =>
     consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr), [consistentIncomeCR, todayStr]);
@@ -1257,46 +1290,65 @@ export function ExecutiveDashboard() {
       && !(isHolding && (i.documentIdentificationId || "").trim().toUpperCase() === "TRAN")
     ), [consistentIncomeForRecebidas, matchesSelectedPaymentDate, isHolding]);
 
+  // Idem, só com o ano (gráfico mensal de Recebidas no modo de destaque).
+  const itemsRecebidasSemMes = useMemo(() =>
+    consistentIncomeForRecebidas.filter(i =>
+      i.originalAmount > 0 && (i.payments || []).some(p =>
+        p.netAmount > 0 &&
+        matchesPaymentYearOnly(p.paymentDate)
+      )
+      && !(isHolding && (i.documentIdentificationId || "").trim().toUpperCase() === "TRAN")
+    ), [consistentIncomeForRecebidas, matchesPaymentYearOnly, isHolding]);
+
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);
   const filteredAtrasadas = useMemo(() => applyFilters(itemsAtrasadas), [itemsAtrasadas, applyFilters]);
   // Pagas: anos/meses/dias devem filtrar pela data da baixa (paymentDate),
   // nao pelo vencimento do titulo. Ex.: HANNOVER tem caucoes com vencimento
   // em 2027 pagas em 2024; o Sienge soma essas baixas no periodo pago.
-  const filteredPagas = useMemo(() => {
-    let result = itemsPagas;
+  const filtrarPagas = useCallback((lista: SiengeOutcome[], comDrill: boolean) => {
+    let result = lista;
     if (selectedCompanies.size > 0) {
       result = result.filter(i => selectedCompanies.has(i.companyName));
+    }
+    if (comDrill && drillCompany) {
+      result = result.filter(i => i.companyName === drillCompany);
     }
     if (selectedDocTypes.size > 0) {
       result = result.filter(i => selectedDocTypes.has(i.documentIdentificationName));
     }
     return result;
-  }, [itemsPagas, selectedCompanies, selectedDocTypes]);
+  }, [selectedCompanies, drillCompany, selectedDocTypes]);
+  const filteredPagas = useMemo(() => filtrarPagas(itemsPagas, true), [itemsPagas, filtrarPagas]);
+  // Variantes só para os gráficos (filtro cruzado): sem o drill da empresa
+  // clicada ("Por Empresa") e sem o mês escolhido ("Evolução Mensal").
+  const filteredPagasSemDrill = useMemo(() => filtrarPagas(itemsPagas, false), [itemsPagas, filtrarPagas]);
+  const filteredPagasSemMes = useMemo(() => filtrarPagas(itemsPagasSemMes, true), [itemsPagasSemMes, filtrarPagas]);
 
-  const filteredAReceber = useMemo(() => {
-    let result = applyFilters(itemsAReceber);
-    if (selectedDocNumbers.size > 0) result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
-    return result;
-  }, [itemsAReceber, applyFilters, selectedDocNumbers]);
-  const filteredInadimplencia = useMemo(() => {
-    let result = applyFilters(itemsInadimplencia);
-    if (selectedDocNumbers.size > 0) result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
-    return result;
-  }, [itemsInadimplencia, applyFilters, selectedDocNumbers]);
+  const comDocNumbers = useCallback(<T extends { documentNumber: string }>(list: T[]): T[] =>
+    selectedDocNumbers.size > 0 ? list.filter(i => selectedDocNumbers.has(i.documentNumber)) : list,
+    [selectedDocNumbers]);
+  const filteredAReceber = useMemo(() => comDocNumbers(applyFilters(itemsAReceber)), [itemsAReceber, applyFilters, comDocNumbers]);
+  const filteredInadimplencia = useMemo(() => comDocNumbers(applyFilters(itemsInadimplencia)), [itemsInadimplencia, applyFilters, comDocNumbers]);
   // Recebidas: filtro alinhado com a página Contas Recebidas (contas-table)
   // NÃO aplica selectedDocTypes (PREVISÃO etc.) nem filtra por dueDate year
   // O filtro de ano/mês já é aplicado via paymentDate em itemsRecebidas e receivedSum
-  const filteredRecebidas = useMemo(() => {
-    let result = itemsRecebidas;
+  const filtrarRecebidas = useCallback((lista: SiengeIncome[], comDrill: boolean) => {
+    let result = lista;
     if (selectedCompanies.size > 0) {
       result = result.filter(i => selectedCompanies.has(i.companyName));
+    }
+    if (comDrill && drillCompany) {
+      result = result.filter(i => i.companyName === drillCompany);
     }
     if (selectedDocNumbers.size > 0) {
       result = result.filter(i => selectedDocNumbers.has(i.documentNumber));
     }
     return result;
-  }, [itemsRecebidas, selectedCompanies, selectedDocNumbers]);
+  }, [selectedCompanies, drillCompany, selectedDocNumbers]);
+  const filteredRecebidas = useMemo(() => filtrarRecebidas(itemsRecebidas, true), [itemsRecebidas, filtrarRecebidas]);
+  const filteredRecebidasSemDrill = useMemo(() => filtrarRecebidas(itemsRecebidas, false), [itemsRecebidas, filtrarRecebidas]);
+  const filteredRecebidasSemMes = useMemo(() => filtrarRecebidas(itemsRecebidasSemMes, true), [itemsRecebidasSemMes, filtrarRecebidas]);
 
   // === Budget vs Actual (Orçado vs Realizado) ===
   // ▼▼▼ VALIDATED 2026-04-02 — Budget vs Realizado — DO NOT MODIFY without explicit user request ▼▼▼
@@ -1759,7 +1811,10 @@ export function ExecutiveDashboard() {
       .sort((a, b) => b.value - a.value);
   }
 
-  function buildMonthlyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: ChartValueField, skipPastMonths = false) {
+  // ignorarMes: a lista já veio sem o filtro de mês; os pagamentos também
+  // casam só pelo ano, para o gráfico mostrar os 12 meses (modo de destaque).
+  function buildMonthlyChart(filteredItems: (SiengeOutcome | SiengeIncome)[], field: ChartValueField, skipPastMonths = false, ignorarMes = false) {
+    const casaPagamento = ignorarMes ? matchesPaymentYearOnly : matchesSelectedPaymentDate;
     const currentMonth = new Date().getMonth(); // 0-indexed
     if (field === "paid") {
       // Agrupa pagamentos por paymentDate (data real do pagamento), filtrando pelo ano selecionado
@@ -1771,7 +1826,7 @@ export function ExecutiveDashboard() {
           .filter(p =>
             !canceled.has(p) &&
             (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
-            matchesSelectedPaymentDate(p.paymentDate)
+            casaPagamento(p.paymentDate)
           )
           .forEach(p => {
             const m = new Date(p.paymentDate + "T00:00:00").getMonth();
@@ -1792,7 +1847,7 @@ export function ExecutiveDashboard() {
         (item.payments || [])
           .filter(p =>
             p.netAmount > 0 &&
-            matchesSelectedPaymentDate(p.paymentDate)
+            casaPagamento(p.paymentDate)
           )
           .forEach(p => {
             const m = new Date(p.paymentDate + "T00:00:00").getMonth();
@@ -1918,8 +1973,8 @@ export function ExecutiveDashboard() {
   const tabData = useMemo(() => {
     if (activeTab === "a-pagar") {
       return {
-        companyChart: buildCompanyChart(filteredAPagar, "balance"),
-        monthly: buildMonthlyChart(filteredAPagar, "balance", true),
+        companyChart: buildCompanyChart(applyFilters(itemsAPagar, { semDrill: true }), "balance"),
+        monthly: buildMonthlyChart(applyFilters(itemsAPagar, { semMes: true }), "balance", true, true),
         annual: buildAnnualChart(filteredAPagar, "balance"),
         daily: buildDailyChart(filteredAPagar, "balance"),
         color: "hsl(217, 91%, 60%)",
@@ -1927,8 +1982,8 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "pagas") {
       return {
-        companyChart: buildCompanyChart(filteredPagas, "paid"),
-        monthly: buildMonthlyChart(filteredPagas, "paid"),
+        companyChart: buildCompanyChart(filteredPagasSemDrill, "paid"),
+        monthly: buildMonthlyChart(filteredPagasSemMes, "paid", false, true),
         annual: buildAnnualChart(filteredPagas, "paid"),
         daily: buildDailyChart(filteredPagas, "paid"),
         color: "hsl(160, 60%, 45%)",
@@ -1936,8 +1991,8 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "atrasadas") {
       return {
-        companyChart: buildCompanyChart(filteredAtrasadas, "balance"),
-        monthly: buildMonthlyChart(filteredAtrasadas, "balance"),
+        companyChart: buildCompanyChart(applyFilters(itemsAtrasadas, { semDrill: true }), "balance"),
+        monthly: buildMonthlyChart(applyFilters(itemsAtrasadas, { semMes: true }), "balance", false, true),
         annual: buildAnnualChart(filteredAtrasadas, "balance"),
         daily: buildDailyChart(filteredAtrasadas, "balance"),
         color: "hsl(0, 84%, 68%)",
@@ -1945,8 +2000,8 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "a-receber") {
       return {
-        companyChart: buildCompanyChart(filteredAReceber, "balance"),
-        monthly: buildMonthlyChart(filteredAReceber, "balance", true),
+        companyChart: buildCompanyChart(comDocNumbers(applyFilters(itemsAReceber, { semDrill: true })), "balance"),
+        monthly: buildMonthlyChart(comDocNumbers(applyFilters(itemsAReceber, { semMes: true })), "balance", true, true),
         annual: buildAnnualChart(filteredAReceber, "balance"),
         daily: buildDailyChart(filteredAReceber, "balance"),
         color: "hsl(142, 71%, 45%)",
@@ -1954,8 +2009,8 @@ export function ExecutiveDashboard() {
       };
     } else if (activeTab === "recebidas") {
       return {
-        companyChart: buildCompanyChart(filteredRecebidas, "received"),
-        monthly: buildMonthlyChart(filteredRecebidas, "received"),
+        companyChart: buildCompanyChart(filteredRecebidasSemDrill, "received"),
+        monthly: buildMonthlyChart(filteredRecebidasSemMes, "received", false, true),
         annual: buildAnnualChart(filteredRecebidas, "received"),
         daily: buildDailyChart(filteredRecebidas, "received"),
         color: "hsl(199, 89%, 48%)",
@@ -1964,8 +2019,8 @@ export function ExecutiveDashboard() {
     } else {
       // inadimplencia
       return {
-        companyChart: buildCompanyChart(filteredInadimplencia, "delinquent"),
-        monthly: buildMonthlyChart(filteredInadimplencia, "delinquent"),
+        companyChart: buildCompanyChart(comDocNumbers(applyFilters(itemsInadimplencia, { semDrill: true })), "delinquent"),
+        monthly: buildMonthlyChart(comDocNumbers(applyFilters(itemsInadimplencia, { semMes: true })), "delinquent", false, true),
         annual: buildAnnualChart(filteredInadimplencia, "delinquent"),
         daily: buildDailyChart(filteredInadimplencia, "delinquent"),
         color: "hsl(25, 95%, 53%)",
@@ -1973,7 +2028,7 @@ export function ExecutiveDashboard() {
       };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, items, incomeItems, allBankMovements, allBankMovementsFull, todayStr, selectedCompanies, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes]);
+  }, [activeTab, items, incomeItems, allBankMovements, allBankMovementsFull, todayStr, selectedCompanies, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes, drillCompany, selectedDocNumbers, filteredPagasSemDrill, filteredPagasSemMes, filteredRecebidasSemDrill, filteredRecebidasSemMes]);
 
   // === Loading State ===
   if (loading) {
@@ -2061,6 +2116,8 @@ export function ExecutiveDashboard() {
     trend?: number | null;
     trendLabel?: string;
     onClick?: () => void;
+    active?: boolean;
+    hint?: string;
   }>> = {
     "a-pagar": [
       {
@@ -2330,7 +2387,29 @@ export function ExecutiveDashboard() {
     comparativo: [],
   };
 
-  const kpis = kpiConfigs[activeTab];
+  // Cards clicáveis (Power BI: "clica no valor e filtra os outros"): os cards
+  // de vencimento ligam o filtro Vencimento; o total limpa; Credores/Clientes
+  // abrem o detalhamento (modal).
+  const PERIODO_DO_CARD: Record<string, string> = { "Vence Hoje": "hoje", "Vence em 7 dias": "7dias", "Vence em 15 dias": "15dias", "Vence em 30 dias": "30dias" };
+  const kpis = kpiConfigs[activeTab].map(k => {
+    const periodo = PERIODO_DO_CARD[k.label];
+    if (periodo && (activeTab === "a-pagar" || activeTab === "a-receber")) {
+      const ativo = selectedDuePeriods.size === 1 && selectedDuePeriods.has(periodo);
+      return {
+        ...k,
+        active: ativo,
+        hint: ativo ? "Clique para voltar a ver todos os vencimentos" : "Clique para filtrar os gráficos por este vencimento",
+        onClick: () => setSelectedDuePeriods(ativo ? new Set() : new Set([periodo])),
+      };
+    }
+    if ((k.label === "Total a Pagar" || k.label === "Total a Receber") && selectedDuePeriods.size > 0) {
+      return { ...k, hint: "Clique para limpar o filtro de vencimento", onClick: () => setSelectedDuePeriods(new Set()) };
+    }
+    if (k.onClick && (k.label === "Credores" || k.label === "Clientes")) {
+      return { ...k, active: showCounterpartDetail || showOverdueTable || showDelinquentTable };
+    }
+    return k;
+  });
   const { companyChart, monthly, annual, daily, color, label: seriesLabel } = tabData;
   const chartDataRaw = chartView === "anual" ? annual : chartView === "diario" ? daily : monthly;
   const chartData = chartDataRaw.map((item, idx) => {
@@ -2348,10 +2427,64 @@ export function ExecutiveDashboard() {
     return `hsl(25, 95%, ${48 + idx * 3}%)`;
   };
 
-
+  // === Tela única + interação ao estilo Power BI (Edielson, 06/11/2026) ===
+  // Nas abas CP/CR o painel ocupa exatamente a altura da janela (sem barra de
+  // rolagem): cabeçalho, sub-abas, período em botões, cards e os dois
+  // gráficos esticando no que sobrar. Carlos Humberto usa o Power BI assim.
+  const CP_CR_TABS: MainTab[] = ["a-pagar", "pagas", "atrasadas", "a-receber", "recebidas", "inadimplencia"];
+  const isCpCrTab = CP_CR_TABS.includes(activeTab);
+  const multiClick = (e: React.MouseEvent) => e.ctrlKey || e.metaKey || e.shiftKey;
+  // Clique simples = só aquele ano; Ctrl/Shift+clique = soma ao que já está.
+  const escolherAno = (y: string, e: React.MouseEvent) => {
+    if (multiClick(e)) toggleInSet(setSelectedYears, y);
+    else setSelectedYears(new Set([y]));
+    setSelectedDays(new Set());
+  };
+  // Clique simples = só aquele mês (de novo = todos); Ctrl/Shift+clique = soma.
+  const escolherMes = (m: string, e?: React.MouseEvent) => {
+    if (e && multiClick(e)) toggleInSet(setSelectedMonths, m);
+    else setSelectedMonths(prev => (prev.size === 1 && prev.has(m)) ? new Set() : new Set([m]));
+    setSelectedDays(new Set());
+  };
+  const aoClicarEmpresa = (nome: string) => {
+    if (!nome) return;
+    setDrillCompany(prev => prev === nome ? null : nome);
+  };
+  const subTabClass = "gap-1.5 px-3.5 h-7 rounded-full text-xs font-medium text-slate-500 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:text-primary dark:data-[state=active]:text-primary data-[state=active]:shadow-sm data-[state=active]:font-semibold transition-all";
+  const chipClass = (ativo: boolean, fraco = false) =>
+    `h-7 min-w-[2.6rem] px-2.5 rounded-lg border text-xs font-medium tabular-nums transition-colors select-none ${
+      ativo
+        ? "bg-primary border-primary text-white"
+        : fraco
+          ? "bg-transparent border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 hover:border-slate-300 dark:hover:border-slate-600"
+          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500"
+    }`;
+  const todosAnosAtivos = availableYears.length > 0 && availableYears.every(y => selectedYears.has(y));
+  const modalTabelaClass = "max-w-[min(1400px,94vw)] max-h-[90vh] overflow-y-auto p-2 sm:rounded-2xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700";
+  const exportarPdfAPagar = () => {
+    const now = new Date();
+    const fmtNow = `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+    let periodLabel = "Todas as contas a pagar";
+    if (selectedDuePeriods.size > 0) {
+      const labels: string[] = [];
+      if (selectedDuePeriods.has("hoje")) labels.push("Hoje");
+      if (selectedDuePeriods.has("7dias")) labels.push("7 dias");
+      if (selectedDuePeriods.has("15dias")) labels.push("15 dias");
+      if (selectedDuePeriods.has("30dias")) labels.push("30 dias");
+      periodLabel = `Vencimento: ${labels.join(", ")}`;
+    }
+    if (drillCompany) periodLabel += ` · ${drillCompany}`;
+    generateContasPagarPDF({
+      items: filteredAPagar,
+      totalAPagar,
+      periodLabel,
+      companyName: process.env.NEXT_PUBLIC_COMPANY_NAME || "Empresa",
+      generatedAt: fmtNow,
+    });
+  };
 
   return (
-    <div className="space-y-6 p-1">
+    <div className={isCpCrTab ? "flex flex-col gap-3 md:h-[calc(100vh-7rem)] md:min-h-[600px]" : "space-y-6 p-1"}>
       {/* Refresh progress modal */}
       {refreshing && refreshSteps.length > 0 && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm">
@@ -2388,14 +2521,143 @@ export function ExecutiveDashboard() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-800">Painel Executivo</h1>
-            <p className="text-slate-500 mt-1">
-              {isHolding ? "Visao consolidada da Holding" : "Visao consolidada do empreendimento"}
-            </p>
+      {/* Cabeçalho: título e seções na mesma linha (tela única) */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex items-center gap-4 flex-wrap">
+          <h1 className="text-xl font-semibold tracking-tight text-slate-800 dark:text-slate-100" title={isHolding ? "Visão consolidada da Holding" : "Visão consolidada do empreendimento"}>Painel Executivo</h1>
+          {/* Seções do painel */}
+          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-0.5 flex-wrap">
+            <button
+              onClick={() => switchTab("visao-geral")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "visao-geral"
+                  ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Geral
+            </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("a-pagar");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                section === "cp" && !["orcamento", "dre", "saldos", "visao-geral"].includes(activeTab)
+                  ? "bg-white dark:bg-slate-700 text-red-600 dark:text-red-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <ArrowUpRight className="h-3.5 w-3.5" />
+              CP
+            </button>
+            <button
+              onClick={() => {
+                setSection("cr");
+                switchTab("a-receber");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                section === "cr" && ["a-receber", "recebidas", "inadimplencia"].includes(activeTab)
+                  ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <ArrowDownLeft className="h-3.5 w-3.5" />
+              CR
+            </button>
+            {!isHolding && (
+              <button
+                onClick={() => {
+                  setSection("cp");
+                  switchTab("orcamento");
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  activeTab === "orcamento"
+                    ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Ruler className="h-3.5 w-3.5" />
+                Orçamento
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("dre");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "dre"
+                  ? "bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              DRE
+            </button>
+            {/* Botao DRE API removido em 2026-05-13: decidimos manter DRE
+                via Excel (Sienge calcula 100% correto, bulk API nao expoe
+                campos necessarios pra replicar). Endpoints /api/dre-api/*
+                e tab 'dre-api' preservados no codigo pra eventual retomada. */}
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("saldos");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "saldos"
+                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <Landmark className="h-3.5 w-3.5" />
+              Saldos
+            </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("resumo");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "resumo"
+                  ? "bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Resumo
+            </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("indicadores");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "indicadores"
+                  ? "bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+              title="CUB-SC, CDI, IPCA, IGP-M e INCC"
+            >
+              <TrendingUp className="h-3.5 w-3.5" />
+              Indicadores
+            </button>
+            <button
+              onClick={() => {
+                setSection("cp");
+                switchTab("comparativo");
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                activeTab === "comparativo"
+                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+              title="Comparar períodos (ex.: 1º sem 2026 vs 2025)"
+            >
+              <BarChart3 className="h-3.5 w-3.5" />
+              Comparativo
+            </button>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -2419,144 +2681,8 @@ export function ExecutiveDashboard() {
         </div>
       </div>
 
-      {/* Section Toggle (CP / CR) + Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          {/* Section Toggle */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1 gap-0.5">
-            <button
-              onClick={() => switchTab("visao-geral")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "visao-geral"
-                  ? "bg-white dark:bg-slate-700 text-slate-800 dark:text-slate-100 shadow-md ring-2 ring-slate-300 dark:ring-slate-500"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Geral
-            </button>
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("a-pagar");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                section === "cp" && !["orcamento", "dre", "saldos", "visao-geral"].includes(activeTab)
-                  ? "bg-white dark:bg-slate-700 text-red-600 dark:text-red-400 shadow-md ring-2 ring-red-300 dark:ring-red-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" />
-              CP
-            </button>
-            <button
-              onClick={() => {
-                setSection("cr");
-                switchTab("a-receber");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                section === "cr" && ["a-receber", "recebidas", "inadimplencia"].includes(activeTab)
-                  ? "bg-white dark:bg-slate-700 text-emerald-600 dark:text-emerald-400 shadow-md ring-2 ring-emerald-300 dark:ring-emerald-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <ArrowDownLeft className="h-3.5 w-3.5" />
-              CR
-            </button>
-            {!isHolding && (
-              <button
-                onClick={() => {
-                  setSection("cp");
-                  switchTab("orcamento");
-                }}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  activeTab === "orcamento"
-                    ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-md ring-2 ring-purple-300 dark:ring-purple-500/50"
-                    : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <Ruler className="h-3.5 w-3.5" />
-                Orçamento
-              </button>
-            )}
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("dre");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "dre"
-                  ? "bg-white dark:bg-slate-700 text-teal-600 dark:text-teal-400 shadow-md ring-2 ring-teal-300 dark:ring-teal-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <BarChart3 className="h-3.5 w-3.5" />
-              DRE
-            </button>
-            {/* Botao DRE API removido em 2026-05-13: decidimos manter DRE
-                via Excel (Sienge calcula 100% correto, bulk API nao expoe
-                campos necessarios pra replicar). Endpoints /api/dre-api/*
-                e tab 'dre-api' preservados no codigo pra eventual retomada. */}
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("saldos");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "saldos"
-                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-md ring-2 ring-indigo-300 dark:ring-indigo-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <Landmark className="h-3.5 w-3.5" />
-              Saldos
-            </button>
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("resumo");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "resumo"
-                  ? "bg-white dark:bg-slate-700 text-cyan-600 dark:text-cyan-400 shadow-md ring-2 ring-cyan-300 dark:ring-cyan-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              <FileText className="h-3.5 w-3.5" />
-              Resumo
-            </button>
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("indicadores");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "indicadores"
-                  ? "bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 shadow-md ring-2 ring-amber-300 dark:ring-amber-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-              title="CUB-SC, CDI, IPCA, IGP-M e INCC"
-            >
-              <TrendingUp className="h-3.5 w-3.5" />
-              Indicadores
-            </button>
-            <button
-              onClick={() => {
-                setSection("cp");
-                switchTab("comparativo");
-              }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                activeTab === "comparativo"
-                  ? "bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-md ring-2 ring-indigo-300 dark:ring-indigo-500/50"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-              title="Comparar períodos (ex.: 1º sem 2026 vs 2025)"
-            >
-              <BarChart3 className="h-3.5 w-3.5" />
-              Comparativo
-            </button>
-          </div>
-        </div>
+      {/* Sub-abas + filtros na mesma linha (o período fica na linha de baixo) */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
 
         {/* Sub-tabs CP/CR - separate line */}
         {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (
@@ -2566,19 +2692,20 @@ export function ExecutiveDashboard() {
             setSelectedMonths(new Set());
             setSelectedDays(new Set());
             setSelectedDuePeriods(new Set());
-          }} className="basis-full">
-            <TabsList className="h-12 bg-transparent p-0 gap-1 border-b border-slate-200 dark:border-slate-700 w-full justify-start">
+            setDrillCompany(null);
+          }} className="shrink-0">
+            <TabsList className="h-9 bg-slate-100 dark:bg-slate-800 rounded-full p-1 gap-0.5">
               {section === "cp" ? (
                 <>
-                  <TabsTrigger value="a-pagar" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "a-pagar" ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <TabsTrigger value="a-pagar" className={subTabClass}>
                     <Clock className="h-4 w-4" />
                     Contas a Pagar
                   </TabsTrigger>
-                  <TabsTrigger value="pagas" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "pagas" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <TabsTrigger value="pagas" className={subTabClass}>
                     <CheckCircle className="h-4 w-4" />
                     Contas Pagas
                   </TabsTrigger>
-                  <TabsTrigger value="atrasadas" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "atrasadas" ? "border-red-500 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-300/80 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <TabsTrigger value="atrasadas" className={subTabClass}>
                     <AlertTriangle className="h-4 w-4" />
                     Contas em Atraso
                     {itemsAtrasadas.length > 0 && (
@@ -2587,22 +2714,22 @@ export function ExecutiveDashboard() {
                       </span>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="calendario-pagamento" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${(activeTab as string) === "calendario-pagamento" ? "border-violet-500 bg-violet-50 dark:bg-violet-950/30 text-violet-700 dark:text-violet-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <TabsTrigger value="calendario-pagamento" className={subTabClass}>
                     <CalendarDays className="h-4 w-4" />
                     Calendário
                   </TabsTrigger>
                 </>
               ) : (
                 <>
-                  <TabsTrigger value="a-receber" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "a-receber" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <TabsTrigger value="a-receber" className={subTabClass}>
                     <Banknote className="h-4 w-4" />
                     Contas a Receber
                   </TabsTrigger>
-                  <TabsTrigger value="recebidas" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "recebidas" ? "border-sky-500 bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <TabsTrigger value="recebidas" className={subTabClass}>
                     <CheckCircle className="h-4 w-4" />
                     Contas Recebidas
                   </TabsTrigger>
-                  <TabsTrigger value="inadimplencia" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${activeTab === "inadimplencia" ? "border-orange-500 bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <TabsTrigger value="inadimplencia" className={subTabClass}>
                     <AlertTriangle className="h-4 w-4" />
                     Inadimplência
                     {itemsInadimplencia.length > 0 && (
@@ -2611,7 +2738,7 @@ export function ExecutiveDashboard() {
                       </span>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="calendario-recebimento" className={`gap-2 px-5 h-10 rounded-t-lg rounded-b-none border-b-[3px] transition-all ${(activeTab as string) === "calendario-recebimento" ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 font-semibold" : "border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800"}`}>
+                  <TabsTrigger value="calendario-recebimento" className={subTabClass}>
                     <CalendarDays className="h-4 w-4" />
                     Calendário
                   </TabsTrigger>
@@ -2765,7 +2892,8 @@ export function ExecutiveDashboard() {
               toast.success("Padrao de tipo documento salvo!");
             }}
           />
-          {/* Time filters for all tabs */}
+          {/* Anos/Meses em dropdown só fora das abas CP/CR (lá viram botões, como no Power BI) */}
+          {!isCpCrTab && (<>
           <MultiSelectFilter
             label="Anos"
             icon={<CalendarClock className="h-4 w-4" />}
@@ -2800,6 +2928,7 @@ export function ExecutiveDashboard() {
             ].filter(qf => qf.values.length > 0)}
             onSelectValues={(vals) => setSelectedMonths(new Set(vals))}
           />
+          </>)}
           {(activeTab === "a-pagar" || activeTab === "a-receber") && (
             <MultiSelectFilter
               label="Vencimento"
@@ -2813,10 +2942,17 @@ export function ExecutiveDashboard() {
               labelFn={(v) => DUE_PERIOD_LABELS[v] || v}
             />
           )}
+          {activeTab === "a-pagar" && filteredAPagar.length > 0 && (
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-slate-600 dark:text-slate-300" onClick={exportarPdfAPagar} title="Exportar PDF das contas a pagar filtradas">
+              <FileDown className="h-3.5 w-3.5" />
+              PDF
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
             onClick={() => {
+              setDrillCompany(null);
               const savedCo = localStorage.getItem(companyStorageKey(activeTab)) || localStorage.getItem("dashboard_default_companies");
               setSelectedCompanies(savedCo ? new Set(JSON.parse(savedCo)) : defaultCompanies());
               const savedDoc = localStorage.getItem(filterTabKey(activeTab, "docTypes")) || localStorage.getItem("dashboard_default_docTypes");
@@ -2842,6 +2978,34 @@ export function ExecutiveDashboard() {
           </Button>
         </div>}
       </div>
+
+      {/* Período em botões, como no Power BI: clique escolhe o ano/mês;
+          Ctrl (ou Shift) + clique soma; "Todos" volta ao conjunto inteiro. */}
+      {isCpCrTab && (
+        <div className="flex items-center gap-1.5 flex-wrap rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 shrink-0">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Ano</span>
+          {availableYears.map(y => (
+            <button key={y} type="button" onClick={(e) => escolherAno(y, e)} className={chipClass(selectedYears.has(y))} title="Clique: só este ano · Ctrl+clique: soma">{y}</button>
+          ))}
+          <button type="button" onClick={() => { setSelectedYears(new Set(availableYears)); setSelectedDays(new Set()); }} className={chipClass(todosAnosAtivos, true)}>Todos</button>
+          <span className="mx-2 h-5 w-px bg-slate-200 dark:bg-slate-700" />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-400 mr-1.5">Mês</span>
+          {MONTH_OPTIONS.map((m, idx) => (
+            <button key={m} type="button" onClick={(e) => escolherMes(m, e)} className={chipClass(selectedMonths.has(m), !availableMonths.includes(m))} title={`${MONTH_NAMES[m]} · clique: só este mês · Ctrl+clique: soma`}>{(MONTH_LABELS[idx] || m).toLowerCase()}</button>
+          ))}
+          <button type="button" onClick={() => { setSelectedMonths(new Set()); setSelectedDays(new Set()); }} className={chipClass(selectedMonths.size === 0, true)}>Todos</button>
+          {(drillCompany || selectedMonths.size > 0 || selectedDuePeriods.size > 0) && (
+            <button
+              type="button"
+              onClick={() => { setDrillCompany(null); setSelectedMonths(new Set()); setSelectedDays(new Set()); setSelectedDuePeriods(new Set()); }}
+              className="ml-auto inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              <X className="h-3.5 w-3.5" />
+              {drillCompany ? `limpar · ${drillCompany}` : "limpar seleção"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Budget Tab Content */}
       {activeTab === "orcamento" && (
@@ -3051,92 +3215,60 @@ export function ExecutiveDashboard() {
         </div>
       )}
 
-      {/* PDF Export Button */}
-      {activeTab === "a-pagar" && filteredAPagar.length > 0 && (
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 text-slate-600 hover:text-blue-600 hover:border-blue-300"
-            onClick={() => {
-              const now = new Date();
-              const fmtNow = `${String(now.getDate()).padStart(2,"0")}/${String(now.getMonth()+1).padStart(2,"0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-              let periodLabel = "Todas as contas a pagar";
-              if (selectedDuePeriods.size > 0) {
-                const labels: string[] = [];
-                if (selectedDuePeriods.has("hoje")) labels.push("Hoje");
-                if (selectedDuePeriods.has("7dias")) labels.push("7 dias");
-                if (selectedDuePeriods.has("15dias")) labels.push("15 dias");
-                if (selectedDuePeriods.has("30dias")) labels.push("30 dias");
-                periodLabel = `Vencimento: ${labels.join(", ")}`;
-              }
-              generateContasPagarPDF({
-                items: filteredAPagar,
-                totalAPagar,
-                periodLabel,
-                companyName: process.env.NEXT_PUBLIC_COMPANY_NAME || "Empresa",
-                generatedAt: fmtNow,
-              });
-            }}
-          >
-            <FileDown className="h-4 w-4" />
-            Exportar PDF
-          </Button>
-        </div>
-      )}
-
-      {/* KPI Cards. Nas abas CP/CR compactamos pra caber tudo numa
-          viewport sem barra de scroll (gap menor, padding interno menor). */}
+      {/* Cards no padrão minimalista do Portal SP: borda fina, sem sombra nem
+          ícone colorido, ponto de estado antes do rótulo. O valor usa fonte
+          fluida (clamp) e nunca é cortado com reticências — a 100% de zoom, com
+          a barra lateral aberta, os seis cards cabem numa linha (Edielson, 06/11/2026). */}
       {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (() => {
-        const cpCrTabs = ["a-pagar", "pagas", "atrasadas", "a-receber", "recebidas", "inadimplencia"];
-        const isCompact = cpCrTabs.includes(activeTab);
-        return (<><div className={`grid md:grid-cols-2 lg:grid-cols-${kpis.length} ${isCompact ? "gap-3" : "gap-5"}`}>
-        {kpis.map((kpi) => (
-          <Card
+        const colsXl: Record<number, string> = { 3: "2xl:grid-cols-3", 4: "2xl:grid-cols-4", 5: "2xl:grid-cols-5", 6: "2xl:grid-cols-6" };
+        const dotClass = (gradient: string) => (gradient.split(" ")[0] || "from-slate-500").replace("from-", "bg-");
+        return (<><div className={`grid grid-cols-2 md:grid-cols-3 ${colsXl[kpis.length] || "2xl:grid-cols-6"} gap-3 shrink-0`}>
+        {kpis.map((kpi) => {
+          const clicavel = Boolean(kpi.onClick);
+          return (
+          <div
             key={kpi.label}
-            className={`border-0 shadow-sm overflow-hidden relative group hover:shadow-md transition-all duration-300 dark:bg-slate-900 ${kpi.onClick ? "cursor-pointer" : ""} ${kpi.onClick && (showDelinquentTable || showOverdueTable || showCounterpartDetail) ? "ring-2 ring-red-400 ring-offset-1" : ""}`}
+            role={clicavel ? "button" : undefined}
+            tabIndex={clicavel ? 0 : undefined}
             onClick={kpi.onClick}
+            onKeyDown={clicavel ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); kpi.onClick?.(); } } : undefined}
+            title={kpi.hint}
+            className={`rounded-2xl border bg-white dark:bg-slate-900 px-4 py-3 min-w-0 transition-colors ${clicavel ? "cursor-pointer hover:border-slate-400 dark:hover:border-slate-500" : ""} ${kpi.active ? "border-primary ring-1 ring-primary/30" : "border-slate-200 dark:border-slate-700"}`}
           >
-            <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${kpi.gradient}`} />
-            <CardContent className={isCompact ? "pt-4 pb-3 px-5" : "pt-6 pb-5 px-6"}>
-              <div className="flex items-start justify-between">
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-400">
-                    {kpi.label}
-                  </p>
-                  <p className="text-lg lg:text-xl xl:text-2xl font-bold text-slate-800 dark:text-slate-50 mt-2 tabular-nums truncate">
-                    {kpi.value}
-                  </p>
-                  {kpi.subtitle && (
-                    <p className="text-xs text-slate-400 dark:text-slate-400 mt-1">{kpi.subtitle}</p>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${dotClass(kpi.gradient)}`} />
+              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 truncate">
+                {kpi.label}
+              </p>
+            </div>
+            <p className="mt-1.5 font-semibold tabular-nums whitespace-nowrap leading-tight text-slate-900 dark:text-slate-50 text-[clamp(1rem,1.15vw,1.5rem)]">
+              {kpi.value}
+            </p>
+            {kpi.subtitle && (
+              <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 truncate">{kpi.subtitle}</p>
+            )}
+            {kpi.trend != null && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <div
+                  className={`flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[11px] font-medium ${
+                    kpi.trend >= 0
+                      ? "text-emerald-600 bg-emerald-50 dark:text-emerald-300/80 dark:bg-emerald-950/40"
+                      : "text-red-600 bg-red-50 dark:text-red-300/70 dark:bg-red-950/40"
+                  }`}
+                >
+                  {kpi.trend >= 0 ? (
+                    <TrendingUp className="h-3 w-3" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3" />
                   )}
-                  {kpi.trend != null && (
-                    <div className="flex items-center gap-1.5 mt-2">
-                      <div
-                        className={`flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium ${
-                          kpi.trend >= 0
-                            ? "text-emerald-600 bg-emerald-50 dark:text-emerald-300/80 dark:bg-emerald-950/40"
-                            : "text-red-600 bg-red-50 dark:text-red-300/70 dark:bg-red-950/40"
-                        }`}
-                      >
-                        {kpi.trend >= 0 ? (
-                          <TrendingUp className="h-3 w-3" />
-                        ) : (
-                          <TrendingDown className="h-3 w-3" />
-                        )}
-                        {kpi.trend >= 0 ? "+" : ""}{kpi.trend.toFixed(1)}%
-                      </div>
-                      <span className="text-[11px] text-slate-400">{kpi.trendLabel}</span>
-                    </div>
-                  )}
+                  {kpi.trend >= 0 ? "+" : ""}{kpi.trend.toFixed(1)}%
                 </div>
-                <div className={`p-3 rounded-2xl ${kpi.iconBg} shrink-0 ml-3`}>
-                  {kpi.icon}
-                </div>
+                <span className="text-[11px] text-slate-400">{kpi.trendLabel}</span>
               </div>
-            </CardContent>
-          </Card>
-        ))}
+            )}
+          </div>
+          );
+        })}
       </div>
 
       {/* Row 2: Company + Monthly
@@ -3144,29 +3276,30 @@ export function ExecutiveDashboard() {
           de detalhe sao opt-in via clique no KPI). Compactam pra caber
           tudo numa viewport sem barra de scroll. */}
       {(() => {
-        const cpCrTabs = ["a-pagar", "pagas", "atrasadas", "a-receber", "recebidas", "inadimplencia"];
-        const compactCharts = cpCrTabs.includes(activeTab);
-        const chartHeight = compactCharts ? 360 : 480;
-        const companyChartHeight = compactCharts
-          ? Math.max(360, companyChart.length * 36)
-          : Math.max(480, companyChart.length * 44);
+        // Os gráficos esticam no que sobrar da tela (flex-1) — nada de altura
+        // fixa. Barra esmaecida = fora da seleção clicada (como no Power BI).
+        const dimBar = isDark ? "#3a2c31" : "#ece2e4";
+        const mesDoRotulo = (label: string) => { const idx = MONTH_LABELS.indexOf(label); return idx >= 0 ? MONTH_OPTIONS[idx] : null; };
+        const destaqueMes = chartView === "mensal" && selectedMonths.size > 0;
+        const destaqueAno = chartView === "anual" && selectedYears.size > 0 && chartData.some(d => !selectedYears.has(d.month));
+        const cardGrafico = "border border-slate-200 dark:border-slate-700 shadow-none rounded-2xl bg-white dark:bg-slate-900 flex flex-col min-h-0";
         return (
-      <div className={`grid ${isHolding ? "" : "lg:grid-cols-5"} ${compactCharts ? "gap-3" : "gap-6"}`}>
+      <div className={`flex-1 min-h-0 grid ${isHolding ? "" : "lg:grid-cols-5"} gap-3`}>
         {/* Company Breakdown — escondido no modo Holding (só 1 empresa) */}
-        {!isHolding && <Card className="border-0 shadow-sm lg:col-span-2">
-          <CardHeader className="pb-2">
+        {!isHolding && <Card className={`${cardGrafico} lg:col-span-2`}>
+          <CardHeader className="pb-1 pt-4 px-5 shrink-0">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg text-slate-800">Por Empresa</CardTitle>
-                <CardDescription className="text-slate-400">
-                  {seriesLabel} por empresa/obra
+                <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Por Empresa</CardTitle>
+                <CardDescription className="text-xs text-slate-400">
+                  {seriesLabel} por empresa/obra · clique numa barra para filtrar
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 min-h-0 px-3 pb-3">
             {companyChart.length > 0 ? (
-              <ResponsiveContainer width="100%" height={companyChartHeight}>
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={companyChart}
                   layout="vertical"
@@ -3197,21 +3330,23 @@ export function ExecutiveDashboard() {
                     dataKey="value"
                     radius={[0, 4, 4, 0]}
                     maxBarSize={32}
+                    cursor="pointer"
+                    onClick={(d: { fullName?: string; payload?: { fullName?: string } }) => aoClicarEmpresa(String(d?.fullName ?? d?.payload?.fullName ?? ""))}
                   >
                     {companyChart.map((entry, idx) => (
-                      <Cell key={idx} fill={barColorFn(idx)} />
+                      <Cell key={idx} fill={drillCompany ? (entry.fullName === drillCompany ? color : dimBar) : barColorFn(idx)} />
                     ))}
                     <LabelList
                       dataKey="value"
                       position="right"
                       formatter={(v: unknown) => formatCurrency(Number(v))}
-                      style={{ fontSize: 11, fill: "#475569", fontWeight: 600 }}
+                      style={{ fontSize: 11, fill: chartColors.valueText, fontWeight: 600 }}
                     />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="flex items-center justify-center text-slate-400 text-sm" style={{ height: companyChartHeight }}>
+              <div className="flex h-full items-center justify-center text-slate-400 text-sm">
                 Sem dados para o periodo selecionado
               </div>
             )}
@@ -3219,11 +3354,11 @@ export function ExecutiveDashboard() {
         </Card>}
 
         {/* Monthly/Annual Evolution */}
-        <Card className={`border-0 shadow-sm ${isHolding ? "" : "lg:col-span-3"}`}>
-          <CardHeader className="pb-2">
+        <Card className={`${cardGrafico} ${isHolding ? "" : "lg:col-span-3"}`}>
+          <CardHeader className="pb-1 pt-4 px-5 shrink-0">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg text-slate-800">
+                <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">
                   {chartView === "mensal" ? "Evolucao Mensal" : chartView === "diario" ? "Evolucao Diaria" : "Evolucao Anual"}
                   {(selectedCompanies.size !== defaultCompanies().size || [...selectedCompanies].some(n => isExcludedCompany(n)) || selectedMonths.size > 0 || selectedDays.size > 0 || selectedDuePeriods.size > 0 || [...selectedDocTypes].some(t => isExcludedDocType(t)) || selectedDocTypes.size !== allDocTypes.filter(t => !isExcludedDocType(t)).length) && (
                     <span className="text-sm font-normal text-blue-500 ml-2">
@@ -3231,8 +3366,8 @@ export function ExecutiveDashboard() {
                     </span>
                   )}
                 </CardTitle>
-                <CardDescription className="text-slate-400">
-                  {seriesLabel} por {chartView === "mensal" ? "mes" : chartView === "diario" ? "dia" : "ano"}
+                <CardDescription className="text-xs text-slate-400">
+                  {seriesLabel} por {chartView === "mensal" ? "mês · clique numa barra para filtrar o mês" : chartView === "diario" ? "dia" : "ano · clique numa barra para filtrar o ano"}
                 </CardDescription>
               </div>
               <Tabs value={chartView} onValueChange={v => setChartView(v as ChartView)}>
@@ -3244,9 +3379,9 @@ export function ExecutiveDashboard() {
               </Tabs>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1 min-h-0 px-3 pb-3">
             {chartView === "diario" && (selectedYears.size !== 1 || selectedMonths.size !== 1) ? (
-              <div className="flex items-center justify-center text-slate-400 text-sm text-center px-6" style={{ height: chartHeight }}>
+              <div className="flex h-full items-center justify-center text-slate-400 text-sm text-center px-6">
                 <div className="space-y-2">
                   <p className="font-medium">Para ver a visão Diária, ajuste os filtros:</p>
                   <ul className="text-xs space-y-1 inline-block text-left">
@@ -3261,7 +3396,7 @@ export function ExecutiveDashboard() {
                 </div>
               </div>
             ) : (
-            <ResponsiveContainer width="100%" height={chartHeight}>
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData} margin={{ top: 35, right: 30, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} vertical={false} />
                 <XAxis
@@ -3278,7 +3413,35 @@ export function ExecutiveDashboard() {
                   width={80}
                 />
                 <RechartsTooltip content={<CustomTooltip />} />
-                <Bar dataKey="value" name={seriesLabel} fill={color} radius={[4, 4, 0, 0]} maxBarSize={40}>
+                <Bar
+                  dataKey="value"
+                  name={seriesLabel}
+                  fill={color}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                  cursor={chartView === "diario" ? undefined : "pointer"}
+                  onClick={(d: { month?: string; payload?: { month?: string } }) => {
+                    const rotulo = String(d?.month ?? d?.payload?.month ?? "");
+                    if (chartView === "mensal") {
+                      const m = mesDoRotulo(rotulo);
+                      if (m) escolherMes(m);
+                    } else if (chartView === "anual" && /^\d{4}$/.test(rotulo)) {
+                      setSelectedYears(prev => (prev.size === 1 && prev.has(rotulo)) ? new Set(availableYears) : new Set([rotulo]));
+                      setSelectedDays(new Set());
+                    }
+                  }}
+                >
+                  {chartData.map((entry, idx) => (
+                    <Cell
+                      key={idx}
+                      fill={
+                        (destaqueMes && !selectedMonths.has(mesDoRotulo(entry.month) || "")) ||
+                        (destaqueAno && !selectedYears.has(entry.month))
+                          ? dimBar
+                          : color
+                      }
+                    />
+                  ))}
                   <LabelList
                     dataKey="value"
                     position="top"
@@ -3313,7 +3476,11 @@ export function ExecutiveDashboard() {
         );
       })()}
 
-      {/* Overdue Table (CP - Contas em Atraso) */}
+      {/* Detalhamentos abrem em modal central (tela única; mesmo padrão do app
+          de Pedidos, onde a linha expansível "confundia"). */}
+      <Dialog open={showCounterpartDetail && isCpCrTab} onOpenChange={(aberto) => { if (!aberto) setShowCounterpartDetail(false); }}>
+        <DialogContent semFechar className={modalTabelaClass}>
+          <DialogTitle className="sr-only">Detalhamento</DialogTitle>
       {/* Detalhamento por Credor/Cliente (a-pagar, pagas, a-receber, recebidas) */}
       {showCounterpartDetail && activeTab === "a-pagar" && (
         <DetalhamentoTable
@@ -3402,8 +3569,13 @@ export function ExecutiveDashboard() {
         />
       )}
 
+        </DialogContent>
+      </Dialog>
+      <Dialog open={showOverdueTable && activeTab === "atrasadas"} onOpenChange={(aberto) => { if (!aberto) setShowOverdueTable(false); }}>
+        <DialogContent semFechar className={modalTabelaClass}>
+          <DialogTitle className="sr-only">Contas em atraso</DialogTitle>
       {showOverdueTable && activeTab === "atrasadas" && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border-0 shadow-none">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
@@ -3578,8 +3750,13 @@ export function ExecutiveDashboard() {
           </CardContent>
         </Card>
       )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delinquent Table */}
+      <Dialog open={showDelinquentTable && activeTab === "inadimplencia"} onOpenChange={(aberto) => { if (!aberto) setShowDelinquentTable(false); }}>
+        <DialogContent semFechar className={modalTabelaClass}>
+          <DialogTitle className="sr-only">Inadimplência</DialogTitle>
       {showDelinquentTable && activeTab === "inadimplencia" && (() => {
         // Empresas unicas com inadimplencia (pra montar os chips de filtro)
         const companiesWithDelinquency = Array.from(
@@ -3591,7 +3768,7 @@ export function ExecutiveDashboard() {
           : delinquentsByClient;
         const visibleParcels = visibleDelinquents.reduce((s, c) => s + c.installments, 0);
         return (
-        <Card className="border-0 shadow-sm">
+        <Card className="border-0 shadow-none">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div>
@@ -3812,6 +3989,8 @@ export function ExecutiveDashboard() {
         </Card>
         );
       })()}
+        </DialogContent>
+      </Dialog>
       </>);
       })()}
 
