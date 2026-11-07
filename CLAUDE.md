@@ -426,8 +426,28 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Recebido e Lucro Realizado) usa a mesma lista e acompanhou. Holding: regra antiga.
 - Página CONTAS À RECEBER do BI fechada. O que sobra nela são cards que o painel não tem:
   `Fat. ano anterior:` + YoY (Total Recebido de 01/01 até hoje no ano anterior) e
-  `Saldo Estimado Entradas 2` (= A Receber Futuro + Vencidas, ambos já iguais). Próxima
-  página do BI: **CONTAS À PAGAR** (`9b648ba73a754ca52976`).
+  `Saldo Estimado Entradas 2` (= A Receber Futuro + Vencidas, ambos já iguais).
+- **Contas a Pagar › A Pagar — conferido 07/11 (página CONTAS À PAGAR do BI,
+  `9b648ba73a754ca52976`, 1º quadro):** card `À Pagar sem prev CARD.` = `Geral a Pagar
+  Ajustado` − `Contas Atrasadas` sobre `f_PAGAR` (/outcome por vencimento, indexador 0).
+  Regra em `src/lib/a-pagar-regra.ts` (trava `a-pagar-regra.test.ts`): saldo corrigido > 0,
+  a vencer, qualquer documento menos as previsões PPC/PPE/PRV/PCT, **sem olhar a
+  consistência do título** e com **toda Previsão de Comissão (PRC) em aberto, mesmo vencida**
+  (o BI tira PRC das Atrasadas mas não do total). Decisões do Edielson em 07/11: contar os
+  não consistidos (135 Jardins R$ 51.048,22, Chave Digital; Domus R$ 708,84) e somar a PRC
+  como o BI (Domus R$ 90.000,00 vencidos em 27/03/2026). Valor da parcela continua
+  `effectiveOpenAmount` (igual ao BI em todas em 07/11). PRC não aparece no filtro Tipo Doc
+  e não é cortada por ele (`ignoraFiltroTipoDocCP`, também no Calendário de Pagamentos).
+  2026: as 12 empresas iguais ao BI; painel com todas = R$ 4.712.138,42. **A página do BI
+  só mostra 10 obras** (filtro fixo sem Silva Packer Construtora, Sul Brasil, Holding e
+  Galpão Rua Canelinha; cita uma "RUA 2450" que não existe mais no Sienge) = R$ 4.143.614,48.
+  Edielson: o painel continua abrindo com todas; o Carlos desmarca no filtro Empresas.
+  Holding: regra antiga. Atrasadas e Pagas ainda na regra antiga.
+- Próximo quadro da página CONTAS À PAGAR: **Contas Atrasadas** (`Contas Atrasadas CARD`:
+  vencida, saldo > 0, sem PPC/PPE/PRC/PCT/PRV, sem olhar consistência, − imposto; atenção:
+  conta os títulos 15596 (parcelas 1 e 2) e 15597 (parcela 14) da TETRA, R$ 262.774,79,
+  que o `Geral a Pagar Ajustado` exclui). Depois: `Total pago até data selecionada`,
+  `Geral a Pagar Ajustado CARD` e `Estimativa Saidas no Periodo`.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

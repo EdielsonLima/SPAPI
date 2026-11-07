@@ -17,6 +17,9 @@ interface Props {
   selectedCompanies: Set<string>;
   // Filtro de doc types selecionados.
   selectedDocTypes: Set<string>;
+  // Parcela que o filtro Tipo Doc não corta (ex.: Previsão de Comissão, que
+  // entra no A Pagar fora da Holding mas não aparece no filtro).
+  ignoraTipoDoc?: (item: SiengeOutcome) => boolean;
 }
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -40,7 +43,7 @@ interface CalendarDay {
   count: number;
 }
 
-export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedCompanies, selectedDocTypes }: Props) {
+export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedCompanies, selectedDocTypes, ignoraTipoDoc }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => getCurrentMonthKey());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<SiengeOutcome | null>(null);
@@ -56,14 +59,14 @@ export function CalendarioPagamentoTab({ itemsAPagar, allOutcomeItems, selectedC
     const q = search.trim().toLowerCase();
     return itemsAPagar.filter(item => {
       if (selectedCompanies.size > 0 && !selectedCompanies.has(item.companyName)) return false;
-      if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName || "")) return false;
+      if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName || "") && !ignoraTipoDoc?.(item)) return false;
       if (q) {
         const hay = `${item.creditorName || ""} ${item.documentNumber || ""} ${item.companyName || ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [itemsAPagar, selectedCompanies, selectedDocTypes, search]);
+  }, [itemsAPagar, selectedCompanies, selectedDocTypes, search, ignoraTipoDoc]);
 
   // Histórico do credor selecionado: todos os títulos (abertos + pagos).
   const creditorHistory = useMemo(() => {

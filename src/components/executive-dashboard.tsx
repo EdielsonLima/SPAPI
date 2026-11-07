@@ -58,6 +58,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc, ehDocumentoTransferencia } from "@/lib/a-receber-regra";
+import { entraNoAPagar, ignoraFiltroTipoDocCP } from "@/lib/a-pagar-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -1011,7 +1012,11 @@ export function ExecutiveDashboard() {
         // "Contrato de Locação…": o tipo não aparece no filtro do CR; no A
         // Receber o aluguel já saiu pela categoria e nas Vencidas ele conta,
         // como no Power BI — ver a-receber-regra.ts
-        (section === "cr" && !isHolding && ignoraFiltroTipoDoc(i))
+        (section === "cr" && !isHolding && ignoraFiltroTipoDoc(i)) ||
+        // "Previsão de Comissão" (PRC): fica no A Pagar como no Power BI, mas
+        // o tipo não aparece no filtro (previsões ficam fora da lista) — ver
+        // a-pagar-regra.ts. Só existe em contas a pagar.
+        (!isHolding && ignoraFiltroTipoDocCP(i as { documentIdentificationId?: string }))
       );
     }
     if (selectedYears.size > 0) {
@@ -1030,8 +1035,19 @@ export function ExecutiveDashboard() {
   }, [selectedCompanies, drillCompany, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate, section, isHolding]);
 
   // === Filtered item sets ===
+  // A Pagar fora da Holding = card "À Pagar sem prev" do Power BI
+  // (src/lib/a-pagar-regra.ts, 07/11/2026): sem o filtro de consistência do
+  // título e com a Previsão de Comissão (PRC) mesmo vencida; as outras
+  // previsões (PPC, PPE, PRV, PCT) ficam fora. Holding: regra antiga.
   const itemsAPagar = useMemo(() =>
-    consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr), [consistentItems, todayStr]);
+    isHolding
+      ? consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr)
+      : items.filter(i =>
+          companyModeFilter(i.companyName) &&
+          !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`)) &&
+          entraNoAPagar(i, todayStr)
+        ),
+    [isHolding, consistentItems, items, companyModeFilter, exclusionSet, todayStr]);
 
   const itemsAtrasadas = useMemo(() =>
     consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentItems, todayStr]);
@@ -5262,6 +5278,7 @@ export function ExecutiveDashboard() {
           allOutcomeItems={consistentItems}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
+          ignoraTipoDoc={isHolding ? undefined : ignoraFiltroTipoDocCP}
         />
         </div>
       )}
