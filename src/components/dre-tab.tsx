@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
+import { variacaoDre } from "@/lib/dre-variacao";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -775,12 +776,10 @@ export function DreTab({
                 return v < 0 ? `-${formatted}` : formatted;
               };
 
-              // Variacao percentual entre mes atual e anterior. Retorna null
-              // se mes anterior e 0 (divisao por zero).
-              const calcVariation = (current: number, previous: number): number | null => {
-                if (previous === 0) return null;
-                return ((current - previous) / Math.abs(previous)) * 100;
-              };
+              // Variação mês a mês: regra em src/lib/dre-variacao.ts (Edielson,
+              // 07/11/2026). Em custo/despesa o número mostra se o custo subiu
+              // (+) ou caiu (−); a cor diz se isso foi bom (verde) ou ruim
+              // (vermelho) para o resultado.
 
               const fmtPct = (p: number) => {
                 const abs = Math.abs(p);
@@ -810,6 +809,7 @@ export function DreTab({
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                       {DRE_LINES.map((line) => {
                         const isCalc = line.type === "calculated";
+                        const ehCusto = NEGATIVE_CATEGORIES.has(line.key);
                         const total = getLineTotal(line);
                         const isExpanded = expandedCategories.has(line.key);
                         const lineAccounts = !isCalc && monthlyData
@@ -858,7 +858,7 @@ export function DreTab({
                                 const v = getLineMonthVal(line, m);
                                 const prev = i > 0 ? monthCols[i - 1] : null;
                                 const prevV = prev ? getLineMonthVal(line, prev) : 0;
-                                const variation = prev ? calcVariation(v, prevV) : null;
+                                const variation = prev ? variacaoDre(v, prevV, ehCusto) : null;
                                 return (
                                   <td key={m} className={`text-right px-4 py-3 text-[13px] tabular-nums ${
                                     isCalc
@@ -868,9 +868,9 @@ export function DreTab({
                                     {v !== 0 ? fmtVal(v) : ""}
                                     {variation !== null && v !== 0 && (
                                       <div className={`text-[10px] font-medium leading-tight mt-0.5 ${
-                                        variation > 0 ? "text-emerald-700 dark:text-emerald-400" : variation < 0 ? "text-red-500 dark:text-red-400" : "text-slate-400 dark:text-slate-500"
+                                        variation.efeito > 0 ? "text-emerald-700 dark:text-emerald-400" : variation.efeito < 0 ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400"
                                       }`}>
-                                        {fmtPct(variation)}
+                                        {fmtPct(variation.exibida)}
                                       </div>
                                     )}
                                   </td>
@@ -899,7 +899,7 @@ export function DreTab({
                                     const v = acctData.months[m] || 0;
                                     const prev = i > 0 ? monthCols[i - 1] : null;
                                     const prevV = prev ? (acctData.months[prev] || 0) : 0;
-                                    const variation = prev ? calcVariation(v, prevV) : null;
+                                    const variation = prev ? variacaoDre(v, prevV, ehCusto) : null;
                                     return (
                                       <td key={m} className={`text-right px-4 py-2.5 text-[12px] tabular-nums ${
                                         v < 0 ? "text-red-600 dark:text-red-300/80 font-medium" : "text-slate-600 dark:text-slate-300"
@@ -907,9 +907,9 @@ export function DreTab({
                                         {v !== 0 ? fmtVal(v) : ""}
                                         {variation !== null && v !== 0 && (
                                           <div className={`text-[9px] leading-tight mt-0.5 ${
-                                            variation > 0 ? "text-emerald-500 dark:text-emerald-400" : variation < 0 ? "text-red-400 dark:text-red-400" : "text-slate-300 dark:text-slate-600"
+                                            variation.efeito > 0 ? "text-emerald-700 dark:text-emerald-400" : variation.efeito < 0 ? "text-red-600 dark:text-red-400" : "text-slate-500 dark:text-slate-400"
                                           }`}>
-                                            {fmtPct(variation)}
+                                            {fmtPct(variation.exibida)}
                                           </div>
                                         )}
                                       </td>

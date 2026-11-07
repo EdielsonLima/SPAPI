@@ -480,6 +480,12 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
 - Schema da tabela `dre_excel_supplementary` em `schema.sql`
 - DRE mostra TODAS empresas (ignora filtro de empresa) para bater com Power BI
 - 4 niveis de drill-down: Categoria > Conta Financeira > Credor/Cliente > Transações
+- **Variação mês a mês do DRE Completo (Edielson, 07/11/2026):** em custo e despesa
+  (`NEGATIVE_CATEGORIES`) o número mostra se o CUSTO subiu (+) ou caiu (−); a COR diz se
+  foi bom (verde) ou ruim (vermelho) para o resultado. Custo variável jun→jul 2026 de
+  −5.212.081,44 para −4.663.228,15 = "−10,5%" verde (antes "+10,5%"). Receita e linhas
+  de lucro não mudaram. Regra em `src/lib/dre-variacao.ts` (trava
+  `dre-variacao.test.ts`); só a exibição do %, nenhum valor do DRE passa por ela.
 
 Os valores da DRE foram validados contra o Power BI e batem 100%.
 
