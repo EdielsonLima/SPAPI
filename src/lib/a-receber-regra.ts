@@ -14,6 +14,14 @@
 // painel = o do Power BI (R$ 7.635.160,05 em 2026).
 //
 // O modo Holding NÃO usa esta regra: lá o A Receber é justamente o aluguel.
+//
+// VENCIDAS (aba Inadimplência, 07/11/2026) = medida "Total Vencidas" do mesmo
+// BI: saldo corrigido > 0 · vencimento < hoje · condição ≠ Permuta — e COM
+// aluguel (no BI a exclusão por categoria está comentada) e SEM multa/juros.
+// "% Atrasada" = vencidas ÷ carteira em aberto (saldo > 0, sem Permuta, com
+// aluguel, a vencer + vencido). Conferido em 07/11 (2026): R$ 2.544.304,20 e
+// 23,59 %, iguais ao BI. A soma com multa 2 % + juros 1 % a.m. (relatório
+// "Posição de Inadimplência" do Sienge) continua na tela como card à parte.
 
 export const CATEGORIAS_RECEITA_LOCACAO = new Set(["10513", "10514"]);
 
@@ -56,11 +64,24 @@ export function entraNoAReceber(item: ItemAReceber, hoje: string): boolean {
     !ehCondicaoPermuta(item);
 }
 
+/** Entra no Total Vencidas (vencida, em aberto, sem permuta; aluguel conta). */
+export function entraNasVencidas(item: ItemAReceber, hoje: string): boolean {
+  return (item.correctedBalanceAmount || 0) > 0 &&
+    !!item.dueDate && item.dueDate < hoje &&
+    !ehCondicaoPermuta(item);
+}
+
+/** Carteira em aberto, base do "% Atrasada" (a vencer + vencido, com aluguel, sem permuta). */
+export function entraNaCarteiraAberta(item: ItemAReceber): boolean {
+  return (item.correctedBalanceAmount || 0) > 0 && !ehCondicaoPermuta(item);
+}
+
 /**
- * Documento de locação que NÃO é aluguel pela categoria (ex.: os R$ 108,08 de
- * 07/11). O tipo "Contrato de Locação…" não aparece no filtro Tipo Doc do CR
- * (lá ele é escondido), então o filtro não pode cortá-lo — no Power BI ele conta.
+ * Documento "Contrato de Locação…": o tipo não aparece no filtro Tipo Doc do CR
+ * (lá ele é escondido), então o filtro não pode cortá-lo. No A Receber o
+ * aluguel já saiu pela categoria (sobra, ex., o ressarcimento de IPTU de
+ * R$ 108,08 de 07/11); nas Vencidas o aluguel conta, como no Power BI.
  */
 export function ignoraFiltroTipoDoc(item: ItemAReceber): boolean {
-  return ehDocumentoDeLocacao(item.documentIdentificationName) && !ehReceitaDeLocacao(item);
+  return ehDocumentoDeLocacao(item.documentIdentificationName);
 }

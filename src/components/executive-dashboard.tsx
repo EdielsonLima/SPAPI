@@ -57,7 +57,7 @@ import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } 
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
-import { entraNoAReceber, ignoraFiltroTipoDoc } from "@/lib/a-receber-regra";
+import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc } from "@/lib/a-receber-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -1008,8 +1008,9 @@ export function ExecutiveDashboard() {
       result = result.filter(i =>
         selectedDocTypes.has(i.documentIdentificationName) ||
         shouldKeepIncomeExcludedDoc(i.companyId, i.billId, i.installmentId) ||
-        // "Contrato de Locação…" que não é aluguel pela categoria (só chega ao
-        // A Receber; o tipo não aparece no filtro do CR) — ver a-receber-regra.ts
+        // "Contrato de Locação…": o tipo não aparece no filtro do CR; no A
+        // Receber o aluguel já saiu pela categoria e nas Vencidas ele conta,
+        // como no Power BI — ver a-receber-regra.ts
         (section === "cr" && !isHolding && ignoraFiltroTipoDoc(i))
       );
     }
@@ -1275,13 +1276,13 @@ export function ExecutiveDashboard() {
     ), [consistentItemsForPagas, selectedOpTypes, matchesPaymentYearOnly]);
 
   // === CR Filtered item sets ===
-  // A Receber fora da Holding = regra do Power BI ("Total a Receber Futuro",
-  // src/lib/a-receber-regra.ts, 07/11/2026): o aluguel sai pela CATEGORIA
-  // (10513/10514), não pelo tipo de documento — por isso parte da base sem o
-  // corte de "Contrato de Locação" que consistentIncome faz. Recebidas,
-  // Inadimplência, DRE e Resumo (Recebido) continuam em consistentIncome.
-  // No modo Holding o A Receber é o aluguel do grupo: regra antiga, intacta.
-  const incomeBaseAReceber = useMemo(() =>
+  // A Receber e Vencidas fora da Holding = regras do Power BI ("Total a Receber
+  // Futuro" e "Total Vencidas", src/lib/a-receber-regra.ts, 07/11/2026): o
+  // aluguel sai do A Receber pela CATEGORIA (10513/10514) e conta nas Vencidas
+  // — por isso partem da base sem o corte de "Contrato de Locação" que
+  // consistentIncome faz. Recebidas, DRE e Resumo (Recebido) continuam em
+  // consistentIncome. No modo Holding: regras antigas, intactas.
+  const incomeBaseReceber = useMemo(() =>
     isHolding ? [] : incomeItems.filter(i =>
       companyModeFilter(i.companyName) &&
       !isExcludedFinancialDocType(
@@ -1295,11 +1296,20 @@ export function ExecutiveDashboard() {
   const itemsAReceber = useMemo(() =>
     isHolding
       ? consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr)
-      : incomeBaseAReceber.filter(i => entraNoAReceber(i, todayStr)),
-    [isHolding, consistentIncomeCR, incomeBaseAReceber, todayStr]);
+      : incomeBaseReceber.filter(i => entraNoAReceber(i, todayStr)),
+    [isHolding, consistentIncomeCR, incomeBaseReceber, todayStr]);
 
   const itemsInadimplencia = useMemo(() =>
-    consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentIncomeCR, todayStr]);
+    isHolding
+      ? consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr)
+      : incomeBaseReceber.filter(i => entraNasVencidas(i, todayStr)),
+    [isHolding, consistentIncomeCR, incomeBaseReceber, todayStr]);
+
+  // Carteira em aberto (a vencer + vencido, com aluguel, sem permuta): base do
+  // "% Atrasada" do Power BI. Só fora da Holding.
+  const itemsCarteiraAberta = useMemo(() =>
+    isHolding ? [] : incomeBaseReceber.filter(i => entraNaCarteiraAberta(i)),
+    [isHolding, incomeBaseReceber]);
 
   const itemsRecebidas = useMemo(() =>
     consistentIncomeForRecebidas.filter(i =>
@@ -1354,6 +1364,7 @@ export function ExecutiveDashboard() {
     [selectedDocNumbers]);
   const filteredAReceber = useMemo(() => comDocNumbers(applyFilters(itemsAReceber)), [itemsAReceber, applyFilters, comDocNumbers]);
   const filteredInadimplencia = useMemo(() => comDocNumbers(applyFilters(itemsInadimplencia)), [itemsInadimplencia, applyFilters, comDocNumbers]);
+  const filteredCarteiraAberta = useMemo(() => comDocNumbers(applyFilters(itemsCarteiraAberta)), [itemsCarteiraAberta, applyFilters, comDocNumbers]);
   // Recebidas: filtro alinhado com a página Contas Recebidas (contas-table)
   // NÃO aplica selectedDocTypes (PREVISÃO etc.) nem filtra por dueDate year
   // O filtro de ano/mês já é aplicado via paymentDate em itemsRecebidas e receivedSum
@@ -1751,6 +1762,16 @@ export function ExecutiveDashboard() {
   const saldoInadimplenciaBruto = useMemo(() =>
     filteredInadimplencia.reduce((s, i) => s + (i.correctedBalanceAmount || 0), 0), [filteredInadimplencia]);
 
+  // Power BI (fora da Holding): Total Vencidas = saldo vencido SEM multa/juros;
+  // % Atrasada = vencidas ÷ carteira em aberto (com aluguel a vencer).
+  const totalVencidas = useMemo(() =>
+    filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i), 0), [filteredInadimplencia]);
+  const pctAtrasada = useMemo(() => {
+    if (isHolding) return carteiraTotal > 0 ? (saldoInadimplenciaBruto / carteiraTotal) * 100 : 0;
+    const base = filteredCarteiraAberta.reduce((s, i) => s + (i.correctedBalanceAmount || 0), 0);
+    return base > 0 ? (saldoInadimplenciaBruto / base) * 100 : 0;
+  }, [isHolding, carteiraTotal, saldoInadimplenciaBruto, filteredCarteiraAberta]);
+
   const totalRecebido = useMemo(() =>
     filteredRecebidas.reduce((s, i) => s + receivedSum(i), 0), [filteredRecebidas, receivedSum]);
 
@@ -2045,18 +2066,20 @@ export function ExecutiveDashboard() {
         label: "Recebido",
       };
     } else {
-      // inadimplencia
+      // inadimplencia — fora da Holding os gráficos mostram o saldo vencido
+      // sem multa/juros, como o "Total Vencidas" do Power BI.
+      const campoInad: ChartValueField = isHolding ? "delinquent" : "balance";
       return {
-        companyChart: buildCompanyChart(comDocNumbers(applyFilters(itemsInadimplencia, { semDrill: true })), "delinquent"),
-        monthly: buildMonthlyChart(comDocNumbers(applyFilters(itemsInadimplencia, { semMes: true })), "delinquent", false, true),
-        annual: buildAnnualChart(filteredInadimplencia, "delinquent"),
-        daily: buildDailyChart(filteredInadimplencia, "delinquent"),
+        companyChart: buildCompanyChart(comDocNumbers(applyFilters(itemsInadimplencia, { semDrill: true })), campoInad),
+        monthly: buildMonthlyChart(comDocNumbers(applyFilters(itemsInadimplencia, { semMes: true })), campoInad, false, true),
+        annual: buildAnnualChart(filteredInadimplencia, campoInad),
+        daily: buildDailyChart(filteredInadimplencia, campoInad),
         color: "hsl(25, 95%, 53%)",
         label: "Inadimplente",
       };
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, items, incomeItems, allBankMovements, allBankMovementsFull, todayStr, selectedCompanies, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes, drillCompany, selectedDocNumbers, filteredPagasSemDrill, filteredPagasSemMes, filteredRecebidasSemDrill, filteredRecebidasSemMes]);
+  }, [activeTab, items, incomeItems, allBankMovements, allBankMovementsFull, todayStr, selectedCompanies, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate, selectedOpTypes, drillCompany, selectedDocNumbers, filteredPagasSemDrill, filteredPagasSemMes, filteredRecebidasSemDrill, filteredRecebidasSemMes, isHolding]);
 
   // === Loading State ===
   if (loading) {
@@ -2365,7 +2388,7 @@ export function ExecutiveDashboard() {
         onClick: () => setShowCounterpartDetail(v => !v),
       },
     ],
-    "inadimplencia": [
+    "inadimplencia": isHolding ? [
       {
         label: "Total Inadimplente",
         value: formatCurrency(totalInadimplencia),
@@ -2391,6 +2414,50 @@ export function ExecutiveDashboard() {
         icon: <TrendingDown className="h-7 w-7 text-red-400" />,
         iconBg: "bg-red-50",
         gradient: "from-red-400 to-red-500",
+      },
+      {
+        label: "Clientes",
+        value: String(new Set(filteredInadimplencia.map(i => i.clientName)).size),
+        subtitle: showDelinquentTable ? "clique para fechar" : "clique para detalhar",
+        icon: <Users className="h-7 w-7 text-red-500 dark:text-red-300/70" />,
+        iconBg: "bg-red-50",
+        gradient: "from-red-500 to-red-600",
+        onClick: () => { setShowDelinquentTable(v => !v); setExpandedClients(new Set()); },
+      },
+    ] : [
+      // Fora da Holding: os quadros do Power BI (Total Vencidas, % Atrasada) e,
+      // à parte, a soma com multa e juros do relatório do Sienge.
+      {
+        label: "Total Vencidas",
+        value: formatCurrency(totalVencidas),
+        subtitle: `${filteredInadimplencia.length} parcelas · sem multa e juros`,
+        icon: <AlertTriangle className="h-7 w-7 text-orange-500" />,
+        iconBg: "bg-orange-50",
+        gradient: "from-orange-500 to-orange-600",
+      },
+      {
+        label: "% Atrasada",
+        value: pctAtrasada.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%",
+        subtitle: "das parcelas em aberto",
+        icon: <TrendingDown className="h-7 w-7 text-red-400" />,
+        iconBg: "bg-red-50",
+        gradient: "from-red-400 to-red-500",
+      },
+      {
+        label: "Com multa e juros",
+        value: formatCurrency(totalInadimplencia),
+        subtitle: "multa 2% + juros 1% a.m.",
+        icon: <AlertTriangle className="h-7 w-7 text-red-500 dark:text-red-300/70" />,
+        iconBg: "bg-red-50",
+        gradient: "from-rose-500 to-rose-600",
+      },
+      {
+        label: "Empresas",
+        value: String(new Set(filteredInadimplencia.map(i => i.companyName)).size),
+        subtitle: "com parcelas vencidas",
+        icon: <Building2 className="h-7 w-7 text-orange-400" />,
+        iconBg: "bg-orange-50",
+        gradient: "from-orange-400 to-orange-500",
       },
       {
         label: "Clientes",
@@ -3869,7 +3936,7 @@ export function ExecutiveDashboard() {
                       onClick={() => setDelinquentSort(s => ({ field: "totalOverdue", dir: s.field === "totalOverdue" && s.dir === "desc" ? "asc" : "desc" }))}
                     >
                       <div className="flex items-center justify-end gap-1">
-                        Total Inadimplente
+                        {isHolding ? "Total Inadimplente" : "Total c/ multa e juros"}
                         {delinquentSort.field === "totalOverdue" ? (delinquentSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3 text-slate-300" />}
                       </div>
                     </TableHead>
@@ -4017,8 +4084,12 @@ export function ExecutiveDashboard() {
         // A Receber
         const totalAReceber = filteredAReceber.reduce((s, i) => s + effectiveAmount(i), 0);
         const aReceber7d = filteredAReceber.filter(i => i.dueDate >= todayStr && i.dueDate <= in7d).reduce((s, i) => s + effectiveAmount(i), 0);
-        const totalInadimplencia = filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i) + calcEncargos(i), 0);
-        const pctInadimplencia = totalAReceber > 0 ? (totalInadimplencia / totalAReceber) * 100 : 0;
+        const totalInadimplencia = isHolding
+          ? filteredInadimplencia.reduce((s, i) => s + effectiveAmount(i) + calcEncargos(i), 0)
+          : totalVencidas; // = "Total Vencidas" da aba (Power BI, sem multa e juros)
+        const pctInadimplencia = isHolding
+          ? (totalAReceber > 0 ? (totalInadimplencia / totalAReceber) * 100 : 0)
+          : pctAtrasada;
 
         // Saldos
         const saldoTotal = bankAccounts

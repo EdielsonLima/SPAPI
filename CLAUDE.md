@@ -397,12 +397,23 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   card, gráficos, Calendário de Recebimentos e coluna A Receber do Resumo. **Modo Holding não
   muda** (lá o A Receber é o aluguel). Recebidas, Inadimplência, DRE e Resumo (Recebido)
   continuam em `consistentIncome`, regra antiga, até cada quadro ser conferido.
+- **Contas a Receber › Inadimplência — conferido 07/11 (2º quadro):** medidas `Total Vencidas`
+  e `% Atrasada` do BI. Mesma lib (`entraNasVencidas`, `entraNaCarteiraAberta`): vencida
+  (vencimento < hoje), saldo corrigido > 0, sem Permuta, **COM aluguel** (no BI a exclusão por
+  categoria está comentada) e **SEM multa e juros**. % Atrasada = vencidas ÷ carteira em aberto
+  (a vencer + vencido, com aluguel, sem Permuta). 2026: R$ 2.544.304,20 e 23,59 %, iguais ao BI.
+  Cards fora da Holding: Total Vencidas · % Atrasada · **Com multa e juros** (a soma antiga,
+  multa 2 % + juros 1 % a.m., que bate com a "Posição de Inadimplência" do Sienge — validada
+  em 08/05/2026, fica como card à parte) · Empresas · Clientes. Gráficos = saldo sem encargo;
+  a tabela de inadimplentes continua com Acréscimo e a coluna virou "Total c/ multa e juros".
+  O card Inadimplência do **Geral** usa o mesmo % e o Total Vencidas. Filtro Tipo Doc não corta
+  "Contrato de Locação…" no CR (o tipo não aparece nele). Holding: cards e regra antigos.
 - Diferenças do BI que o painel NÃO copiou: o BI soma `correctedBalanceAmount` sem tirar
-  desconto (o painel tira `discountAmount`; em 07/11 nenhuma parcela aberta tinha desconto) e
-  a consulta do BI corta o `billId` 437 de qualquer empresa (gambiarra; nada em aberto).
-- Próximos quadros da mesma página do BI: Faturamento (`Total Recebido`, vem de um Excel
-  exportado do Sienge, `f_RECEBIDAS_CSV`, sem filtro de aluguel), `Total Vencidas` (vencido,
-  saldo corrigido > 0, sem Permuta, **com** aluguel, sem encargos) e % Atrasada.
+  desconto (o painel tira `discountAmount`; em 07/11 nenhuma parcela aberta tinha desconto),
+  a consulta do BI corta o `billId` 437 de qualquer empresa (gambiarra; nada em aberto) e o
+  BI não tira documento de PREVISÃO (o painel tira; nada em aberto em 07/11).
+- Próximo quadro da mesma página do BI: Faturamento (`Total Recebido`, vem de um Excel
+  exportado do Sienge, `f_RECEBIDAS_CSV`, só tira documento "TRAN", sem filtro de aluguel).
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 
