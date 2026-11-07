@@ -454,6 +454,9 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   continuam na tabela, esmaecidas, mas fora dos três totais (`budgetTotals`).
   Saldo a Realizar segue sem contar saldo negativo. Trava: Test 13 de
   `src/__tests__/budget-calculations.test.ts`.
+- **Coluna Área (m²)** (Edielson, 07/11/2026) entre Empreendimento e Fator: é o
+  `areaM2` de Configurações › Empreendimentos, o mesmo que entra no Orçado
+  (m² × fator × CUB). Só exibição e ordenação; não muda nenhum cálculo.
 
 ## DRE - Regras Criticas (Validado em 2026-03-17)
 

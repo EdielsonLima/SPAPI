@@ -3097,6 +3097,7 @@ export function ExecutiveDashboard() {
                       <TableRow className="hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                         {[
                           { field: "companyName", label: "Empreendimento", align: "left", widthClass: "px-6" },
+                          { field: "areaM2", label: "Área (m²)", align: "right", widthClass: "w-32" },
                           { field: "factor", label: "Fator", align: "center", widthClass: "w-20" },
                           { field: "budget", label: "Orçamento", align: "right", widthClass: "" },
                           { field: "realized", label: "Realizado", align: "right", widthClass: "" },
@@ -3127,6 +3128,10 @@ export function ExecutiveDashboard() {
                         return (
                           <TableRow key={row.companyId} className={`transition-colors h-14 ${isFinalizada ? "bg-slate-50/50 hover:bg-slate-50 dark:bg-slate-800/30 dark:hover:bg-slate-800/50" : "bg-white hover:bg-slate-50/80 dark:bg-transparent dark:hover:bg-slate-800/40"}`}>
                             <TableCell className={`px-6 font-semibold text-[13px] ${isFinalizada ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100"}`}>{row.companyName}</TableCell>
+                            {/* Área do empreendimento (Configurações › Empreendimentos), a mesma que entra no Orçado = m² × fator × CUB (Edielson, 07/11/2026) */}
+                            <TableCell className={`text-right tabular-nums text-[13px] whitespace-nowrap ${isFinalizada ? "text-slate-400 dark:text-slate-500 font-medium" : "text-slate-600 dark:text-slate-300 font-semibold"}`}>
+                              {row.areaM2.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²
+                            </TableCell>
                             <TableCell className="text-center text-[13px] font-medium">
                               <FactorInput
                                 companyId={row.companyId}
