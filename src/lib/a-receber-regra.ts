@@ -22,6 +22,17 @@
 // aluguel, a vencer + vencido). Conferido em 07/11 (2026): R$ 2.544.304,20 e
 // 23,59 %, iguais ao BI. A soma com multa 2 % + juros 1 % a.m. (relatório
 // "Posição de Inadimplência" do Sienge) continua na tela como card à parte.
+//
+// RECEBIDAS (aba Contas Recebidas, 07/11/2026) = medida "Total Recebido"
+// (Faturamento) do mesmo BI: SUM(f_RECEBIDAS_CSV[Liquido]) por data da baixa,
+// com NOT CONTAINSSTRING(Documento, "TRAN") — Documento é "<tipo>.<número>"
+// (ex.: "TRAN.REPASSE SILVA ADM"). SEM filtro de aluguel (o aluguel conta) e a
+// Holding fica de fora pelo filtro da página. Antes o painel tirava o aluguel
+// pelo tipo de documento e deixava as transferências: em 2026 dava
+// R$ 2.061.173,62 a menos na Silva Packer Construtora (aluguel −2.461.173,62,
+// repasse TRAN da Holding +400.000) e R$ 663.381,21 a mais na Sul Brasil
+// (aluguel −717.019,82, resgate de aplicação TRAN +1.380.401,03). As outras 10
+// empresas já batiam. Conferido: R$ 62.444.306,50, igual ao BI.
 
 export const CATEGORIAS_RECEITA_LOCACAO = new Set(["10513", "10514"]);
 
@@ -84,4 +95,18 @@ export function entraNaCarteiraAberta(item: ItemAReceber): boolean {
  */
 export function ignoraFiltroTipoDoc(item: ItemAReceber): boolean {
   return ehDocumentoDeLocacao(item.documentIdentificationName);
+}
+
+/**
+ * Documento de transferência entre contas: o "Total Recebido" do Power BI tira
+ * todo documento cujo texto "<tipo>.<número>" contém "TRAN" (sem diferenciar
+ * maiúsculas, como o CONTAINSSTRING do DAX) — repasses entre empresas do grupo
+ * e resgates de aplicação não são faturamento.
+ */
+export function ehDocumentoTransferencia(item: {
+  documentIdentificationId?: string | null;
+  documentNumber?: string | null;
+}): boolean {
+  const doc = `${(item.documentIdentificationId || "").trim()}.${(item.documentNumber || "").trim()}`;
+  return doc.toUpperCase().includes("TRAN");
 }

@@ -395,8 +395,8 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   as 11 empresas e nov/dez iguais ao BI. "Contrato de Locação…" que não é aluguel não é cortado
   pelo filtro Tipo Doc (`ignoraFiltroTipoDoc`; o tipo não aparece no filtro do CR). Vale no
   card, gráficos, Calendário de Recebimentos e coluna A Receber do Resumo. **Modo Holding não
-  muda** (lá o A Receber é o aluguel). Recebidas, Inadimplência, DRE e Resumo (Recebido)
-  continuam em `consistentIncome`, regra antiga, até cada quadro ser conferido.
+  muda** (lá o A Receber é o aluguel). DRE e Comparativo continuam em `consistentIncome`
+  (regra antiga, com o corte de "Contrato de Locação").
 - **Contas a Receber › Inadimplência — conferido 07/11 (2º quadro):** medidas `Total Vencidas`
   e `% Atrasada` do BI. Mesma lib (`entraNasVencidas`, `entraNaCarteiraAberta`): vencida
   (vencimento < hoje), saldo corrigido > 0, sem Permuta, **COM aluguel** (no BI a exclusão por
@@ -412,8 +412,22 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   desconto (o painel tira `discountAmount`; em 07/11 nenhuma parcela aberta tinha desconto),
   a consulta do BI corta o `billId` 437 de qualquer empresa (gambiarra; nada em aberto) e o
   BI não tira documento de PREVISÃO (o painel tira; nada em aberto em 07/11).
-- Próximo quadro da mesma página do BI: Faturamento (`Total Recebido`, vem de um Excel
-  exportado do Sienge, `f_RECEBIDAS_CSV`, só tira documento "TRAN", sem filtro de aluguel).
+- **Contas a Receber › Contas Recebidas — conferido 07/11 (3º quadro, Faturamento):** medida
+  `Total Recebido` = Líquido por data da baixa de um Excel exportado do Sienge
+  (`SILVA PACKER/RECEBER/relatorio.xlsx`, tabela `f_RECEBIDAS_CSV`), tirando todo documento
+  cujo "<tipo>.<número>" contém "TRAN", **sem filtro de aluguel** e sem a Holding (filtro da
+  página). Painel fora da Holding (`incomeRecebidas` + `ehDocumentoTransferencia` na mesma
+  lib): base `incomeBaseReceber` (COM aluguel) + movimentos bancários avulsos só das empresas
+  do modo (antes os da Holding vazavam no modo Silva Packer: R$ 7.004.390,25 em 2026), menos
+  TRAN. Antes: Silva Packer Construtora −R$ 2.061.173,62 (aluguel −2.461.173,62, repasse TRAN
+  da Holding +400.000) e Sul Brasil +R$ 663.381,21 (aluguel −717.019,82, resgate de aplicação
+  TRAN +1.380.401,03); as outras 10 já batiam. Depois: 2026 = **R$ 62.444.306,50** e 2025 =
+  R$ 86.965.479,17, iguais ao BI nas 12 empresas e mês a mês. A aba **Resumo** (Total
+  Recebido e Lucro Realizado) usa a mesma lista e acompanhou. Holding: regra antiga.
+- Página CONTAS À RECEBER do BI fechada. O que sobra nela são cards que o painel não tem:
+  `Fat. ano anterior:` + YoY (Total Recebido de 01/01 até hoje no ano anterior) e
+  `Saldo Estimado Entradas 2` (= A Receber Futuro + Vencidas, ambos já iguais). Próxima
+  página do BI: **CONTAS À PAGAR** (`9b648ba73a754ca52976`).
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

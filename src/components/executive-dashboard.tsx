@@ -57,7 +57,7 @@ import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } 
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
-import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc } from "@/lib/a-receber-regra";
+import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc, ehDocumentoTransferencia } from "@/lib/a-receber-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -1276,12 +1276,13 @@ export function ExecutiveDashboard() {
     ), [consistentItemsForPagas, selectedOpTypes, matchesPaymentYearOnly]);
 
   // === CR Filtered item sets ===
-  // A Receber e Vencidas fora da Holding = regras do Power BI ("Total a Receber
-  // Futuro" e "Total Vencidas", src/lib/a-receber-regra.ts, 07/11/2026): o
-  // aluguel sai do A Receber pela CATEGORIA (10513/10514) e conta nas Vencidas
-  // — por isso partem da base sem o corte de "Contrato de Locação" que
-  // consistentIncome faz. Recebidas, DRE e Resumo (Recebido) continuam em
-  // consistentIncome. No modo Holding: regras antigas, intactas.
+  // A Receber, Vencidas e Recebidas fora da Holding = regras do Power BI
+  // ("Total a Receber Futuro", "Total Vencidas" e "Total Recebido",
+  // src/lib/a-receber-regra.ts, 07/11/2026): o aluguel sai do A Receber pela
+  // CATEGORIA (10513/10514) e conta nas Vencidas e nas Recebidas — por isso
+  // partem da base sem o corte de "Contrato de Locação" que consistentIncome
+  // faz. DRE e Comparativo continuam em consistentIncome. No modo Holding:
+  // regras antigas, intactas.
   const incomeBaseReceber = useMemo(() =>
     isHolding ? [] : incomeItems.filter(i =>
       companyModeFilter(i.companyName) &&
@@ -1311,8 +1312,20 @@ export function ExecutiveDashboard() {
     isHolding ? [] : incomeBaseReceber.filter(i => entraNaCarteiraAberta(i)),
     [isHolding, incomeBaseReceber]);
 
+  // Contas Recebidas fora da Holding = "Total Recebido" (Faturamento) do Power
+  // BI: COM aluguel, SEM documento de transferência entre contas ("TRAN") e
+  // sem a Holding — os movimentos bancários avulsos não passavam pelo filtro
+  // de empresa e traziam os da Holding para o modo Silva Packer. A aba
+  // Resumo (Total Recebido) usa a mesma lista. Holding: regra antiga.
+  const incomeRecebidas = useMemo(() =>
+    isHolding
+      ? consistentIncomeForRecebidas
+      : [...incomeBaseReceber, ...incomeBankMovementsAsItems.filter(i => companyModeFilter(i.companyName))]
+          .filter(i => !ehDocumentoTransferencia(i)),
+    [isHolding, consistentIncomeForRecebidas, incomeBaseReceber, incomeBankMovementsAsItems, companyModeFilter]);
+
   const itemsRecebidas = useMemo(() =>
-    consistentIncomeForRecebidas.filter(i =>
+    incomeRecebidas.filter(i =>
       i.originalAmount > 0 && (i.payments || []).some(p =>
         p.netAmount > 0 &&
         matchesSelectedPaymentDate(p.paymentDate)
@@ -1322,17 +1335,17 @@ export function ExecutiveDashboard() {
       // exclui. Validado mês a mês (Jan/Fev/Mar/2026). Escopado à Holding via
       // isHolding — as 12 empresas validadas (cujos resgates ficam) não mudam.
       && !(isHolding && (i.documentIdentificationId || "").trim().toUpperCase() === "TRAN")
-    ), [consistentIncomeForRecebidas, matchesSelectedPaymentDate, isHolding]);
+    ), [incomeRecebidas, matchesSelectedPaymentDate, isHolding]);
 
   // Idem, só com o ano (gráfico mensal de Recebidas no modo de destaque).
   const itemsRecebidasSemMes = useMemo(() =>
-    consistentIncomeForRecebidas.filter(i =>
+    incomeRecebidas.filter(i =>
       i.originalAmount > 0 && (i.payments || []).some(p =>
         p.netAmount > 0 &&
         matchesPaymentYearOnly(p.paymentDate)
       )
       && !(isHolding && (i.documentIdentificationId || "").trim().toUpperCase() === "TRAN")
-    ), [consistentIncomeForRecebidas, matchesPaymentYearOnly, isHolding]);
+    ), [incomeRecebidas, matchesPaymentYearOnly, isHolding]);
 
   // Items filtered by company + doc type for KPIs and charts
   const filteredAPagar = useMemo(() => applyFilters(itemsAPagar), [itemsAPagar, applyFilters]);

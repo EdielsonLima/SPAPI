@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta,
   ehReceitaDeLocacao, ehDocumentoDeLocacao, ehCondicaoPermuta, ignoraFiltroTipoDoc,
+  ehDocumentoTransferencia,
 } from "../lib/a-receber-regra";
 
 const hoje = "2026-11-07";
@@ -59,5 +60,16 @@ const venc = carteira.filter((i) => entraNasVencidas(i, hoje)).reduce((s, i) => 
 const base = carteira.filter((i) => entraNaCarteiraAberta(i)).reduce((s, i) => s + i.correctedBalanceAmount, 0);
 assert.equal(venc.toFixed(2), (4900.87 + 16683.5).toFixed(2));
 assert.equal(base.toFixed(2), (4900.87 * 2 + 16683.5 * 2 + 1000).toFixed(2));
+
+// Recebidas (Total Recebido do Power BI): documento com "TRAN" sai, aluguel fica.
+assert.equal(ehDocumentoTransferencia({ documentIdentificationId: "TRAN", documentNumber: "REPASSE SILVA ADM" }), true, "repasse da Holding (bill 1065)");
+assert.equal(ehDocumentoTransferencia({ documentIdentificationId: "TRAN", documentNumber: "" }), true, "resgate de aplicação (movimento bancário)");
+assert.equal(ehDocumentoTransferencia({ documentIdentificationId: "TRAN ", documentNumber: null }), true);
+assert.equal(ehDocumentoTransferencia({ documentIdentificationId: "REC", documentNumber: "TRANSF. ALUGUÉIS" }), true, "o BI procura no texto todo");
+assert.equal(ehDocumentoTransferencia({ documentIdentificationId: "rec", documentNumber: "tran 01" }), true, "sem diferenciar maiúsculas");
+assert.equal(ehDocumentoTransferencia({ documentIdentificationId: "LOC", documentNumber: "BRASIL CENTRAL SL" }), false, "aluguel fica");
+assert.equal(ehDocumentoTransferencia({ documentIdentificationId: "REC", documentNumber: "EMPRÉSTIMO SP" }), false);
+assert.equal(ehDocumentoTransferencia({ documentIdentificationId: "MB", documentNumber: "" }), false);
+assert.equal(ehDocumentoTransferencia({}), false);
 
 console.log("a-receber-regra: ok");
