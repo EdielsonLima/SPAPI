@@ -1423,7 +1423,11 @@ export function ExecutiveDashboard() {
     const totalBudget = activeRows.reduce((s, r) => s + r.budget, 0);
     const totalRealized = activeRows.reduce((s, r) => s + r.realized, 0);
     const totalToRealize = activeRows.reduce((s, r) => s + Math.max(0, r.toRealize), 0);
-    return { totalBudget, totalRealized, totalToRealize };
+    // % sobre o Orçamento Total, nos cards Custo Realizado e Saldo a Realizar
+    // (Edielson, 07/11/2026). Mesma base (só ativas); sem orçamento = 0.
+    const pctRealized = totalBudget > 0 ? (totalRealized / totalBudget) * 100 : 0;
+    const pctToRealize = totalBudget > 0 ? (totalToRealize / totalBudget) * 100 : 0;
+    return { totalBudget, totalRealized, totalToRealize, pctRealized, pctToRealize };
   }, [budgetData]);
 
   // Aplica ordenacao da UI mantendo Finalizadas sempre no final
@@ -3077,8 +3081,18 @@ export function ExecutiveDashboard() {
               />
             </>)}
             <CardPainel rotulo="Orçamento Total" valor={formatCurrency(budgetTotals.totalBudget)} sub="só obras ativas" cor="bg-blue-500" />
-            <CardPainel rotulo="Custo Realizado" valor={formatCurrency(budgetTotals.totalRealized)} sub="só obras ativas" cor="bg-emerald-500" />
-            <CardPainel rotulo="Saldo a Realizar" valor={formatCurrency(budgetTotals.totalToRealize)} sub="só obras ativas, sem saldos negativos" cor="bg-amber-500" />
+            <CardPainel
+              rotulo="Custo Realizado" valor={formatCurrency(budgetTotals.totalRealized)} sub="só obras ativas" cor="bg-emerald-500"
+              selo={budgetTotals.totalBudget > 0 ? `${budgetTotals.pctRealized.toFixed(1)}%` : undefined}
+              corSelo="bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"
+              dicaSelo={`${budgetTotals.pctRealized.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do Orçamento Total já realizado (só obras ativas)`}
+            />
+            <CardPainel
+              rotulo="Saldo a Realizar" valor={formatCurrency(budgetTotals.totalToRealize)} sub="só obras ativas, sem negativos" cor="bg-amber-500"
+              selo={budgetTotals.totalBudget > 0 ? `${budgetTotals.pctToRealize.toFixed(1)}%` : undefined}
+              corSelo="bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300"
+              dicaSelo={`${budgetTotals.pctToRealize.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}% do Orçamento Total ainda a realizar (só obras ativas)`}
+            />
           </div>
 
           {/* Budget Table — rola por dentro do card se não couber */}
@@ -5163,13 +5177,16 @@ export function ExecutiveDashboard() {
 // sem sombra nem ícone colorido, ponto de estado antes do rótulo e valor em
 // fonte fluida que nunca é cortado. Usado nas abas Geral e Orçamento; os cards
 // das abas CP/CR têm o mesmo desenho inline (com clique/active próprios).
-function CardPainel({ rotulo, valor, sub, cor, corValor, onClick }: {
+function CardPainel({ rotulo, valor, sub, cor, corValor, onClick, selo, corSelo, dicaSelo }: {
   rotulo: string;
   valor: string;
   sub?: string;
   cor: string;        // classe do ponto, ex.: "bg-blue-500"
   corValor?: string;  // classe de cor do valor (padrão: tinta)
   onClick?: () => void;
+  selo?: string;      // pílula discreta à direita da linha de baixo, ex.: "42.7%"
+  corSelo?: string;   // fundo + texto da pílula (contraste ≥ 4,5:1 nos dois temas)
+  dicaSelo?: string;  // texto ao passar o mouse na pílula
 }) {
   const clicavel = Boolean(onClick);
   return (
@@ -5185,7 +5202,21 @@ function CardPainel({ rotulo, valor, sub, cor, corValor, onClick }: {
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 truncate">{rotulo}</p>
       </div>
       <p className={`mt-1.5 font-semibold tabular-nums whitespace-nowrap leading-tight text-[clamp(1rem,1.15vw,1.5rem)] ${corValor || "text-slate-900 dark:text-slate-50"}`}>{valor}</p>
-      {sub && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 truncate">{sub}</p>}
+      {/* Selo na linha de baixo, à direita: na do rótulo ele cortava "Custo
+          Realizado"/"Saldo a Realizar" com seis cards por linha a 1536 px. */}
+      {selo ? (
+        <div className="mt-1 flex items-center gap-2 min-w-0">
+          {sub && <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{sub}</p>}
+          <span
+            title={dicaSelo}
+            className={`ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-semibold tabular-nums leading-none ${corSelo || "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"}`}
+          >
+            {selo}
+          </span>
+        </div>
+      ) : (
+        sub && <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 truncate">{sub}</p>
+      )}
     </div>
   );
 }

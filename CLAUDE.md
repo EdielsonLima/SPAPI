@@ -460,6 +460,13 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Fica centralizada no meio do caminho entre o nome e o Fator (Edielson, 07/11):
   Empreendimento com `w-[1%] whitespace-nowrap` (abraça o nome mais longo) e a
   coluna Área com `w-[16%]` e texto ao centro. Sem rolagem lateral de 1366 px para cima.
+- **% nos cards Custo Realizado e Saldo a Realizar** (Edielson, 07/11/2026): pílula
+  discreta à direita da linha de baixo (`selo` do `CardPainel`), na cor do ponto do
+  card, = total do card ÷ Orçamento Total (mesma base: só ativas) × 100, uma casa
+  como a coluna % Real; a dica mostra duas casas. Sem saldo negativo os dois somam
+  100 %. Na linha do rótulo cortava "Custo Realizado" a 1536 px, por isso fica embaixo;
+  o texto do Saldo virou "só obras ativas, sem negativos" para caber a 1846 px.
+  Trava: Test 14 de `budget-calculations.test.ts`.
 
 ## DRE - Regras Criticas (Validado em 2026-03-17)
 

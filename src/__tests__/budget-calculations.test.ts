@@ -314,7 +314,9 @@ function computeBudgetTotals(rows: LinhaOrcamento[]) {
   const totalBudget = activeRows.reduce((s, r) => s + r.budget, 0);
   const totalRealized = activeRows.reduce((s, r) => s + r.realized, 0);
   const totalToRealize = activeRows.reduce((s, r) => s + Math.max(0, r.toRealize), 0);
-  return { totalBudget, totalRealized, totalToRealize };
+  const pctRealized = totalBudget > 0 ? (totalRealized / totalBudget) * 100 : 0;
+  const pctToRealize = totalBudget > 0 ? (totalToRealize / totalBudget) * 100 : 0;
+  return { totalBudget, totalRealized, totalToRealize, pctRealized, pctToRealize };
 }
 
 const linha = (budget: number, realized: number, status: "Ativa" | "Finalizada"): LinhaOrcamento =>
@@ -345,6 +347,23 @@ assertClose("Só finalizadas selecionadas → cards zerados (realizado)", soFina
 const comNegativaAtiva = computeBudgetTotals([linha(100, 120, "Ativa"), linha(100, 40, "Ativa")]);
 assertClose("Saldo a Realizar ignora saldo negativo de ativa: 0 + 60", comNegativaAtiva.totalToRealize, 60);
 assertClose("Orçamento/Realizado não clipam: 200 e 160", comNegativaAtiva.totalBudget + comNegativaAtiva.totalRealized, 360);
+
+// ─── Test 14: % nos cards Custo Realizado e Saldo a Realizar (Edielson, 07/11/2026)
+// Percentual sobre o Orçamento Total (só ativas). Números = tela de 07/11/2026:
+// 190.489.292,74 de 446.534.347,85 = 42,66 %; saldo 256.045.055,11 = 57,34 %.
+
+console.log("\n=== Test 14: % realizado e % a realizar nos cards ===");
+
+const tela0711 = computeBudgetTotals([
+  linha(446534347.85, 190489292.74, "Ativa"),
+  linha(79446432.00, 75953816.20, "Finalizada"),
+]);
+assertClose("Saldo a Realizar 07/11 = 256.045.055,11", tela0711.totalToRealize, 256045055.11);
+assertClose("% realizado = 42,66", Math.round(tela0711.pctRealized * 100) / 100, 42.66);
+assertClose("% a realizar = 57,34", Math.round(tela0711.pctToRealize * 100) / 100, 57.34);
+assertClose("Sem saldo negativo, os dois somam 100 %", tela0711.pctRealized + tela0711.pctToRealize, 100);
+assertClose("Sem orçamento (só finalizadas) → 0 %, sem divisão por zero", soFinalizadas.pctRealized, 0);
+assertClose("Ativa estourada: realizado 80 % e saldo 30 % (negativo fica fora)", comNegativaAtiva.pctRealized + comNegativaAtiva.pctToRealize, 110);
 
 // ─── Summary ─────────────────────────────────────────────────────────────────
 
