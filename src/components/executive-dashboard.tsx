@@ -57,6 +57,7 @@ import { SiengeOutcome, SiengeBankMovement, SiengeIncome, SiengeSalesContract } 
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
+import { entraNoAReceber, ignoraFiltroTipoDoc } from "@/lib/a-receber-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -1006,7 +1007,10 @@ export function ExecutiveDashboard() {
     if (selectedDocTypes.size > 0) {
       result = result.filter(i =>
         selectedDocTypes.has(i.documentIdentificationName) ||
-        shouldKeepIncomeExcludedDoc(i.companyId, i.billId, i.installmentId)
+        shouldKeepIncomeExcludedDoc(i.companyId, i.billId, i.installmentId) ||
+        // "Contrato de Locação…" que não é aluguel pela categoria (só chega ao
+        // A Receber; o tipo não aparece no filtro do CR) — ver a-receber-regra.ts
+        (section === "cr" && !isHolding && ignoraFiltroTipoDoc(i))
       );
     }
     if (selectedYears.size > 0) {
@@ -1022,7 +1026,7 @@ export function ExecutiveDashboard() {
       result = result.filter(i => i.dueDate && i.dueDate <= duePeriodMaxDate);
     }
     return result;
-  }, [selectedCompanies, drillCompany, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate]);
+  }, [selectedCompanies, drillCompany, selectedDocTypes, selectedYears, selectedMonths, selectedDays, duePeriodMaxDate, section, isHolding]);
 
   // === Filtered item sets ===
   const itemsAPagar = useMemo(() =>
@@ -1271,8 +1275,28 @@ export function ExecutiveDashboard() {
     ), [consistentItemsForPagas, selectedOpTypes, matchesPaymentYearOnly]);
 
   // === CR Filtered item sets ===
+  // A Receber fora da Holding = regra do Power BI ("Total a Receber Futuro",
+  // src/lib/a-receber-regra.ts, 07/11/2026): o aluguel sai pela CATEGORIA
+  // (10513/10514), não pelo tipo de documento — por isso parte da base sem o
+  // corte de "Contrato de Locação" que consistentIncome faz. Recebidas,
+  // Inadimplência, DRE e Resumo (Recebido) continuam em consistentIncome.
+  // No modo Holding o A Receber é o aluguel do grupo: regra antiga, intacta.
+  const incomeBaseAReceber = useMemo(() =>
+    isHolding ? [] : incomeItems.filter(i =>
+      companyModeFilter(i.companyName) &&
+      !isExcludedFinancialDocType(
+        i.documentIdentificationName,
+        (i as { forecastDocument?: string | null }).forecastDocument,
+        { excludeLocacao: false }
+      ) &&
+      !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`))
+    ), [incomeItems, companyModeFilter, exclusionSet, isHolding]);
+
   const itemsAReceber = useMemo(() =>
-    consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr), [consistentIncomeCR, todayStr]);
+    isHolding
+      ? consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr)
+      : incomeBaseAReceber.filter(i => entraNoAReceber(i, todayStr)),
+    [isHolding, consistentIncomeCR, incomeBaseAReceber, todayStr]);
 
   const itemsInadimplencia = useMemo(() =>
     consistentIncomeCR.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentIncomeCR, todayStr]);
@@ -4936,7 +4960,8 @@ export function ExecutiveDashboard() {
           if (!companySummary[co]) return;
           if (selectedDocTypes.size > 0 && !(
             selectedDocTypes.has(item.documentIdentificationName) ||
-            shouldKeepIncomeExcludedDoc(item.companyId, item.billId, item.installmentId)
+            shouldKeepIncomeExcludedDoc(item.companyId, item.billId, item.installmentId) ||
+            (!isHolding && ignoraFiltroTipoDoc(item))
           )) return;
           if (duePeriodMaxDate && !(item.dueDate && item.dueDate <= duePeriodMaxDate)) return;
           companySummary[co].totalAReceber += effectiveAmount(item);
@@ -5165,6 +5190,7 @@ export function ExecutiveDashboard() {
           allIncomeItems={consistentIncomeCR}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
+          ignoraTipoDoc={isHolding ? undefined : ignoraFiltroTipoDoc}
         />
         </div>
       )}

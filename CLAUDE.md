@@ -376,6 +376,34 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Docker `spapi-sp-db` na porta 5447 e login `admin-local`); `node scripts/migrate.js`
   com `DATABASE_URL` exportada. Primeira carga puxa 10 anos do Sienge (~3 min).
 
+## Conferência com o Power BI "FINANCEIRO GERAL", quadro a quadro (Edielson, 07/11/2026)
+
+- Motivo: o Carlos Humberto vem do Power BI; painel e BI têm de bater em cada quadro.
+- O BI é um projeto **.pbip** (texto, dá para ler sem abrir o Power BI):
+  `C:/Users/Desktop/OneDrive - DTCONSULTORIAS/SILVA PACKER/PBIX/FINAIS/FINANCEIRO/FINANCEIRO GERAL.pbip`.
+  Medidas em `FINANCEIRO GERAL.SemanticModel/definition/tables/MEDIDAS.tmdl`, consulta M de
+  cada tabela no próprio `.tmdl` (ex.: `f_RECEBER.tmdl`), visuais e filtros de página em
+  `FINANCEIRO GERAL.Report/definition/pages/<id>/visuals/*/visual.json`. Histórico do BI em
+  `CONTEXTO_FINANCEIRO_GERAL.md` na mesma pasta.
+- **Contas a Receber › Total a Receber — conferido 07/11 (1º quadro):** card, "Por Empresa"
+  e "Evolução Mensal" = medida `Total a Receber Futuro`. Regra única em
+  `src/lib/a-receber-regra.ts` (trava `a-receber-regra.test.ts`): saldo corrigido > 0,
+  vencimento ≥ hoje, condição ≠ Permuta e **aluguel sai pela CATEGORIA 10513/10514**, não
+  pelo tipo de documento. Antes saía por "Contrato de Locação": +R$ 2.000,00 (acordo Bigliardi,
+  doc CONTRATO, categoria 10514) e −R$ 108,08 (ressarcimento de IPTU em doc "Locação Não
+  Contábil", categoria 2090111) na Silva Packer Construtora. Depois: 2026 = R$ 7.635.160,05,
+  as 11 empresas e nov/dez iguais ao BI. "Contrato de Locação…" que não é aluguel não é cortado
+  pelo filtro Tipo Doc (`ignoraFiltroTipoDoc`; o tipo não aparece no filtro do CR). Vale no
+  card, gráficos, Calendário de Recebimentos e coluna A Receber do Resumo. **Modo Holding não
+  muda** (lá o A Receber é o aluguel). Recebidas, Inadimplência, DRE e Resumo (Recebido)
+  continuam em `consistentIncome`, regra antiga, até cada quadro ser conferido.
+- Diferenças do BI que o painel NÃO copiou: o BI soma `correctedBalanceAmount` sem tirar
+  desconto (o painel tira `discountAmount`; em 07/11 nenhuma parcela aberta tinha desconto) e
+  a consulta do BI corta o `billId` 437 de qualquer empresa (gambiarra; nada em aberto).
+- Próximos quadros da mesma página do BI: Faturamento (`Total Recebido`, vem de um Excel
+  exportado do Sienge, `f_RECEBIDAS_CSV`, sem filtro de aluguel), `Total Vencidas` (vencido,
+  saldo corrigido > 0, sem Permuta, **com** aluguel, sem encargos) e % Atrasada.
+
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 
 - Pedido: "comparar o CUB-SC com o m² de Balneário Camboriú". A aba "Valor m²" só guarda

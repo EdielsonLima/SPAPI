@@ -18,6 +18,9 @@ interface Props {
   selectedCompanies: Set<string>;
   // Filtro de doc types selecionados.
   selectedDocTypes: Set<string>;
+  // Parcela que o filtro Tipo Doc não corta ("Contrato de Locação…" que não é
+  // aluguel pela categoria — ver src/lib/a-receber-regra.ts). Fora da Holding.
+  ignoraTipoDoc?: (item: SiengeIncome) => boolean;
 }
 
 const WEEKDAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -41,7 +44,7 @@ interface CalendarDay {
   count: number;
 }
 
-export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, selectedCompanies, selectedDocTypes }: Props) {
+export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, selectedCompanies, selectedDocTypes, ignoraTipoDoc }: Props) {
   const [currentMonth, setCurrentMonth] = useState(() => getCurrentMonthKey());
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<SiengeIncome | null>(null);
@@ -57,14 +60,14 @@ export function CalendarioRecebimentoTab({ itemsAReceber, allIncomeItems, select
     const q = search.trim().toLowerCase();
     return itemsAReceber.filter(item => {
       if (selectedCompanies.size > 0 && !selectedCompanies.has(item.companyName)) return false;
-      if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName || "")) return false;
+      if (selectedDocTypes.size > 0 && !selectedDocTypes.has(item.documentIdentificationName || "") && !ignoraTipoDoc?.(item)) return false;
       if (q) {
         const hay = `${item.clientName || ""} ${item.documentNumber || ""} ${item.companyName || ""}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [itemsAReceber, selectedCompanies, selectedDocTypes, search]);
+  }, [itemsAReceber, selectedCompanies, selectedDocTypes, ignoraTipoDoc, search]);
 
   // 2. Filtra pelo mes atual e calcula valor a receber de cada parcela
   const monthItems = useMemo(() => {
