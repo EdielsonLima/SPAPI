@@ -3096,8 +3096,8 @@ export function ExecutiveDashboard() {
                     <TableHeader className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
                       <TableRow className="hover:bg-slate-50 dark:hover:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
                         {[
-                          { field: "companyName", label: "Empreendimento", align: "left", widthClass: "px-6" },
-                          { field: "areaM2", label: "Área (m²)", align: "right", widthClass: "w-32" },
+                          { field: "companyName", label: "Empreendimento", align: "left", widthClass: "px-6 w-[1%] whitespace-nowrap" },
+                          { field: "areaM2", label: "Área (m²)", align: "center", widthClass: "w-[16%]" },
                           { field: "factor", label: "Fator", align: "center", widthClass: "w-20" },
                           { field: "budget", label: "Orçamento", align: "right", widthClass: "" },
                           { field: "realized", label: "Realizado", align: "right", widthClass: "" },
@@ -3127,9 +3127,9 @@ export function ExecutiveDashboard() {
                         const isFinalizada = row.status === "Finalizada";
                         return (
                           <TableRow key={row.companyId} className={`transition-colors h-14 ${isFinalizada ? "bg-slate-50/50 hover:bg-slate-50 dark:bg-slate-800/30 dark:hover:bg-slate-800/50" : "bg-white hover:bg-slate-50/80 dark:bg-transparent dark:hover:bg-slate-800/40"}`}>
-                            <TableCell className={`px-6 font-semibold text-[13px] ${isFinalizada ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100"}`}>{row.companyName}</TableCell>
-                            {/* Área do empreendimento (Configurações › Empreendimentos), a mesma que entra no Orçado = m² × fator × CUB (Edielson, 07/11/2026) */}
-                            <TableCell className={`text-right tabular-nums text-[13px] whitespace-nowrap ${isFinalizada ? "text-slate-400 dark:text-slate-500 font-medium" : "text-slate-600 dark:text-slate-300 font-semibold"}`}>
+                            <TableCell className={`px-6 font-semibold text-[13px] whitespace-nowrap ${isFinalizada ? "text-slate-400 dark:text-slate-500" : "text-slate-800 dark:text-slate-100"}`}>{row.companyName}</TableCell>
+                            {/* Área do empreendimento (Configurações › Empreendimentos), a mesma que entra no Orçado = m² × fator × CUB (Edielson, 07/11/2026). Fica no meio do caminho entre o nome e o Fator: a coluna Empreendimento abraça o nome mais longo (w-[1%] + nowrap) e esta ocupa 16% da tabela, centralizada. */}
+                            <TableCell className={`text-center tabular-nums text-[13px] whitespace-nowrap ${isFinalizada ? "text-slate-400 dark:text-slate-500 font-medium" : "text-slate-600 dark:text-slate-300 font-semibold"}`}>
                               {row.areaM2.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m²
                             </TableCell>
                             <TableCell className="text-center text-[13px] font-medium">

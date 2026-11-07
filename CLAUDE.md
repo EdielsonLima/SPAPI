@@ -457,6 +457,9 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
 - **Coluna Área (m²)** (Edielson, 07/11/2026) entre Empreendimento e Fator: é o
   `areaM2` de Configurações › Empreendimentos, o mesmo que entra no Orçado
   (m² × fator × CUB). Só exibição e ordenação; não muda nenhum cálculo.
+  Fica centralizada no meio do caminho entre o nome e o Fator (Edielson, 07/11):
+  Empreendimento com `w-[1%] whitespace-nowrap` (abraça o nome mais longo) e a
+  coluna Área com `w-[16%]` e texto ao centro. Sem rolagem lateral de 1366 px para cima.
 
 ## DRE - Regras Criticas (Validado em 2026-03-17)
 
