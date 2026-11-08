@@ -457,9 +457,23 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   todas: R$ 3.354.665,15 (221 parcelas); 2026: R$ 2.492.749,23 (151); 10 obras do BI em
   2026: R$ 1.312.974,64. A badge da aba e o card Contas Vencidas do Geral seguem a mesma
   lista. Holding: regra antiga.
-- Próximo quadro da página CONTAS À PAGAR: `Total pago até data selecionada`. Depois:
-  `Geral a Pagar Ajustado CARD` (exclui TETRA 15596 parc. 1–2 e 15597 parc. 14) e
-  `Estimativa Saidas no Periodo`.
+- **Contas a Pagar › Contas Pagas — conferido 08/11 (3º quadro):** card `Total pago até data
+  selecionada` = SUM(Líquido) por data da baixa de um CSV do relatório "Contas Pagas" do
+  Sienge ("Ambos", período 2001–2040, exportado todo dia às 06:02 por robô para
+  `SILVA PACKER/PAGAR/PAGAS CSV JANEIRO.csv.csv`, tabela `f_PAGAS CSV`), sem documento
+  "TRAN.". A regra do painel (netAmount + movimentos bancários avulsos de saída, tipos de
+  operação padrão) **já batia centavo a centavo nas 13 empresas em 2024 e 2025** e em 11 em
+  2026. Mudou só uma coisa (`basePagas` em `a-pagar-regra.ts`): fora da Holding, os
+  movimentos bancários avulsos entram só das empresas do modo — os da Holding vazavam no
+  modo Silva Packer (2026: R$ 870.009,29; 2025: R$ 1.173.376,01). Orçamento e Comparativo
+  continuam em `consistentItemsForPagas`; a aba Resumo (Total Pago) acompanhou. Ficam duas
+  diferenças, ambas do BI: título 41035 (FEY PROBST, **NFSE** 413, 13/10/2026,
+  R$ 14.546,75, Silva Packer Construtora — o único NFSE do Sienge; o CSV do BI não traz
+  nenhum) e a consulta M do BI apaga a última linha do CSV (`RemoveLastN 1`; em 08/11,
+  R$ 6.000,00 do Galpão). 2026 todas: **R$ 64.957.152,12** (BI sem Holding
+  R$ 64.936.605,37); 10 obras do BI: R$ 50.392.060,29 nos dois. Holding: regra antiga.
+- Próximo quadro da página CONTAS À PAGAR: `Geral a Pagar Ajustado CARD` (exclui TETRA
+  15596 parc. 1–2 e 15597 parc. 14). Depois: `Estimativa Saidas no Periodo`.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

@@ -47,6 +47,22 @@
 //   · Contrato de Locação 024939 (título 33345): R$ 9.900,00 com desconto de
 //     R$ 9.900,00 — o painel mostra 0, o BI R$ 9.900,00.
 //
+// PAGAS (aba Contas Pagas, 08/11/2026) = card "Total pago até data
+// selecionada" do mesmo BI: soma do Líquido por data da baixa de um CSV do
+// relatório "Contas Pagas" do Sienge (tabela f_PAGAS CSV, "Ambos": contas a
+// pagar + caixa/bancos), sem documento "TRAN.". A regra do painel (netAmount
+// dos pagamentos + movimentos bancários avulsos de saída, sem os tipos de
+// operação Substituição/Cancelamento/Abatimento/Devolução/Por Bens/Permuta)
+// já dava o mesmo, centavo a centavo, nas 13 empresas em 2024 e 2025 e em 11
+// delas em 2026. O que mudou: os movimentos bancários avulsos só entram se a
+// empresa é do modo — os da Holding entravam no modo Silva Packer (2026:
+// R$ 870.009,29; 2025: R$ 1.173.376,01). Diferenças que ficam, ambas do BI:
+//   · título 41035 (FEY PROBST, NFSE 413, pago em 13/10/2026, R$ 14.546,75,
+//     Silva Packer Construtora): o único título do Sienge com documento NFSE,
+//     e o CSV do BI não traz nenhum NFSE;
+//   · a consulta do BI apaga a última linha do CSV (RemoveLastN 1): em 08/11,
+//     AMARAL E AMARAL, R$ 6.000,00 no Galpão Rua Canelinha.
+//
 // O modo Holding NÃO usa estas regras.
 
 /** Previsões que o Power BI tira do total a pagar. */
@@ -91,4 +107,17 @@ export function entraNasAtrasadas(item: ItemAPagar, hoje: string): boolean {
  */
 export function ignoraFiltroTipoDocCP(item: ItemAPagar): boolean {
   return ehPrevisaoDeComissao(item);
+}
+
+/**
+ * Base das Contas Pagas fora do modo Holding: os títulos do modo e os
+ * movimentos bancários avulsos SÓ das empresas do modo (antes os da Holding
+ * entravam no modo Silva Packer, sem filtro de empresa).
+ */
+export function basePagas<T extends { companyName: string }>(
+  titulos: T[],
+  movimentosAvulsos: T[],
+  empresaDoModo: (empresa: string) => boolean,
+): T[] {
+  return [...titulos, ...movimentosAvulsos.filter((m) => empresaDoModo(m.companyName))];
 }

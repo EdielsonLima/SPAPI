@@ -58,7 +58,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc, ehDocumentoTransferencia } from "@/lib/a-receber-regra";
-import { entraNoAPagar, entraNasAtrasadas, ignoraFiltroTipoDocCP } from "@/lib/a-pagar-regra";
+import { entraNoAPagar, entraNasAtrasadas, ignoraFiltroTipoDocCP, basePagas } from "@/lib/a-pagar-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -1282,25 +1282,37 @@ export function ExecutiveDashboard() {
     [consistentIncomeCR, incomeBankMovementsAsItems]
   );
 
+  // Contas Pagas fora da Holding = "Total pago até data selecionada" do Power
+  // BI (src/lib/a-pagar-regra.ts, 08/11/2026): a mesma regra de sempre, mas os
+  // movimentos bancários avulsos só das empresas do modo — os da Holding
+  // entravam no modo Silva Packer. A aba Resumo (Total Pago) usa a mesma
+  // lista. Orçamento e Comparativo continuam em consistentItemsForPagas.
+  // Holding: regra antiga.
+  const itensBasePagas = useMemo(() =>
+    isHolding
+      ? consistentItemsForPagas
+      : basePagas(consistentItems, bankMovementsAsItems, companyModeFilter),
+    [isHolding, consistentItemsForPagas, consistentItems, bankMovementsAsItems, companyModeFilter]);
+
   const itemsPagas = useMemo(() =>
-    consistentItemsForPagas.filter(i =>
+    itensBasePagas.filter(i =>
       (i.payments || []).some(p =>
         p.netAmount > 0 &&
         (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
         matchesSelectedPaymentDate(p.paymentDate)
       )
-    ), [consistentItemsForPagas, selectedOpTypes, matchesSelectedPaymentDate]);
+    ), [itensBasePagas, selectedOpTypes, matchesSelectedPaymentDate]);
 
   // Mesma lista, só com o filtro de ano (sem mês/dia): gráfico mensal de Pagas
   // no modo de destaque (ver matchesPaymentYearOnly).
   const itemsPagasSemMes = useMemo(() =>
-    consistentItemsForPagas.filter(i =>
+    itensBasePagas.filter(i =>
       (i.payments || []).some(p =>
         p.netAmount > 0 &&
         (selectedOpTypes.size === 0 || selectedOpTypes.has(p.operationTypeName)) &&
         matchesPaymentYearOnly(p.paymentDate)
       )
-    ), [consistentItemsForPagas, selectedOpTypes, matchesPaymentYearOnly]);
+    ), [itensBasePagas, selectedOpTypes, matchesPaymentYearOnly]);
 
   // === CR Filtered item sets ===
   // A Receber, Vencidas e Recebidas fora da Holding = regras do Power BI

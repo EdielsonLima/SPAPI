@@ -1,7 +1,7 @@
 // Trava da regra do A Pagar (igual ao Power BI). Rodar:
 //   npx tsx src/__tests__/a-pagar-regra.test.ts
 import assert from "node:assert/strict";
-import { entraNoAPagar, entraNasAtrasadas, ehPrevisaoDeComissao, ignoraFiltroTipoDocCP } from "../lib/a-pagar-regra";
+import { entraNoAPagar, entraNasAtrasadas, ehPrevisaoDeComissao, ignoraFiltroTipoDocCP, basePagas } from "../lib/a-pagar-regra";
 
 const hoje = "2026-11-07";
 
@@ -63,5 +63,17 @@ const naoConsistidos = [
   { correctedBalanceAmount: 1164.39, dueDate: "2026-04-17", documentIdentificationId: "NFS" }, // SP Construtora, Max Mohr (já sem imposto)
 ];
 assert.equal(naoConsistidos.filter((i) => entraNasAtrasadas(i, hoje2)).reduce((s, i) => s + i.correctedBalanceAmount, 0).toFixed(2), "8131.40");
+
+// Contas Pagas (Total pago do BI): movimento bancário avulso só da empresa do modo.
+const HOLDING = "SILVA ADMINISTRADORA HOLDING LTDA";
+const doModoSP = (empresa: string) => empresa !== HOLDING;
+const titulo = { companyName: "SILVA PACKER CONSTRUTORA E INCORPORADORA LTDA", billId: 41035 };
+const tarifaSP = { companyName: "PALACIO ELIZABETH", billId: 1 };
+const tarifaHolding = { companyName: HOLDING, billId: 2 };
+const tituloHolding = { companyName: HOLDING, billId: 3 }; // a lista de títulos já vem filtrada pelo modo; não é papel da base
+assert.deepEqual(basePagas([titulo], [tarifaSP, tarifaHolding], doModoSP), [titulo, tarifaSP], "movimento da Holding fica fora do modo Silva Packer");
+assert.deepEqual(basePagas([titulo, tituloHolding], [], doModoSP), [titulo, tituloHolding], "não mexe nos títulos");
+assert.deepEqual(basePagas([], [tarifaHolding, tarifaSP], (e) => e === HOLDING), [tarifaHolding], "no modo Holding, só os dela");
+assert.deepEqual(basePagas([], [], doModoSP), []);
 
 console.log("a-pagar-regra: ok");
