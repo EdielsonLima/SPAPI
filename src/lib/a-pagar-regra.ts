@@ -29,12 +29,32 @@
 // desconto − imposto quando a parcela está inteira), validado com o relatório
 // do Sienge; em 07/11 dava o mesmo que o BI (saldo − imposto) em todas.
 //
-// O modo Holding NÃO usa esta regra.
+// ATRASADAS (aba Contas Atrasadas, 08/11/2026) = card "Contas Atrasadas CARD"
+// do mesmo BI: vencida (< hoje), saldo corrigido > 0, sem as 5 previsões
+// (PPC, PPE, PRC, PCT, PRV) e, de novo, SEM olhar a consistência. O painel
+// deixava fora 3 títulos não consistidos (Domus R$ 5.635,40, Sul Brasil
+// R$ 1.331,61, Silva Packer Construtora R$ 1.164,39) — mesma decisão do A
+// Pagar: contar. Os títulos 15596/15597 da TETRA (R$ 262.774,79), que o
+// "Geral a Pagar Ajustado" exclui, contam nas Atrasadas nos dois.
+//
+// O valor da parcela NÃO segue o BI nas Atrasadas (Edielson, 08/11/2026): o
+// BI faz saldo − imposto sempre e ignora o desconto; o painel mantém
+// effectiveOpenAmount, conferido com o relatório do Sienge. Diferença que
+// fica, toda no 135 Jardins (+R$ 11.597,05 no painel):
+//   · R M FERNANDEZ, NF 1189 (título 34134): pago em parte em 06/03/2026 com
+//     o imposto de R$ 21.497,05 já retido; o BI tira o imposto de novo e
+//     mostra R$ 18.493,41 — o Sienge e o painel, R$ 39.990,46;
+//   · Contrato de Locação 024939 (título 33345): R$ 9.900,00 com desconto de
+//     R$ 9.900,00 — o painel mostra 0, o BI R$ 9.900,00.
+//
+// O modo Holding NÃO usa estas regras.
 
 /** Previsões que o Power BI tira do total a pagar. */
 export const PREVISOES_FORA_DO_A_PAGAR = new Set(["PPC", "PPE", "PRV", "PCT"]);
 /** Previsão de Comissão: fica no A Pagar mesmo vencida (sai das Atrasadas no BI). */
 export const DOC_PREVISAO_COMISSAO = "PRC";
+/** Previsões que o Power BI tira das Contas Atrasadas (as 4 + a de comissão). */
+export const PREVISOES_FORA_DAS_ATRASADAS = new Set([...PREVISOES_FORA_DO_A_PAGAR, DOC_PREVISAO_COMISSAO]);
 
 export type ItemAPagar = {
   correctedBalanceAmount?: number | null;
@@ -56,6 +76,13 @@ export function entraNoAPagar(item: ItemAPagar, hoje: string): boolean {
   if (PREVISOES_FORA_DO_A_PAGAR.has(tipoDoc(item))) return false;
   if ((item.correctedBalanceAmount || 0) <= 0) return false;
   return ehPrevisaoDeComissao(item) || (!!item.dueDate && item.dueDate >= hoje);
+}
+
+/** Entra nas Contas Atrasadas do Power BI (sem olhar a consistência). */
+export function entraNasAtrasadas(item: ItemAPagar, hoje: string): boolean {
+  if (PREVISOES_FORA_DAS_ATRASADAS.has(tipoDoc(item))) return false;
+  if ((item.correctedBalanceAmount || 0) <= 0) return false;
+  return !!item.dueDate && item.dueDate < hoje;
 }
 
 /**

@@ -443,11 +443,23 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Galpão Rua Canelinha; cita uma "RUA 2450" que não existe mais no Sienge) = R$ 4.143.614,48.
   Edielson: o painel continua abrindo com todas; o Carlos desmarca no filtro Empresas.
   Holding: regra antiga. Atrasadas e Pagas ainda na regra antiga.
-- Próximo quadro da página CONTAS À PAGAR: **Contas Atrasadas** (`Contas Atrasadas CARD`:
-  vencida, saldo > 0, sem PPC/PPE/PRC/PCT/PRV, sem olhar consistência, − imposto; atenção:
-  conta os títulos 15596 (parcelas 1 e 2) e 15597 (parcela 14) da TETRA, R$ 262.774,79,
-  que o `Geral a Pagar Ajustado` exclui). Depois: `Total pago até data selecionada`,
-  `Geral a Pagar Ajustado CARD` e `Estimativa Saidas no Periodo`.
+- **Contas a Pagar › Contas em Atraso — conferido 08/11 (2º quadro):** card `Contas
+  Atrasadas CARD` = saldo corrigido vencido (< hoje) > 0, sem PPC/PPE/PRC/PCT/PRV, sem olhar
+  consistência, − imposto das mesmas linhas. Mesma lib (`entraNasAtrasadas`): a seleção é a do
+  BI (passaram a contar 3 não consistidos: Domus R$ 5.635,40, Sul Brasil R$ 1.331,61, SP
+  Construtora R$ 1.164,39 — mesma decisão do A Pagar). Os títulos 15596/15597 da TETRA
+  (R$ 262.774,79) contam nos dois. **O valor da parcela NÃO segue o BI** (Edielson, 08/11):
+  continua `effectiveOpenAmount`, conferido com o relatório do Sienge. O BI tira o imposto
+  também de saldo parcial (R M FERNANDEZ, título 34134: imposto de R$ 21.497,05 já retido no
+  pagamento de 06/03; BI R$ 18.493,41, Sienge/painel R$ 39.990,46) e ignora desconto (título
+  33345, locação de R$ 9.900,00 com desconto de R$ 9.900,00; BI 9.900, painel 0). Diferença
+  que fica: painel **+R$ 11.597,05 no 135 Jardins**; as outras empresas iguais ao BI. 08/11,
+  todas: R$ 3.354.665,15 (221 parcelas); 2026: R$ 2.492.749,23 (151); 10 obras do BI em
+  2026: R$ 1.312.974,64. A badge da aba e o card Contas Vencidas do Geral seguem a mesma
+  lista. Holding: regra antiga.
+- Próximo quadro da página CONTAS À PAGAR: `Total pago até data selecionada`. Depois:
+  `Geral a Pagar Ajustado CARD` (exclui TETRA 15596 parc. 1–2 e 15597 parc. 14) e
+  `Estimativa Saidas no Periodo`.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

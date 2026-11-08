@@ -1,7 +1,7 @@
 // Trava da regra do A Pagar (igual ao Power BI). Rodar:
 //   npx tsx src/__tests__/a-pagar-regra.test.ts
 import assert from "node:assert/strict";
-import { entraNoAPagar, ehPrevisaoDeComissao, ignoraFiltroTipoDocCP } from "../lib/a-pagar-regra";
+import { entraNoAPagar, entraNasAtrasadas, ehPrevisaoDeComissao, ignoraFiltroTipoDocCP } from "../lib/a-pagar-regra";
 
 const hoje = "2026-11-07";
 
@@ -39,5 +39,29 @@ assert.equal(soma.toFixed(2), "90708.84");
 assert.equal(ehPrevisaoDeComissao({ documentIdentificationId: " prc " }), true);
 assert.equal(ignoraFiltroTipoDocCP(comissaoVencida), true);
 assert.equal(ignoraFiltroTipoDocCP(nfe), false);
+
+// Contas Atrasadas (card "Contas Atrasadas CARD" do BI), casos reais de 08/11/2026.
+const hoje2 = "2026-11-08";
+const conteiners = { correctedBalanceAmount: 5635.4, dueDate: "2025-12-10", documentIdentificationId: "NFE" }; // Domus, não consistido
+assert.equal(entraNasAtrasadas(conteiners, hoje2), true, "vencida entra (a consistência não importa)");
+assert.equal(entraNasAtrasadas(comissaoVencida, hoje2), false, "previsão de comissão sai das Atrasadas (fica no A Pagar)");
+for (const doc of ["PPC", "PPE", "PCT", "PRV", " prv "]) {
+  assert.equal(entraNasAtrasadas({ ...conteiners, documentIdentificationId: doc }, hoje2), false, `previsão ${doc} sai`);
+}
+assert.equal(entraNasAtrasadas({ ...conteiners, dueDate: "2026-11-07" }, hoje2), true, "venceu ontem entra");
+assert.equal(entraNasAtrasadas({ ...conteiners, dueDate: hoje2 }, hoje2), false, "vence hoje é A Pagar");
+assert.equal(entraNasAtrasadas({ ...conteiners, correctedBalanceAmount: 0 }, hoje2), false, "paga sai");
+assert.equal(entraNasAtrasadas({ ...conteiners, dueDate: null }, hoje2), false);
+// A parcela nunca está nos dois quadros ao mesmo tempo, exceto a PRC vencida (só no A Pagar).
+for (const i of [conteiners, nfe, pedidoPrevisto, { ...nfe, dueDate: "2026-11-01" }]) {
+  assert.equal(entraNoAPagar(i, hoje2) && entraNasAtrasadas(i, hoje2), false);
+}
+// Os 3 não consistidos que o painel deixava fora: R$ 8.131,40.
+const naoConsistidos = [
+  conteiners,
+  { correctedBalanceAmount: 1331.61, dueDate: "2025-03-10", documentIdentificationId: "FAT" }, // Sul Brasil, M.R. Mafra
+  { correctedBalanceAmount: 1164.39, dueDate: "2026-04-17", documentIdentificationId: "NFS" }, // SP Construtora, Max Mohr (já sem imposto)
+];
+assert.equal(naoConsistidos.filter((i) => entraNasAtrasadas(i, hoje2)).reduce((s, i) => s + i.correctedBalanceAmount, 0).toFixed(2), "8131.40");
 
 console.log("a-pagar-regra: ok");

@@ -58,7 +58,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc, ehDocumentoTransferencia } from "@/lib/a-receber-regra";
-import { entraNoAPagar, ignoraFiltroTipoDocCP } from "@/lib/a-pagar-regra";
+import { entraNoAPagar, entraNasAtrasadas, ignoraFiltroTipoDocCP } from "@/lib/a-pagar-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -1049,8 +1049,19 @@ export function ExecutiveDashboard() {
         ),
     [isHolding, consistentItems, items, companyModeFilter, exclusionSet, todayStr]);
 
+  // Atrasadas fora da Holding = card "Contas Atrasadas" do Power BI (mesma
+  // lib, 08/11/2026): sem o filtro de consistência e sem as 5 previsões (PPC,
+  // PPE, PRC, PCT, PRV). O valor da parcela continua effectiveOpenAmount,
+  // como o relatório do Sienge (decisão do Edielson). Holding: regra antiga.
   const itemsAtrasadas = useMemo(() =>
-    consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr), [consistentItems, todayStr]);
+    isHolding
+      ? consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate < todayStr)
+      : items.filter(i =>
+          companyModeFilter(i.companyName) &&
+          !(exclusionSet.size > 0 && exclusionSet.has(`${i.companyId}:${i.billId}`)) &&
+          entraNasAtrasadas(i, todayStr)
+        ),
+    [isHolding, consistentItems, items, companyModeFilter, exclusionSet, todayStr]);
 
   // Synthesize bank movements as outcome items with op type "Movimento
   // Bancário", mirroring the standalone Contas Pagas page. This lets bank
