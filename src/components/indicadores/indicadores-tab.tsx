@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CubIndicadorRow, M2BcRow, PctIndicadorRow, ValorM2Row } from "@/lib/db";
 import { CubContent, type CubKpis } from "./cub-content";
+import type { CubManualInfo } from "@/lib/indicadores/cub-serie";
 import { PctIndicadorContent, type PctKpis } from "./pct-indicador-content";
 import { ValorM2Content, type ValorM2Kpis } from "./valor-m2-content";
 import { CompararContent } from "./comparar-content";
@@ -15,6 +16,8 @@ type ApiResponse = {
     kpis: CubKpis;
     atualizadoEm: string | null;
     stale: boolean;
+    /** CUB lançado à mão (só vale enquanto o site não publica o mês). */
+    manual?: CubManualInfo | null;
   };
   cdi: {
     rows: PctIndicadorRow[];
@@ -164,6 +167,7 @@ export function IndicadoresTab() {
           rows={data.cub.rows}
           kpis={data.cub.kpis}
           atualizadoEm={data.cub.atualizadoEm}
+          manual={data.cub.manual ?? null}
           onSynced={load}
         />
       )}

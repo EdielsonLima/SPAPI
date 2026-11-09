@@ -72,8 +72,6 @@ export default function EmpreendimentosPage() {
   const [cubValue, setCubValue] = useState("");
   const [cubMonth, setCubMonth] = useState("");
   const [cubYear, setCubYear] = useState(String(new Date().getFullYear()));
-  const [cubMonthVar, setCubMonthVar] = useState("");
-  const [cubYearVar, setCubYearVar] = useState("");
   const [savingCub, setSavingCub] = useState(false);
 
   const fetchData = useCallback(async () => {
@@ -117,8 +115,6 @@ export default function EmpreendimentosPage() {
         const parts = ov.monthLabel.split("/");
         setCubMonth(parts[0] || "");
         setCubYear(parts[1] || String(new Date().getFullYear()));
-        setCubMonthVar(String(ov.monthlyVariation));
-        setCubYearVar(String(ov.yearlyAccumulated));
       }
     } catch {
       setError(true);
@@ -219,24 +215,17 @@ export default function EmpreendimentosPage() {
     }
     setSavingCub(true);
     try {
-      await fetch("/api/cub/override", {
+      const res = await fetch("/api/cub/override", {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json; charset=utf-8" },
         body: JSON.stringify({
           value: parseFloat(cubValue),
           monthLabel: `${cubMonth}/${cubYear}`,
-          monthlyVariation: parseFloat(cubMonthVar) || 0,
-          yearlyAccumulated: parseFloat(cubYearVar) || 0,
         }),
       });
-      setCubOverride({
-        value: parseFloat(cubValue),
-        monthLabel: `${cubMonth}/${cubYear}`,
-        monthlyVariation: parseFloat(cubMonthVar) || 0,
-        yearlyAccumulated: parseFloat(cubYearVar) || 0,
-        updatedAt: new Date().toISOString(),
-      });
-      toast.success("Valor do CUB manual salvo! Ele sera usado no lugar do automatico.");
+      if (!res.ok) throw new Error();
+      toast.success(`CUB manual de ${cubMonth}/${cubYear} salvo. Vale até o Sinduscon publicar esse mês.`);
+      await fetchData();
     } catch {
       toast.error("Erro ao salvar valor do CUB");
     } finally {
@@ -250,9 +239,8 @@ export default function EmpreendimentosPage() {
       setCubOverride(null);
       setCubValue("");
       setCubMonth("");
-      setCubMonthVar("");
-      setCubYearVar("");
-      toast.success("Override removido. O sistema voltara a buscar automaticamente.");
+      toast.success("CUB manual removido. Vale só o automático.");
+      await fetchData();
     } catch {
       toast.error("Erro ao remover override");
     }
@@ -294,24 +282,24 @@ export default function EmpreendimentosPage() {
               <PenLine className="h-5 w-5 text-blue-600" />
               <h2 className="text-lg font-semibold text-slate-800">Valor do CUB SC</h2>
             </div>
-            {cubOverride ? (
+            {cubAuto?.source === "manual" ? (
               <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-100">
                 Usando valor manual
               </Badge>
             ) : (
               <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">
-                Automatico (myside.com.br)
+                Automático (Sinduscon-SC / myside)
               </Badge>
             )}
           </div>
-          {cubAuto && !cubOverride && (
+          {cubAuto && (
             <p className="text-sm text-slate-500 mt-1">
-              Valor atual via scraping: <strong>R$ {cubAuto.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> ({cubAuto.currentMonth}) | Var. Mes: {cubAuto.monthlyVariation}% | Acum. Ano: {cubAuto.yearlyAccumulated}%
+              Valor em uso{cubAuto.source === "manual" ? " (lançado à mão)" : ""}: <strong>R$ {cubAuto.currentValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong> ({cubAuto.currentMonth}) | Var. Mês: {cubAuto.monthlyVariation.toLocaleString("pt-BR")}% | Acum. Ano: {cubAuto.yearlyAccumulated.toLocaleString("pt-BR")}%
             </p>
           )}
-          {!cubAuto && !cubOverride && (
+          {!cubAuto && (
             <p className="text-sm text-slate-500 mt-1">
-              O scraping automatico ainda nao retornou dados. Insira um valor manual abaixo.
+              A busca automática ainda não retornou dados. Lance o valor do mês abaixo.
             </p>
           )}
         </CardHeader>
@@ -350,28 +338,6 @@ export default function EmpreendimentosPage() {
                 className="w-20 h-9"
               />
             </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-500">Var. Mes (%)</label>
-              <Input
-                type="number"
-                placeholder="0.30"
-                value={cubMonthVar}
-                onChange={(e) => setCubMonthVar(e.target.value)}
-                className="w-28 h-9"
-                step="0.01"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-500">Acum. Ano (%)</label>
-              <Input
-                type="number"
-                placeholder="0.65"
-                value={cubYearVar}
-                onChange={(e) => setCubYearVar(e.target.value)}
-                className="w-28 h-9"
-                step="0.01"
-              />
-            </div>
             <Button
               size="sm"
               onClick={handleSaveCubOverride}
@@ -389,15 +355,15 @@ export default function EmpreendimentosPage() {
                 className="h-9 text-red-600 hover:text-red-700 hover:bg-red-50"
               >
                 <X className="h-4 w-4 mr-1" />
-                Remover Override
+                Remover CUB manual
               </Button>
             )}
           </div>
-          {cubOverride && (
-            <p className="text-xs text-amber-600 mt-2">
-              O valor manual tem prioridade sobre o scraping automatico. Remova o override para voltar ao automatico.
-            </p>
-          )}
+          <p className="text-xs text-slate-500 mt-2">
+            {cubOverride && cubAuto?.source !== "manual"
+              ? `O CUB manual de ${cubOverride.monthLabel} não é mais usado: o site já publicou esse mês. Pode remover.`
+              : "O manual é só para quando o Sinduscon ainda não publicou o mês: vale até o site publicar e depois o automático volta sozinho. Variação, acumulado e 12 meses são calculados pela série."}
+          </p>
         </CardContent>
       </Card>
 

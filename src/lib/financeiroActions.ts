@@ -10,7 +10,6 @@ import {
   getCachedDailyBalance,
   getCachedCompanies,
   getDreExcelData,
-  getIndicadoresCub,
   getIndicadoresValorM2,
   getCompanySettings,
 } from "@/lib/db";
@@ -20,6 +19,7 @@ import {
   normalizeFilterText,
 } from "@/lib/dashboard-utils";
 import { BANK_NAMES, isInDimBanco, REPORT_EXCLUDED_ACCOUNTS } from "@/lib/dimBanco";
+import { getSerieCub } from "@/lib/indicadores/cub-serie";
 
 // ── helpers ───────────────────────────────────────────────────────────────
 function todayISO(): string {
@@ -577,7 +577,8 @@ export async function dreResumo(args: { ano?: string; categoria?: string; meses?
 }
 
 export async function indicadoresResumo() {
-  const cub = await getIndicadoresCub();
+  // Mesma série da aba Indicadores (com o mês lançado à mão, se o site atrasou).
+  const { rows: cub, manual } = await getSerieCub();
   const valorM2 = await getIndicadoresValorM2();
   const ultCub = cub.length ? cub[cub.length - 1] : null;
   const ultM2 = valorM2.length ? valorM2[valorM2.length - 1] : null;
@@ -586,6 +587,7 @@ export async function indicadoresResumo() {
       valorM2: ultCub.valor_m2, valorM2_fmt: fmtBRL(ultCub.valor_m2),
       variacaoMensalPct: ultCub.variacao_pct, variacaoAnualPct: ultCub.variacao_anual_pct,
       mesRef: { ano: ultCub.ano, mes: ultCub.mes },
+      lancadoAMao: !!manual?.emUso,
     } : null,
     valorM2: ultM2 ?? null,
   };

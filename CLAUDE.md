@@ -573,6 +573,17 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
 - `/api/cub` (Orçamento: Orçado = m² × fator × CUB; Comercial; Empreendimentos) usa a
   mesma série. O cache de 7 dias só segura o mês corrente: com CUB de mês anterior busca
   de novo a cada 6 h (idem o "stale" do CUB na aba Indicadores, que busca sozinho ao abrir).
+- **CUB manual = reserva quando o site atrasa (Edielson, 09/11: "deixa no automático, mas
+  [...] a gente tem que poder inserir ele manualmente também").** Botão **Lançar CUB manual**
+  na aba Indicadores › CUB (e o cartão de Cadastros › Empreendimentos): mês + valor; variação,
+  acumulado e 12 meses são calculados pela série (os % digitados só entram sem base). Regra em
+  `src/lib/indicadores/cub-manual.ts` (trava `cub-manual.test.ts`): o manual **só vale para um
+  mês mais novo que o último automático**; quando o Sinduscon/myside publicam o mesmo mês, o
+  automático volta sozinho e o manual fica guardado sem uso (a tela avisa e oferece remover).
+  Antes o manual (`cub_override`) ganhava sempre — o lançado em 09/11 para Nov/26 tinha
+  acumulado 5,65 % (o certo é 5,79 %) e prenderia o Orçamento em novembro. Vale em `/api/cub`
+  (Orçamento/Comercial), na aba Indicadores (`getSerieCub` em `cub-serie.ts`; o "buscar de
+  novo" olha só a série automática) e no resumo do MCP.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import {
-  getIndicadoresCub,
   getIndicadoresDebit,
   getIndicadoresValorM2,
   getIndicadoresM2Bc,
@@ -10,6 +9,7 @@ import {
   type PctIndicadorRow,
   type ValorM2Row,
 } from "@/lib/db";
+import { getSerieCub } from "@/lib/indicadores/cub-serie";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -129,8 +129,8 @@ export async function GET() {
   }
 
   try {
-    const [cubRows, cdiRows, ipcaRows, igpmRows, inccRows, valorM2Rows, m2BcRows] = await Promise.all([
-      getIndicadoresCub(),
+    const [cub, cdiRows, ipcaRows, igpmRows, inccRows, valorM2Rows, m2BcRows] = await Promise.all([
+      getSerieCub(),
       getIndicadoresDebit("cdi"),
       getIndicadoresDebit("ipca"),
       getIndicadoresDebit("igpm"),
@@ -139,7 +139,9 @@ export async function GET() {
       getIndicadoresM2Bc(),
     ]);
 
-    const cubAtu = maxAtualizadoEm(cubRows);
+    // CUB: a data e o "precisa buscar" olham só a série automática; o mês
+    // lançado à mão (se o site ainda não publicou) entra no fim da série.
+    const cubAtu = maxAtualizadoEm(cub.auto);
     const cdiAtu = maxAtualizadoEm(cdiRows);
     const ipcaAtu = maxAtualizadoEm(ipcaRows);
     const igpmAtu = maxAtualizadoEm(igpmRows);
@@ -149,10 +151,11 @@ export async function GET() {
 
     return NextResponse.json({
       cub: {
-        rows: cubRows,
-        kpis: buildCubKpis(cubRows),
+        rows: cub.rows,
+        kpis: buildCubKpis(cub.rows),
         atualizadoEm: cubAtu,
-        stale: cubDesatualizado(cubRows, cubAtu ?? undefined),
+        stale: cubDesatualizado(cub.auto, cubAtu ?? undefined),
+        manual: cub.manual,
       },
       cdi: {
         rows: cdiRows,

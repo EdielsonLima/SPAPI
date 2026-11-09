@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, Minus, Plus, RefreshCcw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Minus, PenLine, Plus, RefreshCcw, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -14,6 +15,8 @@ import {
 } from "@/components/ui/select";
 import { brl, formatDateTime, mesAno, pct } from "@/lib/indicadores/fmt";
 import type { CubIndicadorRow } from "@/lib/db";
+import type { CubManualInfo } from "@/lib/indicadores/cub-serie";
+import { MESES_CUB, manualMaisNovo } from "@/lib/indicadores/cub-manual";
 import { KpiCard } from "./kpi-card";
 import { IndicadorSimplesChart } from "./indicador-simples-chart";
 
@@ -40,18 +43,104 @@ export type CubKpis = {
   ultimoMesLabel: { ano: number; mes: number } | null;
 };
 
+/** "3.182,95" ou "3182.95" → 3182.95 */
+function lerValor(s: string): number {
+  const t = s.trim().replace(/\s/g, "").replace(/^R\$/i, "");
+  const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+  return Number.isFinite(n) ? n : NaN;
+}
+
 export function CubContent({
   rows,
   kpis,
   atualizadoEm,
+  manual,
   onSynced,
 }: {
   rows: CubIndicadorRow[];
   kpis: CubKpis;
   atualizadoEm: string | null;
+  /** CUB lançado à mão (vale só enquanto o site não publica o mês). */
+  manual: CubManualInfo | null;
   onSynced: () => void;
 }) {
   const [syncing, setSyncing] = useState(false);
+
+  // ── CUB manual (reserva para quando o site atrasa) ──
+  // Último mês AUTOMÁTICO: com o manual em uso, ele é a última linha da série.
+  const ultimoAuto = useMemo(() => {
+    const auto = manual?.emUso ? rows.slice(0, -1) : rows;
+    const u = auto[auto.length - 1];
+    return u ? { ano: u.ano, mes: u.mes } : null;
+  }, [rows, manual]);
+  const sugerido = useMemo(() => {
+    if (manual?.emUso) return { ano: manual.ano, mes: manual.mes };
+    if (ultimoAuto) return addMeses(ultimoAuto.ano, ultimoAuto.mes, 1);
+    const hoje = new Date();
+    return { ano: hoje.getFullYear(), mes: hoje.getMonth() + 1 };
+  }, [manual, ultimoAuto]);
+  const [abrirManual, setAbrirManual] = useState(false);
+  const [mManual, setMManual] = useState(String(sugerido.mes));
+  const [aManual, setAManual] = useState(String(sugerido.ano));
+  const [vManual, setVManual] = useState("");
+  const [salvandoManual, setSalvandoManual] = useState(false);
+
+  const abrirLancamento = () => {
+    setMManual(String(sugerido.mes));
+    setAManual(String(sugerido.ano));
+    setVManual(manual?.emUso ? String(manual.valor_m2).replace(".", ",") : "");
+    setAbrirManual(true);
+  };
+
+  const salvarManual = async () => {
+    const mes = Number(mManual);
+    const ano = Number(aManual);
+    const valor = lerValor(vManual);
+    if (!mes || !ano || ano < 2000 || ano > 2100) {
+      toast.error("Informe o mês e o ano do CUB.");
+      return;
+    }
+    if (!Number.isFinite(valor) || valor <= 0) {
+      toast.error("Informe o valor do CUB em R$/m² (ex.: 3.182,95).");
+      return;
+    }
+    if (ultimoAuto && !manualMaisNovo({ ano, mes }, ultimoAuto)) {
+      toast.error(
+        `O site já publicou ${mesAno(ultimoAuto.ano, ultimoAuto.mes)} — o CUB automático já vale. O manual é só para um mês que ainda não saiu.`
+      );
+      return;
+    }
+    setSalvandoManual(true);
+    try {
+      const rotulo = `${MESES_CUB[mes - 1]}/${ano}`;
+      const res = await fetch("/api/cub/override", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify({ value: valor, monthLabel: rotulo }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      toast.success(`CUB de ${rotulo} lançado: ${brl(valor)}. Vale até o Sinduscon publicar o mês.`);
+      setAbrirManual(false);
+      onSynced();
+    } catch (err) {
+      toast.error(`Falha ao lançar o CUB: ${err instanceof Error ? err.message : "erro desconhecido"}`);
+    } finally {
+      setSalvandoManual(false);
+    }
+  };
+
+  const removerManual = async () => {
+    try {
+      const res = await fetch("/api/cub/override", { method: "DELETE" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      toast.success("CUB manual removido. Vale só o automático.");
+      setAbrirManual(false);
+      onSynced();
+    } catch (err) {
+      toast.error(`Falha ao remover o CUB manual: ${err instanceof Error ? err.message : "erro desconhecido"}`);
+    }
+  };
 
   const allKeys = useMemo(() => rows.map((r) => ymKey(r.ano, r.mes)), [rows]);
   const minKey = allKeys[0] ?? null;
@@ -182,28 +271,158 @@ export function CubContent({
           {" "}(série)
           {" · "}sincronizado em {formatDateTime(atualizadoEm)}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSync}
-          disabled={syncing}
-          className="gap-2"
-        >
-          {syncing ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <RefreshCcw className="h-3.5 w-3.5" />
-          )}
-          Atualizar CUB
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => (abrirManual ? setAbrirManual(false) : abrirLancamento())}
+            className="gap-2"
+            title="Para quando o Sinduscon ainda não publicou o mês"
+          >
+            <PenLine className="h-3.5 w-3.5" />
+            Lançar CUB manual
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSync}
+            disabled={syncing}
+            className="gap-2"
+          >
+            {syncing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCcw className="h-3.5 w-3.5" />
+            )}
+            Atualizar CUB
+          </Button>
+        </div>
       </div>
+
+      {manual && !abrirManual && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-2.5 text-xs text-slate-600 dark:text-slate-400">
+          <span className="flex items-start gap-2 min-w-0 flex-1">
+            <span className={`mt-1 h-1.5 w-1.5 rounded-full shrink-0 ${manual.emUso ? "bg-amber-500" : "bg-slate-300 dark:bg-slate-600"}`} />
+            {manual.emUso ? (
+              <span>
+                CUB de <strong>{mesAno(manual.ano, manual.mes)}</strong> lançado à mão ({brl(manual.valor_m2)}) — vale
+                até o Sinduscon publicar esse mês; aí o automático entra sozinho.
+              </span>
+            ) : (
+              <span>
+                O CUB manual de <strong>{mesAno(manual.ano, manual.mes)}</strong> não é mais usado: o site já publicou
+                esse mês.
+              </span>
+            )}
+          </span>
+          <span className="flex items-center gap-1 ml-auto">
+            {manual.emUso && (
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={abrirLancamento}>
+                Editar
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-red-600 hover:text-red-700 dark:text-red-300/80"
+              onClick={removerManual}
+            >
+              Remover
+            </Button>
+          </span>
+        </div>
+      )}
+
+      {abrirManual && (
+        <Card className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-50">Lançar CUB manual</p>
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400 max-w-2xl">
+                  Use quando o Sinduscon ainda não publicou o mês
+                  {ultimoAuto ? <> (o automático está em <strong>{mesAno(ultimoAuto.ano, ultimoAuto.mes)}</strong>)</> : null}.
+                  A variação do mês, o acumulado no ano e os 12 meses são calculados pela série. Quando o site
+                  publicar o mesmo mês, o valor automático passa a valer sozinho.
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={() => setAbrirManual(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  Mês
+                </span>
+                <Select value={mManual} onValueChange={setMManual}>
+                  <SelectTrigger className="w-24 h-9">
+                    <SelectValue placeholder="—" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MESES_CUB.map((m, i) => (
+                      <SelectItem key={m} value={String(i + 1)}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  Ano
+                </span>
+                <Input
+                  type="number"
+                  value={aManual}
+                  onChange={(e) => setAManual(e.target.value)}
+                  className="w-24 h-9"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                  Valor (R$/m²)
+                </span>
+                <Input
+                  inputMode="decimal"
+                  placeholder="3.182,95"
+                  value={vManual}
+                  onChange={(e) => setVManual(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") salvarManual();
+                  }}
+                  className="w-36 h-9"
+                />
+              </div>
+              <Button size="sm" className="h-9 gap-2" onClick={salvarManual} disabled={salvandoManual}>
+                {salvandoManual && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                Salvar
+              </Button>
+              {manual && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-red-600 hover:text-red-700 dark:text-red-300/80"
+                  onClick={removerManual}
+                >
+                  Remover o manual
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KpiCard
           tone="accent"
           label="CUB-SC R$/m²"
           value={kpis.valorAtual !== null ? brl(kpis.valorAtual) : "—"}
-          hint={kpis.ultimoMesLabel ? mesAno(kpis.ultimoMesLabel.ano, kpis.ultimoMesLabel.mes) : undefined}
+          hint={
+            kpis.ultimoMesLabel
+              ? `${mesAno(kpis.ultimoMesLabel.ano, kpis.ultimoMesLabel.mes)}${manual?.emUso ? " · lançado à mão" : ""}`
+              : undefined
+          }
         />
         <KpiCard
           tone={kpis.variacaoMensal !== null && kpis.variacaoMensal < 0 ? "danger" : "default"}

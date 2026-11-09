@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCubOverride, upsertCubOverride, deleteCubOverride } from "@/lib/db";
+import { lerRotuloMes, rotuloMes } from "@/lib/indicadores/cub-manual";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -28,13 +29,18 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const { value, monthLabel, monthlyVariation, yearlyAccumulated } = body;
 
-    if (!value || !monthLabel) {
-      return NextResponse.json({ error: "value and monthLabel are required" }, { status: 400 });
+    // Só vale para um mês que o site ainda não publicou (regra em cub-manual.ts);
+    // a variação, o acumulado e os 12 meses saem da série — os % digitados só
+    // entram se faltar a base.
+    const mes = lerRotuloMes(monthLabel);
+    const valor = Number(value);
+    if (!mes || !Number.isFinite(valor) || valor <= 0) {
+      return NextResponse.json({ error: "Informe o mês (ex.: Dez/2026) e o valor do CUB em R$/m²" }, { status: 400 });
     }
 
     await upsertCubOverride(
-      Number(value),
-      monthLabel,
+      valor,
+      rotuloMes(mes.ano, mes.mes),
       Number(monthlyVariation) || 0,
       Number(yearlyAccumulated) || 0
     );
