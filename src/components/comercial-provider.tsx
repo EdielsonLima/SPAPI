@@ -17,6 +17,7 @@
 
 import { normalizarTabelaComercial, type TabelaComercial } from "@/lib/tabela-comercial";
 import { ehSituacaoManual, type SituacaoManual } from "@/lib/estoque-resumo";
+import type { UnidadePainel } from "@/lib/unidades-painel";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { SiengeSalesContract } from "@/types/sienge";
@@ -70,6 +71,8 @@ interface ComercialContextValue {
   tabelasComerciais: Map<string, TabelaComercial>;
   // Situação posta à mão no Painel › Resumo › Estoque (unitId → situação): vale por cima do Sienge e da tabela comercial.
   situacoesManuais: Map<number, SituacaoManual>;
+  // Salas cadastradas só no painel (Painel › Resumo › Estoque): entram no VGV potencial da Visão Geral.
+  unidadesPainel: UnidadePainel[];
   podeEditarPrecos: boolean;
   recarregarPrecos: () => Promise<void>;
 }
@@ -257,6 +260,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
   const [precosTabela, setPrecosTabela] = useState<Map<number, number>>(new Map());
   const [tabelasComerciais, setTabelasComerciais] = useState<Map<string, TabelaComercial>>(new Map());
   const [situacoesManuais, setSituacoesManuais] = useState<Map<number, SituacaoManual>>(new Map());
+  const [unidadesPainel, setUnidadesPainel] = useState<UnidadePainel[]>([]);
   const [podeEditarPrecos, setPodeEditarPrecos] = useState(false);
   const recarregarPrecos = useCallback(async () => {
     try {
@@ -278,6 +282,12 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
       const d = await r.json() as { situacoes?: { unitId: number; situacao: string }[] };
       setSituacoesManuais(new Map((d.situacoes || []).filter(x => ehSituacaoManual(x.situacao)).map(x => [x.unitId, x.situacao as SituacaoManual])));
     } catch { /* sem ajuste manual: vale o Sienge e a tabela comercial */ }
+    try {
+      const r = await fetch("/api/unidades-painel");
+      if (!r.ok) return;
+      const d = await r.json() as { unidades?: UnidadePainel[] };
+      setUnidadesPainel(d.unidades || []);
+    } catch { /* sem unidades do painel: só as do Sienge */ }
   }, []);
   useEffect(() => { recarregarPrecos(); }, [recarregarPrecos]);
 
@@ -298,7 +308,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
     selectedUnitCustomers, setSelectedUnitCustomers,
     toggleInSet,
-    precosTabela, tabelasComerciais, situacoesManuais, podeEditarPrecos, recarregarPrecos,
+    precosTabela, tabelasComerciais, situacoesManuais, unidadesPainel, podeEditarPrecos, recarregarPrecos,
   };
 
   return <ComercialContext.Provider value={value}>{children}</ComercialContext.Provider>;

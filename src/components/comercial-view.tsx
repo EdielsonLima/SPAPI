@@ -30,6 +30,7 @@ import { TabelaPrecosView } from "@/components/tabela-precos-view";
 import { semVenda } from "@/lib/tabela-precos";
 import { aplicarTabelaComercial, precoDaTabelaComercial, tabelaComercialPara } from "@/lib/tabela-comercial";
 import { aplicarSituacaoManual, contaNoEstoque } from "@/lib/estoque-resumo";
+import { unidadesComPainel } from "@/lib/unidades-painel";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
@@ -69,7 +70,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     selectedUnitEnterprises, setSelectedUnitEnterprises,
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
     selectedUnitCustomers, setSelectedUnitCustomers,
-    toggleInSet, precosTabela, tabelasComerciais, situacoesManuais,
+    toggleInSet, precosTabela, tabelasComerciais, situacoesManuais, unidadesPainel,
   } = useComercial();
   // Vendas: contar por unidade (padrão, como no Financeiro da Leven) ou por contrato.
   const [contarPor, setContarPor] = React.useState<"unidades" | "contratos">("unidades");
@@ -487,10 +488,11 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
 
         // VGV potencial do estoque disponível: área privativa × fator × CUB
         // (mesma regra do Resumo Financeiro — apartamento e sala comercial, pelo
-        // tipo do cadastro do Sienge: contaNoEstoque em src/lib/estoque-resumo.ts)
+        // tipo do cadastro do Sienge: contaNoEstoque em src/lib/estoque-resumo.ts),
+        // com as salas cadastradas só no painel (src/lib/unidades-painel.ts)
         let ovEstoqueArea = 0;
         let ovEstoqueVgv = 0;
-        apiUnits.forEach(u => {
+        unidadesComPainel(apiUnits, unidadesPainel).forEach(u => {
           if (u.commercialStock !== "Disponível") return;
           if (selectedCompanies.size > 0 && u.companyName && !selectedCompanies.has(u.companyName)) return;
           if (!contaNoEstoque(u)) return;

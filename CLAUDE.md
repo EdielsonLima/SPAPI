@@ -862,6 +862,31 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   "user" (`session.user.role` do Portal; ausente conta como "user"). Quem já estava
   logado no Financeiro precisa abrir de novo pelo card do Portal (bilhete novo = sessão
   nova) para a edição liberar. Mudança no Portal se faz em sessão na pasta dele, não daqui.
+- **Sala só no painel (Edielson, 09/11: "pode ser que algumas salas não estejam
+  cadastradas no Sienge. Elas podem ser somente aqui pelo painel").** Botão **Adicionar
+  sala** no modal do Estoque (quem edita: admin ou `TABELA_PRECOS_EMAILS`). Grava na
+  tabela `unidades_painel` (`ensureUnidadesPainel` em `src/lib/db.ts`; campos empresa,
+  empreendimento, enterprise_id, unidade, tipo Sala comercial/Loja, área, situação
+  Disponível/Reservado/Vendido, preço). Rota `/api/unidades-painel` (GET lista +
+  `podeEditar`; POST cria; PUT `{itens:[{id,...}]}` altera; DELETE `?id=` **arquiva**
+  com `removido_em`/`removido_por`, nunca apaga). Nada vai para o Sienge.
+  - Entra no estoque como `ApiUnit` com **id negativo** (`-id`), via `unidadesComPainel`
+    e `precosComPainel` (`src/lib/unidades-painel.ts`). Situação e preço são os do
+    cadastro dela (origem "painel"); a tabela comercial não mexe nela. Conta no
+    Resumo (Valor Estoque, Disp., Res.Téc., Lucro potencial), no modal e no VGV
+    potencial do Comercial › Visão Geral. Quadro Espelho e Tabela de Preços **não**
+    mostram (lá é só Sienge).
+  - **Duplicada:** mesmo empreendimento (enterpriseId, ou nome se não houver) e mesmo
+    nome por `chaveDoNome` (maiúsculas, sem acento, sem zero à esquerda: "Sala 1" =
+    "SALA 01") → a do Sienge vale, a do painel sai da conta e o modal mostra aviso com
+    "Tirar a do painel". O formulário já bloqueia cadastrar nome que existe no Sienge
+    ou repetido no painel; o servidor bloqueia repetida no painel (409).
+  - Venda de verdade (contrato, recebíveis) continua exigindo a unidade no Sienge:
+    cadastrar lá com o mesmo nome e a do painel cai sozinha.
+  - Trava: `src/__tests__/unidades-painel.test.ts`. Teste local de 09/11 (banco
+    `spapi-sp-db`): cadastrar SALA 08 com R$ 450.000,00 levou o 135 Jardins de
+    R$ 5.014.312,64 / 9 disp. para R$ 5.464.312,64 / 10 disp.; reservar tirou do
+    valor; "Sala 1" duplicada da SALA 01 não contou e mostrou o aviso; leitor recebe 403.
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
 

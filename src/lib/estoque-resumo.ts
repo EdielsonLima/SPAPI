@@ -16,10 +16,15 @@
 //     sempre: área privativa × fator × CUB.
 // Disp. e Res.Téc. contam apartamento e sala comercial (contaNoEstoque). Vaga,
 // box e o resto não contam e só somam no valor quando têm preço.
+//
+// Unidade cadastrada só no painel (src/lib/unidades-painel.ts) entra com id
+// negativo: situação e preço são os do cadastro dela (origem "painel"), sem
+// tabela comercial; a conta é a mesma das do Sienge.
 
 import { inferUnitTypeFromName, pavimentoDaUnidade, type ApiUnit } from "@/lib/comercial-utils";
 import { situacaoDaUnidade } from "@/lib/situacao-unidade";
 import { aplicarTabelaComercial, precoDaTabelaComercial, tabelaComercialPara, type TabelaComercial } from "@/lib/tabela-comercial";
+import { ehDoPainel } from "@/lib/unidades-painel";
 
 // Situações que se pode pôr à mão. São nomes do Quadro (situacao-unidade.ts).
 export type SituacaoManual = "Disponível" | "Reservado" | "Vendido";
@@ -60,8 +65,8 @@ export interface ContextoEstoque {
   cub: number;                                      // CUB do mês (R$/m²)
 }
 
-export type OrigemSituacao = "sienge" | "tabela" | "manual";
-export type OrigemPreco = "tabela-precos" | "tabela-comercial";
+export type OrigemSituacao = "sienge" | "tabela" | "manual" | "painel";
+export type OrigemPreco = "tabela-precos" | "tabela-comercial" | "painel";
 
 export interface LinhaEstoque {
   unitId: number | null;
@@ -72,7 +77,7 @@ export interface LinhaEstoque {
   tipo: string;
   pavimento: string;
   area: number;
-  situacaoSienge: string;     // estoque do Sienge, nos nomes do Quadro
+  situacaoSienge: string;     // estoque do Sienge, nos nomes do Quadro (unidade do painel: a do cadastro dela)
   situacaoBase: string;       // Sienge + tabela comercial (o "automático")
   situacao: string;           // a que vale (manual por cima)
   origem: OrigemSituacao;
@@ -93,18 +98,20 @@ export function linhasDeEstoque(unidades: ApiUnit[], ctx: ContextoEstoque): Linh
     if (!fatorDe.has(u.companyName)) fatorDe.set(u.companyName, ctx.fator(u.companyName) || 0);
     const tc = tabelaDe.get(u.enterpriseName) ?? null;
     const unitId = u.id ?? null;
+    // Cadastrada só no painel: a situação e o preço são os do cadastro, sem tabela comercial.
+    const cadastroPainel = ehDoPainel(unitId);
 
     const situacaoSienge = situacaoDaUnidade(u.commercialStock, false);
-    const situacaoBase = aplicarTabelaComercial(situacaoSienge, u.name, tc);
+    const situacaoBase = cadastroPainel ? situacaoSienge : aplicarTabelaComercial(situacaoSienge, u.name, tc);
     const manual = unitId != null ? ctx.situacoesManuais.get(unitId) : undefined;
     const situacao = manual ?? situacaoBase;
-    const origem: OrigemSituacao = manual ? "manual" : situacaoBase !== situacaoSienge ? "tabela" : "sienge";
+    const origem: OrigemSituacao = cadastroPainel ? "painel" : manual ? "manual" : situacaoBase !== situacaoSienge ? "tabela" : "sienge";
 
-    const doPainel = unitId != null ? ctx.precos.get(unitId) : undefined;
-    const precoTabela = doPainel && doPainel > 0 ? doPainel : null;
-    const daComercial = precoDaTabelaComercial(u.name, tc);
+    const digitado = unitId != null ? ctx.precos.get(unitId) : undefined;
+    const precoTabela = digitado && digitado > 0 ? digitado : null;
+    const daComercial = cadastroPainel ? 0 : precoDaTabelaComercial(u.name, tc);
     const preco = precoTabela ?? (daComercial > 0 ? daComercial : null);
-    const origemPreco: OrigemPreco | null = precoTabela !== null ? "tabela-precos" : preco !== null ? "tabela-comercial" : null;
+    const origemPreco: OrigemPreco | null = precoTabela !== null ? (cadastroPainel ? "painel" : "tabela-precos") : preco !== null ? "tabela-comercial" : null;
 
     const area = u.privateArea || 0;
     const entraNaContagem = contaNoEstoque(u);

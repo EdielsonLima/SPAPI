@@ -1,6 +1,7 @@
 import { Pool } from "pg";
 import { randomBytes } from "crypto";
 import bcrypt from "bcryptjs";
+import { chaveDoNome, type UnidadePainel } from "@/lib/unidades-painel";
 
 const databaseUrl = process.env.DATABASE_URL || "";
 const needsSsl =
@@ -1630,4 +1631,145 @@ export async function gravarSituacoesManuais(alteracoes: AlteracaoSituacao[], us
   } finally {
     client.release();
   }
+}
+
+// ── Unidades cadastradas só no painel (Painel › Resumo › Estoque, 09/11/2026) ──
+// Sala que não está no Sienge e conta no estoque do Resumo. Regra em
+// src/lib/unidades-painel.ts. "Tirar" arquiva (removido_em), não apaga.
+let unidadesPainelPronta = false;
+
+async function ensureUnidadesPainel() {
+  if (unidadesPainelPronta) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS unidades_painel (
+      id              SERIAL        PRIMARY KEY,
+      empresa         TEXT          NOT NULL,
+      empreendimento  TEXT          NOT NULL,
+      enterprise_id   INTEGER,
+      unidade         TEXT          NOT NULL,
+      tipo            TEXT          NOT NULL DEFAULT 'Sala comercial',
+      area            NUMERIC(12,2) NOT NULL DEFAULT 0,
+      situacao        VARCHAR(20)   NOT NULL DEFAULT 'Disponível',
+      preco           NUMERIC(15,2),
+      criado_por      TEXT          NOT NULL DEFAULT '',
+      criado_em       TIMESTAMP     NOT NULL DEFAULT NOW(),
+      atualizado_por  TEXT          NOT NULL DEFAULT '',
+      atualizado_em   TIMESTAMP     NOT NULL DEFAULT NOW(),
+      removido_por    TEXT,
+      removido_em     TIMESTAMP
+    );
+  `);
+  unidadesPainelPronta = true;
+}
+
+const SELECT_UNIDADE_PAINEL = `
+  SELECT id, empresa, empreendimento, enterprise_id AS "enterpriseId", unidade, tipo,
+         area::float8 AS area, situacao, preco::float8 AS preco,
+         criado_por AS "criadoPor", criado_em AS "criadoEm",
+         atualizado_por AS "atualizadoPor", atualizado_em AS "atualizadoEm"
+    FROM unidades_painel`;
+
+export interface NovaUnidadePainel {
+  empresa: string;
+  empreendimento: string;
+  enterpriseId: number | null;
+  unidade: string;
+  tipo: string;
+  area: number;
+  situacao: string;
+  preco: number | null;
+}
+
+export type AlteracaoUnidadePainel = { id: number } & Partial<NovaUnidadePainel>;
+
+export async function listarUnidadesPainel(): Promise<UnidadePainel[]> {
+  await ensureUnidadesPainel();
+  const { rows } = await pool.query(`${SELECT_UNIDADE_PAINEL} WHERE removido_em IS NULL ORDER BY empresa, empreendimento, unidade`);
+  return rows;
+}
+
+type Consulta = (sql: string, params: unknown[]) => Promise<{ rows: Record<string, unknown>[] }>;
+
+// Outra unidade ativa do painel com o mesmo nome no mesmo empreendimento da empresa.
+async function nomeEmUso(
+  consultar: Consulta,
+  empresa: string, empreendimento: string, unidade: string, ignorarId: number | null,
+): Promise<boolean> {
+  const { rows } = await consultar(
+    `SELECT id, unidade, empreendimento FROM unidades_painel WHERE removido_em IS NULL AND empresa = $1`,
+    [empresa],
+  );
+  return (rows as { id: number; unidade: string; empreendimento: string }[]).some(r =>
+    r.id !== ignorarId && chaveDoNome(r.empreendimento) === chaveDoNome(empreendimento) && chaveDoNome(r.unidade) === chaveDoNome(unidade));
+}
+
+// Erro de regra (nome repetido, unidade já tirada): a rota devolve 409 com a mensagem.
+export class ErroUnidadePainel extends Error {}
+
+export async function criarUnidadePainel(u: NovaUnidadePainel, usuario: string) {
+  await ensureUnidadesPainel();
+  if (await nomeEmUso((sql, params) => pool.query(sql, params), u.empresa, u.empreendimento, u.unidade, null)) {
+    throw new ErroUnidadePainel(`Já existe a ${u.unidade} em ${u.empreendimento} no painel.`);
+  }
+  const { rows } = await pool.query(
+    `INSERT INTO unidades_painel (empresa, empreendimento, enterprise_id, unidade, tipo, area, situacao, preco, criado_por, atualizado_por)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$9)
+     RETURNING id`,
+    [u.empresa, u.empreendimento, u.enterpriseId, u.unidade, u.tipo, u.area, u.situacao, u.preco, usuario],
+  );
+  const { rows: [criada] } = await pool.query(`${SELECT_UNIDADE_PAINEL} WHERE id = $1`, [rows[0].id]);
+  return criada;
+}
+
+// Atualiza só os campos enviados; devolve quantas unidades mudaram de fato.
+export async function atualizarUnidadesPainel(itens: AlteracaoUnidadePainel[], usuario: string): Promise<number> {
+  if (itens.length === 0) return 0;
+  await ensureUnidadesPainel();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    let mudou = 0;
+    for (const it of itens) {
+      const { rows: [atual] } = await client.query(
+        `SELECT id, empresa, empreendimento, enterprise_id AS "enterpriseId", unidade, tipo,
+                area::float8 AS area, situacao, preco::float8 AS preco
+           FROM unidades_painel WHERE id = $1 AND removido_em IS NULL FOR UPDATE`,
+        [it.id],
+      );
+      if (!atual) throw new ErroUnidadePainel(`A unidade ${it.id} não está mais no painel.`);
+      const CAMPOS = ["empreendimento", "enterpriseId", "unidade", "tipo", "area", "situacao", "preco"] as const;
+      const mudancas: Partial<NovaUnidadePainel> = {};
+      for (const k of CAMPOS) if (it[k] !== undefined) Object.assign(mudancas, { [k]: it[k] });
+      const novo: NovaUnidadePainel = { ...(atual as NovaUnidadePainel), ...mudancas };
+      if (CAMPOS.every(k => novo[k] === atual[k])) continue;
+      if ((novo.unidade !== atual.unidade || novo.empreendimento !== atual.empreendimento)
+        && await nomeEmUso((sql, params) => client.query(sql, params), atual.empresa, novo.empreendimento, novo.unidade, it.id)) {
+        throw new ErroUnidadePainel(`Já existe a ${novo.unidade} em ${novo.empreendimento} no painel.`);
+      }
+      await client.query(
+        `UPDATE unidades_painel SET empreendimento = $2, enterprise_id = $3, unidade = $4, tipo = $5, area = $6,
+                situacao = $7, preco = $8, atualizado_por = $9, atualizado_em = NOW()
+          WHERE id = $1`,
+        [it.id, novo.empreendimento, novo.enterpriseId, novo.unidade, novo.tipo, novo.area, novo.situacao, novo.preco, usuario],
+      );
+      mudou++;
+    }
+    await client.query("COMMIT");
+    return mudou;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// "Tirar do painel": arquiva (fica no banco com quem tirou e quando).
+export async function removerUnidadePainel(id: number, usuario: string): Promise<boolean> {
+  await ensureUnidadesPainel();
+  const { rowCount } = await pool.query(
+    `UPDATE unidades_painel SET removido_em = NOW(), removido_por = $2 WHERE id = $1 AND removido_em IS NULL`,
+    [id, usuario],
+  );
+  return (rowCount ?? 0) > 0;
 }

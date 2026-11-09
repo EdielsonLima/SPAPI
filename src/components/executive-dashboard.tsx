@@ -71,6 +71,7 @@ import { MultiSelectFilter, CustomTooltip } from "@/components/multi-select-filt
 import type { ApiUnit } from "@/lib/comercial-utils";
 import { EstoqueModal, useDadosEstoque, type FiltroEstoque } from "@/components/estoque-modal";
 import { linhasDeEstoque, totaisPorEmpresa } from "@/lib/estoque-resumo";
+import { unidadesComPainel } from "@/lib/unidades-painel";
 import { periodosDoPainel } from "@/lib/painel-periodos";
 
 type Section = "cp" | "cr";
@@ -285,15 +286,16 @@ export function ExecutiveDashboard() {
   // Estoque do Resumo (Valor Estoque, Disp., Res.Téc.): preço de tabela do painel,
   // tabela comercial e situação manual por cima do Sienge — regra única em
   // src/lib/estoque-resumo.ts. Clicar numa das três colunas abre o modal da empresa.
+  // Entram também as salas cadastradas só no painel (src/lib/unidades-painel.ts).
   const dadosEstoque = useDadosEstoque();
   const [estoqueAberto, setEstoqueAberto] = useState<{ empresa: string; filtro: FiltroEstoque } | null>(null);
-  const totaisEstoque = useMemo(() => totaisPorEmpresa(linhasDeEstoque(apiUnits, {
+  const totaisEstoque = useMemo(() => totaisPorEmpresa(linhasDeEstoque(unidadesComPainel(apiUnits, dadosEstoque.unidadesPainel), {
     precos: dadosEstoque.precos,
     tabelasComerciais: dadosEstoque.tabelasComerciais,
     situacoesManuais: dadosEstoque.situacoesManuais,
     fator: empresa => companySettings.find(cs => cs.companyName === empresa)?.factor || 0,
     cub: cubData?.currentValue || 0,
-  })), [apiUnits, dadosEstoque.precos, dadosEstoque.tabelasComerciais, dadosEstoque.situacoesManuais, companySettings, cubData]);
+  })), [apiUnits, dadosEstoque.unidadesPainel, dadosEstoque.precos, dadosEstoque.tabelasComerciais, dadosEstoque.situacoesManuais, companySettings, cubData]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   // Per-tab filters: save/restore when switching tabs. Companies tem o seu
   // proprio Record (perTabCompanies) por questao historica; os outros filtros

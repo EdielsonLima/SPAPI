@@ -10,6 +10,8 @@
 // Nada é gravado no Sienge. As contas são as de src/lib/estoque-resumo.ts — as
 // mesmas da tabela do Resumo, então o total daqui é o número da coluna.
 // O que se digita fica pendente (e já simulado nos cartões) até "Salvar".
+// Sala que não está no Sienge se cadastra aqui ("Adicionar sala"): fica em
+// unidades_painel (src/lib/unidades-painel.ts) e conta no estoque igual.
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -26,15 +28,20 @@ import {
   linhasDeEstoque, totaisDoEstoque, composicaoPorTipo, grupoDoTipo, ehSituacaoManual,
   ORDEM_GRUPOS, SITUACOES_MANUAIS, type ContextoEstoque, type LinhaEstoque, type SituacaoManual,
 } from "@/lib/estoque-resumo";
+import {
+  unidadesComPainel, precosComPainel, separarDuplicadas, noSienge, chaveDoNome, ehDoPainel, idDoPainel, idNoEstoque,
+  SITUACOES_PAINEL, TIPOS_PAINEL, type SituacaoPainel, type UnidadePainel,
+} from "@/lib/unidades-painel";
 import type { ApiUnit } from "@/lib/comercial-utils";
-import { ArrowDown, ArrowUp, ArrowUpDown, Lock, Save, Search, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Lock, Pencil, Plus, Save, Search, Trash2, Undo2, X } from "lucide-react";
 
 // ── Dados que o estoque usa além das unidades (preços, tabela comercial, situação manual) ──
 export interface DadosEstoque {
-  precos: Map<number, number>;
+  precos: Map<number, number>;                       // tabela de preços + preço das unidades do painel (id negativo)
   tabelasComerciais: Map<string, TabelaComercial>;
   situacoesManuais: Map<number, SituacaoManual>;
   autores: Map<number, { por: string; em: string }>;
+  unidadesPainel: UnidadePainel[];                   // cadastradas só no painel (fora do Sienge)
   podeEditar: boolean;
   recarregar: () => Promise<void>;
 }
@@ -47,7 +54,8 @@ async function lerJson<T>(url: string): Promise<T | null> {
 }
 
 export function useDadosEstoque(): DadosEstoque {
-  const [precos, setPrecos] = useState<Map<number, number>>(new Map());
+  const [precosTabela, setPrecosTabela] = useState<Map<number, number>>(new Map());
+  const [unidadesPainel, setUnidadesPainel] = useState<UnidadePainel[]>([]);
   const [tabelasComerciais, setTabelasComerciais] = useState<Map<string, TabelaComercial>>(new Map());
   const [situacoesManuais, setSituacoesManuais] = useState<Map<number, SituacaoManual>>(new Map());
   const [autores, setAutores] = useState<Map<number, { por: string; em: string }>>(new Map());
@@ -56,13 +64,15 @@ export function useDadosEstoque(): DadosEstoque {
   // Cada leitura falha sozinha: sem preço ou sem situação manual, o Resumo cai
   // na regra de antes (Sienge + estimativa), nunca fica sem número.
   const recarregar = useCallback(async () => {
-    const [p, t, s] = await Promise.all([
+    const [p, t, s, u] = await Promise.all([
       lerJson<{ podeEditar?: boolean; precos?: { unitId: number; valor: number }[] }>("/api/tabela-precos"),
       lerJson<{ tabelas?: Record<string, Partial<TabelaComercial>> }>("/api/tabela-comercial"),
       lerJson<{ situacoes?: { unitId: number; situacao: string; atualizadoPor: string; atualizadoEm: string }[] }>("/api/situacao-unidades"),
+      lerJson<{ unidades?: UnidadePainel[] }>("/api/unidades-painel"),
     ]);
+    if (u) setUnidadesPainel(u.unidades || []);
     if (p) {
-      setPrecos(new Map((p.precos || []).map(x => [x.unitId, x.valor])));
+      setPrecosTabela(new Map((p.precos || []).map(x => [x.unitId, x.valor])));
       setPodeEditar(Boolean(p.podeEditar));
     }
     if (t) setTabelasComerciais(new Map(Object.entries(t.tabelas || {}).map(([k, v]) => [k, normalizarTabelaComercial(v)])));
@@ -74,14 +84,15 @@ export function useDadosEstoque(): DadosEstoque {
   }, []);
   useEffect(() => { recarregar(); }, [recarregar]);
 
+  const precos = useMemo(() => precosComPainel(precosTabela, unidadesPainel), [precosTabela, unidadesPainel]);
   return useMemo(
-    () => ({ precos, tabelasComerciais, situacoesManuais, autores, podeEditar, recarregar }),
-    [precos, tabelasComerciais, situacoesManuais, autores, podeEditar, recarregar],
+    () => ({ precos, tabelasComerciais, situacoesManuais, autores, unidadesPainel, podeEditar, recarregar }),
+    [precos, tabelasComerciais, situacoesManuais, autores, unidadesPainel, podeEditar, recarregar],
   );
 }
 
 // ── Modal ──
-export type FiltroEstoque = "estoque" | "disponiveis" | "reservadas" | "fora" | "divergentes" | "todas";
+export type FiltroEstoque = "estoque" | "disponiveis" | "reservadas" | "fora" | "divergentes" | "painel" | "todas";
 
 const FILTROS: { chave: FiltroEstoque; rotulo: string; dica: string; passa: (l: LinhaEstoque) => boolean }[] = [
   { chave: "estoque", rotulo: "Em estoque", dica: "Disponíveis e reservadas", passa: l => l.situacao === "Disponível" || l.situacao === "Reservado" },
@@ -89,6 +100,7 @@ const FILTROS: { chave: FiltroEstoque; rotulo: string; dica: string; passa: (l: 
   { chave: "reservadas", rotulo: "Reservadas", dica: "Só as reservadas", passa: l => l.situacao === "Reservado" },
   { chave: "fora", rotulo: "Vendidas e outras", dica: "Vendidas, em proposta, permuta…", passa: l => l.situacao !== "Disponível" && l.situacao !== "Reservado" },
   { chave: "divergentes", rotulo: "Diferem do Sienge", dica: "Situação no painel diferente da do Sienge (ajuste manual ou tabela comercial)", passa: l => l.situacao !== l.situacaoSienge },
+  { chave: "painel", rotulo: "Só no painel", dica: "Cadastradas no painel, fora do Sienge", passa: l => ehDoPainel(l.unitId) },
   { chave: "todas", rotulo: "Todas", dica: "Todas as unidades da empresa", passa: () => true },
 ];
 
@@ -104,6 +116,24 @@ const precoDigitado = (texto: string): number | null | "invalido" => {
 };
 const numeroBR = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const quem = (s: string) => s.replace(/\s*<.*>$/, "");
+// Área digitada: "72,5", "1.234,56" ou "72.5" → número; vazio = 0; null = não dá para ler.
+const lerArea = (texto: string): number | null => {
+  const t = texto.trim().replace(/\s*m²?$/i, "");
+  if (t === "") return 0;
+  const n = Number(t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t);
+  return Number.isFinite(n) && n >= 0 && n < 100_000 ? Math.round(n * 100) / 100 : null;
+};
+
+// Formulário de cadastro/edição de unidade do painel.
+interface FormPainel {
+  id: number | null;           // null = nova
+  empreendimento: string;
+  unidade: string;
+  tipo: string;
+  areaTxt: string;
+  situacao: SituacaoPainel;
+  precoTxt: string;
+}
 const dia = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("pt-BR"); };
 const chip = (ativo: boolean) =>
   `h-7 px-2.5 rounded-lg border text-xs font-medium tabular-nums transition-colors select-none ${
@@ -136,7 +166,21 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
   onFechar: () => void;
 }) {
   const { podeEditar } = dados;
-  const daEmpresa = useMemo(() => unidades.filter(u => u.companyName === empresa), [unidades, empresa]);
+  // Unidades do Sienge da empresa + as cadastradas só no painel (sem as que já foram para o Sienge).
+  const doSienge = useMemo(() => unidades.filter(u => u.companyName === empresa), [unidades, empresa]);
+  const painelDaEmpresa = useMemo(() => dados.unidadesPainel.filter(p => p.empresa === empresa), [dados.unidadesPainel, empresa]);
+  const daEmpresa = useMemo(() => unidadesComPainel(doSienge, painelDaEmpresa), [doSienge, painelDaEmpresa]);
+  const duplicadas = useMemo(() => separarDuplicadas(painelDaEmpresa, doSienge).duplicadas, [painelDaEmpresa, doSienge]);
+  const painelPorId = useMemo(() => new Map(painelDaEmpresa.map(p => [idNoEstoque(p.id), p])), [painelDaEmpresa]);
+  // Empreendimentos da empresa no Sienge (onde se cadastra a sala do painel); o "COMERCIAL" primeiro.
+  const empreendimentos = useMemo(() => {
+    const m = new Map<string, number | null>();
+    for (const u of doSienge) if (!m.has(u.enterpriseName)) m.set(u.enterpriseName, u.enterpriseId ?? null);
+    for (const p of painelDaEmpresa) if (!m.has(p.empreendimento)) m.set(p.empreendimento, p.enterpriseId);
+    const comercial = (n: string) => (/COMERCIAL/i.test(n) ? 0 : 1);
+    return Array.from(m.entries()).map(([nome, id]) => ({ nome, id }))
+      .sort((a, b) => comercial(a.nome) - comercial(b.nome) || a.nome.localeCompare(b.nome, "pt-BR"));
+  }, [doSienge, painelDaEmpresa]);
 
   // ── O que foi digitado e ainda não foi salvo ──
   const [precosTxt, setPrecosTxt] = useState<Map<number, string>>(new Map());
@@ -173,7 +217,8 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
     const invalidos: LinhaEstoque[] = [];
     const mudancasSit: { linha: LinhaEstoque; situacao: SituacaoManual | null }[] = [];
     for (const l of salvas) {
-      if (l.unitId === null || l.enterpriseId === null) continue;
+      const painel = ehDoPainel(l.unitId);
+      if (l.unitId === null || (l.enterpriseId === null && !painel)) continue;
       if (precosTxt.has(l.unitId)) {
         const v = precoDigitado(precosTxt.get(l.unitId)!);
         if (v === "invalido") invalidos.push(l);
@@ -181,8 +226,13 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
       }
       if (sitPend.has(l.unitId)) {
         const p = sitPend.get(l.unitId)!;
-        const situacao = p === "auto" ? null : p;
-        if (situacao !== (dados.situacoesManuais.get(l.unitId) ?? null)) mudancasSit.push({ linha: l, situacao });
+        if (painel) {
+          // Do painel: a situação é a do cadastro dela (não há "automático").
+          if (p !== "auto" && p !== l.situacaoSienge) mudancasSit.push({ linha: l, situacao: p });
+        } else {
+          const situacao = p === "auto" ? null : p;
+          if (situacao !== (dados.situacoesManuais.get(l.unitId) ?? null)) mudancasSit.push({ linha: l, situacao });
+        }
       }
     }
     return {
@@ -211,23 +261,37 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
         if (!r.ok) throw new Error(d.error || "Falha ao salvar.");
         return d.alteradas ?? 0;
       };
-      let nPrecos = 0, nSit = 0;
-      if (mudancasPreco.length > 0) {
+      let nPrecos = 0, nSit = 0, nPainel = 0;
+      const doPainel = (m: { linha: LinhaEstoque }) => ehDoPainel(m.linha.unitId);
+      const precosSienge = mudancasPreco.filter(m => !doPainel(m));
+      const sitSienge = mudancasSit.filter(m => !doPainel(m));
+      if (precosSienge.length > 0) {
         nPrecos = await enviar("/api/tabela-precos", {
           tipo: "manual",
           descricao: `Valor digitado no Estoque do Resumo · ${empresa}`,
-          itens: mudancasPreco.map(m => ({ unitId: m.linha.unitId, enterpriseId: m.linha.enterpriseId, unidade: m.linha.unidade, valor: m.valor })),
+          itens: precosSienge.map(m => ({ unitId: m.linha.unitId, enterpriseId: m.linha.enterpriseId, unidade: m.linha.unidade, valor: m.valor })),
         });
       }
-      if (mudancasSit.length > 0) {
+      if (sitSienge.length > 0) {
         nSit = await enviar("/api/situacao-unidades", {
-          itens: mudancasSit.map(m => ({ unitId: m.linha.unitId, enterpriseId: m.linha.enterpriseId, unidade: m.linha.unidade, situacao: m.situacao })),
+          itens: sitSienge.map(m => ({ unitId: m.linha.unitId, enterpriseId: m.linha.enterpriseId, unidade: m.linha.unidade, situacao: m.situacao })),
         });
       }
+      // Unidades do painel: preço e situação vão para o cadastro delas.
+      const itensPainel = new Map<number, { id: number; preco?: number | null; situacao?: string }>();
+      for (const m of mudancasPreco.filter(doPainel)) {
+        const id = idDoPainel(m.linha.unitId!);
+        itensPainel.set(id, { ...(itensPainel.get(id) ?? { id }), preco: m.valor });
+      }
+      for (const m of mudancasSit.filter(doPainel)) {
+        const id = idDoPainel(m.linha.unitId!);
+        itensPainel.set(id, { ...(itensPainel.get(id) ?? { id }), situacao: m.situacao ?? undefined });
+      }
+      if (itensPainel.size > 0) nPainel = await enviar("/api/unidades-painel", { itens: Array.from(itensPainel.values()) });
       // Recarrega ANTES de limpar o digitado, senão os campos piscam com o valor antigo.
       await dados.recarregar();
       descartar();
-      const partes = [nPrecos > 0 ? `${nPrecos} preço(s)` : "", nSit > 0 ? `${nSit} situação(ões)` : ""].filter(Boolean);
+      const partes = [nPrecos > 0 ? `${nPrecos} preço(s)` : "", nSit > 0 ? `${nSit} situação(ões)` : "", nPainel > 0 ? `${nPainel} unidade(s) do painel` : ""].filter(Boolean);
       toast.success(partes.length > 0 ? `Salvo: ${partes.join(" e ")}. O Resumo já usa os novos valores.` : "Nada mudou.");
     } catch (e) {
       // Se o preço gravou e a situação não (ou o contrário), o que gravou já aparece como salvo.
@@ -235,6 +299,82 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
       toast.error(e instanceof Error ? e.message : "Falha ao salvar.");
     } finally {
       setSalvando(false);
+    }
+  };
+
+  // ── Unidade cadastrada só no painel: cadastrar, editar, tirar ──
+  const [form, setForm] = useState<FormPainel | null>(null);
+  const [gravandoForm, setGravandoForm] = useState(false);
+  const esquecerPendente = (unitId: number) => {
+    setPrecosTxt(prev => { if (!prev.has(unitId)) return prev; const m = new Map(prev); m.delete(unitId); return m; });
+    setSitPend(prev => { if (!prev.has(unitId)) return prev; const m = new Map(prev); m.delete(unitId); return m; });
+  };
+  const abrirNova = () => setForm({
+    id: null, empreendimento: empreendimentos[0]?.nome ?? "", unidade: "", tipo: "Sala comercial",
+    areaTxt: "", situacao: "Disponível", precoTxt: "",
+  });
+  const abrirEdicao = (p: UnidadePainel) => setForm({
+    id: p.id, empreendimento: p.empreendimento, unidade: p.unidade, tipo: p.tipo,
+    areaTxt: p.area ? numeroBR(p.area) : "", situacao: p.situacao, precoTxt: p.preco !== null ? numeroBR(p.preco) : "",
+  });
+  // O que impede gravar o formulário (null = pode gravar).
+  const problemaForm = useMemo(() => {
+    if (!form) return null;
+    if (!form.empreendimento.trim()) return "Escolha o empreendimento.";
+    if (!form.unidade.trim()) return "Informe o nome da unidade (ex.: SALA 08).";
+    if (lerArea(form.areaTxt) === null) return "Área inválida.";
+    if (precoDigitado(form.precoTxt) === "invalido") return "Preço inválido.";
+    const enterpriseId = empreendimentos.find(e => e.nome === form.empreendimento)?.id ?? null;
+    const noSiengeJa = noSienge({ enterpriseId, empreendimento: form.empreendimento, unidade: form.unidade }, doSienge);
+    if (noSiengeJa) return `A ${noSiengeJa.name} já está no Sienge neste empreendimento: ajuste a de lá na lista.`;
+    const repetida = painelDaEmpresa.find(p => p.id !== form.id && chaveDoNome(p.empreendimento) === chaveDoNome(form.empreendimento) && chaveDoNome(p.unidade) === chaveDoNome(form.unidade));
+    if (repetida) return `A ${repetida.unidade} já está cadastrada no painel neste empreendimento.`;
+    return null;
+  }, [form, empreendimentos, doSienge, painelDaEmpresa]);
+
+  const gravarForm = async () => {
+    if (!form || problemaForm || gravandoForm || !podeEditar) return;
+    setGravandoForm(true);
+    try {
+      const preco = precoDigitado(form.precoTxt);
+      const campos = {
+        empreendimento: form.empreendimento.trim(),
+        enterpriseId: empreendimentos.find(e => e.nome === form.empreendimento)?.id ?? null,
+        unidade: form.unidade.replace(/\s+/g, " ").trim().toUpperCase(),
+        tipo: form.tipo,
+        area: lerArea(form.areaTxt) ?? 0,
+        situacao: form.situacao,
+        preco: preco === "invalido" ? null : preco,
+      };
+      const r = form.id === null
+        ? await fetch("/api/unidades-painel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa, ...campos }) })
+        : await fetch("/api/unidades-painel", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ itens: [{ id: form.id, ...campos }] }) });
+      const d = await r.json().catch(() => ({})) as { error?: string };
+      if (!r.ok) throw new Error(d.error || "Falha ao gravar a unidade.");
+      if (form.id !== null) esquecerPendente(idNoEstoque(form.id));
+      await dados.recarregar();
+      toast.success(form.id === null ? `${campos.unidade} cadastrada no painel. Já conta no estoque do Resumo.` : `${campos.unidade} atualizada.`);
+      setForm(null);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao gravar a unidade.");
+    } finally {
+      setGravandoForm(false);
+    }
+  };
+
+  const tirar = async (p: UnidadePainel) => {
+    if (!podeEditar) return;
+    if (!window.confirm(`Tirar a ${p.unidade} (${p.empreendimento}) do painel? Ela deixa de contar no estoque. Dá para cadastrar de novo depois.`)) return;
+    try {
+      const r = await fetch(`/api/unidades-painel?id=${p.id}`, { method: "DELETE" });
+      const d = await r.json().catch(() => ({})) as { error?: string };
+      if (!r.ok) throw new Error(d.error || "Falha ao tirar a unidade.");
+      esquecerPendente(idNoEstoque(p.id));
+      if (form?.id === p.id) setForm(null);
+      await dados.recarregar();
+      toast.success(`${p.unidade} saiu do painel.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao tirar a unidade.");
     }
   };
 
@@ -310,7 +450,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Estoque</p>
             <DialogTitle className="mt-0.5 truncate text-lg font-semibold tracking-[-0.02em] text-slate-900 dark:text-slate-50">{empresa}</DialogTitle>
             <DialogDescription className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Preço e situação de cada unidade. O que você ajusta aqui vale no Resumo, no Quadro Espelho e na Tabela de Preços, e não é gravado no Sienge.
+              Preço e situação de cada unidade. O que você ajusta aqui vale no Resumo, no Quadro Espelho e na Tabela de Preços, e não é gravado no Sienge. Sala que não está no Sienge entra por &ldquo;Adicionar sala&rdquo;.
             </DialogDescription>
           </div>
           <button type="button" onClick={fechar} aria-label="Fechar" className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100">
@@ -343,10 +483,20 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
         <p className="px-6 pt-2 text-[11px] text-slate-500 dark:text-slate-400">
           Sem preço, apartamento e sala comercial entram pela estimativa: área privativa × fator ({fator ? fator.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "sem fator"}) × CUB ({cub ? `${formatCurrency(cub)}/m²` : "indisponível"}{cubMes ? `, ${cubMes}` : ""}). O preço digitado entra no lugar dela. Vaga e box só entram no valor com preço.
         </p>
+        {duplicadas.length > 0 && (
+          <div className="mx-6 mt-2 space-y-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+            {duplicadas.map(d => (
+              <p key={d.painel.id}>
+                A <b>{d.painel.unidade}</b> cadastrada no painel ({d.painel.empreendimento}) agora existe no Sienge como <b>{d.sienge.name}</b>. O estoque já usa a do Sienge e a do painel não conta mais.
+                {podeEditar && <> <button type="button" onClick={() => tirar(d.painel)} className="font-semibold underline underline-offset-2">Tirar a do painel</button></>}
+              </p>
+            ))}
+          </div>
+        )}
 
         {/* Filtros */}
         <div className="flex flex-wrap items-center gap-2 px-6 py-3">
-          {FILTROS.map(f => (
+          {FILTROS.filter(f => f.chave !== "painel" || filtro === "painel" || linhas.some(l => ehDoPainel(l.unitId))).map(f => (
             <button key={f.chave} type="button" onClick={() => setFiltro(f.chave)} className={chip(filtro === f.chave)} title={f.dica}>
               {f.rotulo} <span className="font-normal">{linhas.filter(l => passaNoResto(l) && f.passa(l)).length}</span>
             </button>
@@ -365,7 +515,64 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
               <Lock className="h-3.5 w-3.5" /> Somente leitura: preço e situação são alterados por administradores e por quem edita a Tabela de Preços.
             </span>
           )}
+          {podeEditar && (
+            <Button size="sm" variant="outline" className="ml-auto h-7 text-xs" onClick={abrirNova} disabled={form !== null} title="Cadastrar uma sala que não está no Sienge; ela conta no estoque do Resumo">
+              <Plus className="mr-1 h-3.5 w-3.5" />Adicionar sala
+            </Button>
+          )}
         </div>
+
+        {/* Cadastro / edição de unidade só no painel */}
+        {form && (
+          <div className="mx-6 mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <p className="mb-2 text-xs font-semibold text-slate-800 dark:text-slate-100">
+              {form.id === null ? "Nova unidade só no painel" : `Editar ${painelDaEmpresa.find(x => x.id === form.id)?.unidade ?? "unidade"}`}
+              <span className="font-normal text-slate-500 dark:text-slate-400"> · não vai para o Sienge. Quando for vendida, cadastre no Sienge com o mesmo nome e o painel passa a usar a de lá.</span>
+            </p>
+            <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.8fr)]">
+              <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 col-span-2 lg:col-span-1">Empreendimento
+                {empreendimentos.length > 0 ? (
+                  <select value={form.empreendimento} onChange={e => setForm({ ...form, empreendimento: e.target.value })} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                    {empreendimentos.map(e => <option key={e.nome} value={e.nome}>{e.nome}</option>)}
+                  </select>
+                ) : (
+                  <Input value={form.empreendimento} onChange={e => setForm({ ...form, empreendimento: e.target.value })} placeholder="Nome do empreendimento" className="h-8 bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100 text-xs md:text-xs" />
+                )}
+              </label>
+              <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">Unidade
+                <Input value={form.unidade} onChange={e => setForm({ ...form, unidade: e.target.value })} onKeyDown={e => { if (e.key === "Enter") gravarForm(); }} placeholder="SALA 08" autoFocus className="h-8 bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100 text-xs md:text-xs" />
+              </label>
+              <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">Tipo
+                <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                  {TIPOS_PAINEL.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">Área privativa (m²)
+                <Input value={form.areaTxt} onChange={e => setForm({ ...form, areaTxt: e.target.value })} onKeyDown={e => { if (e.key === "Enter") gravarForm(); }} inputMode="decimal" placeholder="0,00" className="h-8 bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100 text-right text-xs tabular-nums md:text-xs" />
+              </label>
+              <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">Situação
+                <select value={form.situacao} onChange={e => setForm({ ...form, situacao: e.target.value as SituacaoPainel })} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
+                  {SITUACOES_PAINEL.map(x => <option key={x} value={x}>{x}</option>)}
+                </select>
+              </label>
+              <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 col-span-2 lg:col-span-1">Preço de tabela
+                <InputReais value={form.precoTxt} onChange={t => setForm({ ...form, precoTxt: t })} onKeyDown={e => { if (e.key === "Enter") gravarForm(); }} placeholder="vazio = estimativa" className="h-8 [&_input]:h-8 [&_input]:text-xs md:[&_input]:text-xs" />
+              </label>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              {problemaForm && (form.unidade.trim() !== "" || !problemaForm.startsWith("Informe o nome")) && (
+                <span className="text-[11px] text-amber-700 dark:text-amber-300">{problemaForm}</span>
+              )}
+              <div className="ml-auto flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setForm(null)} disabled={gravandoForm}>Cancelar</Button>
+                <Button size="sm" onClick={gravarForm} disabled={problemaForm !== null || gravandoForm}>
+                  <Save className="mr-1.5 h-3.5 w-3.5" />
+                  {gravandoForm ? "Gravando..." : form.id === null ? "Cadastrar no painel" : "Salvar unidade"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Tabela */}
         <div className="min-h-0 flex-1 overflow-auto border-y border-slate-200 dark:border-slate-700">
@@ -386,22 +593,36 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
             <tbody>
               {visiveis.length === 0 && (
                 <tr><td colSpan={colunas} className="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">
-                  {daEmpresa.length === 0 ? "Nenhuma unidade desta empresa no cadastro do Sienge." : "Nenhuma unidade para os filtros atuais."}
+                  {daEmpresa.length === 0 ? "Nenhuma unidade desta empresa no Sienge nem no painel." : "Nenhuma unidade para os filtros atuais."}
                 </td></tr>
               )}
               {visiveis.map((l, i) => {
                 const id = l.unitId;
-                const editavel = podeEditar && id !== null && l.enterpriseId !== null;
+                const doPainel = id !== null ? painelPorId.get(id) : undefined;
+                const editavel = podeEditar && id !== null && (l.enterpriseId !== null || doPainel !== undefined);
                 const txt = id !== null ? precosTxt.get(id) : undefined;
                 const invalido = id !== null && idsInvalidos.has(id);
                 const precoMexido = id !== null && idsPreco.has(id);
                 const sitMexida = id !== null && idsSit.has(id);
-                const escolha: Pendente = (id !== null && sitPend.get(id)) || (id !== null && dados.situacoesManuais.get(id)) || "auto";
+                const escolha: Pendente = (id !== null && sitPend.get(id)) || (doPainel ? doPainel.situacao : (id !== null && dados.situacoesManuais.get(id)) || "auto");
                 const autor = id !== null ? dados.autores.get(id) : undefined;
                 const disponivel = l.situacao === "Disponível";
                 return (
                   <tr key={id ?? `s${i}`} className={`border-t border-slate-100 dark:border-slate-800 ${precoMexido || sitMexida ? "bg-amber-50/60 dark:bg-amber-500/5" : "hover:bg-slate-50 dark:hover:bg-slate-800/50"}`}>
-                    <td className="whitespace-nowrap py-1.5 pl-6 pr-3 font-semibold tabular-nums text-slate-800 dark:text-slate-100">{l.unidade}</td>
+                    <td className="whitespace-nowrap py-1.5 pl-6 pr-3 font-semibold tabular-nums text-slate-800 dark:text-slate-100">
+                      {doPainel ? (
+                        <div className="flex items-center gap-1.5">
+                          <span>{l.unidade}</span>
+                          <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200" title={`Cadastrada no painel por ${quem(doPainel.criadoPor)} em ${dia(doPainel.criadoEm)}. Não existe no Sienge.`}>só no painel</span>
+                          {podeEditar && (
+                            <>
+                              <button type="button" onClick={() => abrirEdicao(doPainel)} aria-label={`Editar ${l.unidade}`} title="Editar nome, área e tipo" className="rounded p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"><Pencil className="h-3.5 w-3.5" /></button>
+                              <button type="button" onClick={() => tirar(doPainel)} aria-label={`Tirar ${l.unidade} do painel`} title="Tirar do painel" className="rounded p-1 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </>
+                          )}
+                        </div>
+                      ) : l.unidade}
+                    </td>
                     {variosEmpreendimentos && <td className="max-w-[220px] truncate px-3 py-1.5 text-slate-600 dark:text-slate-400" title={l.empreendimento}>{l.empreendimento}</td>}
                     <td className="whitespace-nowrap px-3 py-1.5 text-slate-600 dark:text-slate-400">{l.tipo}</td>
                     <td className="whitespace-nowrap px-3 py-1.5 tabular-nums text-slate-600 dark:text-slate-400">{l.pavimento || "—"}</td>
@@ -416,14 +637,18 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
                             aria-label={`Situação da unidade ${l.unidade}`}
                             className={`h-8 min-w-[11.5rem] rounded-md border bg-white px-2 text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-100 ${sitMexida ? "border-amber-400" : "border-slate-200 dark:border-slate-700"}`}
                           >
-                            <option value="auto">{l.situacaoBase !== l.situacaoSienge ? "Tabela comercial" : "Sienge"} · {l.situacaoBase}</option>
-                            {SITUACOES_MANUAIS.map(s => <option key={s} value={s}>{s} (manual)</option>)}
+                            {doPainel ? SITUACOES_PAINEL.map(s => <option key={s} value={s}>{s}</option>) : (
+                              <>
+                                <option value="auto">{l.situacaoBase !== l.situacaoSienge ? "Tabela comercial" : "Sienge"} · {l.situacaoBase}</option>
+                                {SITUACOES_MANUAIS.map(s => <option key={s} value={s}>{s} (manual)</option>)}
+                              </>
+                            )}
                           </select>
                         ) : (
                           <span className="text-slate-800 dark:text-slate-100">{l.situacao}</span>
                         )}
                       </div>
-                      {l.origem !== "sienge" && (
+                      {l.origem !== "sienge" && l.origem !== "painel" && (
                         <p className="mt-0.5 pl-4 text-[10px] text-slate-500 dark:text-slate-400" title={l.origem === "manual" && autor ? `Ajustada por ${quem(autor.por)} em ${dia(autor.em)}` : undefined}>
                           {l.origem === "manual" ? "ajuste manual" : "pela tabela comercial"} · no Sienge: {l.situacaoSienge}
                         </p>
