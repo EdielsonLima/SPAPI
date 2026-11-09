@@ -543,6 +543,16 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Contas Pagas (`contas-table.tsx`) segue a regra antiga. Margem direita do gráfico "Por
   Empresa" passou a ser calculada pelo maior rótulo (`margemRotuloEmpresa`); fixa em 80 px
   cortava o fim de valores com 16+ caracteres.
+- **A Receber da Silva Packer Construtora × Sienge: aluguel fica fora, como o BI (Edielson,
+  09/11: "Manter como o BI").** Relatório "Contas a Receber (por Data de Vencimento)" do
+  Sienge, 09/11/2026 a 31/12/2050: R$ 2.530.053,02 (283 parcelas, 22 títulos); painel
+  R$ 468.612,30. A diferença, R$ 2.061.440,72, é só aluguel (categoria 10513/10514: 18
+  contratos de locação + acordo Bigliardi); o resto bate no centavo (títulos 298, 327 e o
+  ressarcimento de IPTU 965). O Sienge soma aluguel, o painel segue a medida `Total a Receber
+  Futuro` do BI. Com aluguel o modo Silva Packer iria de R$ 161.700.397,63 para
+  R$ 164.616.235,74 (+ Sul Brasil R$ 854.397,39). Não mudar sem pedido. "Saldo atual" do
+  relatório = `correctedBalanceAmount` (o título 298 é corrigido, +R$ 1.900,87 por parcela
+  sobre o valor original).
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 
