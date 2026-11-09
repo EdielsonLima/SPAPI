@@ -12,12 +12,14 @@
 // Na prática, entra no A Pagar: parcela em aberto (saldo corrigido > 0) a
 // vencer (>= hoje), de qualquer documento menos as 4 previsões, e TODA
 // "Previsão de Comissão" (PRC) em aberto, vencida ou não — ela sai das
-// Atrasadas mas fica no total. O BI não olha a consistência do título.
+// Atrasadas mas fica no total. O BI não olha a consistência do título; o
+// painel olha (ver NÃO CONSISTIDOS abaixo).
 //
 // Diferenças que o painel tinha (07/11/2026, ano 2026):
 //   · títulos "não consistidos" no Sienge (NF-e lançada, pendente de
 //     conferência) ficavam fora: 135 Jardins R$ 51.048,22 (Chave Digital) e
-//     Domus R$ 708,84 — o Edielson decidiu contar, como o BI;
+//     Domus R$ 708,84 — o Edielson decidiu contar, como o BI (revisto em
+//     09/11: agora ficam fora, ver NÃO CONSISTIDOS);
 //   · a Previsão de Comissão do Domus (R$ 90.000,00, vencida em 27/03/2026:
 //     Reserva Imob 82.500 + Renata K 7.500) ficava fora — o Edielson decidiu
 //     somar no A Pagar, igual ao BI.
@@ -34,7 +36,8 @@
 // (PPC, PPE, PRC, PCT, PRV) e, de novo, SEM olhar a consistência. O painel
 // deixava fora 3 títulos não consistidos (Domus R$ 5.635,40, Sul Brasil
 // R$ 1.331,61, Silva Packer Construtora R$ 1.164,39) — mesma decisão do A
-// Pagar: contar. Os títulos 15596/15597 da TETRA (R$ 262.774,79), que o
+// Pagar: contar (revisto em 09/11: fora). Os títulos 15596/15597 da TETRA
+// (R$ 262.774,79), que o
 // "Geral a Pagar Ajustado" exclui, contam nas Atrasadas nos dois.
 //
 // O valor da parcela NÃO segue o BI nas Atrasadas (Edielson, 08/11/2026): o
@@ -87,6 +90,17 @@
 // parcela 14, R$ 262.774,77), mas as mantém nas Atrasadas. No painel elas
 // ficam nos dois cards; só pesam com 2023 ou 2025 marcado (vencimento delas).
 //
+// NÃO CONSISTIDOS (Edielson, 09/11/2026: "Tirar, como o Sienge"): título
+// com consistencyStatus "N" (NF-e lançada, pendente de conferência) fica fora
+// do A Pagar, das Atrasadas e, por consequência, do Geral e da Estimativa —
+// como o relatório "Contas a Pagar (por Data de Vencimento)" do Sienge, e não
+// como o BI. Motivo: 135 Jardins de 09/11 a 31/12/2050 no Sienge
+// R$ 1.662.470,27 × painel R$ 1.739.050,27; a diferença era só o título 41760
+// (CHAVE DIGITAL, NFE, 3 parcelas, R$ 76.580,00), não consistido. Em 09/11
+// saíram R$ 77.288,84 do A Pagar (+ Domus 41556, 2 × R$ 354,42) e R$ 8.131,40
+// das Atrasadas (Domus 31604, Sul Brasil 23708, SP Construtora 35266). As
+// Previsões de Comissão do Domus são consistidas e continuam.
+//
 // O modo Holding NÃO usa estas regras.
 
 /** Previsões que o Power BI tira do total a pagar. */
@@ -100,10 +114,16 @@ export type ItemAPagar = {
   correctedBalanceAmount?: number | null;
   dueDate?: string | null;
   documentIdentificationId?: string | null;
+  consistencyStatus?: string | null;
 };
 
 function tipoDoc(item: ItemAPagar): string {
   return (item.documentIdentificationId || "").trim().toUpperCase();
+}
+
+/** Título consistido no Sienge (consistencyStatus diferente de "N"). */
+export function consistido(item: ItemAPagar): boolean {
+  return (item.consistencyStatus || "").trim().toUpperCase() !== "N";
 }
 
 /** Documento "Previsão de Comissão" (PRC). */
@@ -111,15 +131,17 @@ export function ehPrevisaoDeComissao(item: ItemAPagar): boolean {
   return tipoDoc(item) === DOC_PREVISAO_COMISSAO;
 }
 
-/** Entra no A Pagar do Power BI. */
+/** Entra no A Pagar (Power BI, sem os não consistidos, como o Sienge). */
 export function entraNoAPagar(item: ItemAPagar, hoje: string): boolean {
+  if (!consistido(item)) return false;
   if (PREVISOES_FORA_DO_A_PAGAR.has(tipoDoc(item))) return false;
   if ((item.correctedBalanceAmount || 0) <= 0) return false;
   return ehPrevisaoDeComissao(item) || (!!item.dueDate && item.dueDate >= hoje);
 }
 
-/** Entra nas Contas Atrasadas do Power BI (sem olhar a consistência). */
+/** Entra nas Contas Atrasadas (Power BI, sem os não consistidos, como o Sienge). */
 export function entraNasAtrasadas(item: ItemAPagar, hoje: string): boolean {
+  if (!consistido(item)) return false;
   if (PREVISOES_FORA_DAS_ATRASADAS.has(tipoDoc(item))) return false;
   if ((item.correctedBalanceAmount || 0) <= 0) return false;
   return !!item.dueDate && item.dueDate < hoje;
@@ -152,6 +174,7 @@ export function basePagas<T extends { companyName: string }>(
  * preenchido, é o mesmo que estar no A Pagar ou nas Atrasadas (nunca nos dois).
  */
 export function entraNoGeralAPagar(item: ItemAPagar): boolean {
+  if (!consistido(item)) return false;
   if (PREVISOES_FORA_DO_A_PAGAR.has(tipoDoc(item))) return false;
   return (item.correctedBalanceAmount || 0) > 0;
 }

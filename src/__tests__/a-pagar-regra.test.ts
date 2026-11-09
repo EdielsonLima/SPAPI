@@ -3,18 +3,18 @@
 import assert from "node:assert/strict";
 import {
   entraNoAPagar, entraNasAtrasadas, ehPrevisaoDeComissao, ignoraFiltroTipoDocCP, basePagas,
-  entraNoGeralAPagar, geralAPagar, estimativaSaidas,
+  entraNoGeralAPagar, geralAPagar, estimativaSaidas, consistido,
 } from "../lib/a-pagar-regra";
 
 const hoje = "2026-11-07";
 
 // Casos reais de 07/11/2026.
-const nfe = { correctedBalanceAmount: 25524.11, dueDate: "2026-11-29", documentIdentificationId: "NFE " }; // Chave Digital, não consistido
+const nfe = { correctedBalanceAmount: 25524.11, dueDate: "2026-11-29", documentIdentificationId: "NFE ", consistencyStatus: "S" };
 const comissaoVencida = { correctedBalanceAmount: 82500, dueDate: "2026-03-27", documentIdentificationId: "PRC" }; // Domus, Reserva Imob
 const pedidoPrevisto = { correctedBalanceAmount: 50000, dueDate: "2026-12-14", documentIdentificationId: "PPC" };
 const medicaoPrevista = { correctedBalanceAmount: 940505.92, dueDate: "2027-11-22", documentIdentificationId: "PCT" };
 
-assert.equal(entraNoAPagar(nfe, hoje), true, "a vencer entra (a consistência não importa)");
+assert.equal(entraNoAPagar(nfe, hoje), true, "a vencer entra");
 assert.equal(entraNoAPagar(comissaoVencida, hoje), true, "previsão de comissão entra mesmo vencida (como no BI)");
 assert.equal(entraNoAPagar({ ...comissaoVencida, dueDate: "2027-01-10" }, hoje), true);
 assert.equal(entraNoAPagar(pedidoPrevisto, hoje), false, "previsão de pedido de compra sai");
@@ -29,15 +29,27 @@ assert.equal(entraNoAPagar({ ...nfe, correctedBalanceAmount: 0 }, hoje), false);
 assert.equal(entraNoAPagar({ ...comissaoVencida, correctedBalanceAmount: 0 }, hoje), false, "comissão já paga sai");
 assert.equal(entraNoAPagar({ ...nfe, dueDate: null }, hoje), false);
 
-// Soma do Domus em 2026 do que o painel não contava: 2 NF-e não consistidas + 2 comissões.
+// Não consistidos (Edielson, 09/11/2026: "Tirar, como o Sienge"). No Domus em
+// 2026: 2 NF-e não consistidas saem; as 2 comissões (consistidas) ficam.
 const domus = [
-  { correctedBalanceAmount: 354.42, dueDate: "2026-11-23", documentIdentificationId: "NFE" },
-  { correctedBalanceAmount: 354.42, dueDate: "2026-12-21", documentIdentificationId: "NFE" },
-  comissaoVencida,
-  { correctedBalanceAmount: 7500, dueDate: "2026-03-27", documentIdentificationId: "PRC" },
+  { correctedBalanceAmount: 354.42, dueDate: "2026-11-23", documentIdentificationId: "NFE", consistencyStatus: "N" },
+  { correctedBalanceAmount: 354.42, dueDate: "2026-12-21", documentIdentificationId: "NFE", consistencyStatus: "N" },
+  { ...comissaoVencida, consistencyStatus: "S" },
+  { correctedBalanceAmount: 7500, dueDate: "2026-03-27", documentIdentificationId: "PRC", consistencyStatus: "S" },
 ];
 const soma = domus.filter((i) => entraNoAPagar(i, hoje)).reduce((s, i) => s + i.correctedBalanceAmount, 0);
-assert.equal(soma.toFixed(2), "90708.84");
+assert.equal(soma.toFixed(2), "90000.00");
+// 135 Jardins: título 41760 (CHAVE DIGITAL), não consistido — a diferença
+// inteira entre o painel (R$ 1.739.050,27) e o relatório do Sienge
+// (R$ 1.662.470,27) em 09/11.
+const chaveDigital = [25524.11, 25524.11, 25531.78].map((v, k) => ({
+  correctedBalanceAmount: v, dueDate: ["2026-11-29", "2026-12-29", "2027-01-28"][k], documentIdentificationId: "NFE", consistencyStatus: "N",
+}));
+assert.equal(chaveDigital.filter((i) => entraNoAPagar(i, "2026-11-09")).length, 0, "não consistido sai do A Pagar");
+assert.equal((1739050.27 - chaveDigital.reduce((s, i) => s + i.correctedBalanceAmount, 0)).toFixed(2), "1662470.27");
+assert.equal(consistido({ consistencyStatus: " n " }), false);
+assert.equal(consistido({ consistencyStatus: "S" }), true);
+assert.equal(consistido({}), true, "sem a informação, conta (como antes do campo existir)");
 
 assert.equal(ehPrevisaoDeComissao({ documentIdentificationId: " prc " }), true);
 assert.equal(ignoraFiltroTipoDocCP(comissaoVencida), true);
@@ -45,8 +57,8 @@ assert.equal(ignoraFiltroTipoDocCP(nfe), false);
 
 // Contas Atrasadas (card "Contas Atrasadas CARD" do BI), casos reais de 08/11/2026.
 const hoje2 = "2026-11-08";
-const conteiners = { correctedBalanceAmount: 5635.4, dueDate: "2025-12-10", documentIdentificationId: "NFE" }; // Domus, não consistido
-assert.equal(entraNasAtrasadas(conteiners, hoje2), true, "vencida entra (a consistência não importa)");
+const conteiners = { correctedBalanceAmount: 5635.4, dueDate: "2025-12-10", documentIdentificationId: "NFE" }; // Domus
+assert.equal(entraNasAtrasadas(conteiners, hoje2), true, "vencida entra");
 assert.equal(entraNasAtrasadas(comissaoVencida, hoje2), false, "previsão de comissão sai das Atrasadas (fica no A Pagar)");
 for (const doc of ["PPC", "PPE", "PCT", "PRV", " prv "]) {
   assert.equal(entraNasAtrasadas({ ...conteiners, documentIdentificationId: doc }, hoje2), false, `previsão ${doc} sai`);
@@ -59,13 +71,13 @@ assert.equal(entraNasAtrasadas({ ...conteiners, dueDate: null }, hoje2), false);
 for (const i of [conteiners, nfe, pedidoPrevisto, { ...nfe, dueDate: "2026-11-01" }]) {
   assert.equal(entraNoAPagar(i, hoje2) && entraNasAtrasadas(i, hoje2), false);
 }
-// Os 3 não consistidos que o painel deixava fora: R$ 8.131,40.
+// Os 3 não consistidos vencidos (R$ 8.131,40) ficam fora das Atrasadas, como no Sienge (09/11).
 const naoConsistidos = [
-  conteiners,
-  { correctedBalanceAmount: 1331.61, dueDate: "2025-03-10", documentIdentificationId: "FAT" }, // Sul Brasil, M.R. Mafra
-  { correctedBalanceAmount: 1164.39, dueDate: "2026-04-17", documentIdentificationId: "NFS" }, // SP Construtora, Max Mohr (já sem imposto)
+  { ...conteiners, consistencyStatus: "N" }, // Domus, Conteiners Catarinense
+  { correctedBalanceAmount: 1331.61, dueDate: "2025-03-10", documentIdentificationId: "FAT", consistencyStatus: "N" }, // Sul Brasil, M.R. Mafra
+  { correctedBalanceAmount: 1164.39, dueDate: "2026-04-17", documentIdentificationId: "NFS", consistencyStatus: "N" }, // SP Construtora, Max Mohr
 ];
-assert.equal(naoConsistidos.filter((i) => entraNasAtrasadas(i, hoje2)).reduce((s, i) => s + i.correctedBalanceAmount, 0).toFixed(2), "8131.40");
+assert.equal(naoConsistidos.filter((i) => entraNasAtrasadas(i, hoje2)).length, 0, "não consistido sai das Atrasadas");
 
 // Contas Pagas (Total pago do BI): movimento bancário avulso só da empresa do modo.
 const HOLDING = "SILVA ADMINISTRADORA HOLDING LTDA";
@@ -91,6 +103,7 @@ const casosGeral = [
   { ...nfe, documentIdentificationId: "PRV" },
   { ...conteiners, documentIdentificationId: "PRC" },
   { correctedBalanceAmount: 262774.77, dueDate: "2023-11-17", documentIdentificationId: "MED" }, // TETRA 15597/14: fica (o BI tira)
+  ...naoConsistidos, ...chaveDigital,
 ];
 for (const i of casosGeral) {
   const quadros = Number(entraNoAPagar(i, hoje2)) + Number(entraNasAtrasadas(i, hoje2));

@@ -431,10 +431,12 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   `9b648ba73a754ca52976`, 1º quadro):** card `À Pagar sem prev CARD.` = `Geral a Pagar
   Ajustado` − `Contas Atrasadas` sobre `f_PAGAR` (/outcome por vencimento, indexador 0).
   Regra em `src/lib/a-pagar-regra.ts` (trava `a-pagar-regra.test.ts`): saldo corrigido > 0,
-  a vencer, qualquer documento menos as previsões PPC/PPE/PRV/PCT, **sem olhar a
-  consistência do título** e com **toda Previsão de Comissão (PRC) em aberto, mesmo vencida**
+  a vencer, qualquer documento menos as previsões PPC/PPE/PRV/PCT, sem olhar a
+  consistência do título (**revisto em 09/11: não consistido fica fora**, ver abaixo) e com
+  **toda Previsão de Comissão (PRC) em aberto, mesmo vencida**
   (o BI tira PRC das Atrasadas mas não do total). Decisões do Edielson em 07/11: contar os
-  não consistidos (135 Jardins R$ 51.048,22, Chave Digital; Domus R$ 708,84) e somar a PRC
+  não consistidos (135 Jardins R$ 51.048,22, Chave Digital; Domus R$ 708,84; revisto em
+  09/11) e somar a PRC
   como o BI (Domus R$ 90.000,00 vencidos em 27/03/2026). Valor da parcela continua
   `effectiveOpenAmount` (igual ao BI em todas em 07/11). PRC não aparece no filtro Tipo Doc
   e não é cortada por ele (`ignoraFiltroTipoDocCP`, também no Calendário de Pagamentos).
@@ -447,7 +449,7 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Atrasadas CARD` = saldo corrigido vencido (< hoje) > 0, sem PPC/PPE/PRC/PCT/PRV, sem olhar
   consistência, − imposto das mesmas linhas. Mesma lib (`entraNasAtrasadas`): a seleção é a do
   BI (passaram a contar 3 não consistidos: Domus R$ 5.635,40, Sul Brasil R$ 1.331,61, SP
-  Construtora R$ 1.164,39 — mesma decisão do A Pagar). Os títulos 15596/15597 da TETRA
+  Construtora R$ 1.164,39 — mesma decisão do A Pagar; **revisto em 09/11: fora**). Os títulos 15596/15597 da TETRA
   (R$ 262.774,79) contam nos dois. **O valor da parcela NÃO segue o BI** (Edielson, 08/11):
   continua `effectiveOpenAmount`, conferido com o relatório do Sienge. O BI tira o imposto
   também de saldo parcial (R M FERNANDEZ, título 34134: imposto de R$ 21.497,05 já retido no
@@ -507,6 +509,18 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Geral e Atrasadas do BI (R$ 6.634.712,15 / R$ 1.440.140,67) também batem na conta. As
   barras "Valores por Empresa" do BI usam outra medida (`ValorTotalPagaveis`) e não
   somam o card do próprio BI (R$ 4.730.241,65). Nada mudou no painel.
+- **Não consistidos fora, como o Sienge (Edielson, 09/11: "Tirar, como o Sienge"):** o
+  relatório "Contas a Pagar (por Data de Vencimento) Sintético" do Sienge, 135 Jardins,
+  09/11/2026 a 31/12/2050, deu A vencer R$ 1.662.470,27; o painel, R$ 1.739.050,27. A
+  diferença era só o título 41760 (CHAVE DIGITAL, NFE, 3 parcelas, R$ 76.580,00), não
+  consistido — conferido mês a mês com dado novo do Sienge (nov–ago iguais fora ele).
+  Agora `consistido()` em `a-pagar-regra.ts` tira `consistencyStatus = "N"` do A Pagar,
+  das Atrasadas e, por consequência, do Geral e da Estimativa (trava no teste). Saíram, na
+  tela de 09/11 (dados de 08/11): A Pagar −R$ 77.288,84 (Chave Digital + Domus 41556,
+  2 × R$ 354,42) e Atrasadas −R$ 8.131,40 (Domus 31604, Sul Brasil 23708, SP Construtora
+  35266). As PRC do Domus são consistidas e ficam. Com isso o painel volta a ficar ABAIXO do
+  Power BI nesses valores (o BI conta não consistido). Conferido local: 135 Jardins
+  R$ 1.662.470,27 = Sienge; Todos: A Pagar R$ 9.804.971,61, Geral R$ 13.164.061,02.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

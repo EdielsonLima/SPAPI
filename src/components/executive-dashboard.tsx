@@ -1036,9 +1036,9 @@ export function ExecutiveDashboard() {
 
   // === Filtered item sets ===
   // A Pagar fora da Holding = card "À Pagar sem prev" do Power BI
-  // (src/lib/a-pagar-regra.ts, 07/11/2026): sem o filtro de consistência do
-  // título e com a Previsão de Comissão (PRC) mesmo vencida; as outras
-  // previsões (PPC, PPE, PRV, PCT) ficam fora. Holding: regra antiga.
+  // (src/lib/a-pagar-regra.ts, 07/11/2026), com a Previsão de Comissão (PRC)
+  // mesmo vencida; as outras previsões (PPC, PPE, PRV, PCT) ficam fora. Título
+  // não consistido fica fora, como no Sienge (09/11). Holding: regra antiga.
   const itemsAPagar = useMemo(() =>
     isHolding
       ? consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr)
@@ -1050,8 +1050,8 @@ export function ExecutiveDashboard() {
     [isHolding, consistentItems, items, companyModeFilter, exclusionSet, todayStr]);
 
   // Atrasadas fora da Holding = card "Contas Atrasadas" do Power BI (mesma
-  // lib, 08/11/2026): sem o filtro de consistência e sem as 5 previsões (PPC,
-  // PPE, PRC, PCT, PRV). O valor da parcela continua effectiveOpenAmount,
+  // lib, 08/11/2026): sem as 5 previsões (PPC, PPE, PRC, PCT, PRV) e sem os
+  // não consistidos (09/11). O valor da parcela continua effectiveOpenAmount,
   // como o relatório do Sienge (decisão do Edielson). Holding: regra antiga.
   const itemsAtrasadas = useMemo(() =>
     isHolding
