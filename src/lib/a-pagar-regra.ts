@@ -22,7 +22,7 @@
 //     09/11: agora ficam fora, ver NÃO CONSISTIDOS);
 //   · a Previsão de Comissão do Domus (R$ 90.000,00, vencida em 27/03/2026:
 //     Reserva Imob 82.500 + Renata K 7.500) ficava fora — o Edielson decidiu
-//     somar no A Pagar, igual ao BI.
+//     somar no A Pagar, igual ao BI (revisto em 09/11: fora, como o Sienge).
 // As outras empresas já batiam centavo a centavo. A página do BI só mostra 10
 // obras (sem Silva Packer Construtora, Sul Brasil e Galpão Rua Canelinha); o
 // painel continua com todas e o filtro Empresas faz o recorte.
@@ -98,17 +98,27 @@
 // R$ 1.662.470,27 × painel R$ 1.739.050,27; a diferença era só o título 41760
 // (CHAVE DIGITAL, NFE, 3 parcelas, R$ 76.580,00), não consistido. Em 09/11
 // saíram R$ 77.288,84 do A Pagar (+ Domus 41556, 2 × R$ 354,42) e R$ 8.131,40
-// das Atrasadas (Domus 31604, Sul Brasil 23708, SP Construtora 35266). As
-// Previsões de Comissão do Domus são consistidas e continuam.
+// das Atrasadas (Domus 31604, Sul Brasil 23708, SP Construtora 35266).
+//
+// PREVISÃO DE COMISSÃO (Edielson, 09/11/2026, de novo "Tirar, como o
+// Sienge"): a PRC sai do A Pagar, vencida ou não, como as outras previsões.
+// O relatório do Sienge não traz documento de previsão (forecastDocument "S",
+// que no Sienge da Silva Packer são exatamente PPC, PPE, PRV, PCT e PRC).
+// Motivo: Domus de 09/11 a 31/12/2050 no Sienge R$ 1.302.368,67 × painel
+// R$ 1.392.368,67; a diferença eram os títulos 35196 (Reserva Imob,
+// R$ 82.500,00) e 35197 (Renata K, R$ 7.500,00), PRC vencidas em 27/03/2026.
+// Os outros meses batiam no centavo. Sem PRC no A Pagar, o filtro Tipo Doc
+// não precisa mais de exceção.
 //
 // O modo Holding NÃO usa estas regras.
 
-/** Previsões que o Power BI tira do total a pagar. */
-export const PREVISOES_FORA_DO_A_PAGAR = new Set(["PPC", "PPE", "PRV", "PCT"]);
-/** Previsão de Comissão: fica no A Pagar mesmo vencida (sai das Atrasadas no BI). */
-export const DOC_PREVISAO_COMISSAO = "PRC";
-/** Previsões que o Power BI tira das Contas Atrasadas (as 4 + a de comissão). */
-export const PREVISOES_FORA_DAS_ATRASADAS = new Set([...PREVISOES_FORA_DO_A_PAGAR, DOC_PREVISAO_COMISSAO]);
+/**
+ * Documentos de previsão do Sienge (forecastDocument "S"): ficam fora do A
+ * Pagar, das Atrasadas e do Geral, como no relatório do Sienge. A Previsão de
+ * Comissão (PRC) entrou na lista em 09/11/2026 (antes ficava no A Pagar, como
+ * no Power BI).
+ */
+export const PREVISOES = new Set(["PPC", "PPE", "PRV", "PCT", "PRC"]);
 
 export type ItemAPagar = {
   correctedBalanceAmount?: number | null;
@@ -126,33 +136,20 @@ export function consistido(item: ItemAPagar): boolean {
   return (item.consistencyStatus || "").trim().toUpperCase() !== "N";
 }
 
-/** Documento "Previsão de Comissão" (PRC). */
-export function ehPrevisaoDeComissao(item: ItemAPagar): boolean {
-  return tipoDoc(item) === DOC_PREVISAO_COMISSAO;
-}
-
-/** Entra no A Pagar (Power BI, sem os não consistidos, como o Sienge). */
+/** Entra no A Pagar: em aberto, a vencer, sem previsão e consistido (como o Sienge). */
 export function entraNoAPagar(item: ItemAPagar, hoje: string): boolean {
   if (!consistido(item)) return false;
-  if (PREVISOES_FORA_DO_A_PAGAR.has(tipoDoc(item))) return false;
+  if (PREVISOES.has(tipoDoc(item))) return false;
   if ((item.correctedBalanceAmount || 0) <= 0) return false;
-  return ehPrevisaoDeComissao(item) || (!!item.dueDate && item.dueDate >= hoje);
+  return !!item.dueDate && item.dueDate >= hoje;
 }
 
-/** Entra nas Contas Atrasadas (Power BI, sem os não consistidos, como o Sienge). */
+/** Entra nas Contas Atrasadas: em aberto, vencida, sem previsão e consistida. */
 export function entraNasAtrasadas(item: ItemAPagar, hoje: string): boolean {
   if (!consistido(item)) return false;
-  if (PREVISOES_FORA_DAS_ATRASADAS.has(tipoDoc(item))) return false;
+  if (PREVISOES.has(tipoDoc(item))) return false;
   if ((item.correctedBalanceAmount || 0) <= 0) return false;
   return !!item.dueDate && item.dueDate < hoje;
-}
-
-/**
- * O tipo "Previsão de Comissão" não aparece no filtro Tipo Doc do CP (as
- * previsões ficam fora da lista), então o filtro não pode cortá-lo.
- */
-export function ignoraFiltroTipoDocCP(item: ItemAPagar): boolean {
-  return ehPrevisaoDeComissao(item);
 }
 
 /**
@@ -169,13 +166,13 @@ export function basePagas<T extends { companyName: string }>(
 }
 
 /**
- * Entra no "Geral a Pagar Ajustado" do Power BI: parcela em aberto (saldo
- * corrigido > 0), de qualquer documento menos as 4 previsões. Com vencimento
+ * Entra no "Geral a Pagar": parcela em aberto (saldo corrigido > 0),
+ * consistida, de qualquer documento menos as previsões. Com vencimento
  * preenchido, é o mesmo que estar no A Pagar ou nas Atrasadas (nunca nos dois).
  */
 export function entraNoGeralAPagar(item: ItemAPagar): boolean {
   if (!consistido(item)) return false;
-  if (PREVISOES_FORA_DO_A_PAGAR.has(tipoDoc(item))) return false;
+  if (PREVISOES.has(tipoDoc(item))) return false;
   return (item.correctedBalanceAmount || 0) > 0;
 }
 

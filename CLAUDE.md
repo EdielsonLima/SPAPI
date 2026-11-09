@@ -433,13 +433,12 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Regra em `src/lib/a-pagar-regra.ts` (trava `a-pagar-regra.test.ts`): saldo corrigido > 0,
   a vencer, qualquer documento menos as previsões PPC/PPE/PRV/PCT, sem olhar a
   consistência do título (**revisto em 09/11: não consistido fica fora**, ver abaixo) e com
-  **toda Previsão de Comissão (PRC) em aberto, mesmo vencida**
+  **toda Previsão de Comissão (PRC) em aberto, mesmo vencida** (**revisto em 09/11: PRC fora**)
   (o BI tira PRC das Atrasadas mas não do total). Decisões do Edielson em 07/11: contar os
   não consistidos (135 Jardins R$ 51.048,22, Chave Digital; Domus R$ 708,84; revisto em
   09/11) e somar a PRC
   como o BI (Domus R$ 90.000,00 vencidos em 27/03/2026). Valor da parcela continua
-  `effectiveOpenAmount` (igual ao BI em todas em 07/11). PRC não aparece no filtro Tipo Doc
-  e não é cortada por ele (`ignoraFiltroTipoDocCP`, também no Calendário de Pagamentos).
+  `effectiveOpenAmount` (igual ao BI em todas em 07/11).
   2026: as 12 empresas iguais ao BI; painel com todas = R$ 4.712.138,42. **A página do BI
   só mostra 10 obras** (filtro fixo sem Silva Packer Construtora, Sul Brasil, Holding e
   Galpão Rua Canelinha; cita uma "RUA 2450" que não existe mais no Sienge) = R$ 4.143.614,48.
@@ -479,8 +478,8 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   dois cards"). BI: `Geral a Pagar Ajustado CARD` = saldo corrigido de tudo em aberto sem
   PPC/PPE/PRV/PCT − imposto; `Estimativa Saidas no Periodo` = Total pago + Geral. No painel
   (`geralAPagar` e `estimativaSaidas` em `a-pagar-regra.ts`, trava `a-pagar-regra.test.ts`):
-  **Geral = Total a Pagar + Contas em Atraso** (toda parcela aberta sem as 4 previsões está
-  em exatamente um dos dois; a PRC vencida só no A Pagar), card "Geral a Pagar" na aba
+  **Geral = Total a Pagar + Contas em Atraso** (toda parcela aberta sem as previsões está
+  em exatamente um dos dois), card "Geral a Pagar" na aba
   Contas a Pagar, logo depois do Total a Pagar; **Estimativa = Total Pago + Geral**, card
   "Estimativa de Saídas" na aba Contas Pagas. Mesmos filtros e valor de parcela das abas,
   só fora da Holding. Anos: com "Todos" aceso (todos ou nenhum marcado) o Geral é tudo em
@@ -518,9 +517,18 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   das Atrasadas e, por consequência, do Geral e da Estimativa (trava no teste). Saíram, na
   tela de 09/11 (dados de 08/11): A Pagar −R$ 77.288,84 (Chave Digital + Domus 41556,
   2 × R$ 354,42) e Atrasadas −R$ 8.131,40 (Domus 31604, Sul Brasil 23708, SP Construtora
-  35266). As PRC do Domus são consistidas e ficam. Com isso o painel volta a ficar ABAIXO do
+  35266). Com isso o painel volta a ficar ABAIXO do
   Power BI nesses valores (o BI conta não consistido). Conferido local: 135 Jardins
   R$ 1.662.470,27 = Sienge; Todos: A Pagar R$ 9.804.971,61, Geral R$ 13.164.061,02.
+- **Previsão de Comissão fora, como o Sienge (Edielson, 09/11, de novo "Tirar, como o
+  Sienge"):** relatório do Sienge, Domus, 09/11/2026 a 31/12/2050: R$ 1.302.368,67; painel
+  R$ 1.392.368,67. Todos os meses de nov/2026 a jul/2027 iguais no centavo; a diferença eram
+  os títulos 35196 (Reserva Imob, R$ 82.500,00) e 35197 (Renata K, R$ 7.500,00), PRC
+  vencidas em 27/03/2026, que o painel somava como o BI. O relatório do Sienge não traz
+  documento de previsão (`forecastDocument = "S"`, que na Silva Packer são exatamente PPC,
+  PPE, PRV, PCT e PRC). Agora `PREVISOES` em `a-pagar-regra.ts` tem as 5 e vale para A
+  Pagar, Atrasadas e Geral; saiu a exceção da PRC no filtro Tipo Doc (`ignoraFiltroTipoDocCP`,
+  painel e Calendário de Pagamentos). O painel fica R$ 90.000,00 abaixo do BI no Domus.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

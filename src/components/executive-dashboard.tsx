@@ -58,7 +58,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc, ehDocumentoTransferencia } from "@/lib/a-receber-regra";
-import { entraNoAPagar, entraNasAtrasadas, ignoraFiltroTipoDocCP, basePagas, geralAPagar, estimativaSaidas } from "@/lib/a-pagar-regra";
+import { entraNoAPagar, entraNasAtrasadas, basePagas, geralAPagar, estimativaSaidas } from "@/lib/a-pagar-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -1012,11 +1012,7 @@ export function ExecutiveDashboard() {
         // "Contrato de Locação…": o tipo não aparece no filtro do CR; no A
         // Receber o aluguel já saiu pela categoria e nas Vencidas ele conta,
         // como no Power BI — ver a-receber-regra.ts
-        (section === "cr" && !isHolding && ignoraFiltroTipoDoc(i)) ||
-        // "Previsão de Comissão" (PRC): fica no A Pagar como no Power BI, mas
-        // o tipo não aparece no filtro (previsões ficam fora da lista) — ver
-        // a-pagar-regra.ts. Só existe em contas a pagar.
-        (!isHolding && ignoraFiltroTipoDocCP(i as { documentIdentificationId?: string }))
+        (section === "cr" && !isHolding && ignoraFiltroTipoDoc(i))
       );
     }
     if (selectedYears.size > 0 && !opts.semAno) {
@@ -1036,9 +1032,9 @@ export function ExecutiveDashboard() {
 
   // === Filtered item sets ===
   // A Pagar fora da Holding = card "À Pagar sem prev" do Power BI
-  // (src/lib/a-pagar-regra.ts, 07/11/2026), com a Previsão de Comissão (PRC)
-  // mesmo vencida; as outras previsões (PPC, PPE, PRV, PCT) ficam fora. Título
-  // não consistido fica fora, como no Sienge (09/11). Holding: regra antiga.
+  // (src/lib/a-pagar-regra.ts, 07/11/2026), sem as previsões (PPC, PPE, PRV,
+  // PCT e, desde 09/11, PRC) e sem título não consistido, como o relatório do
+  // Sienge. Holding: regra antiga.
   const itemsAPagar = useMemo(() =>
     isHolding
       ? consistentItems.filter(i => i.correctedBalanceAmount > 0 && i.dueDate >= todayStr)
@@ -5341,7 +5337,6 @@ export function ExecutiveDashboard() {
           allOutcomeItems={consistentItems}
           selectedCompanies={selectedCompanies}
           selectedDocTypes={selectedDocTypes}
-          ignoraTipoDoc={isHolding ? undefined : ignoraFiltroTipoDocCP}
         />
         </div>
       )}
