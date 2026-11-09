@@ -58,7 +58,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc, ehDocumentoTransferencia } from "@/lib/a-receber-regra";
-import { entraNoAPagar, entraNasAtrasadas, basePagas, geralAPagar, estimativaSaidas } from "@/lib/a-pagar-regra";
+import { entraNoAPagar, entraNasAtrasadas, basePagas, geralAPagar, estimativaSaidas, movimentosParaPagas } from "@/lib/a-pagar-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -1075,7 +1075,11 @@ export function ExecutiveDashboard() {
   //   investments)
   // - transferência/saque/depósito: cash management (not payments to credors)
   const bankMovementsAsItems = useMemo(() => {
-    if (allBankMovements.length === 0) return [] as SiengeOutcome[];
+    // Avulsos + as tarifas de cobrança de títulos A RECEBER (origem CR), que
+    // o relatório Contas Pagas do Sienge soma e não são avulsas (09/11/2026,
+    // movimentosParaPagas em a-pagar-regra.ts). Chegam com allBankMovementsFull.
+    const movimentos = movimentosParaPagas(allBankMovements, allBankMovementsFull);
+    if (movimentos.length === 0) return [] as SiengeOutcome[];
     // Filtro refinado 2026-05-09 contra Sienge "Contas Pagas (por Credor)
     // Sintético" — cravou exato em 12 empresas. Mesma lógica de contas-table.tsx:
     //
@@ -1092,7 +1096,7 @@ export function ExecutiveDashboard() {
       "recebimento",
       "cheque",
     ];
-    return allBankMovements
+    return movimentos
       .filter(bm => {
         if (bm.bankMovementAmount === 0) return false;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1106,7 +1110,9 @@ export function ExecutiveDashboard() {
         return true;
       })
       .map(bm => ({
-        billId: bm.billId || bm.bankMovementId,
+        // Tarifa de cobrança (origem CR) traz o billId do título A RECEBER: não
+        // pode virar chave de título a pagar (exclusões são empresa:billId).
+        billId: (bm.bankMovementOriginId === "CR" ? 0 : bm.billId) || bm.bankMovementId,
         installmentId: 1,
         companyId: bm.companyId,
         companyName: bm.companyName,
@@ -1153,7 +1159,7 @@ export function ExecutiveDashboard() {
         buildingsCosts: [],
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any as SiengeOutcome));
-  }, [allBankMovements]);
+  }, [allBankMovements, allBankMovementsFull]);
 
   // For Pagas computations, include synthesized bank movements alongside
   // outcome items so they flow through all the same filters.
@@ -2586,6 +2592,10 @@ export function ExecutiveDashboard() {
     return k;
   });
   const { companyChart, monthly, annual, daily, color, label: seriesLabel } = tabData;
+  // Margem direita do "Por Empresa" pelo maior rótulo (R$ cheio, 11 px semibold
+  // ≈ 6,8 px por caractere). Fixa em 80 px cortava o fim de "R$ 98.468.821,92"
+  // (135 Jardins, Contas Pagas com Todos os anos — Edielson, 09/11/2026).
+  const margemRotuloEmpresa = Math.max(80, Math.ceil(Math.max(0, ...companyChart.map(e => formatCurrency(Number(e.value)).length)) * 6.8) + 8);
   const chartDataRaw = chartView === "anual" ? annual : chartView === "diario" ? daily : monthly;
   const chartData = chartDataRaw.map((item, idx) => {
     const prev = idx > 0 ? chartDataRaw[idx - 1].value : 0;
@@ -3464,7 +3474,7 @@ export function ExecutiveDashboard() {
                 <BarChart
                   data={companyChart}
                   layout="vertical"
-                  margin={{ top: 0, right: 80, left: 0, bottom: 0 }}
+                  margin={{ top: 0, right: margemRotuloEmpresa, left: 0, bottom: 0 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" stroke={chartColors.gridStroke} horizontal={false} />
                   <XAxis

@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   entraNoAPagar, entraNasAtrasadas, basePagas,
   entraNoGeralAPagar, geralAPagar, estimativaSaidas, consistido,
+  ehTarifaCobrancaDeTituloAReceber, movimentosParaPagas,
 } from "../lib/a-pagar-regra";
 
 const hoje = "2026-11-07";
@@ -116,5 +117,28 @@ assert.equal(entraNoGeralAPagar(comissaoVencida), false, "previsão de comissão
 assert.equal(geralAPagar(0, 0), 0);
 assert.equal(geralAPagar(4129766.92, 2505304.90).toFixed(2), "6635071.82");
 assert.equal(estimativaSaidas(64957152.12, 6635071.82).toFixed(2), "71592223.94");
+
+// Tarifa de cobrança de título a receber (09/11/2026): movimentos reais.
+// 135 Jardins, 25/05/2023, título a receber 312 ("BOLETO TESTE"), R$ 2,08.
+const tarifaCR = { bankMovementId: 17251, bankMovementOriginId: "CR", bankMovementOperationType: "S", bankMovementHistoricName: "Pag. tarifa bancária cobrança", bankMovementAmount: 2.08 };
+// Tarifa avulsa (origem BC) do mesmo 135 Jardins, 01/08/2023 — já vinha nos avulsos.
+const tarifaBC = { bankMovementId: 900001, bankMovementOriginId: "BC", bankMovementOperationType: "S", bankMovementHistoricName: "Pag. tarifa bancária cobrança", bankMovementAmount: 2.08 };
+// Origem CR que NÃO entra no relatório: o recebimento e o desconto concedido.
+const recebimentoCR = { bankMovementId: 900002, bankMovementOriginId: "CR", bankMovementOperationType: "S", bankMovementHistoricName: "Recebimento", bankMovementAmount: 1500 };
+const descontoCR = { bankMovementId: 900003, bankMovementOriginId: "CR", bankMovementOperationType: "S", bankMovementHistoricName: "Desconto concedido", bankMovementAmount: 0.58 };
+const pagamentoCP = { bankMovementId: 900004, bankMovementOriginId: "CP", bankMovementOperationType: "S", bankMovementHistoricName: "Pagamento", bankMovementAmount: 100 };
+assert.equal(ehTarifaCobrancaDeTituloAReceber(tarifaCR), true, "tarifa do boleto de título a receber entra");
+assert.equal(ehTarifaCobrancaDeTituloAReceber({ ...tarifaCR, bankMovementHistoricName: "PAG. TARIFA BANCARIA COBRANCA" }), true, "sem acento e em maiúscula");
+assert.equal(ehTarifaCobrancaDeTituloAReceber(tarifaBC), false, "avulsa já entra por outro caminho");
+assert.equal(ehTarifaCobrancaDeTituloAReceber(recebimentoCR), false);
+assert.equal(ehTarifaCobrancaDeTituloAReceber(descontoCR), false);
+assert.equal(ehTarifaCobrancaDeTituloAReceber({ ...tarifaCR, bankMovementOperationType: "E" }), false, "entrada não");
+assert.equal(ehTarifaCobrancaDeTituloAReceber({ ...tarifaCR, bankMovementAmount: 0 }), false, "zerada não");
+const todos = [tarifaBC, tarifaCR, recebimentoCR, descontoCR, pagamentoCP];
+assert.deepEqual(movimentosParaPagas([tarifaBC], todos), [tarifaBC, tarifaCR], "avulsos + tarifa CR, sem o resto");
+assert.deepEqual(movimentosParaPagas([tarifaBC, tarifaCR], todos), [tarifaBC, tarifaCR], "não repete o que já está nos avulsos");
+assert.deepEqual(movimentosParaPagas([tarifaBC], []), [tarifaBC], "antes de chegar a lista completa");
+// Maio/2023 do 135 Jardins: painel R$ 1.082.610,13 + R$ 2,08 = Sienge R$ 1.082.612,21.
+assert.equal((1082610.13 + tarifaCR.bankMovementAmount).toFixed(2), "1082612.21");
 
 console.log("a-pagar-regra: ok");

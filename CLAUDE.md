@@ -529,6 +529,20 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   PPE, PRV, PCT e PRC). Agora `PREVISOES` em `a-pagar-regra.ts` tem as 5 e vale para A
   Pagar, Atrasadas e Geral; saiu a exceção da PRC no filtro Tipo Doc (`ignoraFiltroTipoDocCP`,
   painel e Calendário de Pagamentos). O painel fica R$ 90.000,00 abaixo do BI no Domus.
+- **Contas Pagas do 135 Jardins conferido com o Sienge (Edielson, 09/11):** relatório "Contas
+  Pagas (por Data) Sintético", 01/01/2001 a 09/11/2026: Líquido R$ 98.468.821,92; painel
+  R$ 98.468.819,84. Os 72 meses iguais menos maio/2023 (−R$ 2,08): **tarifa do boleto de um
+  título A RECEBER** (movimento bancário de saída, origem CR, histórico "Pag. tarifa bancária
+  cobrança", 25/05/2023, título 312 "BOLETO TESTE"). Não é avulsa nem está no /outcome, e o
+  relatório soma com "Tarifas bancárias ref. cobrança escritural" marcado. Agora
+  `movimentosParaPagas` em `a-pagar-regra.ts` (trava no teste) junta aos avulsos essas tarifas,
+  tiradas da lista completa de movimentos que o painel já baixa para o DRE
+  (`allBankMovementsFull`); entram com `billId` = id do movimento, para não colidir com título a
+  pagar. Na base toda são 3 (esta e 2 × R$ 2,07 do Palácio Elizabeth em 07/06/2023). Depois:
+  135 Jardins = R$ 98.468.821,92, igual ao Sienge. Só no Painel; a tela avulsa Financeiro ›
+  Contas Pagas (`contas-table.tsx`) segue a regra antiga. Margem direita do gráfico "Por
+  Empresa" passou a ser calculada pelo maior rótulo (`margemRotuloEmpresa`); fixa em 80 px
+  cortava o fim de valores com 16+ caracteres.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

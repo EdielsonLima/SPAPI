@@ -165,6 +165,48 @@ export function basePagas<T extends { companyName: string }>(
   return [...titulos, ...movimentosAvulsos.filter((m) => empresaDoModo(m.companyName))];
 }
 
+// TARIFA DE COBRANÇA DE TÍTULO A RECEBER (Edielson, 09/11/2026, Contas Pagas do
+// 135 Jardins). O relatório "Contas Pagas (por Data) Sintético" do Sienge, com
+// "Tarifas bancárias ref. cobrança escritural" marcado, soma a tarifa que o
+// banco cobra pelo boleto de um título A RECEBER: movimento bancário de saída
+// com origem CR e histórico "Pag. tarifa bancária cobrança". Ele não é avulso
+// (fica ligado ao título do cliente) e não está no /outcome, então o painel não
+// o via. 135 Jardins, 01/01/2001 a 09/11/2026: Sienge R$ 98.468.821,92, painel
+// R$ 98.468.819,84 — só maio/2023 diferia, pela tarifa de R$ 2,08 de 25/05/2023
+// (título a receber 312, "BOLETO TESTE"). Em toda a base, em 09/11, são 3: essa
+// e duas de R$ 2,07 do Palácio Elizabeth em 07/06/2023 (títulos 238 e 225). As
+// tarifas avulsas (origem BC) já entravam pelos movimentos avulsos.
+export type MovimentoBancario = {
+  bankMovementId?: number | null;
+  bankMovementOriginId?: string | null;
+  bankMovementOperationType?: string | null;
+  bankMovementHistoricName?: string | null;
+  bankMovementAmount?: number | null;
+};
+
+function semAcento(s: string | null | undefined): string {
+  return (s || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/** Tarifa do boleto de um título a receber (origem CR, saída, "tarifa ... cobrança"). */
+export function ehTarifaCobrancaDeTituloAReceber(bm: MovimentoBancario): boolean {
+  if ((bm.bankMovementOriginId || "").trim().toUpperCase() !== "CR") return false;
+  if ((bm.bankMovementOperationType || "").trim().toUpperCase() !== "S") return false;
+  if (!bm.bankMovementAmount) return false;
+  const h = semAcento(bm.bankMovementHistoricName);
+  return h.includes("tarifa") && h.includes("cobranca");
+}
+
+/**
+ * Movimentos bancários que entram nas Contas Pagas: os avulsos e, de todos os
+ * movimentos, as tarifas de cobrança de títulos a receber (sem repetir um que
+ * já esteja nos avulsos). O filtro de saída/categoria/histórico vem depois.
+ */
+export function movimentosParaPagas<T extends MovimentoBancario>(avulsos: T[], todos: T[]): T[] {
+  const jaTem = new Set(avulsos.map((b) => b.bankMovementId));
+  return [...avulsos, ...todos.filter((b) => ehTarifaCobrancaDeTituloAReceber(b) && !jaTem.has(b.bankMovementId))];
+}
+
 /**
  * Entra no "Geral a Pagar": parcela em aberto (saldo corrigido > 0),
  * consistida, de qualquer documento menos as previsões. Com vencimento
