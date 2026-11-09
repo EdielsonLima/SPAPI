@@ -29,6 +29,7 @@ import { CorretoresView } from "@/components/corretores-view";
 import { TabelaPrecosView } from "@/components/tabela-precos-view";
 import { semVenda } from "@/lib/tabela-precos";
 import { aplicarTabelaComercial, precoDaTabelaComercial, tabelaComercialPara } from "@/lib/tabela-comercial";
+import { aplicarSituacaoManual } from "@/lib/estoque-resumo";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
@@ -68,7 +69,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     selectedUnitEnterprises, setSelectedUnitEnterprises,
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
     selectedUnitCustomers, setSelectedUnitCustomers,
-    toggleInSet, precosTabela, tabelasComerciais,
+    toggleInSet, precosTabela, tabelasComerciais, situacoesManuais,
   } = useComercial();
   // Vendas: contar por unidade (padrão, como no Financeiro da Leven) ou por contrato.
   const [contarPor, setContarPor] = React.useState<"unidades" | "contratos">("unidades");
@@ -331,8 +332,10 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
     // Situação do Quadro (cor/legenda): estoque do Sienge + permuta pura = Permutante;
     // por cima, a tabela comercial manual do empreendimento (listada = Disponível,
     // não listada e livre no Sienge = Vendido) — src/lib/tabela-comercial.ts.
+    // Por cima de tudo, a situação posta à mão no Painel › Resumo › Estoque
+    // (src/lib/estoque-resumo.ts), para o Quadro e o Resumo dizerem o mesmo.
     const tabelaComercialDe = (u: UnitRecord) => tabelaComercialPara(u.enterprise, tabelasComerciais).tabela;
-    allUnits.forEach(u => { u.situacao = aplicarTabelaComercial(situacaoDaUnidade(u.status, u.permuta), u.unit, tabelaComercialDe(u)); });
+    allUnits.forEach(u => { u.situacao = aplicarSituacaoManual(aplicarTabelaComercial(situacaoDaUnidade(u.status, u.permuta), u.unit, tabelaComercialDe(u)), u.unitId, situacoesManuais); });
     // Preço de tabela (painel) só vale para unidade sem venda; a vendida mostra o
     // contrato. Sem preço no painel, vale o da tabela comercial manual.
     const precoTabela = (u: UnitRecord) => {

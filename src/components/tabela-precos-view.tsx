@@ -19,12 +19,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from "@/components/ui/table";
 import { SortableHead, useTableSort } from "@/components/ui/sortable-head";
 import { PainelLateral, CabecalhoPainel } from "@/components/painel-detalhe";
+import { InputReais } from "@/components/input-reais";
 import { useComercial } from "@/components/comercial-provider";
 import { formatCurrency, formatCompactCurrency } from "@/lib/dashboard-utils";
 import { pavimentoDaUnidade, inferUnitTypeFromName } from "@/lib/comercial-utils";
 import {
   aplicarReajuste, descreverReajuste, lerDecimalBR, lerValorBR, precoPorM2, semVenda, validarReajuste,
-  mascararValorBR, completarCentavosBR, type Reajuste,
+  type Reajuste,
 } from "@/lib/tabela-precos";
 import { normalizarTabelaComercial, aplicarTabelaComercial, tabelaComercialPara, nomeUnidade, TABELA_COMERCIAL_VAZIA, type TabelaComercial } from "@/lib/tabela-comercial";
 import { situacaoDaUnidade } from "@/lib/situacao-unidade";
@@ -62,43 +63,8 @@ const dataHora = (iso: string) => {
 const numeroBR = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const quem = (s: string) => s.replace(/\s*<.*>$/, "");
 
-// Campo de valor em reais: "R$" fixo à esquerda, separador de milhar enquanto
-// digita e centavos completados ao sair. O cursor fica depois do mesmo dígito
-// em que estava — sem isso, cada ponto inserido o jogaria para o fim.
-function InputReais({ value, onChange, permitirNegativo = false, className = "", ...resto }: {
-  value: string; onChange: (texto: string) => void; permitirNegativo?: boolean; className?: string;
-} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange">) {
-  return (
-    <div className={`relative ${className}`}>
-      <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">R$</span>
-      <Input
-        {...resto}
-        inputMode="decimal"
-        value={value}
-        className="h-full w-full pl-8 text-right tabular-nums"
-        onChange={e => {
-          const el = e.target;
-          const cursor = el.selectionStart ?? el.value.length;
-          const antes = el.value.slice(0, cursor);
-          const digitosAntes = antes.replace(/[^\d,]/g, "").length;
-          const novo = mascararValorBR(el.value, permitirNegativo);
-          onChange(novo);
-          requestAnimationFrame(() => {
-            let pos = 0, vistos = 0;
-            const inicio = novo.startsWith("-") && antes.trim().startsWith("-") ? 1 : 0;
-            pos = inicio;
-            while (pos < novo.length && vistos < digitosAntes) { if (/[\d,]/.test(novo[pos])) vistos++; pos++; }
-            try { el.setSelectionRange(pos, pos); } catch { /* campo já desmontado */ }
-          });
-        }}
-        onBlur={e => { const c = completarCentavosBR(value, permitirNegativo); if (c !== value) onChange(c); resto.onBlur?.(e); }}
-      />
-    </div>
-  );
-}
-
 export function TabelaPrecosView() {
-  const { apiUnits, precosTabela, tabelasComerciais, podeEditarPrecos, recarregarPrecos, cubData } = useComercial();
+  const { apiUnits, precosTabela, tabelasComerciais, situacoesManuais, podeEditarPrecos, recarregarPrecos, cubData } = useComercial();
 
   // ── Filtros ──
   const empreendimentos = useMemo(
@@ -530,6 +496,7 @@ export function TabelaPrecosView() {
                     <TableCell className="text-muted-foreground">
                       {l.status}
                       {tcExiste && (() => { const sit = aplicarTabelaComercial(situacaoBase(l.status), l.unidade, tcEfetiva); return sit !== situacaoBase(l.status) ? <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/20 dark:text-amber-200" title="Pela tabela comercial">{sit} (tabela)</span> : null; })()}
+                      {situacoesManuais.has(l.unitId) && <span className="ml-1.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200" title="Situação posta à mão no Painel › Resumo › Estoque; vale por cima do Sienge e da tabela comercial">{situacoesManuais.get(l.unitId)} (manual)</span>}
                     </TableCell>
                     <TableCell>
                       {podeEditarPrecos ? (

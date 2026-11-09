@@ -16,6 +16,7 @@
 //    então os totais são os mesmos.
 
 import { normalizarTabelaComercial, type TabelaComercial } from "@/lib/tabela-comercial";
+import { ehSituacaoManual, type SituacaoManual } from "@/lib/estoque-resumo";
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { SiengeSalesContract } from "@/types/sienge";
@@ -67,6 +68,8 @@ interface ComercialContextValue {
   precosTabela: Map<number, number>;
   // Tabela comercial manual (disponíveis + preços do diretor comercial), por chave do empreendimento.
   tabelasComerciais: Map<string, TabelaComercial>;
+  // Situação posta à mão no Painel › Resumo › Estoque (unitId → situação): vale por cima do Sienge e da tabela comercial.
+  situacoesManuais: Map<number, SituacaoManual>;
   podeEditarPrecos: boolean;
   recarregarPrecos: () => Promise<void>;
 }
@@ -253,6 +256,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
 
   const [precosTabela, setPrecosTabela] = useState<Map<number, number>>(new Map());
   const [tabelasComerciais, setTabelasComerciais] = useState<Map<string, TabelaComercial>>(new Map());
+  const [situacoesManuais, setSituacoesManuais] = useState<Map<number, SituacaoManual>>(new Map());
   const [podeEditarPrecos, setPodeEditarPrecos] = useState(false);
   const recarregarPrecos = useCallback(async () => {
     try {
@@ -268,6 +272,12 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
       const d = await r.json() as { tabelas?: Record<string, Partial<TabelaComercial>> };
       setTabelasComerciais(new Map(Object.entries(d.tabelas || {}).map(([k, v]) => [k, normalizarTabelaComercial(v)])));
     } catch { /* sem tabela comercial: vale o Sienge */ }
+    try {
+      const r = await fetch("/api/situacao-unidades");
+      if (!r.ok) return;
+      const d = await r.json() as { situacoes?: { unitId: number; situacao: string }[] };
+      setSituacoesManuais(new Map((d.situacoes || []).filter(x => ehSituacaoManual(x.situacao)).map(x => [x.unitId, x.situacao as SituacaoManual])));
+    } catch { /* sem ajuste manual: vale o Sienge e a tabela comercial */ }
   }, []);
   useEffect(() => { recarregarPrecos(); }, [recarregarPrecos]);
 
@@ -288,7 +298,7 @@ export function ComercialProvider({ children }: { children: React.ReactNode }) {
     selectedUnitTypes, setSelectedUnitTypes, selectedUnits, setSelectedUnits,
     selectedUnitCustomers, setSelectedUnitCustomers,
     toggleInSet,
-    precosTabela, tabelasComerciais, podeEditarPrecos, recarregarPrecos,
+    precosTabela, tabelasComerciais, situacoesManuais, podeEditarPrecos, recarregarPrecos,
   };
 
   return <ComercialContext.Provider value={value}>{children}</ComercialContext.Provider>;

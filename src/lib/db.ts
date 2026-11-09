@@ -1545,3 +1545,89 @@ export async function salvarTabelaComercial(chave: string, dados: object, por: s
      ON CONFLICT (chave) DO UPDATE SET dados = EXCLUDED.dados, atualizado_por = EXCLUDED.atualizado_por, atualizado_em = NOW()`,
     [chave, JSON.stringify(dados), por]);
 }
+
+// ─── Situação manual das unidades (Painel › Resumo › Estoque) ────────────────
+// Situação posta à mão no painel, por cima do Sienge e da tabela comercial:
+// "Disponível", "Reservado" ou "Vendido". Uma linha por unidade ajustada; sem
+// linha, vale o automático. Nada é gravado no Sienge. A tabela nasce na 1ª
+// chamada (mesmo padrão da tabela de preços).
+let situacaoManualPronta = false;
+async function ensureSituacaoManual() {
+  if (situacaoManualPronta) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS situacao_manual_unidades (
+      unit_id         INTEGER      PRIMARY KEY,
+      enterprise_id   INTEGER      NOT NULL,
+      unidade         TEXT         NOT NULL DEFAULT '',
+      situacao        VARCHAR(20)  NOT NULL,
+      atualizado_por  TEXT         NOT NULL DEFAULT '',
+      atualizado_em   TIMESTAMP    NOT NULL DEFAULT NOW()
+    );
+  `);
+  situacaoManualPronta = true;
+}
+
+export interface SituacaoManualUnidade {
+  unitId: number;
+  enterpriseId: number;
+  unidade: string;
+  situacao: string;
+  atualizadoPor: string;
+  atualizadoEm: string;
+}
+
+export interface AlteracaoSituacao {
+  unitId: number;
+  enterpriseId: number;
+  unidade: string;
+  situacao: string | null;       // null = volta ao automático (Sienge / tabela comercial)
+}
+
+export async function listarSituacoesManuais(): Promise<SituacaoManualUnidade[]> {
+  await ensureSituacaoManual();
+  const { rows } = await pool.query(
+    `SELECT unit_id AS "unitId", enterprise_id AS "enterpriseId", unidade, situacao,
+            atualizado_por AS "atualizadoPor", atualizado_em AS "atualizadoEm"
+       FROM situacao_manual_unidades`
+  );
+  return rows;
+}
+
+// Grava numa transação e devolve quantas unidades mudaram de fato.
+export async function gravarSituacoesManuais(alteracoes: AlteracaoSituacao[], usuario: string): Promise<number> {
+  if (alteracoes.length === 0) return 0;
+  await ensureSituacaoManual();
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `SELECT unit_id, situacao FROM situacao_manual_unidades WHERE unit_id = ANY($1::int[]) FOR UPDATE`,
+      [alteracoes.map(a => a.unitId)],
+    );
+    const atual = new Map<number, string>(rows.map((r: { unit_id: number; situacao: string }) => [r.unit_id, r.situacao]));
+    let mudou = 0;
+    for (const a of alteracoes) {
+      const antes = atual.get(a.unitId) ?? null;
+      if (antes === a.situacao) continue;
+      if (a.situacao === null) {
+        await client.query(`DELETE FROM situacao_manual_unidades WHERE unit_id = $1`, [a.unitId]);
+      } else {
+        await client.query(
+          `INSERT INTO situacao_manual_unidades (unit_id, enterprise_id, unidade, situacao, atualizado_por, atualizado_em)
+           VALUES ($1,$2,$3,$4,$5,NOW())
+           ON CONFLICT (unit_id) DO UPDATE SET
+             enterprise_id = $2, unidade = $3, situacao = $4, atualizado_por = $5, atualizado_em = NOW()`,
+          [a.unitId, a.enterpriseId, a.unidade, a.situacao, usuario],
+        );
+      }
+      mudou++;
+    }
+    await client.query("COMMIT");
+    return mudou;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}

@@ -381,3 +381,16 @@ CREATE TABLE IF NOT EXISTS tabela_comercial (
   atualizado_por TEXT NOT NULL DEFAULT '',
   atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- ── Situação manual das unidades (Painel › Resumo › Estoque) ──
+-- Situação posta à mão no painel ("Disponível", "Reservado", "Vendido"), por cima
+-- do Sienge e da tabela comercial. Sem linha = automático. Não escreve no Sienge.
+-- O app cria a tabela na 1ª chamada (ensureSituacaoManual em src/lib/db.ts).
+CREATE TABLE IF NOT EXISTS situacao_manual_unidades (
+  unit_id INTEGER PRIMARY KEY,
+  enterprise_id INTEGER NOT NULL,
+  unidade TEXT NOT NULL DEFAULT '',
+  situacao VARCHAR(20) NOT NULL,
+  atualizado_por TEXT NOT NULL DEFAULT '',
+  atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);

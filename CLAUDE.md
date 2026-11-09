@@ -789,6 +789,49 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
 - Empresas Finalizadas sempre no final da tabela (case-insensitive)
 - Status Ativa/Finalizada vem de Configurações > Empreendimentos
 
+## Resumo › Estoque por unidade: modal editável (Edielson, 09/11/2026)
+
+- Pedido: "o valor do estoque, ao clicar nele, abra um modal com a empresa filtrada e
+  com todas as unidades disponíveis", com o valor de cada unidade editável em reais e
+  a disponibilidade/reserva ajustável ali mesmo.
+- Clicar em **Valor Estoque**, **Disp.** ou **Res.Téc.** de uma empresa abre o modal
+  (`src/components/estoque-modal.tsx`): cartões (valor, disponíveis, reservadas, sem
+  preço), filtros (Em estoque · Disponíveis · Reservadas · Vendidas e outras · Diferem
+  do Sienge · Todas, tipo e busca) e, por unidade, tipo do Sienge, situação e preço.
+  O digitado fica pendente e já simulado nos cartões até **Salvar**.
+- **Regra única** em `src/lib/estoque-resumo.ts` (trava `estoque-resumo.test.ts`), usada
+  pela tabela do Resumo e pelo modal — o total do modal é o número da coluna.
+  - Situação em camadas: **manual** (posta no modal) > **tabela comercial** do
+    empreendimento > **Sienge**. É a mesma do Quadro Espelho (`aplicarSituacaoManual`
+    em `comercial-view.tsx`); a Tabela de Preços mostra a etiqueta "(manual)".
+  - Valor da unidade Disponível: preço da **Tabela de Preços** do painel; sem ele, o da
+    tabela comercial; sem nenhum, a estimativa de sempre (área × fator × CUB).
+  - Sala, loja e box (pelo nome) continuam fora da contagem e só somam com preço.
+  - Reservada não soma no Valor Estoque (como antes).
+- Onde grava (nada vai para o Sienge): preço → `tabela_precos_unidades` pela rota
+  `/api/tabela-precos` (com histórico); situação → tabela nova `situacao_manual_unidades`
+  (`ensureSituacaoManual` em `db.ts`, nasce na 1ª chamada) pela rota
+  `/api/situacao-unidades`. "Sienge/Tabela comercial · X" no seletor apaga o ajuste.
+  Edita quem edita a Tabela de Preços (`TABELA_PRECOS_EMAILS`); os demais só veem.
+- **Sem preço, tabela comercial nem ajuste manual os números não mudam**: conferido
+  local com os fatores de produção — 135 Jardins R$ 4.019.805,17 (18/3), Rozza
+  R$ 381.954,00 (8), Serenity R$ 4.653.472,90 (5/6), Tesla R$ 954.885,00 (21), Capri
+  R$ 1.193.415,27 (8), Siena R$ 3.985.530,84 (23), Hannover R$ 2.233.065,41 (16), iguais
+  à tela de produção de 09/11.
+- **Palácio Elizabeth mudou**: de R$ 10.496.599,46 / 82 disp. para **R$ 55.600.000,00 /
+  12 disp.**, porque o Resumo passou a seguir a tabela comercial (12 à venda, com preço).
+  As 3102 e 3202 (R$ 10,2 mi) entram por estarem na tabela comercial; no Sienge são
+  permuta de R$ 0,01 em nome de João Paulo e Carlos Humberto. 1501, 1502 e 1801 estão
+  livres no Sienge e fora da tabela comercial (contam como vendidas). Tudo ajustável no modal.
+- **Achado, ainda sem decisão:** a coluna Disp. deveria contar só apartamento, mas a
+  regra olha o NOME (`entraPeloNome`) e a vaga se chama "G 108" no Sienge — então vaga
+  conta e é estimada por m² × fator × CUB (os 82 do Palácio eram 13 apartamentos + 69
+  vagas; 135 Jardins 18 = 3 + 15). O modal mostra a composição no cartão Disponíveis.
+  Não foi mudado: trocar para o tipo do cadastro derruba Disp. e Valor Estoque de quase
+  todas as empresas (Tesla iria a zero).
+- `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
+  (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
+
 ## Visão Geral - Regras (Criado em 2026-04-01)
 
 - Aba padrão ao abrir o Painel Executivo

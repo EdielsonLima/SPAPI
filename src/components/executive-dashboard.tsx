@@ -69,6 +69,8 @@ import { DetalhamentoTable } from "@/components/detalhamento-table";
 import { useCompanyMode } from "@/lib/company-context";
 import { MultiSelectFilter, CustomTooltip } from "@/components/multi-select-filter";
 import type { ApiUnit } from "@/lib/comercial-utils";
+import { EstoqueModal, useDadosEstoque, type FiltroEstoque } from "@/components/estoque-modal";
+import { linhasDeEstoque, totaisPorEmpresa } from "@/lib/estoque-resumo";
 import { periodosDoPainel } from "@/lib/painel-periodos";
 
 type Section = "cp" | "cr";
@@ -280,6 +282,18 @@ export function ExecutiveDashboard() {
   const [apiUnits, setApiUnits] = useState<ApiUnit[]>(() => cacheInicial?.apiUnits ?? []);
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
   const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string; controlaOrcamento?: boolean }[]>([]);
+  // Estoque do Resumo (Valor Estoque, Disp., Res.Téc.): preço de tabela do painel,
+  // tabela comercial e situação manual por cima do Sienge — regra única em
+  // src/lib/estoque-resumo.ts. Clicar numa das três colunas abre o modal da empresa.
+  const dadosEstoque = useDadosEstoque();
+  const [estoqueAberto, setEstoqueAberto] = useState<{ empresa: string; filtro: FiltroEstoque } | null>(null);
+  const totaisEstoque = useMemo(() => totaisPorEmpresa(linhasDeEstoque(apiUnits, {
+    precos: dadosEstoque.precos,
+    tabelasComerciais: dadosEstoque.tabelasComerciais,
+    situacoesManuais: dadosEstoque.situacoesManuais,
+    fator: empresa => companySettings.find(cs => cs.companyName === empresa)?.factor || 0,
+    cub: cubData?.currentValue || 0,
+  })), [apiUnits, dadosEstoque.precos, dadosEstoque.tabelasComerciais, dadosEstoque.situacoesManuais, companySettings, cubData]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   // Per-tab filters: save/restore when switching tabs. Companies tem o seu
   // proprio Record (perTabCompanies) por questao historica; os outros filtros
@@ -5208,27 +5222,18 @@ export function ExecutiveDashboard() {
           companySummary[co].totalAReceber += effectiveAmount(item);
         });
 
-        // Units: Qt. Disponíveis, Res. Técnica, Valor Estoque
-        // Only count "Apartamento" type units (exclude vagas, salas, lojas, etc.)
-        const isApartamento = (name: string): boolean => {
-          const n = name.toUpperCase();
-          if (/VAGA|GARAGEM|ESTACION/i.test(n)) return false;
-          if (/\bSL\b|\bSALA\b|COMERCIAL/i.test(n)) return false;
-          if (/\bLJ\b|\bLOJA\b/i.test(n)) return false;
-          if (/\bDEP\b|DEPOSITO|\bBOX\b/i.test(n)) return false;
-          return true;
-        };
-        apiUnits.forEach(u => {
-          const co = u.companyName;
+        // Units: Qt. Disponíveis, Res. Técnica, Valor Estoque — regra única em
+        // src/lib/estoque-resumo.ts (a mesma do modal Estoque). Sem preço de
+        // tabela, tabela comercial nem ajuste manual, dá os números de antes:
+        // unidade Disponível que passa pela regra do nome soma área × fator × CUB.
+        totaisEstoque.forEach((t, co) => {
           if (!companySummary[co]) return;
-          if (!isApartamento(u.name)) return;
-          if (u.commercialStock === "Disponível") {
-            companySummary[co].qtDisp++;
-            companySummary[co].valorEstoque += u.privateArea * (companySettings.find(cs => cs.companyName === co)?.factor || 0) * (cubData?.currentValue || 0);
-          } else if (u.commercialStock === "Reserva Técnica") {
-            companySummary[co].qtResTec++;
-          }
+          companySummary[co].qtDisp = t.qtDisp;
+          companySummary[co].qtResTec = t.qtResTec;
+          companySummary[co].valorEstoque = t.valorEstoque;
         });
+        const abrirEstoque = (empresa: string, filtro: FiltroEstoque) => setEstoqueAberto({ empresa, filtro });
+        const linkEstoque = "tabular-nums underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-4 hover:text-primary hover:decoration-primary transition-colors";
 
         // Sort: Ativa first, then by selected field
         const toggleResumoSort = (field: string) => {
@@ -5324,6 +5329,10 @@ export function ExecutiveDashboard() {
                         const lucroPotencial = co.totalAReceber + co.valorEstoque;
                         const lucratividade = co.totalRecebido > 0 ? (lucroRealizado / co.totalRecebido) * 100 : 0;
                         const isFinalizada = co.status.toLowerCase().includes("finalizada");
+                        const est = totaisEstoque.get(co.companyName);
+                        const dicaEstoque = est && est.comPreco + est.estimadas > 0
+                          ? `${est.comPreco} a preço de tabela · ${est.estimadas} por estimativa (m² × fator × CUB) · clique para ver e ajustar`
+                          : "Clique para ver e ajustar o estoque";
 
                         return (
                           <TableRow key={co.companyName} className={isFinalizada ? "bg-slate-50/50 dark:bg-slate-800/30 opacity-70" : "hover:bg-slate-50 dark:hover:bg-slate-800"}>
@@ -5341,10 +5350,22 @@ export function ExecutiveDashboard() {
                               {formatCurrency(lucroRealizado)}
                             </TableCell>
                             <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{formatCurrency(co.totalAReceber)}</TableCell>
-                            <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{co.valorEstoque > 0 ? formatCurrency(co.valorEstoque) : "-"}</TableCell>
+                            <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">
+                              <button type="button" onClick={() => abrirEstoque(co.companyName, "estoque")} className={linkEstoque} title={dicaEstoque} aria-label={`Abrir o estoque de ${co.companyName}`}>
+                                {co.valorEstoque > 0 ? formatCurrency(co.valorEstoque) : "-"}
+                              </button>
+                            </TableCell>
                             <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{lucroPotencial > 0 ? formatCurrency(lucroPotencial) : "-"}</TableCell>
-                            <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">{co.qtDisp > 0 ? co.qtDisp : "-"}</TableCell>
-                            <TableCell className="text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">{co.qtResTec > 0 ? co.qtResTec : "-"}</TableCell>
+                            <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">
+                              <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis")} className={linkEstoque} title="Ver as unidades disponíveis" aria-label={`Abrir as unidades disponíveis de ${co.companyName}`}>
+                                {co.qtDisp > 0 ? co.qtDisp : "-"}
+                              </button>
+                            </TableCell>
+                            <TableCell className="text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">
+                              <button type="button" onClick={() => abrirEstoque(co.companyName, "reservadas")} className={linkEstoque} title="Ver as unidades reservadas" aria-label={`Abrir as unidades reservadas de ${co.companyName}`}>
+                                {co.qtResTec > 0 ? co.qtResTec : "-"}
+                              </button>
+                            </TableCell>
                             <TableCell className="text-xs text-right tabular-nums">
                               <div className="flex items-center justify-end gap-2">
                                 <div className="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
@@ -5386,6 +5407,20 @@ export function ExecutiveDashboard() {
                 </div>
               </CardContent>
             </Card>
+
+            {estoqueAberto && (
+              <EstoqueModal
+                key={estoqueAberto.empresa}
+                empresa={estoqueAberto.empresa}
+                filtroInicial={estoqueAberto.filtro}
+                unidades={apiUnits}
+                dados={dadosEstoque}
+                fator={companySettings.find(cs => cs.companyName === estoqueAberto.empresa)?.factor || 0}
+                cub={cubData?.currentValue || 0}
+                cubMes={cubData?.currentMonth}
+                onFechar={() => setEstoqueAberto(null)}
+              />
+            )}
           </div>
         );
       })()}
