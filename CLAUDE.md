@@ -747,6 +747,15 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   −5.212.081,44 para −4.663.228,15 = "−10,5%" verde (antes "+10,5%"). Receita e linhas
   de lucro não mudaram. Regra em `src/lib/dre-variacao.ts` (trava
   `dre-variacao.test.ts`); só a exibição do %, nenhum valor do DRE passa por ela.
+- **% da Receita no lugar dos Insights (Edielson, 09/11/2026: "o Carlos Humberto não usa
+  isso"):** o painel "Insights da DRE" (frases automáticas) saiu de vez e a tabela da DRE
+  Simples ocupa a largura toda. Coluna **% Receita** (análise vertical) na DRE Simples e
+  **% Rec.** depois do Total na DRE Completa: linha ÷ Receita Operacional do período.
+  Custo/despesa sem sinal (custo variável 84,5 %), linhas de lucro com sinal = margem, a
+  mesma conta da pílula dos cards (−4,7 %). Conta aberta (nível 2) mostra também o % da
+  receita (as contas somam o grupo); a parte dela dentro do grupo, que era o % mostrado
+  até 09/11, foi para a dica. Regra em `src/lib/dre-analise-vertical.ts` (trava
+  `dre-analise-vertical.test.ts`); só exibição, nenhum valor do DRE passa por ela.
 
 Os valores da DRE foram validados contra o Power BI e batem 100%.
 

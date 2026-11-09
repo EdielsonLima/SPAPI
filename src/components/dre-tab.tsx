@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { variacaoDre } from "@/lib/dre-variacao";
+import { pctDaReceita, formatarPctReceita } from "@/lib/dre-analise-vertical";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +15,6 @@ import {
   Settings,
   BarChart3,
   Loader2,
-  Lightbulb,
-  AlertTriangle,
-  CheckCircle,
   RefreshCw,
 } from "lucide-react";
 import { SiengeOutcome, SiengeBankMovement, SiengeIncome } from "@/types/sienge";
@@ -771,6 +769,10 @@ export function DreTab({
                 return monthCols.reduce((sum, m) => sum + getLineMonthVal(line, m), 0);
               };
 
+              // Análise vertical (% da receita do período), regra em
+              // src/lib/dre-analise-vertical.ts.
+              const receitaTotal = monthCols.reduce((sum, m) => sum + (catMonthTotals.receita_operacional?.[m] || 0), 0);
+
               const fmtVal = (v: number) => {
                 const formatted = new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Math.abs(v));
                 return v < 0 ? `-${formatted}` : formatted;
@@ -804,6 +806,7 @@ export function DreTab({
                           );
                         })}
                         <th className="text-right px-5 py-3 font-semibold min-w-[120px] border-b border-slate-200 dark:border-slate-700">Total</th>
+                        <th className="text-right pl-2 pr-5 py-3 font-semibold min-w-[80px] border-b border-slate-200 dark:border-slate-700" title="Análise vertical: quanto o total da linha representa da Receita Operacional do período. Nas linhas de lucro é a margem.">% Rec.</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -883,6 +886,13 @@ export function DreTab({
                               }`}>
                                 {fmtVal(total)}
                               </td>
+                              <td className={`text-right pl-2 pr-5 py-3 text-[12px] tabular-nums whitespace-nowrap ${
+                                isCalc
+                                  ? total < 0 ? "font-semibold text-red-600 dark:text-red-300/80" : "font-semibold text-emerald-700 dark:text-emerald-400"
+                                  : "font-medium text-slate-500 dark:text-slate-400"
+                              }`}>
+                                {formatarPctReceita(pctDaReceita(total, receitaTotal, isCalc))}
+                              </td>
                             </tr>
                             {/* Expanded sub-accounts */}
                             {isExpanded && lineAccounts.map(([fcId, acctData]) => {
@@ -920,6 +930,9 @@ export function DreTab({
                                   }`}>
                                     {fmtVal(acctTotal)}
                                   </td>
+                                  <td className="text-right pl-2 pr-5 py-2.5 text-[11px] tabular-nums whitespace-nowrap font-medium text-slate-500 dark:text-slate-400">
+                                    {formatarPctReceita(pctDaReceita(acctTotal, receitaTotal, false))}
+                                  </td>
                                 </tr>
                               );
                             })}
@@ -933,14 +946,21 @@ export function DreTab({
             })()
           ) : (
             /* ══════ DRE SIMPLES: Original view ══════ */
-            <div className="mx-5 my-4 flex flex-col xl:flex-row items-start gap-5">
-              {/* Table */}
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex-grow bg-white dark:bg-slate-900 w-full max-w-4xl">
+            <div className="mx-5 my-4">
+              {/* Table — o painel "Insights da DRE" saiu em 09/11/2026 (Edielson:
+                  o Carlos não usa); no lugar, a coluna % da Receita. */}
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 w-full">
               {/* Table Header */}
-          <div className="grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+          <div className="grid grid-cols-[auto_1fr_180px_96px] items-center px-5 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <span className="w-8" />
             <span>Conta</span>
             <span className="text-right">Realizado</span>
+            <span
+              className="text-right"
+              title="Análise vertical: quanto a linha representa da Receita Operacional do período. Nas linhas de lucro é a margem."
+            >
+              % Receita
+            </span>
           </div>
 
           {/* Table Body */}
@@ -957,7 +977,7 @@ export function DreTab({
                 <React.Fragment key={line.key}>
                   {/* Level 1: DRE Category Row */}
                   <div
-                    className={`grid grid-cols-[auto_1fr_180px] items-center px-5 py-3 transition-colors ${
+                    className={`grid grid-cols-[auto_1fr_180px_96px] items-center px-5 py-3 transition-colors ${
                       isCalculated
                         ? "bg-slate-50 dark:bg-slate-800/60 font-semibold"
                         : "bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/50"
@@ -997,6 +1017,15 @@ export function DreTab({
                       {formatCurrency(Math.abs(value))}
                       {value < 0 && <span className="text-xs ml-0.5">-</span>}
                     </span>
+                    <span className={`text-[13px] text-right tabular-nums whitespace-nowrap ${
+                      isCalculated
+                        ? value < 0
+                          ? "font-semibold text-red-600 dark:text-red-300/80"
+                          : "font-semibold text-emerald-700 dark:text-emerald-400"
+                        : "font-medium text-slate-500 dark:text-slate-400"
+                    }`}>
+                      {formatarPctReceita(pctDaReceita(value, receitaOperacional, isCalculated))}
+                    </span>
                   </div>
 
                   {/* Level 2: Sub-accounts (financial categories) */}
@@ -1010,14 +1039,16 @@ export function DreTab({
                           const hasDetails = Object.keys(acct.details).length > 1 ||
                             (Object.keys(acct.details).length === 1 && !acct.details["Sem identificacao"]);
 
+                          // Parte da conta dentro do grupo (até 09/11 era o % mostrado;
+                          // agora vai na dica e a coluna mostra o % da receita).
                           const catTotal = Math.abs(value);
-                          const pct = catTotal > 0 ? (Math.abs(acct.amount) / catTotal) * 100 : 0;
+                          const pctDoGrupo = catTotal > 0 ? (Math.abs(acct.amount) / catTotal) * 100 : 0;
 
                           return (
                             <React.Fragment key={fcId}>
                               {/* Level 2 row */}
                               <div
-                                className={`grid grid-cols-[auto_1fr_60px_180px] items-center px-5 py-2 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-b-0 ${
+                                className={`grid grid-cols-[auto_1fr_180px_96px] items-center px-5 py-2 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-b-0 ${
                                   hasDetails ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" : ""
                                 }`}
                                 onClick={hasDetails ? () => toggleAccountExpand(accountKey) : undefined}
@@ -1036,14 +1067,17 @@ export function DreTab({
                                   </span>
                                   <span className="flex-grow border-b-2 border-dotted border-slate-300/60 dark:border-slate-600/60 opacity-60 relative top-[2px] min-w-[20px]"></span>
                                 </span>
-                                <span className="text-[11px] text-right tabular-nums text-slate-400 dark:text-slate-500 font-medium">
-                                  {pct >= 0.1 ? `${pct.toFixed(1)}%` : "<0.1%"}
-                                </span>
                                 <span className={`text-[12px] text-right tabular-nums whitespace-nowrap ${
                                   acct.amount < 0 ? "text-red-600 dark:text-red-300/80 font-semibold" : "text-slate-700 dark:text-slate-200 font-semibold"
                                 }`}>
                                   {formatCurrency(Math.abs(acct.amount))}
                                   {acct.amount < 0 && <span className="ml-0.5">-</span>}
+                                </span>
+                                <span
+                                  className="text-[11px] text-right tabular-nums whitespace-nowrap text-slate-500 dark:text-slate-400 font-medium"
+                                  title={`${formatarPctReceita(pctDoGrupo)} de ${line.label.toLowerCase()}`}
+                                >
+                                  {formatarPctReceita(pctDaReceita(acct.amount, receitaOperacional, false))}
                                 </span>
                               </div>
 
@@ -1059,7 +1093,7 @@ export function DreTab({
                                       return (
                                       <React.Fragment key={detailKey}>
                                       <div
-                                        className={`grid grid-cols-[auto_1fr_180px] items-center px-6 py-1.5 ${hasTx ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" : ""}`}
+                                        className={`grid grid-cols-[auto_1fr_180px_96px] items-center px-6 py-1.5 ${hasTx ? "cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50" : ""}`}
                                         onClick={hasTx ? () => toggleDetailExpand(detailExpandKey) : undefined}
                                       >
                                         <span className="w-6 flex items-center justify-center">
@@ -1083,6 +1117,7 @@ export function DreTab({
                                           {formatCurrency(Math.abs(detail.amount))}
                                           {detail.amount < 0 && <span className="ml-0.5">-</span>}
                                         </span>
+                                        <span />
                                       </div>
 
                                       {/* Level 4: Individual transactions */}
@@ -1093,7 +1128,7 @@ export function DreTab({
                                             .map((tx, txIdx) => (
                                               <div
                                                 key={txIdx}
-                                                className="grid grid-cols-[auto_1fr_180px] items-center px-6 py-1"
+                                                className="grid grid-cols-[auto_1fr_180px_96px] items-center px-6 py-1"
                                                 title={tx.observation || undefined}
                                               >
                                                 <span className="w-6" />
@@ -1122,6 +1157,7 @@ export function DreTab({
                                                   {formatCurrency(Math.abs(tx.amount))}
                                                   {tx.amount < 0 && <span className="ml-0.5">-</span>}
                                                 </span>
+                                                <span />
                                               </div>
                                             ))}
                                         </div>
@@ -1141,108 +1177,6 @@ export function DreTab({
             })}
           </div>
               </div>
-
-              {/* ══════ INSIGHTS CONTABEIS (Side Panel in DRE Simples) ══════ */}
-              {receitaOperacional !== 0 && (
-                <div className="w-full xl:w-[420px] flex-shrink-0 self-start rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 sticky top-24">
-                  <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-                    <Lightbulb className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
-                    <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Insights da DRE <span className="text-xs font-normal text-slate-500 dark:text-slate-400 block mt-0.5">Análise Automática</span></h3>
-                  </div>
-                  <div className="px-4 py-4 space-y-2 max-h-[calc(100vh-220px)] overflow-y-auto custom-scrollbar">
-                    {(() => {
-                      const rec = receitaOperacional;
-                      const lb = calculated.lucro_bruto || 0;
-                      const lo = calculated.lucro_operacional || 0;
-                      const ll = calculated.lucro_liquido || 0;
-                      const saldo = calculated.saldo || 0;
-                      const vc = calculated.variacao_caixa || 0;
-                      const cv = accum.custo_variavel?.total || 0;
-                      const cf = accum.custo_fixo?.total || 0;
-                      const df = accum.despesas_financeiras?.total || 0;
-                      const dt = accum.despesas_tributarias?.total || 0;
-                      const imob = accum.imobilizacoes?.total || 0;
-                      const ret = accum.retiradas?.total || 0;
-
-                      const margBruta = (lb / rec) * 100;
-                      const margOp = (lo / rec) * 100;
-                      const margLiq = (ll / rec) * 100;
-                      const pesoCv = (Math.abs(cv) / rec) * 100;
-                      const pesoCf = (Math.abs(cf) / rec) * 100;
-                      const pesoDf = (Math.abs(df) / rec) * 100;
-                      const pesoDt = (Math.abs(dt) / rec) * 100;
-
-                      const insights: { icon: "check" | "alert" | "info"; text: string }[] = [];
-
-                      // Margem bruta
-                      if (margBruta >= 30) {
-                        insights.push({ icon: "check", text: `Margem bruta de ${margBruta.toFixed(1)}% indica boa eficiencia na operacao. Os custos variaveis representam ${pesoCv.toFixed(1)}% da receita.` });
-                      } else if (margBruta >= 15) {
-                        insights.push({ icon: "info", text: `Margem bruta de ${margBruta.toFixed(1)}% esta dentro da media. Os custos variaveis (${pesoCv.toFixed(1)}% da receita) merecem atencao para otimizacao.` });
-                      } else {
-                        insights.push({ icon: "alert", text: `Margem bruta de apenas ${margBruta.toFixed(1)}% e preocupante. Custos variaveis consomem ${pesoCv.toFixed(1)}% da receita — avalie renegociacao com fornecedores e revisao de precificacao.` });
-                      }
-
-                      // Margem operacional
-                      if (margOp >= 15) {
-                        insights.push({ icon: "check", text: `Margem operacional de ${margOp.toFixed(1)}% demonstra eficiencia na gestao de custos fixos (${pesoCf.toFixed(1)}% da receita).` });
-                      } else if (margOp >= 5) {
-                        insights.push({ icon: "info", text: `Margem operacional de ${margOp.toFixed(1)}%. Os custos fixos representam ${pesoCf.toFixed(1)}% da receita — busque oportunidades de reducao de overhead.` });
-                      } else {
-                        insights.push({ icon: "alert", text: `Margem operacional de ${margOp.toFixed(1)}% deixa pouca margem de seguranca. Custos fixos de ${pesoCf.toFixed(1)}% da receita precisam ser revisados.` });
-                      }
-
-                      // Diferenca entre lucro bruto e operacional (peso do custo fixo)
-                      if (pesoCf > pesoCv) {
-                        insights.push({ icon: "alert", text: `Custos fixos (${formatCurrency(Math.abs(cf))}) superam custos variaveis (${formatCurrency(Math.abs(cv))}) — estrutura de custo pesada que aumenta o ponto de equilibrio.` });
-                      }
-
-                      // Despesas financeiras
-                      if (pesoDf > 5) {
-                        insights.push({ icon: "alert", text: `Despesas financeiras representam ${pesoDf.toFixed(1)}% da receita (${formatCurrency(Math.abs(df))}). Avalie renegociacao de dividas e reducao de endividamento.` });
-                      } else if (pesoDf > 2) {
-                        insights.push({ icon: "info", text: `Despesas financeiras em ${pesoDf.toFixed(1)}% da receita — nivel moderado. Monitore a evolucao do custo da divida.` });
-                      }
-
-                      // Carga tributaria
-                      if (pesoDt > 15) {
-                        insights.push({ icon: "alert", text: `Carga tributaria de ${pesoDt.toFixed(1)}% da receita e elevada. Considere revisao do planejamento tributario e aproveitamento de beneficios fiscais.` });
-                      } else if (pesoDt > 8) {
-                        insights.push({ icon: "info", text: `Despesas tributarias representam ${pesoDt.toFixed(1)}% da receita. Revise periodicamente o enquadramento tributario.` });
-                      }
-
-                      // Margem liquida
-                      if (margLiq < 0) {
-                        insights.push({ icon: "alert", text: `Resultado liquido negativo (${formatCurrency(Math.abs(ll))}). A operacao nao esta gerando lucro suficiente para cobrir despesas financeiras e tributarias.` });
-                      } else if (margLiq >= 10) {
-                        insights.push({ icon: "check", text: `Margem liquida de ${margLiq.toFixed(1)}% e saudavel, mostrando boa rentabilidade apos todas as deducoes.` });
-                      }
-
-                      // Saldo vs Lucro liquido (imobilizacoes e retiradas)
-                      if (ll > 0 && saldo < ll * 0.5) {
-                        const consumo = Math.abs(imob) + Math.abs(ret);
-                        insights.push({ icon: "info", text: `Imobilizacoes (${formatCurrency(Math.abs(imob))}) e retiradas (${formatCurrency(Math.abs(ret))}) consomem ${((consumo / ll) * 100).toFixed(0)}% do lucro liquido — acompanhe o impacto no caixa.` });
-                      }
-
-                      // Variacao de caixa
-                      if (vc < 0) {
-                        insights.push({ icon: "alert", text: `Variacao de caixa negativa de ${formatCurrency(Math.abs(vc))}. O caixa da empresa esta diminuindo — revise entradas/saidas nao operacionais e controle o fluxo de caixa.` });
-                      } else if (vc > 0) {
-                        insights.push({ icon: "check", text: `Variacao de caixa positiva de ${formatCurrency(vc)}. A empresa esta acumulando caixa no periodo.` });
-                      }
-
-                      return insights.map((insight, i) => (
-                        <div key={i} className="flex items-start gap-3 p-3 rounded-xl text-[13px] border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200">
-                          {insight.icon === "check" && <CheckCircle className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-500 dark:text-emerald-400" />}
-                          {insight.icon === "alert" && <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-500 dark:text-amber-400" />}
-                          {insight.icon === "info" && <Lightbulb className="h-4 w-4 mt-0.5 flex-shrink-0 text-blue-500 dark:text-blue-400" />}
-                          <span className="leading-relaxed">{insight.text}</span>
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </CardContent>
