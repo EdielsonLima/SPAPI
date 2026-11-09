@@ -63,6 +63,30 @@
 //   · a consulta do BI apaga a última linha do CSV (RemoveLastN 1): em 08/11,
 //     AMARAL E AMARAL, R$ 6.000,00 no Galpão Rua Canelinha.
 //
+// GERAL A PAGAR e ESTIMATIVA DE SAÍDAS (09/11/2026) = cards "Geral a Pagar
+// Ajustado CARD" e "Estimativa Saidas no Periodo" do mesmo BI, que o painel
+// não tinha (pedido do Edielson). No BI:
+//   Geral      = saldo corrigido de tudo em aberto, menos as 4 previsões
+//                (PPC, PPE, PRV, PCT), − imposto retido
+//   Estimativa = Total pago até a data + Geral
+// O Geral é exatamente o A Pagar + as Atrasadas: toda parcela em aberto sem
+// as 4 previsões cai em um dos dois, e só em um (a PRC vencida fica só no A
+// Pagar). Por isso os cards somam os totais que a tela já mostra, com o mesmo
+// valor de parcela (effectiveOpenAmount) e os mesmos filtros. Conferido com
+// os dados de 08/11/2026, vencimento em 2026, as 12 empresas do modo Silva
+// Packer (sem a Holding): BI R$ 6.623.474,77, painel R$ 6.635.071,82 — a
+// diferença é a do 135 Jardins nas Atrasadas (+R$ 11.597,05, decisão do
+// Edielson); as outras 11 empresas iguais.
+// Anos: a página do BI abre com as datas de 01/01/2016 a 31/12/2034 (= tudo
+// em aberto). No painel isso é o "Todos" aceso (todos ou nenhum marcado):
+// aí o Geral soma tudo em aberto, de qualquer vencimento, mesmo na aba A
+// Pagar, que só mostra os botões do ano atual em diante. Com anos marcados,
+// o Geral segue os mesmos anos dos cards Total a Pagar e Contas em Atraso.
+// O painel NÃO copia uma exclusão fixa do BI: ele tira do Geral 3 parcelas
+// vencidas da TETRA (título 15596, parcelas 1 e 2, R$ 0,01 cada; título 15597,
+// parcela 14, R$ 262.774,77), mas as mantém nas Atrasadas. No painel elas
+// ficam nos dois cards; só pesam com 2023 ou 2025 marcado (vencimento delas).
+//
 // O modo Holding NÃO usa estas regras.
 
 /** Previsões que o Power BI tira do total a pagar. */
@@ -120,4 +144,24 @@ export function basePagas<T extends { companyName: string }>(
   empresaDoModo: (empresa: string) => boolean,
 ): T[] {
   return [...titulos, ...movimentosAvulsos.filter((m) => empresaDoModo(m.companyName))];
+}
+
+/**
+ * Entra no "Geral a Pagar Ajustado" do Power BI: parcela em aberto (saldo
+ * corrigido > 0), de qualquer documento menos as 4 previsões. Com vencimento
+ * preenchido, é o mesmo que estar no A Pagar ou nas Atrasadas (nunca nos dois).
+ */
+export function entraNoGeralAPagar(item: ItemAPagar): boolean {
+  if (PREVISOES_FORA_DO_A_PAGAR.has(tipoDoc(item))) return false;
+  return (item.correctedBalanceAmount || 0) > 0;
+}
+
+/** Card "Geral a Pagar": tudo em aberto = Total a Pagar + Contas em Atraso. */
+export function geralAPagar(totalAPagar: number, totalAtrasadas: number): number {
+  return totalAPagar + totalAtrasadas;
+}
+
+/** Card "Estimativa de Saídas": o que já foi pago + tudo o que está em aberto. */
+export function estimativaSaidas(totalPago: number, totalGeralAPagar: number): number {
+  return totalPago + totalGeralAPagar;
 }

@@ -1,7 +1,10 @@
 // Trava da regra do A Pagar (igual ao Power BI). Rodar:
 //   npx tsx src/__tests__/a-pagar-regra.test.ts
 import assert from "node:assert/strict";
-import { entraNoAPagar, entraNasAtrasadas, ehPrevisaoDeComissao, ignoraFiltroTipoDocCP, basePagas } from "../lib/a-pagar-regra";
+import {
+  entraNoAPagar, entraNasAtrasadas, ehPrevisaoDeComissao, ignoraFiltroTipoDocCP, basePagas,
+  entraNoGeralAPagar, geralAPagar, estimativaSaidas,
+} from "../lib/a-pagar-regra";
 
 const hoje = "2026-11-07";
 
@@ -75,5 +78,30 @@ assert.deepEqual(basePagas([titulo], [tarifaSP, tarifaHolding], doModoSP), [titu
 assert.deepEqual(basePagas([titulo, tituloHolding], [], doModoSP), [titulo, tituloHolding], "não mexe nos títulos");
 assert.deepEqual(basePagas([], [tarifaHolding, tarifaSP], (e) => e === HOLDING), [tarifaHolding], "no modo Holding, só os dela");
 assert.deepEqual(basePagas([], [], doModoSP), []);
+
+// Geral a Pagar (BI "Geral a Pagar Ajustado"): toda parcela em aberto sem as
+// 4 previsões está em exatamente um dos dois quadros — por isso o card soma
+// Total a Pagar + Contas em Atraso.
+const casosGeral = [
+  nfe, comissaoVencida, pedidoPrevisto, medicaoPrevista, conteiners,
+  { ...conteiners, correctedBalanceAmount: 0 },
+  { ...nfe, dueDate: hoje2 },
+  { ...nfe, dueDate: "2026-11-07" },
+  { ...comissaoVencida, dueDate: "2027-01-10" },
+  { ...nfe, documentIdentificationId: "PRV" },
+  { ...conteiners, documentIdentificationId: "PRC" },
+  { correctedBalanceAmount: 262774.77, dueDate: "2023-11-17", documentIdentificationId: "MED" }, // TETRA 15597/14: fica (o BI tira)
+];
+for (const i of casosGeral) {
+  const quadros = Number(entraNoAPagar(i, hoje2)) + Number(entraNasAtrasadas(i, hoje2));
+  assert.equal(quadros, entraNoGeralAPagar(i) ? 1 : 0, `Geral = A Pagar + Atrasadas (${i.documentIdentificationId} ${i.dueDate})`);
+}
+assert.equal(entraNoGeralAPagar(pedidoPrevisto), false, "previsão de pedido fica fora do Geral");
+assert.equal(entraNoGeralAPagar(comissaoVencida), true, "previsão de comissão fica no Geral");
+// Na tela em 09/11/2026, dados de 08/11 (modo Silva Packer, todas as empresas, vencimento e
+// baixa em 2026): Total Pago + Geral a Pagar.
+assert.equal(geralAPagar(0, 0), 0);
+assert.equal(geralAPagar(4129766.92, 2505304.90).toFixed(2), "6635071.82");
+assert.equal(estimativaSaidas(64957152.12, 6635071.82).toFixed(2), "71592223.94");
 
 console.log("a-pagar-regra: ok");

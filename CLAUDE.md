@@ -472,8 +472,29 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   nenhum) e a consulta M do BI apaga a última linha do CSV (`RemoveLastN 1`; em 08/11,
   R$ 6.000,00 do Galpão). 2026 todas: **R$ 64.957.152,12** (BI sem Holding
   R$ 64.936.605,37); 10 obras do BI: R$ 50.392.060,29 nos dois. Holding: regra antiga.
-- Próximo quadro da página CONTAS À PAGAR: `Geral a Pagar Ajustado CARD` (exclui TETRA
-  15596 parc. 1–2 e 15597 parc. 14). Depois: `Estimativa Saidas no Periodo`.
+- **Contas a Pagar › Geral a Pagar e Estimativa de Saídas — criados 09/11 (últimos quadros
+  da página CONTAS À PAGAR do BI):** o painel não tinha esses cards (Edielson: "Criar os
+  dois cards"). BI: `Geral a Pagar Ajustado CARD` = saldo corrigido de tudo em aberto sem
+  PPC/PPE/PRV/PCT − imposto; `Estimativa Saidas no Periodo` = Total pago + Geral. No painel
+  (`geralAPagar` e `estimativaSaidas` em `a-pagar-regra.ts`, trava `a-pagar-regra.test.ts`):
+  **Geral = Total a Pagar + Contas em Atraso** (toda parcela aberta sem as 4 previsões está
+  em exatamente um dos dois; a PRC vencida só no A Pagar), card "Geral a Pagar" na aba
+  Contas a Pagar, logo depois do Total a Pagar; **Estimativa = Total Pago + Geral**, card
+  "Estimativa de Saídas" na aba Contas Pagas. Mesmos filtros e valor de parcela das abas,
+  só fora da Holding. Anos: com "Todos" aceso (todos ou nenhum marcado) o Geral é tudo em
+  aberto, de qualquer vencimento (`semAno` em `applyFilters`), porque a aba A Pagar só tem
+  botões do ano atual em diante; com anos marcados segue os anos dos dois cards. No
+  estado inicial (2016–2026 marcados, só "2026" visível na aba A Pagar) o Geral é o A
+  Pagar de 2026 + as atrasadas de 2016–2026 — os mesmos números das abas A Pagar e Contas em
+  Atraso. A página do BI abre de 01/01/2016 a 31/12/2034 (= tudo, o nosso "Todos").
+  Conferido com os dados de 08/11, vencimento em 2026, modo Silva Packer: BI
+  R$ 6.623.474,77, painel R$ 6.635.071,82 (só a diferença do 135 Jardins, +R$ 11.597,05);
+  Estimativa 2026 = R$ 71.592.223,94. Na tela em 09/11: Todos = Geral R$ 13.249.481,26 e
+  Estimativa R$ 539.201.787,08. O painel **não copia** a exclusão fixa do BI no Geral
+  (TETRA 15596 parc. 1–2, R$ 0,01 cada, e 15597 parc. 14, R$ 262.774,77, vencidas em
+  2023/2025): ficam no Geral como ficam nas Atrasadas. Grade com 7 cards
+  (`xl:grid-cols-4 2xl:grid-cols-7`) e fonte do valor menor com 7 cards ou com 6 e valor
+  de 17+ caracteres (`fonteValor`). Página CONTAS À PAGAR do BI fechada.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 

@@ -58,7 +58,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { toast } from "sonner";
 import { formatCurrency, formatCompactCurrency, formatDate, MONTH_LABELS, getEstornoPairs, isExcludedFinancialDocType, effectiveOpenAmount, shouldKeepIncomeExcludedDoc } from "@/lib/dashboard-utils";
 import { entraNoAReceber, entraNasVencidas, entraNaCarteiraAberta, ignoraFiltroTipoDoc, ehDocumentoTransferencia } from "@/lib/a-receber-regra";
-import { entraNoAPagar, entraNasAtrasadas, ignoraFiltroTipoDocCP, basePagas } from "@/lib/a-pagar-regra";
+import { entraNoAPagar, entraNasAtrasadas, ignoraFiltroTipoDocCP, basePagas, geralAPagar, estimativaSaidas } from "@/lib/a-pagar-regra";
 import { generateContasPagarPDF } from "@/lib/pdf-contas-pagar";
 import { DreTab } from "@/components/dre-tab";
 import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
@@ -997,7 +997,7 @@ export function ExecutiveDashboard() {
   // continua valendo) — usado pelo gráfico "Por Empresa", que precisa mostrar
   // todas as barras para destacar a escolhida. opts.semMes: ignora mês/dia —
   // usado pelo gráfico mensal pelo mesmo motivo.
-  const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string; companyId?: number; billId?: number; installmentId?: number }>(list: T[], opts: { semDrill?: boolean; semMes?: boolean } = {}): T[] => {
+  const applyFilters = useCallback(<T extends { companyName: string; documentIdentificationName: string; dueDate: string; companyId?: number; billId?: number; installmentId?: number }>(list: T[], opts: { semDrill?: boolean; semMes?: boolean; semAno?: boolean } = {}): T[] => {
     let result = list;
     if (selectedCompanies.size > 0) {
       result = result.filter(i => selectedCompanies.has(i.companyName));
@@ -1019,7 +1019,7 @@ export function ExecutiveDashboard() {
         (!isHolding && ignoraFiltroTipoDocCP(i as { documentIdentificationId?: string }))
       );
     }
-    if (selectedYears.size > 0) {
+    if (selectedYears.size > 0 && !opts.semAno) {
       result = result.filter(i => i.dueDate && selectedYears.has(i.dueDate.substring(0, 4)));
     }
     if (selectedMonths.size > 0 && !opts.semMes) {
@@ -1728,6 +1728,21 @@ export function ExecutiveDashboard() {
   const totalPago = useMemo(() =>
     filteredPagas.reduce((s, i) => s + paidSum(i), 0), [filteredPagas, paidSum]);
 
+  // Cards "Geral a Pagar" (aba A Pagar) e "Estimativa de Saídas" (aba Contas
+  // Pagas) = "Geral a Pagar Ajustado" e "Estimativa Saidas no Periodo" do
+  // Power BI (09/11/2026): somas dos totais acima, com os mesmos filtros —
+  // ver a-pagar-regra.ts. Só fora da Holding. Com "Todos" os anos aceso
+  // (todos marcados ou nenhum), o Geral é tudo em aberto, de qualquer
+  // vencimento: a aba A Pagar só lista os anos de agora em diante, e sem isso
+  // as atrasadas dos anos anteriores sumiriam do Geral.
+  const anosTodos = selectedYears.size === 0 || (availableYears.length > 0 && availableYears.every(y => selectedYears.has(y)));
+  const totalGeralAPagar = useMemo(() => {
+    if (!anosTodos) return geralAPagar(totalAPagar, totalAtrasado);
+    const soma = (lista: SiengeOutcome[]) => lista.reduce((s, i) => s + effectiveAmount(i), 0);
+    return geralAPagar(soma(applyFilters(itemsAPagar, { semAno: true })), soma(applyFilters(itemsAtrasadas, { semAno: true })));
+  }, [anosTodos, totalAPagar, totalAtrasado, applyFilters, itemsAPagar, itemsAtrasadas]);
+  const totalEstimativaSaidas = useMemo(() => estimativaSaidas(totalPago, totalGeralAPagar), [totalPago, totalGeralAPagar]);
+
   const previsaoHoje = useMemo(() => {
     const todayStr = new Date().toISOString().split("T")[0];
     return filteredAPagar
@@ -2232,6 +2247,15 @@ export function ExecutiveDashboard() {
         trend: trends.aPagarDelta,
         trendLabel: "vs ano anterior",
       },
+      ...(isHolding ? [] : [{
+        label: "Geral a Pagar",
+        value: formatCurrency(totalGeralAPagar),
+        subtitle: "a vencer + atrasadas",
+        icon: <Clock className="h-7 w-7 text-indigo-500" />,
+        iconBg: "bg-indigo-50",
+        gradient: "from-indigo-500 to-indigo-600",
+        hint: "Total a Pagar + Contas em Atraso (no Power BI, Geral a Pagar Ajustado), com os mesmos anos e filtros das abas Contas a Pagar e Contas em Atraso. Com Todos aceso, é tudo em aberto.",
+      }]),
       {
         label: "Vence Hoje",
         value: formatCurrency(previsaoHoje),
@@ -2289,6 +2313,15 @@ export function ExecutiveDashboard() {
         trend: trends.pagoDelta,
         trendLabel: "vs ano anterior",
       },
+      ...(isHolding ? [] : [{
+        label: "Estimativa de Saídas",
+        value: formatCurrency(totalEstimativaSaidas),
+        subtitle: "pago + em aberto no período",
+        icon: <TrendingDown className="h-7 w-7 text-purple-500" />,
+        iconBg: "bg-purple-50",
+        gradient: "from-purple-500 to-purple-600",
+        hint: "Total Pago + Geral a Pagar (a vencer + atrasadas), com os mesmos filtros (no Power BI, Estimativa Saidas no Periodo). Com Todos aceso, é tudo o que já foi pago mais tudo o que está em aberto.",
+      }]),
       {
         label: "Pago Hoje",
         value: formatCurrency(pagoHoje),
@@ -3345,8 +3378,15 @@ export function ExecutiveDashboard() {
           fluida (clamp) e nunca é cortado com reticências — a 100% de zoom, com
           a barra lateral aberta, os seis cards cabem numa linha (Edielson, 06/11/2026). */}
       {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (() => {
-        const colsXl: Record<number, string> = { 3: "2xl:grid-cols-3", 4: "2xl:grid-cols-4", 5: "2xl:grid-cols-5", 6: "2xl:grid-cols-6" };
+        const colsXl: Record<number, string> = { 3: "2xl:grid-cols-3", 4: "2xl:grid-cols-4", 5: "2xl:grid-cols-5", 6: "2xl:grid-cols-6", 7: "xl:grid-cols-4 2xl:grid-cols-7" };
         const dotClass = (gradient: string) => (gradient.split(" ")[0] || "from-slate-500").replace("from-", "bg-");
+        // Com 7 cards (A Pagar + "Geral a Pagar"), ou 6 com valor de centenas
+        // de milhões (Contas Pagas com todos os anos: "R$ 539.201.787,08"), a
+        // fonte do valor desce um pouco para caber de 1536 px para cima.
+        const maiorValor = Math.max(0, ...kpis.map(k => String(k.value ?? "").length));
+        const fonteValor = kpis.length >= 7 || (kpis.length >= 6 && maiorValor >= 17)
+          ? "text-[clamp(0.9rem,0.95vw,1.3rem)]"
+          : "text-[clamp(1rem,1.15vw,1.5rem)]";
         return (<><div className={`grid grid-cols-2 md:grid-cols-3 ${colsXl[kpis.length] || "2xl:grid-cols-6"} gap-3 shrink-0`}>
         {kpis.map((kpi) => {
           const clicavel = Boolean(kpi.onClick);
@@ -3366,7 +3406,7 @@ export function ExecutiveDashboard() {
                 {kpi.label}
               </p>
             </div>
-            <p className="mt-1.5 font-semibold tabular-nums whitespace-nowrap leading-tight text-slate-900 dark:text-slate-50 text-[clamp(1rem,1.15vw,1.5rem)]">
+            <p className={`mt-1.5 font-semibold tabular-nums whitespace-nowrap leading-tight text-slate-900 dark:text-slate-50 ${fonteValor}`}>
               {kpi.value}
             </p>
             {kpi.subtitle && (
