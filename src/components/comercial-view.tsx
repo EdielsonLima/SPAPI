@@ -29,7 +29,7 @@ import { CorretoresView } from "@/components/corretores-view";
 import { TabelaPrecosView } from "@/components/tabela-precos-view";
 import { semVenda } from "@/lib/tabela-precos";
 import { aplicarTabelaComercial, precoDaTabelaComercial, tabelaComercialPara } from "@/lib/tabela-comercial";
-import { aplicarSituacaoManual } from "@/lib/estoque-resumo";
+import { aplicarSituacaoManual, ehApartamento } from "@/lib/estoque-resumo";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
@@ -486,17 +486,14 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
         const ovPctVend = ovTotalUn > 0 ? (ovVendidasUn / ovTotalUn) * 100 : 0;
 
         // VGV potencial do estoque disponível: área privativa × fator × CUB
-        // (mesma regra do Resumo Financeiro — considera só unidades tipo apartamento)
-        const ovIsAptoLike = (name: string) => {
-          const n = name.toUpperCase();
-          return !(/VAGA|GARAGEM|ESTACION/.test(n) || /\bSL\b|\bSALA\b|COMERCIAL/.test(n) || /\bLJ\b|\bLOJA\b/.test(n) || /\bDEP\b|DEPOSITO|\bBOX\b/.test(n));
-        };
+        // (mesma regra do Resumo Financeiro — só apartamento, pelo tipo do
+        // cadastro do Sienge: ehApartamento em src/lib/estoque-resumo.ts)
         let ovEstoqueArea = 0;
         let ovEstoqueVgv = 0;
         apiUnits.forEach(u => {
           if (u.commercialStock !== "Disponível") return;
           if (selectedCompanies.size > 0 && u.companyName && !selectedCompanies.has(u.companyName)) return;
-          if (!ovIsAptoLike(u.name)) return;
+          if (!ehApartamento(u)) return;
           ovEstoqueArea += u.privateArea || 0;
           const factor = companySettings.find(cs => cs.companyName === u.companyName)?.factor || 0;
           ovEstoqueVgv += (u.privateArea || 0) * factor * (cubData?.currentValue || 0);

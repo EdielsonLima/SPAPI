@@ -12,10 +12,10 @@
 // Valor de uma unidade Disponível:
 //   - preço de tabela do painel (Comercial › Tabela de Preços); sem ele, o da
 //     tabela comercial;
-//   - sem preço nenhum, a estimativa de antes: área privativa × fator × CUB,
-//     só para as unidades que o Resumo já contava (entraPeloNome).
-// Unidade que o Resumo não contava (sala, loja, box pelo nome) só soma quando
-// tem preço.
+//   - sem preço nenhum, só o APARTAMENTO entra, pela estimativa de sempre:
+//     área privativa × fator × CUB.
+// Disp. e Res.Téc. contam só apartamento (ehApartamento). Vaga, sala, loja,
+// box e o resto não contam e só somam no valor quando têm preço.
 
 import { inferUnitTypeFromName, pavimentoDaUnidade, type ApiUnit } from "@/lib/comercial-utils";
 import { situacaoDaUnidade } from "@/lib/situacao-unidade";
@@ -33,16 +33,13 @@ export function aplicarSituacaoManual(situacao: string, unitId: number | null | 
   return manuais.get(unitId) ?? situacao;
 }
 
-// Regra de sempre do Resumo: fica de fora o que o NOME diz ser vaga, sala,
-// loja, depósito ou box. (No Sienge da Silva Packer a vaga se chama "G 108",
-// então ela passa — o tipo do cadastro aparece no modal para deixar isso à vista.)
-export function entraPeloNome(nome: string): boolean {
-  const n = (nome || "").toUpperCase();
-  if (/VAGA|GARAGEM|ESTACION/.test(n)) return false;
-  if (/\bSL\b|\bSALA\b|COMERCIAL/.test(n)) return false;
-  if (/\bLJ\b|\bLOJA\b/.test(n)) return false;
-  if (/\bDEP\b|DEPOSITO|\bBOX\b/.test(n)) return false;
-  return true;
+// Só apartamento conta (Edielson, 09/11/2026: "Sim, só apartamentos"). Vale o
+// TIPO do cadastro do Sienge ("Apartamento", "Apartamento (Permuta)"); sem
+// tipo, o que o nome indica. Até 09/11 a regra olhava só o nome, e a vaga
+// ("G 108" no Sienge da Silva Packer) passava por apartamento: os 82
+// "disponíveis" do Palácio eram 13 apartamentos e 69 vagas.
+export function ehApartamento(u: Pick<ApiUnit, "name" | "propertyType">): boolean {
+  return grupoDoTipo(u.propertyType || inferUnitTypeFromName(u.name)) === "Apartamento";
 }
 
 export interface ContextoEstoque {
@@ -72,8 +69,8 @@ export interface LinhaEstoque {
   precoTabela: number | null; // tabela de preços do painel (o que o modal edita)
   preco: number | null;       // preço que vale: tabela de preços, senão tabela comercial
   origemPreco: OrigemPreco | null;
-  entraNaContagem: boolean;   // conta em Disp. / Res.Téc. (regra do nome)
-  estimativa: number;         // área × fator × CUB, se entra na contagem
+  entraNaContagem: boolean;   // é apartamento: conta em Disp. / Res.Téc. e pode ser estimado
+  estimativa: number;         // área × fator × CUB, se é apartamento
   valorEstoque: number;       // quanto soma no Valor Estoque (0 se não está Disponível)
   estimado: boolean;          // o valor acima é a estimativa, não um preço
 }
@@ -100,7 +97,7 @@ export function linhasDeEstoque(unidades: ApiUnit[], ctx: ContextoEstoque): Linh
     const origemPreco: OrigemPreco | null = precoTabela !== null ? "tabela-precos" : preco !== null ? "tabela-comercial" : null;
 
     const area = u.privateArea || 0;
-    const entraNaContagem = entraPeloNome(u.name);
+    const entraNaContagem = ehApartamento(u);
     const estimativa = entraNaContagem ? area * fatorDe.get(u.companyName)! * (ctx.cub || 0) : 0;
     const disponivel = situacao === "Disponível";
     const valorEstoque = disponivel ? (preco ?? estimativa) : 0;
@@ -137,8 +134,8 @@ export interface TotaisEstoque {
   valorComPreco: number;
   estimadas: number;       // disponíveis somadas pela estimativa
   valorEstimado: number;
-  semValor: number;        // disponíveis da contagem sem preço e sem estimativa (área zero)
-  foraDaContagem: number;  // disponíveis com preço que não entram em Disp. (sala, loja, box)
+  semValor: number;        // apartamentos disponíveis sem preço e sem estimativa (área ou fator zero)
+  foraDaContagem: number;  // disponíveis com preço que não são apartamento (vaga, sala, box…)
   valorReservado: number;  // reservadas a preço de tabela (informativo; não soma no estoque)
 }
 
