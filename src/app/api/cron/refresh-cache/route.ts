@@ -9,7 +9,8 @@
 // MCP_API_TOKEN). Disparado por GitHub Action diaria (.github/workflows/
 // cron-refresh-cache.yml) antes do relatorio das 7h30 no WhatsApp.
 import { NextRequest, NextResponse } from "next/server";
-import { refreshFinanceiroCache, REFRESH_START, REFRESH_END } from "@/lib/refreshCache";
+import { refreshFinanceiroCache, prepararPainelDepoisDaRotina, REFRESH_START, REFRESH_END } from "@/lib/refreshCache";
+import { periodosDoPainel } from "@/lib/painel-periodos";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,7 +30,14 @@ export async function POST(req: NextRequest) {
   }
   try {
     const resumo = await refreshFinanceiroCache();
-    return NextResponse.json({ ok: true, range: { START: REFRESH_START, END: REFRESH_END }, ...resumo });
+    // Movimentos (todos) + gzip do Painel em segundo plano: a resposta não espera.
+    void prepararPainelDepoisDaRotina("rotina diária");
+    return NextResponse.json({
+      ok: true,
+      range: { painel: periodosDoPainel(), mcpReceber: { START: REFRESH_START, END: REFRESH_END } },
+      ...resumo,
+      painel: "movimentos (todos) e gzip do Painel em preparo",
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("[cron/refresh-cache] ERRO:", message);

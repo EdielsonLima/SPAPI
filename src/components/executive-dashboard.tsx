@@ -69,6 +69,7 @@ import { DetalhamentoTable } from "@/components/detalhamento-table";
 import { useCompanyMode } from "@/lib/company-context";
 import { MultiSelectFilter, CustomTooltip } from "@/components/multi-select-filter";
 import type { ApiUnit } from "@/lib/comercial-utils";
+import { periodosDoPainel } from "@/lib/painel-periodos";
 
 type Section = "cp" | "cr";
 type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores" | "comparativo";
@@ -202,8 +203,10 @@ function FactorInput({
 // que clica no painel executivo, ele fica carregando"). São ~350 MB de JSON
 // (CP, CR e movimentos bancários). Ao voltar ao Painel a tela abre na hora com
 // o que já tinha; em segundo plano pergunta ao servidor se o cache mudou
-// (?desde=cachedAt) e só baixa de novo o que mudou. "Atualizar" continua
-// buscando tudo no Sienge. Só vale com a carga principal completa.
+// (?versao=cachedAt) e só baixa de novo o que mudou. Numa aba nova ou depois
+// de F5 quem guarda é o navegador, no disco (ETag; ver pedirCache em
+// fetchData). "Atualizar" continua buscando tudo no Sienge. Só vale com a
+// carga principal completa.
 type CachePainel = {
   ano: number;
   completo: boolean;
@@ -542,16 +545,29 @@ export function ExecutiveDashboard() {
   const MAX_AUTO_RETRIES = 2;
 
   const fetchData = useCallback(async (forceRefresh = false) => {
-    const startDate = `${currentYear - 10}-01-01`;
-    const endDate = `${currentYear + 5}-12-31`;
-    // CR de imóveis tem parcelas longas (financiamento direto até ~10 anos);
-    // Sienge SILVA PACKER tem dueDate até 2034. Usa range maior apenas para
-    // income — CP/BM raramente têm datas além de 5 anos.
-    const incomeEndDate = `${currentYear + 15}-12-31`;
+    // Mesmos períodos da rotina diária do servidor (CR vai até ano+15: o
+    // financiamento direto da SP tem dueDate até 2034).
+    const { inicio: startDate, fim: endDate, fimReceber: incomeEndDate } = periodosDoPainel(currentYear);
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
     // Com dados na memória, pergunta só se o cache do servidor mudou.
     const versoes = !forceRefresh && cachePainel?.completo && cachePainel.ano === currentYear ? cachePainel.versoes : null;
-    const desde = (k: keyof CachePainel["versoes"]) => (versoes?.[k] ? `&desde=${encodeURIComponent(versoes[k] as string)}` : "");
+    // Na memória → ?versao= (não mudou = resposta de poucos bytes, nada a ler).
+    // Senão, ou se mudou → a URL normal, que o navegador guarda no disco com
+    // ETag: numa aba nova ou depois de F5 o servidor responde 304 e o dado sai
+    // do disco, sem descer pela rede.
+    const pedirCache = async (url: string, k: keyof CachePainel["versoes"]): Promise<Response> => {
+      const v = versoes?.[k];
+      if (v) {
+        try {
+          const r = await fetch(`${url}&versao=${encodeURIComponent(v)}`);
+          if (r.ok) {
+            const j = await r.json();
+            if (j.naoMudou) return new Response(JSON.stringify(j), { headers: { "Content-Type": "application/json" } });
+          }
+        } catch { /* segue para a URL normal */ }
+      }
+      return fetch(url);
+    };
     const guardar = (parcial: Partial<Omit<CachePainel, "ano">>) => guardarNoCachePainel(currentYear, parcial);
 
     if (forceRefresh) {
@@ -586,7 +602,7 @@ export function ExecutiveDashboard() {
         .catch(() => setStep(5, "error"));
 
       // Fetch ALL bank movements (including linked to outcomes/incomes) for DRE Level 3 enrichment
-      fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N${refreshParam}${desde("bmAll")}`)
+      pedirCache(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N${refreshParam}`, "bmAll")
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (!data) { setStep(3, "error"); return; }
@@ -598,11 +614,11 @@ export function ExecutiveDashboard() {
         .catch(() => setStep(3, "error"));
 
       const [outcomeRes, bmRes, incomeRes] = await Promise.all([
-        fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}${desde("outcome")}`)
+        pedirCache(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`, "outcome")
           .then(r => { if (!r.ok) setStep(0, "error"); return r; }),
-        fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}${desde("bm")}`)
+        pedirCache(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`, "bm")
           .then(r => { if (!r.ok) setStep(1, "error"); return r; }),
-        fetch(`/api/sienge/income?startDate=${startDate}&endDate=${incomeEndDate}${refreshParam}${desde("income")}`)
+        pedirCache(`/api/sienge/income?startDate=${startDate}&endDate=${incomeEndDate}${refreshParam}`, "income")
           .then(r => { if (!r.ok) setStep(2, "error"); return r; }),
       ]);
 

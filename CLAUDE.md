@@ -383,10 +383,10 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   bancários avulsos 10 MB e todos, p/ DRE, 137 MB) e o navegador travava.
 - **Na tela** (`cachePainel` no topo de `executive-dashboard.tsx`): os dados ficam na
   memória da aba. Voltar ao Painel abre na hora, sem a tela "Carregando" (0,7 s local), e em
-  segundo plano cada pedido vai com `?desde=<cachedAt>`: o servidor responde
+  segundo plano cada pedido vai com `?versao=<cachedAt>` (era `?desde=`): o servidor responde
   `{ naoMudou: true }` (0 kB) ou o dado novo, e só o que mudou é baixado (rotina diária ou
   "Atualizar" de outra pessoa). Só vale depois da carga principal completa (CP + avulsos +
-  CR). "Atualizar" continua indo ao Sienge. F5 ou aba nova = primeira carga, como antes.
+  CR). "Atualizar" continua indo ao Sienge. (F5 e aba nova: ver "Nunca esperar" abaixo.)
 - **No servidor** (`responderDoCacheSienge` em `src/lib/cache-sienge-resposta.ts`,
   `getCacheCachedAt`/`getCacheTextoDados` em `db.ts`, texto em `cache-texto.ts`, trava
   `cache-texto.test.ts`): outcome, income e bank-movements devolvem o `data::text` do
@@ -398,6 +398,35 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   cache muda. Mesmo JSON de antes.
 - Conferido local: Visão Geral idêntica (100 linhas) entre a volta pela memória e uma
   carga completa; com o CR mudado no banco, só ele foi baixado de novo (66 MB).
+- **Nunca esperar, nem na 1ª abertura (Edielson, 09/11: "o Carlos Humberto [...] não gosta
+  de ver as coisas demorar"):** em produção a 1ª abertura depois de cada mudança do cache
+  levava ~30 s (servidor lendo e comprimindo na hora).
+  - **gzip pronto antes do pedido** (`prepararCachePainel`): as 4 chaves do Painel
+    (`chavesDoPainel`) são lidas e comprimidas uma de cada vez ao subir o servidor
+    (`src/instrumentation.ts`, 15 s depois; `experimental.instrumentationHook` no
+    `next.config.mjs`), depois da rotina diária e do `atualizar_cache` do MCP
+    (`prepararPainelDepoisDaRotina`, em segundo plano) e no "Atualizar" (a resposta do
+    "Atualizar" agora sai do cache recém-gravado, em gzip). Local: 7,9 s ao subir. A memória
+    fica em `globalThis` porque o Next empacota o instrumentation e as rotas separados.
+  - **Navegador guarda no disco:** a URL normal vai com `ETag = cachedAt` e
+    `Cache-Control: private, no-cache`; aba nova ou F5 → `If-None-Match` → **304** sem corpo.
+    Na mesma aba o Painel pergunta com `?versao=` (`{naoMudou}` ou `{mudou}` → aí pede a URL
+    normal, mantendo uma entrada só por base no disco). `?desde=` ficou para abas abertas antes
+    (mudou → dado inteiro, como antes). O navegador embutido do Claude não guarda respostas de
+    6–9 MB (só as menores); Chrome desktop guarda.
+  - **Rotina diária grava as chaves do Painel** (`periodosDoPainel` em
+    `src/lib/painel-periodos.ts`, uma fonte só para tela, rotina e servidor): o CR era gravado
+    até 2031 e o Painel lê até 2041 — o CR do Painel só se renovava no "Atualizar" ou ao vencer
+    (7 dias, aí ia ao Sienge na hora). Agora grava o CR do Painel e DEPOIS o do MCP
+    (`REFRESH_START..REFRESH_END`; o MCP pega "o mais recente que cobre" e não muda de número),
+    e em segundo plano os movimentos bancários todos (`all:`, DRE e tarifas das Pagas).
+  - **Badge "Contas Vencidas" do menu** (`/api/sienge/outcome/vencidas`,
+    `contarParcelasComSaldoNoCache` em `db.ts`): contado no PostgreSQL sobre o cache do Painel
+    (~0,7 s, guardado por versão). Antes o menu ia ao Sienge todo dia buscar o CP do ano até
+    hoje (chave nova por dia, 35 MB, sem limpeza). Mesma regra: vencimento no ano até hoje
+    inclusive e saldo > 0 (local 09/11: 394 nos dois).
+  - A rotina do GitHub (`0 9 * * *` = 06:00) tem rodado entre 12h30 e 14h no horário de
+    Brasília (atraso do agendador do GitHub).
 
 ## Conferência com o Power BI "FINANCEIRO GERAL", quadro a quadro (Edielson, 07/11/2026)
 

@@ -41,7 +41,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { SiengeOutcome } from "@/types/sienge";
 
 interface MenuChild {
   label: string;
@@ -239,19 +238,13 @@ export function Sidebar() {
   }, [isHolding]);
 
   useEffect(() => {
-    const today = new Date();
-    const endDate = today.toISOString().split("T")[0];
-    const startDate = `${today.getFullYear()}-01-01`;
-    fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}`)
-      .then((res) => res.json())
-      .then((json: { data: SiengeOutcome[] }) => {
-        const now = new Date();
-        now.setHours(0, 0, 0, 0);
-        const count = (json.data || []).filter((item) => {
-          return new Date(item.dueDate) < now && item.balanceAmount > 0;
-        }).length;
-        setOverdueCount(count);
-      })
+    // Parcelas do ano com vencimento até hoje e saldo, contadas no servidor sobre
+    // o cache do Painel (antes: CP do ano baixado do Sienge a cada dia).
+    const hoje = new Date();
+    const ate = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
+    fetch(`/api/sienge/outcome/vencidas?de=${hoje.getFullYear()}-01-01&ate=${ate}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { quantidade?: number } | null) => setOverdueCount(json?.quantidade ?? 0))
       .catch(() => {});
   }, []);
 

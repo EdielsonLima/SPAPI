@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   const forceRefresh = searchParams.get("forceRefresh") === "true";
 
   if (!forceRefresh) {
-    // Cache em texto + gzip (sem remontar o JSON); ?desde=cachedAt → "não mudou".
+    // Cache em texto + gzip, ETag e ?versao= (ver cache-sienge-resposta.ts).
     const resposta = await responderDoCacheSienge(request, "outcome", startDate, endDate);
     if (resposta) return resposta;
   }
@@ -47,7 +47,9 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     await cacheOutcome(startDate, endDate, data);
-    return NextResponse.json({ ...data, cachedAt: new Date().toISOString() });
+    // Devolve do cache recém-gravado: em gzip e já deixa a versão pronta para o Painel.
+    const resposta = await responderDoCacheSienge(request, "outcome", startDate, endDate, { semGuardarNoNavegador: true });
+    return resposta ?? NextResponse.json({ ...data, cachedAt: new Date().toISOString() });
   } catch (error) {
     console.error("Error fetching outcome:", error);
     return NextResponse.json(

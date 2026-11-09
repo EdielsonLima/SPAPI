@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // src/instrumentation.ts (gzip do cache do Painel pronto ao subir o servidor)
+  experimental: { instrumentationHook: true },
   allowedDevOrigins: [
     '*.kirk.replit.dev',
     '*.replit.dev',

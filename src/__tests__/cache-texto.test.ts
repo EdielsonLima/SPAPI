@@ -1,7 +1,8 @@
 // Trava da resposta em texto do cache do Sienge: tem de dar o mesmo JSON que o
 // `{ ...dados, cachedAt }` de antes. Rodar: npx tsx src/__tests__/cache-texto.test.ts
 import assert from "node:assert/strict";
-import { jsonComCachedAt } from "../lib/cache-texto";
+import { etagDoCache, jsonComCachedAt, navegadorTemVersao, respostaMudou, respostaNaoMudou } from "../lib/cache-texto";
+import { periodosDoPainel } from "../lib/painel-periodos";
 
 const iso = "2026-11-09T13:39:14.158Z";
 
@@ -23,4 +24,25 @@ assert.deepEqual(JSON.parse(jsonComCachedAt("[1, 2]", iso)), { data: [1, 2], cac
 const acento = '{"data": [{"creditorName": "JOÃO \\"ZÉ\\" Ç"}]}';
 assert.equal(JSON.parse(jsonComCachedAt(acento, iso)).data[0].creditorName, 'JOÃO "ZÉ" Ç');
 
-console.log("cache-texto: ok");
+// ETag = versão do cache; If-None-Match pode vir fraco (W/) ou com várias
+assert.equal(etagDoCache(iso), `"${iso}"`);
+assert.equal(navegadorTemVersao(`"${iso}"`, iso), true);
+assert.equal(navegadorTemVersao(`W/"${iso}"`, iso), true);
+assert.equal(navegadorTemVersao(`"x", "${iso}"`, iso), true);
+assert.equal(navegadorTemVersao(`"2026-11-08T10:00:00.000Z"`, iso), false);
+assert.equal(navegadorTemVersao(null, iso), false);
+
+// Respostas curtas não ficam no disco do navegador
+(async () => {
+  const nm = respostaNaoMudou(iso);
+  assert.equal(nm.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await nm.json(), { naoMudou: true, cachedAt: iso });
+  const m = respostaMudou(iso);
+  assert.equal(m.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await m.json(), { naoMudou: false, mudou: true, cachedAt: iso });
+
+  // Períodos do Painel = os da rotina diária (CR até ano+15)
+  assert.deepEqual(periodosDoPainel(2026), { inicio: "2016-01-01", fim: "2031-12-31", fimReceber: "2041-12-31" });
+
+  console.log("cache-texto: ok");
+})();

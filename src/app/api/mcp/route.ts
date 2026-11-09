@@ -15,7 +15,7 @@ import {
   indicadoresResumo,
   listarEmpresas,
 } from "@/lib/financeiroActions";
-import { refreshFinanceiroCache } from "@/lib/refreshCache";
+import { refreshFinanceiroCache, prepararPainelDepoisDaRotina } from "@/lib/refreshCache";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -91,6 +91,7 @@ const TOOLS = [
     name: "atualizar_cache",
     fn: async () => {
       const resumo = await refreshFinanceiroCache();
+      void prepararPainelDepoisDaRotina("atualizar_cache (MCP)");
       return { ok: true, atualizadoEm: new Date().toISOString(), ...resumo };
     },
     description:

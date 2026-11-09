@@ -6,8 +6,11 @@
 //   - src/app/api/mcp/route.ts  (tool "atualizar_cache" do conector financeiro,
 //     chamada pela tarefa de Fechamento de Caixa ANTES de ler os dados)
 //
-// Range e parametros IDENTICOS ao painel/scripts/refresh-cache-pagas.js
-// (2016-01-01..2031-12-31) para o cache servir Painel + conector MCP.
+// Chaves IGUAIS as do Painel Executivo (periodosDoPainel: CP e movimentos
+// ano-10..ano+5, CR ano-10..ano+15) para o Painel abrir com o dado da rotina.
+// O CR tambem e gravado na chave antiga do conector MCP (REFRESH_START..
+// REFRESH_END), DEPOIS da do Painel: o MCP le "o cache mais recente que cobre o
+// periodo" e assim continua com os mesmos numeros de antes.
 //
 // O processamento de income (merge D+P, receipts->payments, receivedNetAmount)
 // e uma COPIA de src/app/api/sienge/income/route.ts — manter em sincronia.
@@ -21,6 +24,8 @@ import {
 } from "@/lib/db";
 import { siengeBulkGet, siengeGet } from "@/lib/sienge";
 import { expectedDimBancoKeys } from "@/lib/dimBanco";
+import { periodosDoPainel } from "@/lib/painel-periodos";
+import { prepararCachePainel } from "@/lib/cache-sienge-resposta";
 
 export const REFRESH_START = "2016-01-01";
 export const REFRESH_END = "2031-12-31";
@@ -30,46 +35,15 @@ function todayISO(): string {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
 
-// Executa o refresh completo. Lanca em erro nas etapas criticas (outcome/income/
-// BMs); saldos e best-effort (nao derruba o refresh). Retorna um resumo.
-export async function refreshFinanceiroCache(): Promise<Record<string, number | string>> {
-  const START = REFRESH_START;
-  const END = REFRESH_END;
-  const SIENGE_BASE = process.env.SIENGE_BULK_API_URL!;
+function autenticacaoSienge() {
   const SIENGE_USERNAME = process.env.SIENGE_USERNAME!;
   const SIENGE_PASSWORD = process.env.SIENGE_PASSWORD!;
-  const authHeader = "Basic " + Buffer.from(`${SIENGE_USERNAME}:${SIENGE_PASSWORD}`).toString("base64");
-  const t0 = Date.now();
-  const resumo: Record<string, number | string> = {};
+  return "Basic " + Buffer.from(`${SIENGE_USERNAME}:${SIENGE_PASSWORD}`).toString("base64");
+}
 
-  // ── 1. Outcome (mesmos params do painel) ──
-  const outcomeUrl = new URL(`${SIENGE_BASE}/outcome`);
-  outcomeUrl.searchParams.set("startDate", START);
-  outcomeUrl.searchParams.set("endDate", END);
-  outcomeUrl.searchParams.set("selectionType", "D");
-  outcomeUrl.searchParams.set("correctionIndexerId", "0");
-  outcomeUrl.searchParams.set("correctionDate", todayISO());
-  outcomeUrl.searchParams.set("withAuthorizations", "false");
-  outcomeUrl.searchParams.set("withBankMovements", "true");
-  const outResp = await siengeBulkGet(outcomeUrl.toString(), authHeader);
-  if (!outResp.ok) throw new Error(`outcome: ${outResp.status} ${outResp.statusText}`);
-  const outcomeData = await outResp.json();
-  await cacheOutcome(START, END, outcomeData);
-  resumo.outcome = (outcomeData?.data || []).length;
-
-  // ── 2. Bank movements avulsos ──
-  const bmUrl = new URL(`${SIENGE_BASE}/bank-movement`);
-  bmUrl.searchParams.set("startDate", START);
-  bmUrl.searchParams.set("endDate", END);
-  bmUrl.searchParams.set("selectionType", "M");
-  bmUrl.searchParams.set("onlyDetachedMovement", "S");
-  const bmResp = await siengeBulkGet(bmUrl.toString(), authHeader);
-  if (!bmResp.ok) throw new Error(`bank-movement: ${bmResp.status} ${bmResp.statusText}`);
-  const bmData = await bmResp.json();
-  await cacheBankMovements(START, END, bmData);
-  resumo.bankMovementsAvulsos = (bmData?.data || []).length;
-
-  // ── 3. Income (D + P, com o MESMO pos-processamento da rota income) ──
+// Income D + P com o MESMO pos-processamento da rota /api/sienge/income.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function buscarIncome(SIENGE_BASE: string, authHeader: string, START: string, END: string): Promise<any[]> {
   const buildIncomeUrl = (selectionType: string) => {
     const url = new URL(`${SIENGE_BASE}/income`);
     url.searchParams.set("startDate", START);
@@ -151,8 +125,54 @@ export async function refreshFinanceiroCache(): Promise<Record<string, number | 
   }
   /* eslint-enable @typescript-eslint/no-explicit-any */
 
-  await cacheIncome(START, END, { data: mergedData });
-  resumo.income = mergedData.length;
+  return mergedData;
+}
+
+// Executa o refresh completo. Lanca em erro nas etapas criticas (outcome/income/
+// BMs); saldos e best-effort (nao derruba o refresh). Retorna um resumo.
+export async function refreshFinanceiroCache(): Promise<Record<string, number | string>> {
+  const painel = periodosDoPainel();
+  const START = painel.inicio;
+  const END = painel.fim;
+  const SIENGE_BASE = process.env.SIENGE_BULK_API_URL!;
+  const authHeader = autenticacaoSienge();
+  const t0 = Date.now();
+  const resumo: Record<string, number | string> = {};
+
+  // ── 1. Outcome (mesmos params do painel) ──
+  const outcomeUrl = new URL(`${SIENGE_BASE}/outcome`);
+  outcomeUrl.searchParams.set("startDate", START);
+  outcomeUrl.searchParams.set("endDate", END);
+  outcomeUrl.searchParams.set("selectionType", "D");
+  outcomeUrl.searchParams.set("correctionIndexerId", "0");
+  outcomeUrl.searchParams.set("correctionDate", todayISO());
+  outcomeUrl.searchParams.set("withAuthorizations", "false");
+  outcomeUrl.searchParams.set("withBankMovements", "true");
+  const outResp = await siengeBulkGet(outcomeUrl.toString(), authHeader);
+  if (!outResp.ok) throw new Error(`outcome: ${outResp.status} ${outResp.statusText}`);
+  const outcomeData = await outResp.json();
+  await cacheOutcome(START, END, outcomeData);
+  resumo.outcome = (outcomeData?.data || []).length;
+
+  // ── 2. Bank movements avulsos ──
+  const bmUrl = new URL(`${SIENGE_BASE}/bank-movement`);
+  bmUrl.searchParams.set("startDate", START);
+  bmUrl.searchParams.set("endDate", END);
+  bmUrl.searchParams.set("selectionType", "M");
+  bmUrl.searchParams.set("onlyDetachedMovement", "S");
+  const bmResp = await siengeBulkGet(bmUrl.toString(), authHeader);
+  if (!bmResp.ok) throw new Error(`bank-movement: ${bmResp.status} ${bmResp.statusText}`);
+  const bmData = await bmResp.json();
+  await cacheBankMovements(START, END, bmData);
+  resumo.bankMovementsAvulsos = (bmData?.data || []).length;
+
+  // ── 3. Income: chave do Painel primeiro, depois a do conector MCP ──
+  const incomePainel = await buscarIncome(SIENGE_BASE, authHeader, painel.inicio, painel.fimReceber);
+  await cacheIncome(painel.inicio, painel.fimReceber, { data: incomePainel });
+  resumo.incomePainel = incomePainel.length;
+  const incomeMcp = await buscarIncome(SIENGE_BASE, authHeader, REFRESH_START, REFRESH_END);
+  await cacheIncome(REFRESH_START, REFRESH_END, { data: incomeMcp });
+  resumo.income = incomeMcp.length;
 
   // ── 4. Saldos bancarios de ONTEM (cached_daily_balances) ──
   // Mesma logica da aba Saldos: pagina /accounts-balances, completa empresas
@@ -230,4 +250,42 @@ export async function refreshFinanceiroCache(): Promise<Record<string, number | 
 
   resumo.duracaoSegundos = Math.round((Date.now() - t0) / 1000);
   return resumo;
+}
+
+// ── Depois da rotina, em segundo plano (quem chamou a rotina não espera) ──
+// 1. Movimentos bancários TODOS (chave all:, usada pela DRE e pelas tarifas de
+//    cobrança da aba Contas Pagas): a rotina não renovava; venciam em 7 dias e
+//    aí o Painel ia buscar 144 MB no Sienge na hora.
+// 2. Deixa pronto na memória o gzip das quatro chaves do Painel, para o
+//    primeiro a abrir depois da rotina não esperar ~30 s (Edielson, 09/11/2026).
+let depoisDaRotina: Promise<void> | null = null;
+
+export function prepararPainelDepoisDaRotina(motivo: string): Promise<void> {
+  if (depoisDaRotina) return depoisDaRotina.then(() => prepararCachePainel(motivo));
+  depoisDaRotina = (async () => {
+    const t0 = Date.now();
+    const { inicio, fim } = periodosDoPainel();
+    try {
+      const url = new URL(`${process.env.SIENGE_BULK_API_URL!}/bank-movement`);
+      url.searchParams.set("startDate", inicio);
+      url.searchParams.set("endDate", fim);
+      url.searchParams.set("selectionType", "M");
+      const resp = await siengeBulkGet(url.toString(), autenticacaoSienge());
+      if (resp.status === 404) {
+        await cacheBankMovements(`all:${inicio}`, `all:${fim}`, { data: [] });
+      } else if (!resp.ok) {
+        throw new Error(`${resp.status} ${resp.statusText}`);
+      } else {
+        const dados = await resp.json();
+        await cacheBankMovements(`all:${inicio}`, `all:${fim}`, dados);
+        console.log(`[rotina] movimentos bancários (todos): ${(dados?.data || []).length} em ${Math.round((Date.now() - t0) / 1000)} s`);
+      }
+    } catch (e) {
+      console.error("[rotina] movimentos bancários (todos) falhou:", e instanceof Error ? e.message : e);
+    }
+    await prepararCachePainel(motivo);
+  })().finally(() => {
+    depoisDaRotina = null;
+  });
+  return depoisDaRotina;
 }

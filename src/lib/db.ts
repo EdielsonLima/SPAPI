@@ -290,6 +290,30 @@ function filtroCacheTexto(qual: QualCacheTexto) {
   return `FROM ${TABELAS_CACHE_TEXTO[qual]} WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '7 days'`;
 }
 
+/**
+ * Badge "Contas Vencidas" do menu: parcelas a pagar com vencimento entre `de` e
+ * `ate` (inclusive) e saldo > 0, contadas no PostgreSQL sobre o cache do Painel
+ * (sem TTL — é só o número do menu). Antes o menu baixava do Sienge, a cada dia,
+ * o CP do ano até hoje (uma chave nova por dia, 35 MB). null = sem cache.
+ */
+export async function contarParcelasComSaldoNoCache(
+  inicio: string,
+  fim: string,
+  de: string,
+  ate: string
+): Promise<{ quantidade: number; cachedAt: string } | null> {
+  const r = await pool.query(
+    `SELECT c.cached_at,
+            (SELECT count(*)::int FROM jsonb_array_elements(c.data->'data') e
+              WHERE left(e->>'dueDate', 10) >= $3 AND left(e->>'dueDate', 10) <= $4
+                AND (e->>'balanceAmount')::numeric > 0) AS n
+       FROM cached_outcome c WHERE c.start_date = $1 AND c.end_date = $2`,
+    [inicio, fim, de, ate]
+  );
+  if (r.rows.length === 0) return null;
+  return { quantidade: Number(r.rows[0].n) || 0, cachedAt: new Date(r.rows[0].cached_at).toISOString() };
+}
+
 /** Só a data do cache (sem ler o dado). null = não há cache válido (7 dias). */
 export async function getCacheCachedAt(qual: QualCacheTexto, startDate: string, endDate: string): Promise<string | null> {
   const r = await pool.query(`SELECT cached_at ${filtroCacheTexto(qual)}`, [startDate, endDate]);
