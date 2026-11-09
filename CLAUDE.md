@@ -845,10 +845,11 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   `portal-sso.test.ts`). `podeEditarNaSessao` em `src/app/api/tabela-precos/acesso.ts`
   = administrador OU `TABELA_PRECOS_EMAILS`; vale para estoque do Resumo, Tabela de
   Preços, tabela comercial, condições de pagamento e andamento da obra.
-  **Depende do Portal:** `portal-silva-packer/lib/sso.ts` (`emitirBilhete`) ainda não
-  manda `role` no bilhete (09/11); enquanto não mandar, quem entra pelo Portal só edita
-  se estiver em `TABELA_PRECOS_EMAILS`. Depois da mudança no Portal a pessoa precisa
-  abrir o Financeiro de novo pelo card (bilhete novo = sessão nova).
+  **Portal manda o papel desde 09/11/2026** (`portal-silva-packer`, commit `bbc0232`,
+  serviço `portal` no EasyPanel): `emitirBilhete` assina `role` sempre como "admin" ou
+  "user" (`session.user.role` do Portal; ausente conta como "user"). Quem já estava
+  logado no Financeiro precisa abrir de novo pelo card do Portal (bilhete novo = sessão
+  nova) para a edição liberar. Mudança no Portal se faz em sessão na pasta dele, não daqui.
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
 
