@@ -785,7 +785,9 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
 - Total Pago usa filtro de Tipo Operação do próprio Resumo (não per-company)
 - Total Recebido vem de income payments (netAmount > 0)
 - Lucro Realizado = Total Recebido - Total Pago
-- Coluna Disp. conta apenas unidades tipo Apartamento (exclui vagas, salas, lojas)
+- Coluna Disp. conta apenas unidades tipo Apartamento (exclui vagas, salas, lojas) —
+  desde 09/11/2026 pelo TIPO do cadastro do Sienge (`ehApartamento` em
+  `src/lib/estoque-resumo.ts`), não mais pelo nome; ver a seção seguinte
 - Empresas Finalizadas sempre no final da tabela (case-insensitive)
 - Status Ativa/Finalizada vem de Configurações > Empreendimentos
 
@@ -806,29 +808,47 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     em `comercial-view.tsx`); a Tabela de Preços mostra a etiqueta "(manual)".
   - Valor da unidade Disponível: preço da **Tabela de Preços** do painel; sem ele, o da
     tabela comercial; sem nenhum, a estimativa de sempre (área × fator × CUB).
-  - Sala, loja e box (pelo nome) continuam fora da contagem e só somam com preço.
+  - **Só apartamento** conta em Disp./Res.Téc. e é estimado; vaga, sala, loja, box e o
+    resto ficam fora da conta e só somam no valor quando têm preço.
   - Reservada não soma no Valor Estoque (como antes).
 - Onde grava (nada vai para o Sienge): preço → `tabela_precos_unidades` pela rota
   `/api/tabela-precos` (com histórico); situação → tabela nova `situacao_manual_unidades`
   (`ensureSituacaoManual` em `db.ts`, nasce na 1ª chamada) pela rota
   `/api/situacao-unidades`. "Sienge/Tabela comercial · X" no seletor apaga o ajuste.
-  Edita quem edita a Tabela de Preços (`TABELA_PRECOS_EMAILS`); os demais só veem.
-- **Sem preço, tabela comercial nem ajuste manual os números não mudam**: conferido
-  local com os fatores de produção — 135 Jardins R$ 4.019.805,17 (18/3), Rozza
-  R$ 381.954,00 (8), Serenity R$ 4.653.472,90 (5/6), Tesla R$ 954.885,00 (21), Capri
-  R$ 1.193.415,27 (8), Siena R$ 3.985.530,84 (23), Hannover R$ 2.233.065,41 (16), iguais
-  à tela de produção de 09/11.
+  Editam os **administradores** e quem está em `TABELA_PRECOS_EMAILS`; os demais só veem.
+- 1ª publicação (commit `ea71d89`): sem preço, tabela comercial nem ajuste manual os
+  números eram os de antes — conferido local com os fatores de produção, iguais à tela
+  de produção de 09/11 (135 Jardins R$ 4.019.805,17 e 18/3, Tesla R$ 954.885,00 e 21…).
 - **Palácio Elizabeth mudou**: de R$ 10.496.599,46 / 82 disp. para **R$ 55.600.000,00 /
   12 disp.**, porque o Resumo passou a seguir a tabela comercial (12 à venda, com preço).
   As 3102 e 3202 (R$ 10,2 mi) entram por estarem na tabela comercial; no Sienge são
   permuta de R$ 0,01 em nome de João Paulo e Carlos Humberto. 1501, 1502 e 1801 estão
   livres no Sienge e fora da tabela comercial (contam como vendidas). Tudo ajustável no modal.
-- **Achado, ainda sem decisão:** a coluna Disp. deveria contar só apartamento, mas a
-  regra olha o NOME (`entraPeloNome`) e a vaga se chama "G 108" no Sienge — então vaga
-  conta e é estimada por m² × fator × CUB (os 82 do Palácio eram 13 apartamentos + 69
-  vagas; 135 Jardins 18 = 3 + 15). O modal mostra a composição no cartão Disponíveis.
-  Não foi mudado: trocar para o tipo do cadastro derruba Disp. e Valor Estoque de quase
-  todas as empresas (Tesla iria a zero).
+- **Só apartamentos (Edielson, 09/11: "Sim, só apartamentos").** A regra olhava o NOME
+  e a vaga se chama "G 108" no Sienge, então vaga contava como apartamento e era
+  estimada por m² (os 82 do Palácio eram 13 apartamentos + 69 vagas). Agora vale o tipo
+  do cadastro (`ehApartamento`: "Apartamento" e "Apartamento (Permuta)"; sem tipo, o
+  nome). Antes → depois, com os dados de 08/11 e os fatores de produção:
+  135 Jardins R$ 4.019.805,17 (18 disp./3 res.) → **R$ 2.537.797,86 (3/2)** ·
+  Rozza R$ 381.954,00 (8) → **sem valor (1; a 901 está com área zero no Sienge)** ·
+  Serenity R$ 4.653.472,90 (5/6) → **igual (5/2)** · Tesla R$ 954.885,00 (21) →
+  **nada (só vagas, salas e boxes)** · Capri R$ 1.193.415,27 (8) → **R$ 862.388,47 (1)** ·
+  Siena R$ 3.985.530,84 (23) → **R$ 2.628.416,45 (6)** · Hannover R$ 2.233.065,41 (16) →
+  **R$ 1.501.413,43 (3)** · Palácio igual (R$ 55.600.000,00, 12). Vaga, sala e box
+  voltam ao valor quando alguém cadastrar o preço no modal.
+  O "VGV potencial" e a área do **Comercial › Visão Geral** usam a mesma função (era
+  uma cópia da regra do nome): 6.045 m² em 09/11.
+- **Administradores editam (Edielson, 09/11: "todos os usuários admin tenham que poder
+  mudar ali os valores e editar").** O painel não tinha papel de administrador. Agora a
+  sessão leva `admin` (`src/lib/auth.ts`): o login "Administrador" (`ADMIN_USERNAME`)
+  e quem chega do Portal com `role: "admin"` no bilhete (`validarBilhetePortal`, trava
+  `portal-sso.test.ts`). `podeEditarNaSessao` em `src/app/api/tabela-precos/acesso.ts`
+  = administrador OU `TABELA_PRECOS_EMAILS`; vale para estoque do Resumo, Tabela de
+  Preços, tabela comercial, condições de pagamento e andamento da obra.
+  **Depende do Portal:** `portal-silva-packer/lib/sso.ts` (`emitirBilhete`) ainda não
+  manda `role` no bilhete (09/11); enquanto não mandar, quem entra pelo Portal só edita
+  se estiver em `TABELA_PRECOS_EMAILS`. Depois da mudança no Portal a pessoa precisa
+  abrir o Financeiro de novo pelo card (bilhete novo = sessão nova).
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
 
@@ -851,6 +871,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
 
 ## Autenticação
 
+- Administrador (09/11/2026): `session.user.admin` = login "Administrador" ou bilhete do
+  Portal com `role: "admin"`. Ver "Resumo › Estoque por unidade".
 - NextAuth com dois providers: Google OAuth + Credentials
 - Credentials: verifica env vars (ADMIN_USERNAME/PASSWORD) depois banco PostgreSQL (tabela users)
 - Senhas em bcrypt hash

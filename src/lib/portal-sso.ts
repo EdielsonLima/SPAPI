@@ -55,7 +55,9 @@ export function portalSsoAtivo(): boolean {
   return !!process.env.PORTAL_SSO_PUBLIC_KEY;
 }
 
-export function validarBilhetePortal(token: string): { email: string; name: string } | null {
+// `admin` = o Portal disse que a pessoa é administradora (claim `role: "admin"`
+// no bilhete). Bilhete sem o claim (Portal antigo) = não administradora.
+export function validarBilhetePortal(token: string): { email: string; name: string; admin: boolean } | null {
   const key = chavePublica();
   const aud = audienciaEsperada();
   if (!key || !aud || typeof token !== "string") return null;
@@ -74,7 +76,7 @@ export function validarBilhetePortal(token: string): { email: string; name: stri
   if (!payload) return null;
 
   const agora = Math.floor(Date.now() / 1000);
-  const { iss, aud: audToken, exp, iat, jti, email, name } = payload as Record<string, unknown>;
+  const { iss, aud: audToken, exp, iat, jti, email, name, role } = payload as Record<string, unknown>;
   if (iss !== ISSUER || audToken !== aud) return null;
   if (typeof exp !== "number" || typeof iat !== "number" || typeof jti !== "string") return null;
   if (exp < agora - FOLGA_RELOGIO_S || iat > agora + FOLGA_RELOGIO_S) return null;
@@ -85,5 +87,5 @@ export function validarBilhetePortal(token: string): { email: string; name: stri
   if (usados.has(jti)) return null;
   usados.set(jti, exp);
 
-  return { email: email.toLowerCase().trim(), name: typeof name === "string" ? name : email };
+  return { email: email.toLowerCase().trim(), name: typeof name === "string" ? name : email, admin: role === "admin" };
 }

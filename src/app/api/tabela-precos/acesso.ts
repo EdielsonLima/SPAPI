@@ -1,14 +1,25 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
+import { getServerSession, type Session } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { podeEditarPrecos } from "@/lib/tabela-precos";
 
-// Leitura: qualquer usuário logado. Escrita: só a lista de TABELA_PRECOS_EMAILS.
+// Administrador (Edielson, 09/11/2026: "todos os usuários admin tenham que poder
+// mudar ali os valores e editar"): quem entra pelo login "Administrador" ou
+// chega do Portal com `role: "admin"` no bilhete (src/lib/auth.ts).
+export const ehAdministrador = (session: Session | null | undefined): boolean =>
+  (session?.user as { admin?: boolean } | undefined)?.admin === true;
+
+// Quem altera preço, situação, tabela comercial e andamento da obra:
+// administradores e a lista de TABELA_PRECOS_EMAILS.
+export const podeEditarNaSessao = (session: Session | null | undefined): boolean =>
+  ehAdministrador(session) || podeEditarPrecos(session?.user?.email);
+
+// Leitura: qualquer usuário logado. Escrita: administradores e a lista de TABELA_PRECOS_EMAILS.
 export async function sessaoOu401() {
   const session = await getServerSession(authOptions);
   if (!session) return { erro: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   const email = session.user?.email || "";
-  return { email, nome: session.user?.name || email, podeEditar: podeEditarPrecos(email) };
+  return { email, nome: session.user?.name || email, podeEditar: podeEditarNaSessao(session) };
 }
 
 export async function editorOu403() {

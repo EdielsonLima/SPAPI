@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { lerAndamento, gravarAndamento } from "@/lib/db";
 import { CONFIGS_COM_ENTORNO } from "@/lib/torre-3d";
-import { podeEditarPrecos } from "@/lib/tabela-precos";
+import { podeEditarNaSessao } from "@/app/api/tabela-precos/acesso";
 import { ANDAMENTO_INICIAL, etapasValidas, lerAndamentoDoHtml } from "@/lib/andamento-obra";
 
 // Andamento da obra (maquete 3D).
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   const chave = req.nextUrl.searchParams.get("chave") || "";
   const local = CONFIGS_COM_ENTORNO.find(c => c.local?.chave === chave)?.local;
   if (!local) return NextResponse.json({ error: "Empreendimento sem andamento." }, { status: 404 });
-  const podeEditar = podeEditarPrecos(s.user?.email);
+  const podeEditar = podeEditarNaSessao(s);
   try {
     if (local.site && Date.now() - (lidoEm.get(chave) ?? 0) > SEIS_HORAS) {
       lidoEm.set(chave, Date.now());
@@ -47,7 +47,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   const s = await getServerSession(authOptions);
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!podeEditarPrecos(s.user?.email)) return NextResponse.json({ error: "Sem permissão para alterar o andamento." }, { status: 403 });
+  if (!podeEditarNaSessao(s)) return NextResponse.json({ error: "Sem permissão para alterar o andamento." }, { status: 403 });
   const body = await req.json().catch(() => null) as { chave?: string; etapas?: unknown } | null;
   const etapas = etapasValidas(body?.etapas);
   if (!body?.chave || !CONFIGS_COM_ENTORNO.some(c => c.local?.chave === body.chave) || !etapas) {

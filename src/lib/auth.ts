@@ -24,11 +24,15 @@ export const authOptions: NextAuthOptions = {
         const adminUser = process.env.ADMIN_USERNAME || "admin";
         const adminPass = process.env.ADMIN_PASSWORD || "admin";
         if (credentials.username === adminUser && credentials.password === adminPass) {
-          return {
+          // `admin` vai para a sessão (callbacks abaixo): administrador edita o que
+          // é restrito no painel (estoque do Resumo, Tabela de Preços).
+          const administrador = {
             id: "1",
             name: "Administrador",
             email: `admin@${process.env.NEXT_PUBLIC_COMPANY_EMAIL_DOMAIN || "empresa.com.br"}`,
+            admin: true,
           };
+          return administrador;
         }
 
         // 2. Check database users (by email)
@@ -64,7 +68,9 @@ export const authOptions: NextAuthOptions = {
           (await getActiveUserByEmailInsensitive(bilhete.email)) ??
           (await provisionPortalUser(bilhete.name, bilhete.email));
         if (!user) throw new Error("sem-cadastro");
-        return { id: String(user.id), name: user.name, email: user.email };
+        // Administrador no Portal = administrador aqui (o bilhete é assinado pelo Portal).
+        const sessao = { id: String(user.id), name: user.name, email: user.email, admin: bilhete.admin };
+        return sessao;
       },
     }),
   ],
@@ -79,6 +85,7 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user, account, profile }) {
       if (user) {
         token.id = user.id;
+        token.admin = (user as { admin?: boolean }).admin === true;
       }
       if (account?.provider === "google" && profile) {
         token.picture = (profile as { picture?: string }).picture;
@@ -88,6 +95,7 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       if (session.user) {
         (session.user as { id: string }).id = token.id as string;
+        (session.user as { admin?: boolean }).admin = token.admin === true;
         if (token.picture) {
           session.user.image = token.picture as string;
         }
