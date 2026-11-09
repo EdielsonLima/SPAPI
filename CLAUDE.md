@@ -553,6 +553,9 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   R$ 164.616.235,74 (+ Sul Brasil R$ 854.397,39). Não mudar sem pedido. "Saldo atual" do
   relatório = `correctedBalanceAmount` (o título 298 é corrigido, +R$ 1.900,87 por parcela
   sobre o valor original).
+  **Sul Brasil, mesma conferência (09/11):** Sienge R$ 1.917.665,55 (184 parcelas, 12 títulos)
+  × painel R$ 1.063.268,16; a diferença, R$ 854.397,39, é só aluguel (10 contratos de
+  locação); os 2 contratos de venda (títulos 196 e 190, Bella) batem no centavo, mês a mês.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 
