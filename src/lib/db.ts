@@ -274,6 +274,35 @@ export async function getCachedBankMovements(startDate: string, endDate: string)
   return result.rows.length > 0 ? { data: result.rows[0].data, cachedAt: result.rows[0].cached_at } : null;
 }
 
+// ─── Cache em texto (Painel Executivo, 09/11/2026) ──────────────────────────
+// As rotas do Sienge devolvem o JSON gravado como TEXTO (data::text), sem o Node
+// desmontar e remontar dezenas de MB a cada pedido. Com `desde` igual ao
+// cached_at gravado, nem lê o dado: o Painel já tem essa versão.
+const TABELAS_CACHE_TEXTO = {
+  outcome: "cached_outcome",
+  income: "cached_income",
+  bankMovements: "cached_bank_movements",
+} as const;
+
+export async function getCacheTexto(
+  qual: keyof typeof TABELAS_CACHE_TEXTO,
+  startDate: string,
+  endDate: string,
+  desde?: string | null
+): Promise<{ naoMudou: true; cachedAt: string } | { naoMudou: false; texto: string; cachedAt: string } | null> {
+  const tabela = TABELAS_CACHE_TEXTO[qual];
+  const filtro = `FROM ${tabela} WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '7 days'`;
+  if (desde) {
+    const r = await pool.query(`SELECT cached_at ${filtro}`, [startDate, endDate]);
+    if (r.rows.length === 0) return null;
+    const cachedAt = new Date(r.rows[0].cached_at).toISOString();
+    if (cachedAt === desde) return { naoMudou: true, cachedAt };
+  }
+  const r = await pool.query(`SELECT data::text AS texto, cached_at ${filtro}`, [startDate, endDate]);
+  if (r.rows.length === 0) return null;
+  return { naoMudou: false, texto: r.rows[0].texto as string, cachedAt: new Date(r.rows[0].cached_at).toISOString() };
+}
+
 export async function cacheBankMovements(startDate: string, endDate: string, data: unknown) {
   await pool.query(
     `INSERT INTO cached_bank_movements (start_date, end_date, data, cached_at) VALUES ($1, $2, $3, NOW())

@@ -198,8 +198,44 @@ function FactorInput({
   );
 }
 
+// Dados do Painel guardados na memória da aba (Edielson, 09/11/2026: "toda vez
+// que clica no painel executivo, ele fica carregando"). São ~350 MB de JSON
+// (CP, CR e movimentos bancários). Ao voltar ao Painel a tela abre na hora com
+// o que já tinha; em segundo plano pergunta ao servidor se o cache mudou
+// (?desde=cachedAt) e só baixa de novo o que mudou. "Atualizar" continua
+// buscando tudo no Sienge. Só vale com a carga principal completa.
+type CachePainel = {
+  ano: number;
+  completo: boolean;
+  items: SiengeOutcome[];
+  incomeItems: SiengeIncome[];
+  allBankMovements: SiengeBankMovement[];
+  allBankMovementsFull: SiengeBankMovement[];
+  salesContracts: SiengeSalesContract[];
+  apiUnits: ApiUnit[];
+  lastUpdatedCp: string | null;
+  lastUpdatedCr: string | null;
+  versoes: { outcome?: string; income?: string; bm?: string; bmAll?: string };
+};
+let cachePainel: CachePainel | null = null;
+
+function guardarNoCachePainel(ano: number, parcial: Partial<Omit<CachePainel, "ano">>) {
+  const base: CachePainel =
+    cachePainel && cachePainel.ano === ano
+      ? cachePainel
+      : {
+          ano, completo: false, items: [], incomeItems: [], allBankMovements: [], allBankMovementsFull: [],
+          salesContracts: [], apiUnits: [], lastUpdatedCp: null, lastUpdatedCr: null, versoes: {},
+        };
+  cachePainel = { ...base, ...parcial, versoes: { ...base.versoes, ...(parcial.versoes ?? {}) } };
+}
+
 export function ExecutiveDashboard() {
   const currentYear = new Date().getFullYear();
+  // Carga anterior desta aba (ver CachePainel): abre direto, sem a tela de carregando.
+  const [cacheInicial] = useState<CachePainel | null>(() =>
+    cachePainel && cachePainel.completo && cachePainel.ano === new Date().getFullYear() ? cachePainel : null
+  );
   const { isHolding, holdingName } = useCompanyMode();
   // Detecta tema para ajustar cores dos charts SVG (não respondem a CSS dark:).
   // Dark mode usa vermelho/cinza mais claros pra reduzir contraste.
@@ -225,9 +261,9 @@ export function ExecutiveDashboard() {
   });
   const [selectedDuePeriods, setSelectedDuePeriods] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<MainTab>("visao-geral");
-  const [items, setItems] = useState<SiengeOutcome[]>([]);
-  const [incomeItems, setIncomeItems] = useState<SiengeIncome[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<SiengeOutcome[]>(() => cacheInicial?.items ?? []);
+  const [incomeItems, setIncomeItems] = useState<SiengeIncome[]>(() => cacheInicial?.incomeItems ?? []);
+  const [loading, setLoading] = useState(() => !cacheInicial);
   const [refreshing, setRefreshing] = useState(false);
   // Increments on every "Atualizar" click — passed to DreTab as refreshKey
   // to force re-fetch of /api/dre-supplementary (the DRE pulls from Excel/DB
@@ -235,10 +271,10 @@ export function ExecutiveDashboard() {
   const [refreshKey, setRefreshKey] = useState(0);
   type StepStatus = "pending" | "running" | "done" | "error";
   const [refreshSteps, setRefreshSteps] = useState<{ label: string; detail?: string; status: StepStatus }[]>([]);
-  const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(null);
-  const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(null);
-  const [salesContracts, setSalesContracts] = useState<SiengeSalesContract[]>([]);
-  const [apiUnits, setApiUnits] = useState<ApiUnit[]>([]);
+  const [lastUpdatedCp, setLastUpdatedCp] = useState<string | null>(() => cacheInicial?.lastUpdatedCp ?? null);
+  const [lastUpdatedCr, setLastUpdatedCr] = useState<string | null>(() => cacheInicial?.lastUpdatedCr ?? null);
+  const [salesContracts, setSalesContracts] = useState<SiengeSalesContract[]>(() => cacheInicial?.salesContracts ?? []);
+  const [apiUnits, setApiUnits] = useState<ApiUnit[]>(() => cacheInicial?.apiUnits ?? []);
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
   const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string; controlaOrcamento?: boolean }[]>([]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
@@ -366,8 +402,8 @@ export function ExecutiveDashboard() {
 
   // Note: bankFees state was removed — bank movements are now synthesized as
   // outcome items via bankMovementsAsItems memo and flow through filteredPagas
-  const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>([]);
-  const [allBankMovementsFull, setAllBankMovementsFull] = useState<SiengeBankMovement[]>([]);
+  const [allBankMovements, setAllBankMovements] = useState<SiengeBankMovement[]>(() => cacheInicial?.allBankMovements ?? []);
+  const [allBankMovementsFull, setAllBankMovementsFull] = useState<SiengeBankMovement[]>(() => cacheInicial?.allBankMovementsFull ?? []);
   const [bankAccounts, setBankAccounts] = useState<{ bankAccountId: number; bankAccountDescription: string; bankCode: string; bankName: string; agencyNumber: string; accountNumber: string; companyId: number; companyName: string; currentBalance: number; isInDimBanco?: boolean }[]>([]);
   const [loadingBankAccounts, setLoadingBankAccounts] = useState(false);
   const [expandedBankCompanies, setExpandedBankCompanies] = useState<Set<string>>(new Set());
@@ -498,7 +534,7 @@ export function ExecutiveDashboard() {
   }, [activeItems, activeTab]);
 
   // Fixed date range for data fetching — never changes based on filters
-  const dataLoadedRef = useRef(false);
+  const dataLoadedRef = useRef(cacheInicial !== null);
   // Auto-retry counter pra primeira carga. Se um fetch falhar (ex: 429 do
   // Sienge, timeout temporario), retenta ate 2 vezes com backoff antes de
   // desistir e mostrar erro. Resolve o problema de "tela zerada" ao carregar.
@@ -513,6 +549,10 @@ export function ExecutiveDashboard() {
     // income — CP/BM raramente têm datas além de 5 anos.
     const incomeEndDate = `${currentYear + 15}-12-31`;
     const refreshParam = forceRefresh ? "&forceRefresh=true" : "";
+    // Com dados na memória, pergunta só se o cache do servidor mudou.
+    const versoes = !forceRefresh && cachePainel?.completo && cachePainel.ano === currentYear ? cachePainel.versoes : null;
+    const desde = (k: keyof CachePainel["versoes"]) => (versoes?.[k] ? `&desde=${encodeURIComponent(versoes[k] as string)}` : "");
+    const guardar = (parcial: Partial<Omit<CachePainel, "ano">>) => guardarNoCachePainel(currentYear, parcial);
 
     if (forceRefresh) {
       setRefreshing(true);
@@ -536,49 +576,65 @@ export function ExecutiveDashboard() {
       // Sales contracts fetch runs independently — never blocks main data
       fetch(`/api/sienge/sales-contracts${refreshParam ? "?forceRefresh=true" : ""}`)
         .then(res => res.ok ? res.json() : null)
-        .then(data => { if (data) { setSalesContracts(data.data || []); setStep(4, "done", `${(data.data || []).length} contratos`); } else setStep(4, "error"); })
+        .then(data => { if (data) { setSalesContracts(data.data || []); guardar({ salesContracts: data.data || [] }); setStep(4, "done", `${(data.data || []).length} contratos`); } else setStep(4, "error"); })
         .catch(() => setStep(4, "error"));
 
       // Units fetch runs independently — real unit data from Sienge
       fetch(`/api/sienge/units${refreshParam ? "?forceRefresh=true" : ""}`)
         .then(res => res.ok ? res.json() : null)
-        .then(data => { if (data) { setApiUnits(data.data || []); setStep(5, "done", `${(data.data || []).length} unidades`); } else setStep(5, "error"); })
+        .then(data => { if (data) { setApiUnits(data.data || []); guardar({ apiUnits: data.data || [] }); setStep(5, "done", `${(data.data || []).length} unidades`); } else setStep(5, "error"); })
         .catch(() => setStep(5, "error"));
 
       // Fetch ALL bank movements (including linked to outcomes/incomes) for DRE Level 3 enrichment
-      fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N${refreshParam}`)
+      fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}&detachedOnly=N${refreshParam}${desde("bmAll")}`)
         .then(res => res.ok ? res.json() : null)
-        .then(data => { if (data) { setAllBankMovementsFull(data.data || []); setStep(3, "done", `${(data.data || []).length} movimentos`); } else setStep(3, "error"); })
+        .then(data => {
+          if (!data) { setStep(3, "error"); return; }
+          if (data.naoMudou) return;
+          setAllBankMovementsFull(data.data || []);
+          guardar({ allBankMovementsFull: data.data || [], versoes: { bmAll: data.cachedAt } });
+          setStep(3, "done", `${(data.data || []).length} movimentos`);
+        })
         .catch(() => setStep(3, "error"));
 
       const [outcomeRes, bmRes, incomeRes] = await Promise.all([
-        fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}`)
+        fetch(`/api/sienge/outcome?startDate=${startDate}&endDate=${endDate}${refreshParam}${desde("outcome")}`)
           .then(r => { if (!r.ok) setStep(0, "error"); return r; }),
-        fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}`)
+        fetch(`/api/sienge/bank-movements?startDate=${startDate}&endDate=${endDate}${refreshParam}${desde("bm")}`)
           .then(r => { if (!r.ok) setStep(1, "error"); return r; }),
-        fetch(`/api/sienge/income?startDate=${startDate}&endDate=${incomeEndDate}${refreshParam}`)
+        fetch(`/api/sienge/income?startDate=${startDate}&endDate=${incomeEndDate}${refreshParam}${desde("income")}`)
           .then(r => { if (!r.ok) setStep(2, "error"); return r; }),
       ]);
 
       if (!outcomeRes.ok) throw new Error("Outcome API error");
       const outcomeData = await outcomeRes.json();
-      setItems(outcomeData.data || []);
-      if (outcomeData.cachedAt) setLastUpdatedCp(outcomeData.cachedAt);
-      setStep(0, "done", `${(outcomeData.data || []).length} parcelas`);
+      if (!outcomeData.naoMudou) {
+        setItems(outcomeData.data || []);
+        guardar({ items: outcomeData.data || [], versoes: { outcome: outcomeData.cachedAt } });
+        setStep(0, "done", `${(outcomeData.data || []).length} parcelas`);
+      }
+      if (outcomeData.cachedAt) { setLastUpdatedCp(outcomeData.cachedAt); guardar({ lastUpdatedCp: outcomeData.cachedAt }); }
 
       if (bmRes.ok) {
         const bmData = await bmRes.json();
-        const allBm: SiengeBankMovement[] = bmData.data || [];
-        setAllBankMovements(allBm);
-        setStep(1, "done", `${allBm.length} movimentos`);
+        if (!bmData.naoMudou) {
+          const allBm: SiengeBankMovement[] = bmData.data || [];
+          setAllBankMovements(allBm);
+          guardar({ allBankMovements: allBm, versoes: { bm: bmData.cachedAt } });
+          setStep(1, "done", `${allBm.length} movimentos`);
+        }
       }
 
       if (!incomeRes.ok) throw new Error("Income API error");
       const incomeData = await incomeRes.json();
-      setIncomeItems(incomeData.data || []);
-      if (incomeData.cachedAt) setLastUpdatedCr(incomeData.cachedAt);
-      setStep(2, "done", `${(incomeData.data || []).length} parcelas`);
+      if (!incomeData.naoMudou) {
+        setIncomeItems(incomeData.data || []);
+        guardar({ incomeItems: incomeData.data || [], versoes: { income: incomeData.cachedAt } });
+        setStep(2, "done", `${(incomeData.data || []).length} parcelas`);
+      }
+      if (incomeData.cachedAt) { setLastUpdatedCr(incomeData.cachedAt); guardar({ lastUpdatedCr: incomeData.cachedAt }); }
 
+      guardar({ completo: true });
       dataLoadedRef.current = true;
       retryCountRef.current = 0; // sucesso — reseta contador
     } catch (err) {

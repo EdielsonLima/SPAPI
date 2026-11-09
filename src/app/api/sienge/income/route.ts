@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCachedIncome, cacheIncome } from "@/lib/db";
+import { getCacheTexto, cacheIncome } from "@/lib/db";
+import { respostaDoCache, respostaNaoMudou } from "@/lib/cache-texto";
 import { siengeBulkGet } from "@/lib/sienge";
 
 export async function GET(request: NextRequest) {
@@ -21,10 +22,10 @@ export async function GET(request: NextRequest) {
   const forceRefresh = searchParams.get("forceRefresh") === "true";
 
   if (!forceRefresh) {
-    const cached = await getCachedIncome(startDate, endDate);
+    // Texto do cache direto (sem remontar o JSON); ?desde=cachedAt → "não mudou".
+    const cached = await getCacheTexto("income", startDate, endDate, searchParams.get("desde"));
     if (cached) {
-      const resp = typeof cached.data === "object" && cached.data !== null ? cached.data : { data: cached.data };
-      return NextResponse.json({ ...(resp as Record<string, unknown>), cachedAt: cached.cachedAt });
+      return cached.naoMudou ? respostaNaoMudou(cached.cachedAt) : respostaDoCache(cached.texto, cached.cachedAt);
     }
   }
 

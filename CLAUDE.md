@@ -376,6 +376,24 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Docker `spapi-sp-db` na porta 5447 e login `admin-local`); `node scripts/migrate.js`
   com `DATABASE_URL` exportada. Primeira carga puxa 10 anos do Sienge (~3 min).
 
+## Painel Executivo abre direto com o que já carregou (Edielson, 09/11/2026)
+
+- Pedido: "toda vez que clica no painel executivo, ele fica carregando". Cada abertura
+  baixava e lia de novo ~350 MB de JSON do cache do painel (CP 137 MB, CR 63 MB, movimentos
+  bancários avulsos 10 MB e todos, p/ DRE, 137 MB) e o navegador travava.
+- **Na tela** (`cachePainel` no topo de `executive-dashboard.tsx`): os dados ficam na
+  memória da aba. Voltar ao Painel abre na hora, sem a tela "Carregando" (0,7 s local), e em
+  segundo plano cada pedido vai com `?desde=<cachedAt>`: o servidor responde
+  `{ naoMudou: true }` (0 kB) ou o dado novo, e só o que mudou é baixado (rotina diária ou
+  "Atualizar" de outra pessoa). Só vale depois da carga principal completa (CP + avulsos +
+  CR). "Atualizar" continua indo ao Sienge. F5 ou aba nova = primeira carga, como antes.
+- **No servidor** (`getCacheTexto` em `db.ts` + `src/lib/cache-texto.ts`, trava
+  `cache-texto.test.ts`): outcome, income e bank-movements devolvem o `data::text` do
+  PostgreSQL com o `cachedAt` acrescentado no texto, sem JSON.parse/stringify no Node
+  (menos memória; local 3,5 s → 3,2 s para os 137 MB de CP). Mesmo JSON de antes.
+- Conferido local: Visão Geral idêntica (100 linhas) entre a volta pela memória e uma
+  carga completa; com o CR mudado no banco, só ele foi baixado de novo (66 MB).
+
 ## Conferência com o Power BI "FINANCEIRO GERAL", quadro a quadro (Edielson, 07/11/2026)
 
 - Motivo: o Carlos Humberto vem do Power BI; painel e BI têm de bater em cada quadro.

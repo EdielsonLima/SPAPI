@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCachedBankMovements, cacheBankMovements } from "@/lib/db";
+import { getCacheTexto, cacheBankMovements } from "@/lib/db";
+import { respostaDoCache, respostaNaoMudou } from "@/lib/cache-texto";
 import { siengeBulkGet } from "@/lib/sienge";
 
 export async function GET(request: NextRequest) {
@@ -24,11 +25,11 @@ export async function GET(request: NextRequest) {
   const cacheEndDate = detachedOnly ? endDate : `all:${endDate}`;
 
   if (!forceRefresh) {
-    const cached = await getCachedBankMovements(cacheStartDate, cacheEndDate);
+    // Texto do cache direto (sem remontar o JSON); ?desde=cachedAt → "não mudou".
+    const cached = await getCacheTexto("bankMovements", cacheStartDate, cacheEndDate, searchParams.get("desde"));
     if (cached) {
-        const d = cached.data as Record<string, unknown>;
-        return NextResponse.json({ ...d, cachedAt: cached.cachedAt });
-      }
+      return cached.naoMudou ? respostaNaoMudou(cached.cachedAt) : respostaDoCache(cached.texto, cached.cachedAt);
+    }
   }
 
   const SIENGE_BASE = process.env.SIENGE_BULK_API_URL!;
