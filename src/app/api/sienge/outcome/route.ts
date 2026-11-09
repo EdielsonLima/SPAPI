@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCacheTexto, cacheOutcome } from "@/lib/db";
-import { respostaDoCache, respostaNaoMudou } from "@/lib/cache-texto";
+import { cacheOutcome } from "@/lib/db";
+import { responderDoCacheSienge } from "@/lib/cache-sienge-resposta";
 import { siengeBulkGet } from "@/lib/sienge";
 
 export async function GET(request: NextRequest) {
@@ -22,11 +22,9 @@ export async function GET(request: NextRequest) {
   const forceRefresh = searchParams.get("forceRefresh") === "true";
 
   if (!forceRefresh) {
-    // Texto do cache direto (sem remontar o JSON); ?desde=cachedAt → "não mudou".
-    const cached = await getCacheTexto("outcome", startDate, endDate, searchParams.get("desde"));
-    if (cached) {
-      return cached.naoMudou ? respostaNaoMudou(cached.cachedAt) : respostaDoCache(cached.texto, cached.cachedAt);
-    }
+    // Cache em texto + gzip (sem remontar o JSON); ?desde=cachedAt → "não mudou".
+    const resposta = await responderDoCacheSienge(request, "outcome", startDate, endDate);
+    if (resposta) return resposta;
   }
 
   const url = new URL(`${SIENGE_BASE}/outcome`);

@@ -284,23 +284,27 @@ const TABELAS_CACHE_TEXTO = {
   bankMovements: "cached_bank_movements",
 } as const;
 
-export async function getCacheTexto(
-  qual: keyof typeof TABELAS_CACHE_TEXTO,
+export type QualCacheTexto = keyof typeof TABELAS_CACHE_TEXTO;
+
+function filtroCacheTexto(qual: QualCacheTexto) {
+  return `FROM ${TABELAS_CACHE_TEXTO[qual]} WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '7 days'`;
+}
+
+/** Só a data do cache (sem ler o dado). null = não há cache válido (7 dias). */
+export async function getCacheCachedAt(qual: QualCacheTexto, startDate: string, endDate: string): Promise<string | null> {
+  const r = await pool.query(`SELECT cached_at ${filtroCacheTexto(qual)}`, [startDate, endDate]);
+  return r.rows.length ? new Date(r.rows[0].cached_at).toISOString() : null;
+}
+
+/** O dado em texto (data::text), sem JSON.parse no Node. */
+export async function getCacheTextoDados(
+  qual: QualCacheTexto,
   startDate: string,
-  endDate: string,
-  desde?: string | null
-): Promise<{ naoMudou: true; cachedAt: string } | { naoMudou: false; texto: string; cachedAt: string } | null> {
-  const tabela = TABELAS_CACHE_TEXTO[qual];
-  const filtro = `FROM ${tabela} WHERE start_date = $1 AND end_date = $2 AND cached_at > NOW() - INTERVAL '7 days'`;
-  if (desde) {
-    const r = await pool.query(`SELECT cached_at ${filtro}`, [startDate, endDate]);
-    if (r.rows.length === 0) return null;
-    const cachedAt = new Date(r.rows[0].cached_at).toISOString();
-    if (cachedAt === desde) return { naoMudou: true, cachedAt };
-  }
-  const r = await pool.query(`SELECT data::text AS texto, cached_at ${filtro}`, [startDate, endDate]);
+  endDate: string
+): Promise<{ texto: string; cachedAt: string } | null> {
+  const r = await pool.query(`SELECT data::text AS texto, cached_at ${filtroCacheTexto(qual)}`, [startDate, endDate]);
   if (r.rows.length === 0) return null;
-  return { naoMudou: false, texto: r.rows[0].texto as string, cachedAt: new Date(r.rows[0].cached_at).toISOString() };
+  return { texto: r.rows[0].texto as string, cachedAt: new Date(r.rows[0].cached_at).toISOString() };
 }
 
 export async function cacheBankMovements(startDate: string, endDate: string, data: unknown) {

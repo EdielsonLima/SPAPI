@@ -387,10 +387,15 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   `{ naoMudou: true }` (0 kB) ou o dado novo, e só o que mudou é baixado (rotina diária ou
   "Atualizar" de outra pessoa). Só vale depois da carga principal completa (CP + avulsos +
   CR). "Atualizar" continua indo ao Sienge. F5 ou aba nova = primeira carga, como antes.
-- **No servidor** (`getCacheTexto` em `db.ts` + `src/lib/cache-texto.ts`, trava
+- **No servidor** (`responderDoCacheSienge` em `src/lib/cache-sienge-resposta.ts`,
+  `getCacheCachedAt`/`getCacheTextoDados` em `db.ts`, texto em `cache-texto.ts`, trava
   `cache-texto.test.ts`): outcome, income e bank-movements devolvem o `data::text` do
-  PostgreSQL com o `cachedAt` acrescentado no texto, sem JSON.parse/stringify no Node
-  (menos memória; local 3,5 s → 3,2 s para os 137 MB de CP). Mesmo JSON de antes.
+  PostgreSQL com o `cachedAt` acrescentado no texto (sem JSON.parse/stringify no Node) e
+  **em gzip**: o Next NÃO comprime as rotas de API em produção (conferido 09/11: até o
+  `/api/indicadores` saía cru) e a 1ª carga baixava ~400 MB (30 s por pedido). gzip nível 6:
+  CP 144 → 6,6 MB, CR 66 → 1,5 MB, avulsos 11 → 0,4 MB; local CP 3,5 s → 0,8 s. O gzip fica
+  na memória do servidor por versão do cache (até 12 chaves): só comprime de novo quando o
+  cache muda. Mesmo JSON de antes.
 - Conferido local: Visão Geral idêntica (100 linhas) entre a volta pela memória e uma
   carga completa; com o CR mudado no banco, só ele foi baixado de novo (66 MB).
 

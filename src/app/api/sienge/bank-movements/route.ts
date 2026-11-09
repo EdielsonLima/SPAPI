@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { getCacheTexto, cacheBankMovements } from "@/lib/db";
-import { respostaDoCache, respostaNaoMudou } from "@/lib/cache-texto";
+import { cacheBankMovements } from "@/lib/db";
+import { responderDoCacheSienge } from "@/lib/cache-sienge-resposta";
 import { siengeBulkGet } from "@/lib/sienge";
 
 export async function GET(request: NextRequest) {
@@ -25,11 +25,9 @@ export async function GET(request: NextRequest) {
   const cacheEndDate = detachedOnly ? endDate : `all:${endDate}`;
 
   if (!forceRefresh) {
-    // Texto do cache direto (sem remontar o JSON); ?desde=cachedAt → "não mudou".
-    const cached = await getCacheTexto("bankMovements", cacheStartDate, cacheEndDate, searchParams.get("desde"));
-    if (cached) {
-      return cached.naoMudou ? respostaNaoMudou(cached.cachedAt) : respostaDoCache(cached.texto, cached.cachedAt);
-    }
+    // Cache em texto + gzip (sem remontar o JSON); ?desde=cachedAt → "não mudou".
+    const resposta = await responderDoCacheSienge(request, "bankMovements", cacheStartDate, cacheEndDate);
+    if (resposta) return resposta;
   }
 
   const SIENGE_BASE = process.env.SIENGE_BULK_API_URL!;

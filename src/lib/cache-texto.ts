@@ -20,12 +20,6 @@ export function jsonComCachedAt(texto: string, cachedAt: string): string {
   return `{"data":${t || "null"},${carimbo}}`;
 }
 
-export function respostaDoCache(texto: string, cachedAt: string): Response {
-  return new Response(jsonComCachedAt(texto, cachedAt), {
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-  });
-}
-
 /** Resposta curta quando o Painel já tem essa versão do cache (?desde=cachedAt). */
 export function respostaNaoMudou(cachedAt: string): Response {
   return new Response(JSON.stringify({ naoMudou: true, cachedAt }), {
