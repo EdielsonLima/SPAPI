@@ -300,8 +300,9 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (`ensureTabelaPrecos` em `db.ts`); toda gravação passa por `gravarPrecos`
   (preço + histórico na mesma transação). **Quem edita:** só quem está em
   `TABELA_PRECOS_EMAILS` (senão `RESERVA_UNIDADE_EMAILS`; sem as duas,
-  ninguém). Por ora só o Edielson (23/10); depois Carlos, Humberto ou quem
-  usar o painel. Com Valores ligado, o Quadro e o 3D mostram o preço de
+  ninguém). Desde 09/11/2026: Edielson, `admin@silvapacker.com.br` e o Carlos
+  Humberto (`carloshumberto@silvapacker.com.br`); administradores do Portal
+  também editam (ver "Administradores editam"). Com Valores ligado, o Quadro e o 3D mostram o preço de
   tabela nas unidades sem venda.
 - **Escopo do Comercial na Silva Packer (Edielson, 23/10): só visualização.**
   Nada de reserva nem de proposta/contrato pelo painel (diferente da Leven):
@@ -785,8 +786,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
 - Total Pago usa filtro de Tipo Operação do próprio Resumo (não per-company)
 - Total Recebido vem de income payments (netAmount > 0)
 - Lucro Realizado = Total Recebido - Total Pago
-- Coluna Disp. conta apenas unidades tipo Apartamento (exclui vagas, salas, lojas) —
-  desde 09/11/2026 pelo TIPO do cadastro do Sienge (`ehApartamento` em
+- Coluna Disp. conta apartamento e sala comercial (exclui vagas e boxes) — desde
+  09/11/2026 pelo TIPO do cadastro do Sienge (`contaNoEstoque` em
   `src/lib/estoque-resumo.ts`), não mais pelo nome; ver a seção seguinte
 - Empresas Finalizadas sempre no final da tabela (case-insensitive)
 - Status Ativa/Finalizada vem de Configurações > Empreendimentos
@@ -808,8 +809,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     em `comercial-view.tsx`); a Tabela de Preços mostra a etiqueta "(manual)".
   - Valor da unidade Disponível: preço da **Tabela de Preços** do painel; sem ele, o da
     tabela comercial; sem nenhum, a estimativa de sempre (área × fator × CUB).
-  - **Só apartamento** conta em Disp./Res.Téc. e é estimado; vaga, sala, loja, box e o
-    resto ficam fora da conta e só somam no valor quando têm preço.
+  - **Apartamento e sala comercial** contam em Disp./Res.Téc. e são estimados; vaga,
+    box e o resto ficam fora da conta e só somam no valor quando têm preço.
   - Reservada não soma no Valor Estoque (como antes).
 - Onde grava (nada vai para o Sienge): preço → `tabela_precos_unidades` pela rota
   `/api/tabela-precos` (com histórico); situação → tabela nova `situacao_manual_unidades`
@@ -838,6 +839,17 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   voltam ao valor quando alguém cadastrar o preço no modal.
   O "VGV potencial" e a área do **Comercial › Visão Geral** usam a mesma função (era
   uma cópia da regra do nome): 6.045 m² em 09/11.
+- **Salas comerciais também são estoque (Edielson, 09/11: "além dos apartamentos, têm
+  salas comerciais que elas devem contabilizar como estoque").** `contaNoEstoque` =
+  grupo "Apartamento" ou "Sala comercial" do `grupoDoTipo` ("Salas Comerciais", "Sala
+  Comercial (Permuta)" e loja; sem tipo, o nome com SALA/SL/LOJA/LJ). A sala conta em
+  Disp./Res.Téc. e, sem preço, soma área × fator × CUB como o apartamento; o VGV
+  potencial do Comercial também. `ehApartamento` segue existindo (só apartamento).
+  No Sienge em 09/11: 20 salas disponíveis passam a contar — 135 Jardins 6, Esquina
+  Bella 4, Siena 4, Tesla 3, Hannover 2 e 1 sala de permuta da Silva ADM (Palácio e
+  Capri têm 5 cada, todas vendidas; Rua 2870 tem 3 em proposta). Trava:
+  `estoque-resumo.test.ts`. O cartão "Disponíveis" do modal mostra a composição
+  ("3 apartamentos · 2 salas comerciais") e "Sem preço" vale para os dois tipos.
 - **Administradores editam (Edielson, 09/11: "todos os usuários admin tenham que poder
   mudar ali os valores e editar").** O painel não tinha papel de administrador. Agora a
   sessão leva `admin` (`src/lib/auth.ts`): o login "Administrador" (`ADMIN_USERNAME`)

@@ -12,9 +12,9 @@
 // Valor de uma unidade Disponível:
 //   - preço de tabela do painel (Comercial › Tabela de Preços); sem ele, o da
 //     tabela comercial;
-//   - sem preço nenhum, só o APARTAMENTO entra, pela estimativa de sempre:
-//     área privativa × fator × CUB.
-// Disp. e Res.Téc. contam só apartamento (ehApartamento). Vaga, sala, loja,
+//   - sem preço nenhum, APARTAMENTO e SALA COMERCIAL entram pela estimativa de
+//     sempre: área privativa × fator × CUB.
+// Disp. e Res.Téc. contam apartamento e sala comercial (contaNoEstoque). Vaga,
 // box e o resto não contam e só somam no valor quando têm preço.
 
 import { inferUnitTypeFromName, pavimentoDaUnidade, type ApiUnit } from "@/lib/comercial-utils";
@@ -40,6 +40,16 @@ export function aplicarSituacaoManual(situacao: string, unitId: number | null | 
 // "disponíveis" do Palácio eram 13 apartamentos e 69 vagas.
 export function ehApartamento(u: Pick<ApiUnit, "name" | "propertyType">): boolean {
   return grupoDoTipo(u.propertyType || inferUnitTypeFromName(u.name)) === "Apartamento";
+}
+
+// O que é estoque à venda: apartamento e sala comercial (Edielson, 09/11/2026:
+// "além dos apartamentos, têm salas comerciais que elas devem contabilizar
+// como estoque"). Sala comercial é o grupo do tipo do Sienge ("Salas
+// Comerciais", loja); conta em Disp./Res.Téc. e, sem preço, é estimada como o
+// apartamento. Vaga, box e o resto continuam fora da conta.
+export const GRUPOS_DO_ESTOQUE = ["Apartamento", "Sala comercial"];
+export function contaNoEstoque(u: Pick<ApiUnit, "name" | "propertyType">): boolean {
+  return GRUPOS_DO_ESTOQUE.includes(grupoDoTipo(u.propertyType || inferUnitTypeFromName(u.name)));
 }
 
 export interface ContextoEstoque {
@@ -69,8 +79,8 @@ export interface LinhaEstoque {
   precoTabela: number | null; // tabela de preços do painel (o que o modal edita)
   preco: number | null;       // preço que vale: tabela de preços, senão tabela comercial
   origemPreco: OrigemPreco | null;
-  entraNaContagem: boolean;   // é apartamento: conta em Disp. / Res.Téc. e pode ser estimado
-  estimativa: number;         // área × fator × CUB, se é apartamento
+  entraNaContagem: boolean;   // apartamento ou sala comercial: conta em Disp. / Res.Téc. e pode ser estimado
+  estimativa: number;         // área × fator × CUB, se entra na contagem
   valorEstoque: number;       // quanto soma no Valor Estoque (0 se não está Disponível)
   estimado: boolean;          // o valor acima é a estimativa, não um preço
 }
@@ -97,7 +107,7 @@ export function linhasDeEstoque(unidades: ApiUnit[], ctx: ContextoEstoque): Linh
     const origemPreco: OrigemPreco | null = precoTabela !== null ? "tabela-precos" : preco !== null ? "tabela-comercial" : null;
 
     const area = u.privateArea || 0;
-    const entraNaContagem = ehApartamento(u);
+    const entraNaContagem = contaNoEstoque(u);
     const estimativa = entraNaContagem ? area * fatorDe.get(u.companyName)! * (ctx.cub || 0) : 0;
     const disponivel = situacao === "Disponível";
     const valorEstoque = disponivel ? (preco ?? estimativa) : 0;
@@ -134,8 +144,8 @@ export interface TotaisEstoque {
   valorComPreco: number;
   estimadas: number;       // disponíveis somadas pela estimativa
   valorEstimado: number;
-  semValor: number;        // apartamentos disponíveis sem preço e sem estimativa (área ou fator zero)
-  foraDaContagem: number;  // disponíveis com preço que não são apartamento (vaga, sala, box…)
+  semValor: number;        // apartamentos e salas disponíveis sem preço e sem estimativa (área ou fator zero)
+  foraDaContagem: number;  // disponíveis com preço que não entram na contagem (vaga, box…)
   valorReservado: number;  // reservadas a preço de tabela (informativo; não soma no estoque)
 }
 

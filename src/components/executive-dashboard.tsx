@@ -5223,9 +5223,9 @@ export function ExecutiveDashboard() {
         });
 
         // Units: Qt. Disponíveis, Res. Técnica, Valor Estoque — regra única em
-        // src/lib/estoque-resumo.ts (a mesma do modal Estoque). Só apartamento
-        // (tipo do cadastro do Sienge) conta em Disp./Res.Téc.; sem preço de
-        // tabela ele soma área × fator × CUB. Os demais tipos só somam com preço.
+        // src/lib/estoque-resumo.ts (a mesma do modal Estoque). Apartamento e
+        // sala comercial (tipo do cadastro do Sienge) contam em Disp./Res.Téc.;
+        // sem preço de tabela somam área × fator × CUB. Os demais tipos só somam com preço.
         totaisEstoque.forEach((t, co) => {
           if (!companySummary[co]) return;
           companySummary[co].qtDisp = t.qtDisp;

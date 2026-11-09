@@ -287,8 +287,11 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
   );
 
   // ── Cartões ──
-  // Disponíveis que não são apartamento (vaga, sala, box…): o Resumo não conta e só somam com preço.
+  // Disponíveis fora da conta (vaga, box…): o Resumo não conta e só somam com preço.
   const outrasDisponiveis = linhas.filter(l => l.situacao === "Disponível" && !l.entraNaContagem);
+  // O que a coluna Disp. / Res.Téc. conta: "3 apartamentos · 2 salas comerciais".
+  const contadasDisp = linhas.filter(l => l.situacao === "Disponível" && l.entraNaContagem);
+  const contadasRes = linhas.filter(l => l.situacao === "Reservado" && l.entraNaContagem);
   const semPreco = totais.estimadas + totais.semValor;
   const mudou = (a: number, b: number) => Math.abs(a - b) > 0.004;
   const totalVisivel = visiveis.reduce((s, l) => s + l.valorEstoque, 0);
@@ -324,21 +327,21 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
           />
           <Cartao
             rotulo="Disponíveis" cor="bg-blue-500" valor={String(totais.qtDisp)}
-            sub={`${totais.qtDisp === 1 ? "apartamento" : "apartamentos"}${outrasDisponiveis.length > 0 ? ` · fora da conta: ${composicaoPorTipo(outrasDisponiveis)}` : ""}`}
+            sub={`${contadasDisp.length > 0 ? composicaoPorTipo(contadasDisp) : "nenhum apartamento ou sala"}${outrasDisponiveis.length > 0 ? ` · fora da conta: ${composicaoPorTipo(outrasDisponiveis)}` : ""}`}
             alerta={totais.qtDisp !== totaisSalvos.qtDisp ? `antes: ${totaisSalvos.qtDisp} · ainda não salvo` : undefined}
           />
           <Cartao
             rotulo="Reservadas" cor="bg-amber-500" valor={String(totais.qtResTec)}
-            sub={totais.qtResTec === 0 ? "nenhum apartamento reservado" : `${totais.qtResTec === 1 ? "apartamento" : "apartamentos"}${totais.valorReservado > 0 ? ` · ${formatCurrency(totais.valorReservado)} em tabela` : ""} · não somam no valor`}
+            sub={totais.qtResTec === 0 ? "nenhum apartamento ou sala reservado" : `${composicaoPorTipo(contadasRes)}${totais.valorReservado > 0 ? ` · ${formatCurrency(totais.valorReservado)} em tabela` : ""} · não somam no valor`}
             alerta={totais.qtResTec !== totaisSalvos.qtResTec ? `antes: ${totaisSalvos.qtResTec} · ainda não salvo` : undefined}
           />
           <Cartao
-            rotulo="Apartamentos sem preço" cor={semPreco > 0 ? "bg-rose-500" : "bg-slate-400"} valor={String(semPreco)}
-            sub={totais.qtDisp === 0 ? "nenhum apartamento disponível" : semPreco === 0 ? "todos com preço de tabela" : totais.estimadas > 0 ? `${formatCurrency(totais.valorEstimado)} por estimativa${totais.semValor > 0 ? ` · ${totais.semValor} sem valor nenhum` : ""}` : "sem área ou fator: não somam nada"}
+            rotulo="Sem preço" cor={semPreco > 0 ? "bg-rose-500" : "bg-slate-400"} valor={String(semPreco)}
+            sub={totais.qtDisp === 0 ? "nenhum apartamento ou sala disponível" : semPreco === 0 ? "todos com preço de tabela" : totais.estimadas > 0 ? `${formatCurrency(totais.valorEstimado)} por estimativa${totais.semValor > 0 ? ` · ${totais.semValor} sem valor nenhum` : ""}` : "sem área ou fator: não somam nada"}
           />
         </div>
         <p className="px-6 pt-2 text-[11px] text-slate-500 dark:text-slate-400">
-          Sem preço, o apartamento entra pela estimativa: área privativa × fator ({fator ? fator.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "sem fator"}) × CUB ({cub ? `${formatCurrency(cub)}/m²` : "indisponível"}{cubMes ? `, ${cubMes}` : ""}). O preço digitado entra no lugar dela. Vaga, sala, loja e box só entram no valor com preço.
+          Sem preço, apartamento e sala comercial entram pela estimativa: área privativa × fator ({fator ? fator.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "sem fator"}) × CUB ({cub ? `${formatCurrency(cub)}/m²` : "indisponível"}{cubMes ? `, ${cubMes}` : ""}). O preço digitado entra no lugar dela. Vaga e box só entram no valor com preço.
         </p>
 
         {/* Filtros */}
@@ -450,7 +453,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
                       {!disponivel ? <span className="text-slate-400 dark:text-slate-500">—</span>
                         : l.preco !== null ? <span className="font-semibold text-slate-900 dark:text-slate-50">{formatCurrency(l.valorEstoque)}</span>
                         : l.estimado ? <span className="text-slate-600 dark:text-slate-400" title="Estimativa: área privativa × fator × CUB">≈ {formatCurrency(l.valorEstoque)}</span>
-                        : <span className="text-amber-700 dark:text-amber-300" title={l.entraNaContagem ? "Sem preço e sem área ou fator para estimar" : "Só apartamento é estimado; este tipo de unidade soma no estoque quando tem preço"}>{l.entraNaContagem ? "sem valor" : "só com preço"}</span>}
+                        : <span className="text-amber-700 dark:text-amber-300" title={l.entraNaContagem ? "Sem preço e sem área ou fator para estimar" : "Só apartamento e sala comercial são estimados; este tipo de unidade soma no estoque quando tem preço"}>{l.entraNaContagem ? "sem valor" : "só com preço"}</span>}
                     </td>
                   </tr>
                 );
