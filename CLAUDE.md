@@ -557,6 +557,23 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   × painel R$ 1.063.268,16; a diferença, R$ 854.397,39, é só aluguel (10 contratos de
   locação); os 2 contratos de venda (títulos 196 e 190, Bella) batem no centavo, mês a mês.
 
+## Indicadores › CUB-SC: mês novo direto do Sinduscon (Edielson, 09/11/2026)
+
+- Pedido: "aqui tem que já aparecer CUB de novembro". O painel lia só o myside
+  (série desde dez/2013), que em 09/11 ainda parava em Out/26; o Sinduscon da Grande
+  Florianópolis já publicava o de novembro (sai até o dia 5).
+- `fetchCubRows` (`src/lib/indicadores/cub-scraper.ts`) = série do myside +
+  `lerCubSinduscon` (bloco **Residencial Médio** de `sinduscon-fpolis.org.br/servico/cub-mensal/`).
+  O rótulo do mês é o **"Para ser usado em"** (mês de referência outubro = CUB de
+  novembro), o mesmo do myside. `completarComSinduscon` só acrescenta quando o mês é
+  mais novo que o último do myside; acumulado no ano = valor ÷ dez do ano anterior − 1,
+  12 meses = ÷ mesmo mês do ano anterior − 1. Myside já com o mês → o número dele fica.
+  Sinduscon fora do ar → série do myside, como antes. Trava: `cub-scraper.test.ts`.
+- Nov/26 (09/11): R$ 3.182,95 · +0,35 % · ano 5,79 % · 12 m 5,99 % (= anúncio do Sinduscon).
+- `/api/cub` (Orçamento: Orçado = m² × fator × CUB; Comercial; Empreendimentos) usa a
+  mesma série. O cache de 7 dias só segura o mês corrente: com CUB de mês anterior busca
+  de novo a cada 6 h (idem o "stale" do CUB na aba Indicadores, que busca sozinho ao abrir).
+
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 
 - Pedido: "comparar o CUB-SC com o m² de Balneário Camboriú". A aba "Valor m²" só guarda

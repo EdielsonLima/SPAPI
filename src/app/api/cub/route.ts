@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getCachedCub, cacheCub, getCubOverride } from "@/lib/db";
+import { fetchCubRows, type CubRow } from "@/lib/indicadores/cub-scraper";
 
 interface CubMonthData {
   month: string;
@@ -16,65 +17,41 @@ interface CubResult {
   monthlyData: CubMonthData[];
   source: string;
   cachedAt: string;
+  /** 2 = série myside + Sinduscon (09/11/2026); cache sem ele é refeito. */
+  leitura?: number;
 }
 
-function parseMysidePage(html: string): CubResult {
-  // myside.com.br table has columns: Mês/Ano | Valor CUB SC (R$/m²) | Mês (%) | Ano (%) | 12 meses (%)
-  // Rows like: Mar/26 | 3.028,45 | 0,30% | 0,65% | 4,15%
+const MESES_ROTULO = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-  const rows: { month: string; value: number; monthPct: number; yearPct: number }[] = [];
-
-  // Strip HTML tags to get clean text, then parse the table data
-  const text = html.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ");
-
-  // Match rows: Mes/YY  3.028,45  0,30%  0,65%  4,15%
-  const rowPattern = /([A-Za-zçÇ]{3})\/(\d{2})\s+(\d[\d.]*,\d{2})\s+(-?\d+,\d{2})%\s+(-?\d+,\d{2})%\s+(-?\d+,\d{2})%/g;
-
-  let match;
-  while ((match = rowPattern.exec(text)) !== null) {
-    const monthStr = match[1];
-    const yearStr = match[2];
-    const valueStr = match[3].replace(/\./g, "").replace(",", ".");
-    const monthPctStr = match[4].replace(",", ".");
-    const yearPctStr = match[5].replace(",", ".");
-
-    const value = parseFloat(valueStr);
-    const monthPct = parseFloat(monthPctStr);
-    const yearPct = parseFloat(yearPctStr);
-
-    if (!isNaN(value) && value > 100) {
-      rows.push({
-        month: `${monthStr}/20${yearStr}`,
-        value,
-        monthPct,
-        yearPct,
-      });
-    }
-  }
-
-  if (rows.length === 0) {
-    throw new Error("Could not parse CUB data from myside.com.br");
-  }
-
-  // First row is the most recent month
-  const latest = rows[0];
-  const currentYear = new Date().getFullYear();
-
-  // Build monthlyData for current year only
-  const monthlyData: CubMonthData[] = rows
-    .filter((r) => r.month.endsWith(`/${currentYear}`))
-    .reverse()
-    .map((r) => ({ month: r.month, value: r.value }));
-
+// Mesma série da aba Indicadores (myside + mês novo do Sinduscon-SC), no
+// formato que o Orçamento e o Comercial já usavam ("Nov/2026").
+function montarResultado(rows: CubRow[]): CubResult {
+  if (rows.length === 0) throw new Error("CUB-SC sem linhas");
+  const ord = [...rows].sort((a, b) => a.ano - b.ano || a.mes - b.mes);
+  const ultimo = ord[ord.length - 1];
+  const rotulo = (r: CubRow) => `${MESES_ROTULO[r.mes - 1]}/${r.ano}`;
+  const anoAtual = new Date().getFullYear();
   return {
-    currentValue: latest.value,
-    currentMonth: latest.month,
-    monthlyVariation: Math.round(latest.monthPct * 100) / 100,
-    yearlyAccumulated: Math.round(latest.yearPct * 100) / 100,
-    monthlyData,
-    source: "myside",
+    currentValue: ultimo.valor_m2,
+    currentMonth: rotulo(ultimo),
+    monthlyVariation: Math.round(ultimo.variacao_pct * 100) / 100,
+    yearlyAccumulated: Math.round(ultimo.variacao_acumulada_ano_pct * 100) / 100,
+    monthlyData: ord.filter((r) => r.ano === anoAtual).map((r) => ({ month: rotulo(r), value: r.valor_m2 })),
+    source: ultimo.fonte === "sinduscon" ? "sinduscon" : "myside",
     cachedAt: new Date().toISOString(),
+    leitura: 2,
   };
+}
+
+// O cache vale 7 dias, mas só segura o mês corrente: enquanto o CUB guardado
+// for de um mês anterior, busca de novo a cada 6 h (o CUB sai até o dia 5).
+function cacheAindaServe(data: Record<string, unknown>, cachedAt: string): boolean {
+  if (data.leitura !== 2) return false;
+  const hoje = new Date();
+  const mesAtual = `${MESES_ROTULO[hoje.getMonth()]}/${hoje.getFullYear()}`;
+  if (data.currentMonth === mesAtual) return true;
+  const idadeMs = Date.now() - new Date(cachedAt).getTime();
+  return Number.isFinite(idadeMs) && idadeMs < 6 * 60 * 60 * 1000;
 }
 
 export async function GET(request: Request) {
@@ -102,30 +79,20 @@ export async function GET(request: Request) {
     }
 
     // 2. Check cache (skip if forceRefresh)
-    if (!forceRefresh) {
-      const cached = await getCachedCub();
-      if (cached) {
-        const d = cached.data as Record<string, unknown>;
-        if (d.source === "myside") {
-          return NextResponse.json(cached.data);
-        }
-      }
+    const cached = await getCachedCub();
+    if (!forceRefresh && cached && cacheAindaServe(cached.data as Record<string, unknown>, cached.cachedAt)) {
+      return NextResponse.json(cached.data);
     }
 
-    // 3. Fetch from myside.com.br
-    const response = await fetch("https://myside.com.br/guia-balneario-camboriu/cub-sc", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-      cache: "no-store",
-    });
-
-    if (!response.ok) {
-      throw new Error(`myside.com.br fetch error: ${response.status}`);
+    // 3. Busca: série do myside + mês novo do Sinduscon-SC
+    let result: CubResult;
+    try {
+      result = montarResultado(await fetchCubRows());
+    } catch (err) {
+      // Fonte fora do ar: o CUB guardado (até 7 dias) é melhor que nada.
+      if (cached) return NextResponse.json(cached.data);
+      throw err;
     }
-
-    const html = await response.text();
-    const result = parseMysidePage(html);
     await cacheCub(result);
 
     return NextResponse.json(result);

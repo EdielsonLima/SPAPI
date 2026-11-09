@@ -161,7 +161,16 @@ export function CubContent({
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-          Fonte: Sinduscon-SC via{" "}
+          Fonte:{" "}
+          <a
+            href="https://sinduscon-fpolis.org.br/servico/cub-mensal/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary hover:underline"
+          >
+            Sinduscon-SC
+          </a>
+          {" "}(mês atual) e{" "}
           <a
             href="https://myside.com.br/guia-balneario-camboriu/cub-sc"
             target="_blank"
@@ -170,6 +179,7 @@ export function CubContent({
           >
             myside.com.br
           </a>
+          {" "}(série)
           {" · "}sincronizado em {formatDateTime(atualizadoEm)}
         </div>
         <Button

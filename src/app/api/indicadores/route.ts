@@ -24,6 +24,19 @@ function isStale(iso: string | undefined): boolean {
   return ageMs > STALE_DAYS * 24 * 60 * 60 * 1000;
 }
 
+// CUB: além dos 7 dias, fica "velho" enquanto o último mês gravado for de um
+// mês anterior ao atual e a última busca tiver mais de 6 h — o Sinduscon-SC
+// publica até o dia 5 e a aba busca sozinha quando abre.
+function cubDesatualizado(rows: CubIndicadorRow[], atualizadoEm: string | undefined): boolean {
+  if (isStale(atualizadoEm)) return true;
+  const ultimo = rows[rows.length - 1];
+  const hoje = new Date();
+  const mesAtual = hoje.getFullYear() * 100 + hoje.getMonth() + 1;
+  if (!ultimo || ultimo.ano * 100 + ultimo.mes >= mesAtual) return false;
+  const idadeMs = Date.now() - new Date(atualizadoEm as string).getTime();
+  return idadeMs > 6 * 60 * 60 * 1000;
+}
+
 function computeAcumuladoAno(rows: PctIndicadorRow[]): number | null {
   if (rows.length === 0) return null;
   const ultimo = rows[rows.length - 1];
@@ -139,7 +152,7 @@ export async function GET() {
         rows: cubRows,
         kpis: buildCubKpis(cubRows),
         atualizadoEm: cubAtu,
-        stale: isStale(cubAtu ?? undefined),
+        stale: cubDesatualizado(cubRows, cubAtu ?? undefined),
       },
       cdi: {
         rows: cdiRows,
