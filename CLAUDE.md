@@ -495,6 +495,18 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   2023/2025): ficam no Geral como ficam nas Atrasadas. Grade com 7 cards
   (`xl:grid-cols-4 2xl:grid-cols-7`) e fonte do valor menor com 7 cards ou com 6 e valor
   de 17+ caracteres (`fonteValor`). Página CONTAS À PAGAR do BI fechada.
+- **Por que o Total a Pagar do BI difere do painel com "Todos" (09/11, pergunta do
+  Edielson):** BI R$ 5.194.571,49 × painel R$ 4.875.069,78 (10 obras), −R$ 319.501,71,
+  fechado no centavo com o mesmo dado: (1) **−R$ 582.276,50 = data**: o "Status
+  Financeiro" do BI é coluna calculada com `TODAY()`, congelada na hora da atualização
+  (sábado 07/11); as 20 parcelas que venceram em 07 e 08/11 são "a vencer" no BI e já
+  estão em atraso no painel (09/11) — quase tudo é EURO SYSTEMAS, título 41627,
+  R$ 534.235,65, 135 Jardins. Some quando o BI for atualizado. (2) **+R$ 262.774,79 =
+  TETRA**: o card do BI é Geral − Atrasadas e só o Geral tira as 3 parcelas fixas da
+  TETRA, então o BI mostra a TETRA com A Pagar NEGATIVO; no painel ela tem 0 a vencer.
+  Geral e Atrasadas do BI (R$ 6.634.712,15 / R$ 1.440.140,67) também batem na conta. As
+  barras "Valores por Empresa" do BI usam outra medida (`ValorTotalPagaveis`) e não
+  somam o card do próprio BI (R$ 4.730.241,65). Nada mudou no painel.
 
 ## Indicadores › Comparar: m² de Balneário Camboriú (Edielson, 06/11/2026)
 
