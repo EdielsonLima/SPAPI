@@ -5,7 +5,8 @@
 import assert from "node:assert/strict";
 import {
   linhasDeEstoque, totaisDoEstoque, totaisPorEmpresa, ehApartamento, contaNoEstoque, aplicarSituacaoManual,
-  ehSituacaoManual, composicaoPorTipo, grupoDoTipo, type ContextoEstoque, type SituacaoManual,
+  ehSituacaoManual, composicaoPorTipo, grupoDoTipo, grupoInicialDoModal, candidatasALiberar, situacaoParaLiberar,
+  liberadaNoPainel, type ContextoEstoque, type SituacaoManual,
 } from "../lib/estoque-resumo";
 import { normalizarTabelaComercial, type TabelaComercial } from "../lib/tabela-comercial";
 import type { ApiUnit } from "../lib/comercial-utils";
@@ -183,5 +184,69 @@ assert.equal(grupoDoTipo("Salas Comerciais"), "Sala comercial");
 assert.equal(grupoDoTipo("Armário Box"), "Box");
 assert.equal(grupoDoTipo("Veículos (Permuta)"), "Outros");
 assert.equal(composicaoPorTipo(linhasDeEstoque(rozza, ctx()).filter(l => l.situacao === "Disponível")), "1 apartamento · 1 sala comercial · 1 vaga");
+
+// ── 7. Modal: abre só com apartamentos e libera unidade que no Sienge não está à venda ──
+// 135 Jardins em 10/11/2026 (Edielson): 2901 e 2902 em Reserva Técnica no Sienge e à
+// venda na planilha do comercial; 2702 vendida em nome de sócio.
+{
+  const jardins = [
+    un("JARDINS", "101", "Disponível", 177.18),
+    un("JARDINS", "2702", "Vendida", 177.18),
+    un("JARDINS", "2901", "Reserva Técnica", 177.18),
+    un("JARDINS", "2902", "Reserva Técnica", 177.18),
+    un("JARDINS", "SALA 01", "Vendida", 60, "Salas Comerciais"),
+    un("JARDINS", "G 29", "Vendida", 12.5, "Vaga de Garagem Simples"),
+  ];
+  jardins[1].contractNumber = "TER-JAR.2702";
+  const [a101, , a2901, a2902] = jardins;
+  const linhas = linhasDeEstoque(jardins, ctx());
+  const nomes = (ls: { unidade: string }[]) => ls.map(l => l.unidade);
+
+  // Abre em Apartamento; lista sem apartamento (o estoque da Tesla) abre com todos os tipos.
+  assert.equal(grupoInicialDoModal(linhas), "Apartamento");
+  assert.equal(grupoInicialDoModal(linhas.filter(l => grupoDoTipo(l.tipo) !== "Apartamento")), "");
+  assert.equal(grupoInicialDoModal([]), "");
+
+  // Candidatas a liberar: as que não estão Disponíveis; reservadas primeiro, depois pelo número.
+  assert.deepEqual(nomes(candidatasALiberar(linhas)), ["2901", "2902", "2702", "G 29", "SALA 01"]);
+  assert.deepEqual(nomes(candidatasALiberar(linhas, { grupo: "Apartamento" })), ["2901", "2902", "2702"]);
+  assert.deepEqual(nomes(candidatasALiberar(linhas, { grupo: "Apartamento", busca: " 27 " })), ["2702"]);
+  assert.deepEqual(nomes(candidatasALiberar(linhas, { busca: "29" })), ["2901", "2902", "G 29"]); // a que começa com o digitado vem antes
+  assert.deepEqual(nomes(candidatasALiberar(linhas, { busca: "g" })), ["G 29"]);
+  assert.equal(linhas.find(l => l.unidade === "2702")!.contrato, "TER-JAR.2702"); // aparece na lista para identificar a unidade do sócio
+  assert.equal(linhas.find(l => l.unidade === "2901")!.contrato, "");
+  // Cadastrada só no painel (id negativo) não é candidata: a situação dela é a do cadastro.
+  const doPainel = { ...un("JARDINS", "SALA 09", "Vendida", 50, "Sala comercial"), id: -7 };
+  assert.deepEqual(nomes(candidatasALiberar(linhasDeEstoque([doPainel], ctx()))), []);
+  // Sem id do Sienge não há onde gravar.
+  const semId = { ...un("JARDINS", "3001", "Vendida", 177.18), id: undefined };
+  assert.deepEqual(nomes(candidatasALiberar(linhasDeEstoque([semId], ctx()))), []);
+
+  // Liberar = Disponível à mão: passa a contar em Disp. e a somar no valor; o Sienge fica como está.
+  const precos = new Map([[a2901.id!, 4_250_000], [a2902.id!, 4_250_000]]);
+  const antes = totaisDoEstoque(linhasDeEstoque(jardins, ctx({ precos })));
+  assert.equal(antes.qtDisp, 1);
+  assert.equal(antes.qtResTec, 2);
+  perto(antes.valorReservado, 8_500_000); // tinham preço, mas reservada não soma
+  assert.equal(situacaoParaLiberar(linhas.find(l => l.unidade === "2901")!), "Disponível");
+  const liberadas = new Map<number, SituacaoManual>([[a2901.id!, "Disponível"], [a2902.id!, "Disponível"]]);
+  const depoisLinhas = linhasDeEstoque(jardins, ctx({ precos, situacoesManuais: liberadas }));
+  const depois = totaisDoEstoque(depoisLinhas);
+  assert.equal(depois.qtDisp, 3);
+  assert.equal(depois.qtResTec, 0);
+  perto(depois.valorEstoque, antes.valorEstoque + 8_500_000);
+  const l2901 = depoisLinhas.find(l => l.unidade === "2901")!;
+  assert.equal(l2901.situacaoSienge, "Reservado");
+  assert.equal(l2901.situacao, "Disponível");
+  assert.equal(liberadaNoPainel(l2901), true);
+  assert.equal(liberadaNoPainel(depoisLinhas.find(l => l.unidade === "101")!), false); // Disponível do Sienge não é "liberada"
+  assert.deepEqual(nomes(candidatasALiberar(depoisLinhas, { grupo: "Apartamento" })), ["2702"]); // as liberadas saem da lista
+
+  // Unidade Disponível no Sienge segurada só por ajuste manual: liberar = tirar o ajuste.
+  const segurada = linhasDeEstoque(jardins, ctx({ situacoesManuais: new Map<number, SituacaoManual>([[a101.id!, "Vendido"]]) })).find(l => l.unidade === "101")!;
+  assert.equal(segurada.situacao, "Vendido");
+  assert.equal(situacaoParaLiberar(segurada), "auto");
+  assert.equal(liberadaNoPainel(segurada), false);
+}
 
 console.log("estoque-resumo: ok");

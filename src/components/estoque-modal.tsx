@@ -12,6 +12,10 @@
 // O que se digita fica pendente (e já simulado nos cartões) até "Salvar".
 // Sala que não está no Sienge se cadastra aqui ("Adicionar sala"): fica em
 // unidades_painel (src/lib/unidades-painel.ts) e conta no estoque igual.
+// Abre já só com os apartamentos (Edielson, 10/11/2026); o seletor de tipo
+// mostra os demais. "Liberar unidade" põe à venda no painel a unidade que no
+// Sienge está reservada ou vendida (apartamento de sócio que voltou a ficar
+// disponível): é a situação manual "Disponível", em qualquer empresa.
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -26,6 +30,7 @@ import { normalizarTabelaComercial, type TabelaComercial } from "@/lib/tabela-co
 import { COR_SITUACAO } from "@/lib/situacao-unidade";
 import {
   linhasDeEstoque, totaisDoEstoque, composicaoPorTipo, grupoDoTipo, ehSituacaoManual,
+  grupoInicialDoModal, candidatasALiberar, situacaoParaLiberar, liberadaNoPainel,
   ORDEM_GRUPOS, SITUACOES_MANUAIS, type ContextoEstoque, type LinhaEstoque, type SituacaoManual,
 } from "@/lib/estoque-resumo";
 import {
@@ -33,7 +38,7 @@ import {
   SITUACOES_PAINEL, TIPOS_PAINEL, type SituacaoPainel, type UnidadePainel,
 } from "@/lib/unidades-painel";
 import type { ApiUnit } from "@/lib/comercial-utils";
-import { ArrowDown, ArrowUp, ArrowUpDown, Lock, Pencil, Plus, Save, Search, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Lock, LockOpen, Pencil, Plus, Save, Search, Trash2, Undo2, X } from "lucide-react";
 
 // ── Dados que o estoque usa além das unidades (preços, tabela comercial, situação manual) ──
 export interface DadosEstoque {
@@ -135,6 +140,12 @@ interface FormPainel {
   precoTxt: string;
 }
 const dia = (iso: string) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString("pt-BR"); };
+// Quantas unidades a lista do "Liberar unidade" mostra antes de pedir o número.
+const LIMITE_LIBERAR = 6;
+// Como a unidade está hoje, para quem vai liberar: de onde vem a situação e o contrato que a segura.
+const comoEsta = (l: LinhaEstoque) =>
+  (l.origem === "manual" ? `ajuste manual: ${l.situacao}` : l.origem === "tabela" ? `tabela comercial: ${l.situacao}` : `no Sienge: ${l.situacaoSienge}`)
+  + (l.contrato ? ` · contrato ${l.contrato}` : "");
 const chip = (ativo: boolean) =>
   `h-7 px-2.5 rounded-lg border text-xs font-medium tabular-nums transition-colors select-none ${
     ativo ? "chip-ativo" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400 dark:hover:border-slate-500"
@@ -353,6 +364,8 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
       if (!r.ok) throw new Error(d.error || "Falha ao gravar a unidade.");
       if (form.id !== null) esquecerPendente(idNoEstoque(form.id));
       await dados.recarregar();
+      // A lista abre só com apartamentos: passa a mostrar o tipo da unidade recém-cadastrada.
+      if (form.id === null && grupo && grupoDoTipo(campos.tipo) !== grupo) setGrupo(grupoDoTipo(campos.tipo));
       toast.success(form.id === null ? `${campos.unidade} cadastrada no painel. Já conta no estoque do Resumo.` : `${campos.unidade} atualizada.`);
       setForm(null);
     } catch (e) {
@@ -380,7 +393,10 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
 
   // ── Filtros e ordenação ──
   const [filtro, setFiltro] = useState<FiltroEstoque>(filtroInicial);
-  const [grupo, setGrupo] = useState("");
+  // Tipo: abre só com os apartamentos (Edielson, 10/11/2026). Se a lista com que o
+  // modal abre não tem apartamento (o estoque da Tesla é só sala, vaga e box), abre
+  // com todos os tipos, senão viria vazia. Decidido uma vez, na abertura.
+  const [grupo, setGrupo] = useState(() => grupoInicialDoModal(salvas.filter(FILTROS.find(f => f.chave === filtroInicial)!.passa)));
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<{ coluna: Coluna; dir: "asc" | "desc" }>({ coluna: "padrao", dir: "asc" });
 
@@ -426,6 +442,42 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
     </th>
   );
 
+  // ── Liberar para venda a unidade que no Sienge não está Disponível ──
+  // (reserva técnica, apartamento de sócio que voltou a ficar à venda). Fica
+  // pendente como as outras mudanças: Disponível à mão, gravado no "Salvar".
+  const [liberando, setLiberando] = useState(false);
+  const [buscaLiberar, setBuscaLiberar] = useState("");
+  const candidatas = useMemo(
+    () => (liberando ? candidatasALiberar(linhas, { grupo, busca: buscaLiberar }) : []),
+    [liberando, linhas, grupo, buscaLiberar],
+  );
+  // Sem busca a lista traz só as reservadas (as mais prováveis); a vendida aparece
+  // quando se digita o número — não fica um botão "Liberar" à toa em unidade de cliente.
+  const buscandoLiberar = buscaLiberar.trim() !== "";
+  const naListaLiberar = useMemo(
+    () => (buscandoLiberar ? candidatas : candidatas.filter(l => l.situacao === "Reservado")),
+    [buscandoLiberar, candidatas],
+  );
+  // Liberadas agora e ainda não salvas (dá para desfazer ali mesmo).
+  const liberadasAgora = useMemo(
+    () => mudancasSit
+      .filter(m => !ehDoPainel(m.linha.unitId) && m.linha.situacao !== "Disponível"
+        && (m.situacao === "Disponível" || (m.situacao === null && m.linha.situacaoBase === "Disponível")))
+      .map(m => m.linha)
+      .sort((a, b) => a.unidade.localeCompare(b.unidade, "pt-BR", { numeric: true })),
+    [mudancasSit],
+  );
+  const abrirLiberar = () => { setLiberando(true); setBuscaLiberar(""); };
+  const liberar = (l: LinhaEstoque) => {
+    if (l.unitId === null) return;
+    const alvo = situacaoParaLiberar(l);
+    setSitPend(prev => new Map(prev).set(l.unitId!, alvo));
+    setBusca("");          // a linha liberada tem de aparecer na lista de baixo
+    setBuscaLiberar("");
+  };
+  const desfazerLiberacao = (l: LinhaEstoque) =>
+    setSitPend(prev => { const m = new Map(prev); m.delete(l.unitId!); return m; });
+
   // ── Cartões ──
   // Disponíveis fora da conta (vaga, box…): o Resumo não conta e só somam com preço.
   const outrasDisponiveis = linhas.filter(l => l.situacao === "Disponível" && !l.entraNaContagem);
@@ -450,7 +502,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Estoque</p>
             <DialogTitle className="mt-0.5 truncate text-lg font-semibold tracking-[-0.02em] text-slate-900 dark:text-slate-50">{empresa}</DialogTitle>
             <DialogDescription className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Preço e situação de cada unidade. O que você ajusta aqui vale no Resumo, no Quadro Espelho e na Tabela de Preços, e não é gravado no Sienge. Sala que não está no Sienge entra por &ldquo;Adicionar sala&rdquo;.
+              Preço e situação de cada unidade. O que você ajusta aqui vale no Resumo, no Quadro Espelho e na Tabela de Preços, e não é gravado no Sienge. Sala que não está no Sienge entra por &ldquo;Adicionar sala&rdquo;; unidade reservada ou vendida no Sienge que voltou a ficar à venda, por &ldquo;Liberar unidade&rdquo;.
             </DialogDescription>
           </div>
           <button type="button" onClick={fechar} aria-label="Fechar" className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100">
@@ -516,9 +568,18 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
             </span>
           )}
           {podeEditar && (
-            <Button size="sm" variant="outline" className="ml-auto h-7 text-xs" onClick={abrirNova} disabled={form !== null} title="Cadastrar uma sala que não está no Sienge; ela conta no estoque do Resumo">
-              <Plus className="mr-1 h-3.5 w-3.5" />Adicionar sala
-            </Button>
+            <div className="ml-auto flex items-center gap-2">
+              <Button
+                size="sm" variant="outline" className={`h-7 text-xs ${liberando ? "border-slate-400 bg-slate-100 dark:border-slate-500 dark:bg-slate-800" : ""}`}
+                onClick={() => (liberando ? setLiberando(false) : abrirLiberar())} disabled={form !== null} aria-pressed={liberando}
+                title="Pôr à venda no painel uma unidade que no Sienge está reservada ou vendida (ex.: apartamento de sócio que voltou a ficar disponível). O Sienge não muda."
+              >
+                <LockOpen className="mr-1 h-3.5 w-3.5" />Liberar unidade
+              </Button>
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setLiberando(false); abrirNova(); }} disabled={form !== null} title="Cadastrar uma sala que não está no Sienge; ela conta no estoque do Resumo">
+                <Plus className="mr-1 h-3.5 w-3.5" />Adicionar sala
+              </Button>
+            </div>
           )}
         </div>
 
@@ -571,6 +632,58 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
                 </Button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Liberar para venda a unidade que no Sienge está reservada ou vendida */}
+        {liberando && podeEditar && (
+          <div className="mx-6 mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+            <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
+              <p className="min-w-[16rem] flex-1 text-xs font-semibold text-slate-800 dark:text-slate-100">
+                Liberar unidade para venda
+                <span className="font-normal text-slate-500 dark:text-slate-400"> · para a unidade que no Sienge está reservada ou em nome de sócio e voltou a ficar à venda. Ela passa a contar como Disponível no Resumo, no Quadro Espelho e na Tabela de Preços; o Sienge não muda.</span>
+              </p>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <Input value={buscaLiberar} onChange={e => setBuscaLiberar(e.target.value)} placeholder="Número da unidade" aria-label="Buscar unidade para liberar" autoFocus className="h-8 w-48 bg-white pl-7 text-xs text-slate-800 dark:bg-slate-900 dark:text-slate-100 md:text-xs" />
+              </div>
+              <Button size="sm" variant="ghost" className="h-8" onClick={() => setLiberando(false)}>Fechar</Button>
+            </div>
+            {naListaLiberar.length > 0 && (
+              <ul className="mt-2 grid gap-1.5 lg:grid-cols-2">
+                {naListaLiberar.slice(0, LIMITE_LIBERAR).map(l => (
+                  <li key={l.unitId} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1 dark:border-slate-700 dark:bg-slate-900">
+                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: COR_SITUACAO[l.situacao] || "#94a3b8" }} aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-xs text-slate-600 dark:text-slate-400" title={`${l.unidade} · ${l.empreendimento} · ${comoEsta(l)}`}>
+                      <span className="font-semibold tabular-nums text-slate-900 dark:text-slate-50">{l.unidade}</span>
+                      {` · ${l.tipo}${l.pavimento ? ` · ${l.pavimento}` : ""}${l.area ? ` · ${numeroBR(l.area)} m²` : ""} · ${comoEsta(l)}`}
+                    </span>
+                    <Button size="sm" variant="outline" className="h-7 shrink-0 text-xs" onClick={() => liberar(l)} aria-label={`Liberar a unidade ${l.unidade} para venda`}>Liberar</Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+              {candidatas.length === 0
+                ? (buscandoLiberar ? `Nenhuma unidade com “${buscaLiberar.trim()}” para liberar` : "Nenhuma unidade para liberar: todas já estão disponíveis")
+                : buscandoLiberar
+                  ? (naListaLiberar.length > LIMITE_LIBERAR ? `Aparecem ${LIMITE_LIBERAR} de ${naListaLiberar.length}: digite mais do número` : `${naListaLiberar.length} unidade(s) com “${buscaLiberar.trim()}”`)
+                  : `${naListaLiberar.length === 0 ? "Nenhuma reservada no Sienge" : naListaLiberar.length > LIMITE_LIBERAR ? `Aparecem ${LIMITE_LIBERAR} das ${naListaLiberar.length} reservadas no Sienge` : `${naListaLiberar.length} reservada(s) no Sienge`}${
+                      candidatas.length > naListaLiberar.length ? ` · outras ${candidatas.length - naListaLiberar.length} vendidas ou em outra situação (ex.: apartamento de sócio): digite o número para achar` : ""}`}
+              {grupo ? ` · tipo ${grupo} (para liberar vaga ou sala, troque o tipo no filtro acima)` : ""}.
+            </p>
+            {liberadasAgora.length > 0 && (
+              <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] text-amber-800 dark:text-amber-200">
+                Liberadas agora:
+                {liberadasAgora.map(l => (
+                  <span key={l.unitId} className="inline-flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 py-0.5 pl-1.5 pr-1 font-semibold tabular-nums dark:border-amber-500/40 dark:bg-amber-500/10">
+                    {l.unidade}
+                    <button type="button" onClick={() => desfazerLiberacao(l)} aria-label={`Desfazer a liberação da unidade ${l.unidade}`} title="Desfazer" className="rounded p-0.5 transition-colors hover:bg-amber-200 dark:hover:bg-amber-500/30"><X className="h-3 w-3" /></button>
+                  </span>
+                ))}
+                <span>· confira o preço na linha de cada uma e clique em Salvar.</span>
+              </p>
+            )}
           </div>
         )}
 
@@ -650,7 +763,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
                       </div>
                       {l.origem !== "sienge" && l.origem !== "painel" && (
                         <p className="mt-0.5 pl-4 text-[10px] text-slate-500 dark:text-slate-400" title={l.origem === "manual" && autor ? `Ajustada por ${quem(autor.por)} em ${dia(autor.em)}` : undefined}>
-                          {l.origem === "manual" ? "ajuste manual" : "pela tabela comercial"} · no Sienge: {l.situacaoSienge}
+                          {l.origem === "manual" ? (liberadaNoPainel(l) ? "liberada no painel" : "ajuste manual") : "pela tabela comercial"} · no Sienge: {l.situacaoSienge}
                         </p>
                       )}
                     </td>
@@ -683,6 +796,15 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
                   </tr>
                 );
               })}
+              {podeEditar && !liberando && form === null && (filtro === "disponiveis" || filtro === "estoque") && (
+                <tr className="border-t border-slate-100 dark:border-slate-800">
+                  <td colSpan={colunas} className="px-6 py-2.5 text-[11px] text-slate-500 dark:text-slate-400">
+                    Falta alguma unidade que está à venda?{" "}
+                    <button type="button" onClick={abrirLiberar} className="font-semibold text-slate-700 underline decoration-dotted decoration-slate-400 underline-offset-4 transition-colors hover:text-primary dark:text-slate-200 dark:hover:text-white">Liberar unidade</button>
+                    {" "}põe como disponível a que no Sienge está reservada ou vendida.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

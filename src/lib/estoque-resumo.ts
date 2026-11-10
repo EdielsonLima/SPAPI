@@ -74,6 +74,7 @@ export interface LinhaEstoque {
   empresa: string;
   empreendimento: string;
   unidade: string;
+  contrato: string;           // contrato do Sienge que hoje segura a unidade ("" = sem contrato)
   tipo: string;
   pavimento: string;
   area: number;
@@ -125,6 +126,7 @@ export function linhasDeEstoque(unidades: ApiUnit[], ctx: ContextoEstoque): Linh
       empresa: u.companyName,
       empreendimento: u.enterpriseName,
       unidade: u.name,
+      contrato: u.contractNumber || "",
       tipo: u.propertyType || inferUnitTypeFromName(u.name),
       pavimento: pavimentoDaUnidade(u.floor, u.name),
       area,
@@ -218,3 +220,44 @@ export function composicaoPorTipo(linhas: LinhaEstoque[]): string {
   for (const l of linhas) n.set(grupoDoTipo(l.tipo), (n.get(grupoDoTipo(l.tipo)) || 0) + 1);
   return ORDEM_GRUPOS.filter(g => n.has(g)).map(g => `${n.get(g)} ${n.get(g) === 1 ? SINGULAR[g] : PLURAL[g]}`).join(" · ");
 }
+
+// ── Modal Estoque: tipo com que abre e unidades que dá para liberar ──
+
+// O modal abre já só com os apartamentos (Edielson, 10/11/2026: "que venham
+// sempre já em padrão somente os apartamentos"). Recebe as linhas da lista com
+// que ele abre (em estoque, disponíveis ou reservadas): sem apartamento nela —
+// o estoque da Tesla é só sala, vaga e box — abre com todos os tipos, senão a
+// lista viria vazia.
+export function grupoInicialDoModal(linhas: Pick<LinhaEstoque, "tipo">[]): string {
+  return linhas.some(l => grupoDoTipo(l.tipo) === "Apartamento") ? "Apartamento" : "";
+}
+
+// Unidades que dá para LIBERAR para venda no painel (Edielson, 10/11/2026): as
+// do Sienge que hoje não estão Disponíveis — reserva técnica, ou apartamento em
+// nome de sócio (João Paulo, Carlos Humberto) que voltou a ficar à venda. A
+// planilha "Relação apartamentos" do comercial lista essas; o Sienge não.
+// Vale para qualquer empresa ("vai acontecer para vários empreendimentos").
+// Liberar = situação manual "Disponível" (nada vai para o Sienge).
+// Ficam fora a cadastrada só no painel (a situação dela é a do próprio
+// cadastro) e a que não tem id do Sienge (não há onde gravar).
+// Ordem: a que começa com o digitado, depois as reservadas, depois pelo número.
+export function candidatasALiberar(linhas: LinhaEstoque[], filtro: { grupo?: string; busca?: string } = {}): LinhaEstoque[] {
+  const busca = (filtro.busca || "").trim().toLowerCase();
+  const comeca = (l: LinhaEstoque) => (busca && l.unidade.toLowerCase().startsWith(busca) ? 0 : 1);
+  const reservada = (l: LinhaEstoque) => (l.situacao === "Reservado" ? 0 : 1);
+  return linhas
+    .filter(l => l.situacao !== "Disponível" && l.unitId !== null && l.enterpriseId !== null && !ehDoPainel(l.unitId))
+    .filter(l => (!filtro.grupo || grupoDoTipo(l.tipo) === filtro.grupo) && (!busca || l.unidade.toLowerCase().includes(busca)))
+    .sort((a, b) => comeca(a) - comeca(b) || reservada(a) - reservada(b)
+      || a.unidade.localeCompare(b.unidade, "pt-BR", { numeric: true }) || a.empreendimento.localeCompare(b.empreendimento, "pt-BR"));
+}
+
+// O que gravar para liberar: se o automático (Sienge + tabela comercial) já é
+// Disponível, basta tirar o ajuste manual que segurava a unidade ("auto");
+// senão, Disponível à mão.
+export const situacaoParaLiberar = (l: Pick<LinhaEstoque, "situacaoBase">): SituacaoManual | "auto" =>
+  l.situacaoBase === "Disponível" ? "auto" : "Disponível";
+
+// Liberada no painel: Disponível à mão numa unidade que, no automático, não está.
+export const liberadaNoPainel = (l: Pick<LinhaEstoque, "origem" | "situacao" | "situacaoBase">): boolean =>
+  l.origem === "manual" && l.situacao === "Disponível" && l.situacaoBase !== "Disponível";

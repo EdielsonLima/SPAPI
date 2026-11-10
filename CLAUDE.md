@@ -890,6 +890,34 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     `spapi-sp-db`): cadastrar SALA 08 com R$ 450.000,00 levou o 135 Jardins de
     R$ 5.014.312,64 / 9 disp. para R$ 5.464.312,64 / 10 disp.; reservar tirou do
     valor; "Sala 1" duplicada da SALA 01 não contou e mostrou o aviso; leitor recebe 403.
+- **Abre só com apartamentos e "Liberar unidade" (Edielson, 10/11/2026).** Pedidos: "que
+  venham sempre já em padrão somente os apartamentos" e "alguns apartamentos que são do
+  João Paulo e do Carlos Humberto, eles, de vez em quando, colocam em disponibilidade
+  [...] no Sienge não está, mas nessa tabela aqui que eles usam vai estar" (planilha
+  "Relação apartamentos" do comercial); "vai acontecer para vários empreendimentos".
+  - O seletor de tipo do modal abre em **Apartamento** (`grupoInicialDoModal` em
+    `estoque-resumo.ts`), decidido uma vez, na abertura. Se a lista com que ele abre (em
+    estoque, disponíveis ou reservadas) não tem apartamento — o estoque da Tesla é só
+    sala, vaga e box — abre com todos os tipos, senão viria vazia. Os cartões do topo
+    continuam sendo os da empresa inteira (os números da linha do Resumo, com as salas).
+    Sala recém-cadastrada por "Adicionar sala" troca o tipo para Sala comercial, para
+    aparecer na lista.
+  - Botão **Liberar unidade** (ao lado de "Adicionar sala", só para quem edita; também o
+    link "Falta alguma unidade que está à venda?" no fim da lista): busca pelo número e
+    "Liberar" põe a situação manual **Disponível** — a mesma `situacao_manual_unidades`
+    de 09/11, sem tabela nem rota nova, e nada vai para o Sienge. Vale em qualquer
+    empresa. Sem busca a lista traz só as reservadas no Sienge; a vendida (apartamento
+    de sócio; no 135 Jardins o contrato é `TER-JAR.*`) aparece ao digitar o número, com
+    o contrato que a segura. Segue o tipo escolhido no filtro. Fica pendente até
+    **Salvar**, como o resto do modal; a linha mostra "liberada no painel · no Sienge:
+    Reservado". Desfazer = escolher "Sienge · …" no seletor da linha.
+  - Regra em `candidatasALiberar`, `situacaoParaLiberar` e `liberadaNoPainel`
+    (`estoque-resumo.ts`, trava no item 7 de `estoque-resumo.test.ts`). Unidade
+    cadastrada só no painel não é candidata (a situação dela é a do cadastro).
+  - 135 Jardins em 10/11: 2901 e 2902 estão em **Reserva Técnica** no Sienge, por isso
+    caíam em "Reservadas" e não em "Disponíveis". Teste local (dados de 08/11), liberando
+    as duas a R$ 4.250.000,00: Disp. 9 → 11, Res.Téc. 2 → 0, Valor Estoque
+    R$ 5.014.312,64 → R$ 13.514.312,64.
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
 
