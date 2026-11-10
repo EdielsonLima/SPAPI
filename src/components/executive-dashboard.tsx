@@ -5243,9 +5243,10 @@ export function ExecutiveDashboard() {
           { rotulo: "À venda", colunas: 3 },
         ];
         // `inicio` marca a primeira coluna de cada bloco; `info` é a dica do "i"; `linhas` é o
-        // título quebrado em duas linhas. Tabela compacta de propósito (Edielson, 10/11/2026:
-        // o Carlos Humberto usa no notebook e tem de caber numa tela só): sem largura mínima
-        // nas colunas e com o espaçamento das células reduzido. Não alargar sem pedido.
+        // título quebrado em duas linhas abaixo de 1760 px de largura. Tabela compacta de
+        // propósito em tela pequena (Edielson, 10/11/2026: o Carlos Humberto usa no notebook
+        // e tem de caber numa tela só): sem largura mínima nas colunas e com o espaçamento
+        // das células reduzido. Não alargar a versão de notebook sem pedido.
         const colunasResumo: { field: string; label: string; linhas?: [string, string]; align: "left" | "right" | "center"; sticky?: boolean; inicio?: boolean; info?: string }[] = [
           { field: "companyName", label: "Empresa", align: "left", sticky: true },
           { field: "totalRecebido", label: "Total Recebido", linhas: ["Total", "Recebido"], align: "right", inicio: true,
@@ -5280,12 +5281,13 @@ export function ExecutiveDashboard() {
                 herdados da aba CP (selectedOpTypes) — Resumo bate 100% com
                 CP/CR sem o usuario ter que sincronizar dois filtros. */}
 
-            {/* Coluna central de até 1240 px (Edielson, 10/11/2026): no monitor grande as colunas
-                não se espalham e, no notebook do Carlos Humberto, cartões e tabela cabem numa tela só.
-                Em tela baixa as linhas e os espaços apertam em dois degraus (até 820 px e até
-                700 px de altura, com faixas que não se sobrepõem); em tela estreita (até 1320 px)
-                o espaço lateral das células cai mais um pouco. */}
-            <div className="mx-auto w-full max-w-[1240px] space-y-4 [@media(min-height:701px)_and_(max-height:820px)]:space-y-2.5 [@media(max-height:700px)]:space-y-2">
+            {/* Resumo adaptável (Edielson, 10/11/2026). No monitor grande (a partir de 1760 px de
+                largura) fica como ele aprovou: largura toda, títulos em uma linha, células folgadas.
+                Abaixo disso compacta para caber no notebook do Carlos Humberto numa tela só: títulos
+                em duas linhas, menos espaço lateral e, em tela baixa, linhas mais apertadas (dois
+                degraus de altura que não se sobrepõem). Uma coluna central estreita em qualquer
+                tela foi tentada no mesmo dia e ficou feia no monitor grande: não voltar. */}
+            <div className="space-y-4 [@media(min-height:701px)_and_(max-height:820px)]:space-y-2.5 [@media(max-height:700px)]:space-y-2">
             {/* KPI Cards — os nomes são os da tabela (o cartão "Saldo" era o Lucro Realizado) e a
                 margem virou selo do lucro; o quarto cartão mostra o que ainda falta entrar. */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 [@media(min-height:701px)_and_(max-height:820px)]:[&>div]:py-2 [@media(max-height:700px)]:[&>div]:py-1.5">
@@ -5311,9 +5313,9 @@ export function ExecutiveDashboard() {
                   <Table>
                     <TableHeader className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
                       <TableRow className="border-b-0 hover:bg-transparent">
-                        <TableHead className="h-7 px-1.5 [@media(min-height:701px)_and_(max-height:820px)]:h-6 sticky [@media(max-height:700px)]:h-5 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" />
+                        <TableHead className="h-7 px-1.5 [@media(min-height:701px)_and_(max-height:820px)]:h-6 [@media(max-height:700px)]:h-5 min-[1760px]:h-8 min-[1760px]:px-2 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" />
                         {gruposResumo.map(g => (
-                          <TableHead key={g.rotulo} colSpan={g.colunas} className={`h-7 px-1.5 pb-0 pt-1.5 [@media(min-height:701px)_and_(max-height:820px)]:h-6  [@media(max-height:700px)]:h-5 [@media(min-height:701px)_and_(max-height:820px)]:pt-1 text-center [@media(max-height:700px)]:pt-0.5 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-300 ${divisaResumo}`}>
+                          <TableHead key={g.rotulo} colSpan={g.colunas} className={`h-7 px-1.5 pb-0 pt-1.5 [@media(min-height:701px)_and_(max-height:820px)]:h-6 [@media(min-height:701px)_and_(max-height:820px)]:pt-1 [@media(max-height:700px)]:h-5 [@media(max-height:700px)]:pt-0.5 min-[1760px]:h-8 min-[1760px]:px-2 min-[1760px]:pt-2 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-300 ${divisaResumo}`}>
                             <span className="block border-b-2 border-slate-300 pb-1 dark:border-slate-600">{g.rotulo}</span>
                           </TableHead>
                         ))}
@@ -5323,11 +5325,11 @@ export function ExecutiveDashboard() {
                         {colunasResumo.map(col => (
                           <TableHead
                             key={col.field}
-                            className={`h-auto px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-[11px] [@media(max-height:700px)]:py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" : ""} ${col.inicio ? divisaResumo : ""}`}
+                            className={`h-auto px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:h-10 min-[1760px]:px-2 min-[1760px]:py-0 text-[11px] font-semibold uppercase tracking-wide min-[1760px]:tracking-wider text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" : ""} ${col.inicio ? divisaResumo : ""}`}
                             onClick={() => toggleResumoSort(col.field)}
                           >
                             <span className="inline-flex items-end gap-1 whitespace-nowrap leading-[1.2]">
-                              {col.linhas ? <span>{col.linhas[0]}<br />{col.linhas[1]}</span> : col.label}
+                              {col.linhas ? <span>{col.linhas[0]} <br className="min-[1760px]:hidden" />{col.linhas[1]}</span> : col.label}
                               {/* "i" de informação (Edielson, 10/11/2026): passando o mouse, diz o que é
                                   a coluna e que conta é feita. Não ordena ao clicar. */}
                               {col.info && (
@@ -5378,39 +5380,39 @@ export function ExecutiveDashboard() {
                           <React.Fragment key={co.companyName}>
                             {abreFinalizadas && (
                               <TableRow className="bg-slate-50 hover:bg-slate-50 dark:bg-slate-800/60 dark:hover:bg-slate-800/60">
-                                <TableCell colSpan={colunasResumo.length} className="px-1.5 py-1 [@media(min-height:701px)_and_(max-height:820px)]:py-0.5 text-[10px] [@media(max-height:700px)]:py-0 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Finalizadas</TableCell>
+                                <TableCell colSpan={colunasResumo.length} className="px-1.5 py-1 [@media(min-height:701px)_and_(max-height:820px)]:py-0.5 [@media(max-height:700px)]:py-0 min-[1760px]:px-2 min-[1760px]:py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Finalizadas</TableCell>
                               </TableRow>
                             )}
                             <TableRow className={isFinalizada ? "bg-slate-50/50 dark:bg-slate-800/30 opacity-70" : "hover:bg-slate-50 dark:hover:bg-slate-800"}>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs font-semibold text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10 whitespace-nowrap">
+                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10 whitespace-nowrap">
                                 {co.companyName}
                               </TableCell>
-                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{formatCurrency(co.totalRecebido)}</TableCell>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
-                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs font-bold text-right tabular-nums ${lucroRealizado >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{formatCurrency(co.totalRecebido)}</TableCell>
+                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-bold text-right tabular-nums ${lucroRealizado >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
                                 {formatCurrency(lucroRealizado)}
                               </TableCell>
-                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs font-semibold text-right tabular-nums ${corMargemResumo(margem)}`}>
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums ${corMargemResumo(margem)}`}>
                                 {co.totalRecebido > 0 ? pctResumo(margem) : "-"}
                               </TableCell>
-                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs text-right tabular-nums text-slate-600 dark:text-slate-400 ${divisaResumo}`}>{co.totalAReceber > 0 ? formatCurrency(co.totalAReceber) : "-"}</TableCell>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-right tabular-nums text-slate-600 dark:text-slate-400 ${divisaResumo}`}>{co.totalAReceber > 0 ? formatCurrency(co.totalAReceber) : "-"}</TableCell>
+                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">
                                 <button type="button" onClick={() => abrirEstoque(co.companyName, "estoque")} className={linkEstoque} title={dicaEstoque} aria-label={`Abrir o estoque de ${co.companyName}`}>
                                   {co.valorEstoque > 0 ? formatCurrency(co.valorEstoque) : estoqueSemPreco ? <span className="font-semibold text-amber-700 dark:text-amber-300">sem preço</span> : "-"}
                                 </button>
                               </TableCell>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs font-semibold text-right tabular-nums text-slate-800 dark:text-slate-100">{aEntrar > 0 ? formatCurrency(aEntrar) : "-"}</TableCell>
-                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400 ${divisaResumo}`}>
+                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums text-slate-800 dark:text-slate-100">{aEntrar > 0 ? formatCurrency(aEntrar) : "-"}</TableCell>
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400 ${divisaResumo}`}>
                                 <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Apartamento")} className={linkEstoque} title="Ver os apartamentos disponíveis" aria-label={`Abrir os apartamentos disponíveis de ${co.companyName}`}>
                                   {co.qtDispApto > 0 ? co.qtDispApto : "-"}
                                 </button>
                               </TableCell>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">
+                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">
                                 <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Sala comercial")} className={linkEstoque} title="Ver as salas comerciais disponíveis" aria-label={`Abrir as salas comerciais disponíveis de ${co.companyName}`}>
                                   {co.qtDispSala > 0 ? co.qtDispSala : "-"}
                                 </button>
                               </TableCell>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 text-xs [@media(max-height:700px)]:py-0.5 text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">
+                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">
                                 <button type="button" onClick={() => abrirEstoque(co.companyName, "reservadas")} className={linkEstoque} title="Ver as unidades reservadas" aria-label={`Abrir as unidades reservadas de ${co.companyName}`}>
                                   {co.qtResTec > 0 ? co.qtResTec : "-"}
                                 </button>
@@ -5421,17 +5423,17 @@ export function ExecutiveDashboard() {
                       })}
                       {/* Total Row */}
                       <TableRow className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 font-semibold">
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-slate-800 dark:text-slate-100 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10">Total</TableCell>
-                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{formatCurrency(totRecebido)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(totPago)}</TableCell>
-                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</TableCell>
-                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-right tabular-nums ${corMargemResumo(totLucratividade)}`}>{totRecebido > 0 ? pctResumo(totLucratividade, 2) : "-"}</TableCell>
-                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-right tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{formatCurrency(totAReceber)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-right tabular-nums text-slate-700 dark:text-slate-300">{formatCurrency(totEstoque)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-right tabular-nums text-slate-900 dark:text-slate-50">{formatCurrency(totAEntrar)}</TableCell>
-                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-center tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{sorted.reduce((s, c) => s + c.qtDispApto, 0)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDispSala, 0)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 text-xs [@media(max-height:700px)]:py-1 text-xs font-bold text-center tabular-nums text-slate-600 dark:text-slate-400">{sorted.reduce((s, c) => s + c.qtResTec, 0)}</TableCell>
+                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-slate-800 dark:text-slate-100 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10">Total</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{formatCurrency(totRecebido)}</TableCell>
+                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(totPago)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums ${corMargemResumo(totLucratividade)}`}>{totRecebido > 0 ? pctResumo(totLucratividade, 2) : "-"}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{formatCurrency(totAReceber)}</TableCell>
+                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">{formatCurrency(totEstoque)}</TableCell>
+                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-slate-900 dark:text-slate-50">{formatCurrency(totAEntrar)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-center tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{sorted.reduce((s, c) => s + c.qtDispApto, 0)}</TableCell>
+                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDispSala, 0)}</TableCell>
+                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-center tabular-nums text-slate-600 dark:text-slate-400">{sorted.reduce((s, c) => s + c.qtResTec, 0)}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>

@@ -851,24 +851,26 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     para o teste: Valor Estoque R$ 273.050.000,00, Ainda a Entrar R$ 433.218.517,17
     (produção: R$ 433.067.201,54, porque o A Receber do cache local é de 09/11). Sem
     rolagem lateral a 1848 e 1920; a 1366 com o menu aberto continua rolando.
-- **Resumo compacto para o notebook (Edielson, 10/11/2026: "o Carlos Humberto olha sempre
-  no notebook dele, que é uma tela pequena [...] tem um espaço sobrando entre cada coluna
-  [...] nem que os cabeçalhos fiquem em duas linhas").** NÃO alargar sem pedido.
-  - Títulos das colunas em **duas linhas** (`linhas` em `colunasResumo`: "Total /
-    Recebido", "Disp. / Ap."); colunas **sem largura mínima**; espaço lateral das células
-    `px-1.5` (`px-1` até 1320 px de largura); linha de total na mesma fonte das linhas
-    (`text-xs font-bold`, era `text-sm`: o valor do total era o que mais alargava).
-  - Cartões e tabela dentro de uma **coluna central de até 1240 px** (`mx-auto
-    max-w-[1240px]`): no monitor grande as colunas não se espalham; no notebook ocupa a
-    largura toda.
-  - Altura em dois degraus que não se sobrepõem: de 701 a 820 px de altura da janela as
-    linhas vão a `py-1` e os espaços caem; até 700 px, `py-0.5`. Acima de 820 px fica
-    como era (`py-1.5`).
+- **Resumo adaptável: compacto no notebook, folgado no monitor (Edielson, 10/11/2026).**
+  Pedido: "o Carlos Humberto olha sempre no notebook dele, que é uma tela pequena [...]
+  tem um espaço sobrando entre cada coluna [...] nem que os cabeçalhos fiquem em duas
+  linhas". A 1ª versão compactou em qualquer tela e pôs cartões e tabela numa coluna
+  central de 1240 px; no monitor grande ele achou feio ("meio que ficou feio assim, né?").
+  **NÃO voltar à coluna central nem compactar o monitor grande.**
+  - **A partir de 1760 px de largura** (`min-[1760px]:`): como ele aprovou antes — largura
+    toda, títulos em uma linha, células `px-2 py-2`, linha de total em `text-sm`.
+  - **Abaixo de 1760 px:** títulos em duas linhas (`linhas` em `colunasResumo`, com
+    `<br className="min-[1760px]:hidden" />`), células `px-1.5` (`px-1` até 1320 px),
+    total em `text-xs font-bold`. As colunas não têm largura mínima em nenhuma tela.
+  - **Altura**, em dois degraus que não se sobrepõem: de 701 a 820 px de altura da janela
+    as linhas vão a `py-1` e os espaços caem; até 700 px, `py-0.5`.
   - Medido local com os valores de produção, menu recolhido: largura mínima da tabela
-    1.109 px (era 1.405); sem rolagem lateral nem vertical a 1366×768, 1280×720 e
-    1366×650; a tabela termina em 692 px (tela de 768) e 632 px (tela de 650). Abaixo de
-    ~656 px de altura útil sobra uma faixa para rolar. Com o menu ABERTO a 1366 px ainda
-    rola para o lado (1.153 px numa área de 1.052 px); o menu agora abre recolhido.
+    1.109 px (era 1.405); sem rolagem lateral nem vertical a 1366×768, 1280×720, 1366×650
+    e 1536×864; a tabela termina em 692 px (tela de 768) e 632 px (tela de 650). A 1848 e
+    1920 fica na largura toda (1.722 e 1.794 px). Abaixo de ~656 px de altura útil sobra
+    uma faixa para rolar. Com o menu ABERTO a 1366 px ainda rola para o lado (1.153 px
+    numa área de 1.052 px); o menu agora abre recolhido. O limite de 1760 px é da janela,
+    não da área: com o menu aberto entre 1760 e ~1790 px pode faltar largura.
 
 ## Resumo › Estoque por unidade: modal editável (Edielson, 09/11/2026)
 
