@@ -382,10 +382,33 @@ CREATE TABLE IF NOT EXISTS tabela_comercial (
   atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- ── Unidades cadastradas só no painel (Painel › Resumo › Estoque) ──
+-- Apartamento ou sala que não está no Sienge e conta no estoque do Resumo. Mesma
+-- definição do ensureUnidadesPainel (src/lib/db.ts); está aqui porque a carga
+-- única do migrate (apartamentos de Domus, Rozza e Tetra, 10/11/2026) grava nela.
+CREATE TABLE IF NOT EXISTS unidades_painel (
+  id              SERIAL        PRIMARY KEY,
+  empresa         TEXT          NOT NULL,
+  empreendimento  TEXT          NOT NULL,
+  enterprise_id   INTEGER,
+  unidade         TEXT          NOT NULL,
+  tipo            TEXT          NOT NULL DEFAULT 'Sala comercial',
+  area            NUMERIC(12,2) NOT NULL DEFAULT 0,
+  situacao        VARCHAR(20)   NOT NULL DEFAULT 'Disponível',
+  preco           NUMERIC(15,2),
+  criado_por      TEXT          NOT NULL DEFAULT '',
+  criado_em       TIMESTAMP     NOT NULL DEFAULT NOW(),
+  atualizado_por  TEXT          NOT NULL DEFAULT '',
+  atualizado_em   TIMESTAMP     NOT NULL DEFAULT NOW(),
+  removido_por    TEXT,
+  removido_em     TIMESTAMP
+);
+
 -- ── Ajustes únicos de dados aplicados pelo scripts/migrate.js ──
--- Uma linha por ajuste já aplicado (não roda de novo) e o valor que havia antes,
--- para desfazer. Ex.: palacio-disponibilidade-2026-11-10 (lista de disponíveis
--- da tabela comercial do Palácio pela planilha do comercial).
+-- Uma linha por ajuste já aplicado (não roda de novo) e, em `antes`, o que havia
+-- antes ou o que foi criado, para desfazer. Ex.: palacio-disponibilidade-2026-11-10
+-- (lista de disponíveis da tabela comercial do Palácio) e
+-- apartamentos-painel-2026-11-10 (ids criados em unidades_painel).
 CREATE TABLE IF NOT EXISTS ajustes_aplicados (
   chave VARCHAR(80) PRIMARY KEY,
   antes JSONB,

@@ -1,0 +1,29 @@
+{
+  "_fonte": "Planilha 'Relação apartamentos' do comercial da Silva Packer (recebida do Edielson em 10/11/2026), abas Domus, Rozza e Tetra: linhas sem nome = apartamentos à venda. No Sienge (/units de 10/11/2026, 1.438 unidades) esses apartamentos NÃO estão cadastrados: lá só entram os vendidos. Edielson, 10/11/2026: \"Sim, só no painel\". Carga única pelo scripts/migrate.js em unidades_painel (tipo Apartamento, Disponível, sem preço). Depois, quem ajusta ou tira é o modal Estoque do Resumo.",
+  "ajuste": "apartamentos-painel-2026-11-10",
+  "por": "carga: planilha do comercial de 10/11/2026",
+  "_areas": "Rozza 145 m² e Tetra 180 m² = área dos apartamentos desses prédios que estão no Sienge. Domus 0: nenhum apartamento do Domus tem área no Sienge; contam na quantidade e ficam sem valor até terem preço.",
+  "empresas": [
+    {
+      "empresa": "DOMUS",
+      "empreendimento": "DOMUS - DESPESAS INDIRETAS",
+      "enterpriseId": 27,
+      "area": 0,
+      "unidades": ["101", "102", "201", "202", "301", "302", "1102", "1202", "1302", "1602", "1701", "2302", "2502", "2602", "COBERTURA"]
+    },
+    {
+      "empresa": "ROZZA",
+      "empreendimento": "ROZZA - DESPESAS INDIRETAS - SP",
+      "enterpriseId": 17,
+      "area": 145,
+      "unidades": ["101", "102", "201", "202", "501", "502", "902", "1002", "1701", "1702"]
+    },
+    {
+      "empresa": "TETRA",
+      "empreendimento": "TETRA - DESPESAS INDIRETAS",
+      "enterpriseId": 31,
+      "area": 180,
+      "unidades": ["101", "401", "501", "601", "801", "901", "1201", "1301", "1401", "1501", "1601", "1701", "1801", "1901", "2001", "2301", "2401"]
+    }
+  ]
+}

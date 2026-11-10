@@ -10,7 +10,7 @@
 // Nada é gravado no Sienge. As contas são as de src/lib/estoque-resumo.ts — as
 // mesmas da tabela do Resumo, então o total daqui é o número da coluna.
 // O que se digita fica pendente (e já simulado nos cartões) até "Salvar".
-// Sala que não está no Sienge se cadastra aqui ("Adicionar sala"): fica em
+// Apartamento ou sala que não está no Sienge se cadastra aqui ("Adicionar unidade"): fica em
 // unidades_painel (src/lib/unidades-painel.ts) e conta no estoque igual.
 // Abre já só com os apartamentos (Edielson, 10/11/2026); o seletor de tipo
 // mostra os demais. "Liberar unidade" põe à venda no painel a unidade que no
@@ -322,7 +322,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
     setSitPend(prev => { if (!prev.has(unitId)) return prev; const m = new Map(prev); m.delete(unitId); return m; });
   };
   const abrirNova = () => setForm({
-    id: null, empreendimento: empreendimentos[0]?.nome ?? "", unidade: "", tipo: "Sala comercial",
+    id: null, empreendimento: empreendimentos[0]?.nome ?? "", unidade: "", tipo: grupo === "Apartamento" ? "Apartamento" : "Sala comercial",
     areaTxt: "", situacao: "Disponível", precoTxt: "",
   });
   const abrirEdicao = (p: UnidadePainel) => setForm({
@@ -333,7 +333,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
   const problemaForm = useMemo(() => {
     if (!form) return null;
     if (!form.empreendimento.trim()) return "Escolha o empreendimento.";
-    if (!form.unidade.trim()) return "Informe o nome da unidade (ex.: SALA 08).";
+    if (!form.unidade.trim()) return "Informe o nome da unidade (ex.: 1702 ou SALA 08).";
     if (lerArea(form.areaTxt) === null) return "Área inválida.";
     if (precoDigitado(form.precoTxt) === "invalido") return "Preço inválido.";
     const enterpriseId = empreendimentos.find(e => e.nome === form.empreendimento)?.id ?? null;
@@ -506,7 +506,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
             <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Estoque</p>
             <DialogTitle className="mt-0.5 truncate text-lg font-semibold tracking-[-0.02em] text-slate-900 dark:text-slate-50">{empresa}</DialogTitle>
             <DialogDescription className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Preço e situação de cada unidade. O que você ajusta aqui vale no Resumo, no Quadro Espelho e na Tabela de Preços, e não é gravado no Sienge. Sala que não está no Sienge entra por &ldquo;Adicionar sala&rdquo;; unidade reservada ou vendida no Sienge que voltou a ficar à venda, por &ldquo;Liberar unidade&rdquo;.
+              Preço e situação de cada unidade. O que você ajusta aqui vale no Resumo, no Quadro Espelho e na Tabela de Preços, e não é gravado no Sienge. Apartamento ou sala que não está no Sienge entra por &ldquo;Adicionar unidade&rdquo;; unidade reservada ou vendida no Sienge que voltou a ficar à venda, por &ldquo;Liberar unidade&rdquo;.
             </DialogDescription>
           </div>
           <button type="button" onClick={fechar} aria-label="Fechar" className="rounded-md p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100">
@@ -580,8 +580,8 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
               >
                 <LockOpen className="mr-1 h-3.5 w-3.5" />Liberar unidade
               </Button>
-              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setLiberando(false); abrirNova(); }} disabled={form !== null} title="Cadastrar uma sala que não está no Sienge; ela conta no estoque do Resumo">
-                <Plus className="mr-1 h-3.5 w-3.5" />Adicionar sala
+              <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setLiberando(false); abrirNova(); }} disabled={form !== null} title="Cadastrar um apartamento ou uma sala que não está no Sienge; conta no estoque do Resumo">
+                <Plus className="mr-1 h-3.5 w-3.5" />Adicionar unidade
               </Button>
             </div>
           )}
@@ -605,7 +605,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
                 )}
               </label>
               <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">Unidade
-                <Input value={form.unidade} onChange={e => setForm({ ...form, unidade: e.target.value })} onKeyDown={e => { if (e.key === "Enter") gravarForm(); }} placeholder="SALA 08" autoFocus className="h-8 bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100 text-xs md:text-xs" />
+                <Input value={form.unidade} onChange={e => setForm({ ...form, unidade: e.target.value })} onKeyDown={e => { if (e.key === "Enter") gravarForm(); }} placeholder={form.tipo === "Apartamento" ? "1702" : "SALA 08"} autoFocus className="h-8 bg-white text-slate-800 dark:bg-slate-900 dark:text-slate-100 text-xs md:text-xs" />
               </label>
               <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400">Tipo
                 <select value={form.tipo} onChange={e => setForm({ ...form, tipo: e.target.value })} className="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">

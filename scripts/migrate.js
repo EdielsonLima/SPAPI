@@ -117,6 +117,57 @@ async function migrate() {
       console.warn("[migrate] ajuste da disponibilidade do Palácio:", e.message);
     }
 
+    // Carga única (10/11/2026): apartamentos à venda de Domus, Rozza e Tetra que a
+    // planilha do comercial lista e o Sienge não tem cadastrados (lá só entram os
+    // vendidos). Edielson, 10/11: "Sim, só no painel". Entram em unidades_painel
+    // como Apartamento, Disponível e sem preço; depois, quem ajusta ou tira é o
+    // modal Estoque do Resumo. Entra UMA vez: ajustes_aplicados guarda os ids
+    // criados (para desfazer, arquivar esses ids com removido_em).
+    try {
+      const arq = path.join(__dirname, "dados", "apartamentos-painel-2026-11-10.json");
+      if (fs.existsSync(arq)) {
+        const j = JSON.parse(fs.readFileSync(arq, "utf-8"));
+        // Mesmo nome comparável do src/lib/unidades-painel.ts (chaveDoNome).
+        const chaveDoNome = (n) => String(n || "").normalize("NFD").replace(/[̀-ͯ]/g, "")
+          .toUpperCase().replace(/\s+/g, " ").trim().replace(/\b0+(\d)/g, "$1");
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const marca = await client.query(
+            `INSERT INTO ajustes_aplicados (chave) VALUES ($1) ON CONFLICT (chave) DO NOTHING RETURNING chave`, [j.ajuste]);
+          if (marca.rows.length === 1) {
+            const criadas = [];
+            let puladas = 0;
+            for (const e of j.empresas) {
+              const { rows: ja } = await client.query(
+                `SELECT unidade, empreendimento FROM unidades_painel WHERE removido_em IS NULL AND empresa = $1`, [e.empresa]);
+              const emUso = new Set(ja.map((r) => `${chaveDoNome(r.empreendimento)}|${chaveDoNome(r.unidade)}`));
+              for (const unidade of e.unidades) {
+                const k = `${chaveDoNome(e.empreendimento)}|${chaveDoNome(unidade)}`;
+                if (emUso.has(k)) { puladas++; continue; }
+                emUso.add(k);
+                const { rows } = await client.query(
+                  `INSERT INTO unidades_painel (empresa, empreendimento, enterprise_id, unidade, tipo, area, situacao, preco, criado_por, atualizado_por)
+                   VALUES ($1, $2, $3, $4, 'Apartamento', $5, 'Disponível', NULL, $6, $6) RETURNING id`,
+                  [e.empresa, e.empreendimento, e.enterpriseId, unidade, e.area, j.por]);
+                criadas.push(rows[0].id);
+              }
+            }
+            await client.query(`UPDATE ajustes_aplicados SET antes = $2 WHERE chave = $1`, [j.ajuste, JSON.stringify({ criadas })]);
+            console.log(`[migrate] unidades_painel: ${criadas.length} apartamento(s) cadastrado(s) só no painel${puladas ? `, ${puladas} já existia(m)` : ""}.`);
+          }
+          await client.query("COMMIT");
+        } catch (e) {
+          await client.query("ROLLBACK");
+          throw e;
+        } finally {
+          client.release();
+        }
+      }
+    } catch (e) {
+      console.warn("[migrate] carga dos apartamentos só no painel:", e.message);
+    }
+
     // Seed único das fotos da planta do Palácio Elizabeth (24/10/2026): os
     // renders em public/modelos/palacio-fotos entram no banco UMA vez (só
     // enquanto a sequência da tabela nunca foi usada). Depois disso quem manda

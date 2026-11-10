@@ -1,6 +1,6 @@
 // Unidades cadastradas só no painel (Edielson, 09/11/2026: "pode ser que algumas
 // salas não estejam cadastradas no Sienge. Elas podem ser somente aqui pelo
-// painel, sem utilizar o Sienge").
+// painel, sem utilizar o Sienge"). Desde 10/11/2026 vale também para apartamento.
 //
 // Gravadas na tabela `unidades_painel` (src/lib/db.ts) pelo modal Estoque do
 // Resumo. Nas contas do estoque (src/lib/estoque-resumo.ts) viram uma unidade
@@ -19,8 +19,11 @@ export const SITUACOES_PAINEL: SituacaoPainel[] = ["Disponível", "Reservado", "
 export const ehSituacaoPainel = (s: unknown): s is SituacaoPainel =>
   typeof s === "string" && (SITUACOES_PAINEL as string[]).includes(s);
 
-// Tipos que se cadastra no painel; os dois caem no grupo "Sala comercial" e contam no estoque.
-export const TIPOS_PAINEL = ["Sala comercial", "Loja"] as const;
+// Tipos que se cadastra no painel; todos contam no estoque (grupos "Apartamento" e
+// "Sala comercial"). Apartamento entrou em 10/11/2026 (Edielson: "Sim, só no painel"):
+// em Domus, Rozza e Tetra o Sienge só tem os apartamentos vendidos, e os que estão à
+// venda existem só na planilha do comercial.
+export const TIPOS_PAINEL = ["Apartamento", "Sala comercial", "Loja"] as const;
 export type TipoPainel = (typeof TIPOS_PAINEL)[number];
 export const ehTipoPainel = (t: unknown): t is TipoPainel =>
   typeof t === "string" && (TIPOS_PAINEL as readonly string[]).includes(t);

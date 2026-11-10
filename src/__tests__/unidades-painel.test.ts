@@ -3,10 +3,11 @@
 // próprio cadastro, sem tabela comercial; saem da conta quando o Sienge tem a
 // mesma unidade (mesmo empreendimento e mesmo nome).
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { linhasDeEstoque, totaisDoEstoque, totaisPorEmpresa, type ContextoEstoque } from "../lib/estoque-resumo";
 import {
   chaveDoNome, separarDuplicadas, comoUnidadeApi, unidadesComPainel, precosComPainel,
-  idNoEstoque, idDoPainel, ehDoPainel, type UnidadePainel,
+  idNoEstoque, idDoPainel, ehDoPainel, ehTipoPainel, type UnidadePainel,
 } from "../lib/unidades-painel";
 import { normalizarTabelaComercial } from "../lib/tabela-comercial";
 import type { ApiUnit } from "../lib/comercial-utils";
@@ -110,6 +111,49 @@ assert.equal(api.companyName, "135 JARDINS");
   assert.equal(linhas[0].situacao, "Vendido");
   assert.equal(linhas[0].origem, "painel");
   assert.equal(totaisDoEstoque(linhas).qtDisp, 0);
+}
+
+// ── 7. Apartamento só no painel (10/11/2026): conta em Disp. Ap. e é estimado como o do Sienge ──
+{
+  assert.equal(ehTipoPainel("Apartamento"), true);
+  assert.equal(ehTipoPainel("Sala comercial"), true);
+  assert.equal(ehTipoPainel("Vaga"), false);
+  const rozza = (unidade: string, extra: Partial<UnidadePainel> = {}) =>
+    painel(unidade, { empresa: "ROZZA", empreendimento: "ROZZA - DESPESAS INDIRETAS - SP", enterpriseId: 17, tipo: "Apartamento", area: 145, ...extra });
+  const noSienge = [
+    sienge(1488, "901", "Disponível", 0, "Apartamento", "ROZZA - DESPESAS INDIRETAS - SP", 17),
+    sienge(1372, "1801", "Vendida", 145, "Apartamento", "ROZZA - DESPESAS INDIRETAS - SP", 17),
+  ].map(u => ({ ...u, companyName: "ROZZA" }));
+  const doPainel = [rozza("101"), rozza("102"), rozza("1702", { preco: 2_900_000 }), rozza("COBERTURA", { area: 0 })];
+  const linhas = linhasDeEstoque(unidadesComPainel(noSienge, doPainel), ctx({ precos: precosComPainel(new Map(), doPainel) }));
+  const t = totaisDoEstoque(linhas);
+  assert.equal(t.qtDispApto, 5);      // 901 do Sienge + 4 do painel
+  assert.equal(t.qtDispSala, 0);
+  assert.equal(t.estimadas, 2);       // 101 e 102: 145 m² × 1,5 × CUB
+  assert.equal(t.comPreco, 1);        // 1702
+  assert.equal(t.semValor, 2);        // 901 (área zero no Sienge) e a cobertura sem área: contam, não somam
+  perto(t.valorEstoque, 2 * 145 * 1.5 * CUB + 2_900_000);
+  const l101 = linhas.find(l => l.unidade === "101")!;
+  assert.equal(l101.origem, "painel");
+  assert.equal(l101.tipo, "Apartamento");
+  assert.equal(l101.entraNaContagem, true);
+  // Se o apartamento for cadastrado no Sienge com o mesmo nome, vale o de lá.
+  const depois = [...noSienge, { ...sienge(2000, "101", "Vendida", 145, "Apartamento", "ROZZA - DESPESAS INDIRETAS - SP", 17), companyName: "ROZZA" }];
+  assert.deepEqual(separarDuplicadas(doPainel, depois).duplicadas.map(d => d.painel.unidade), ["101"]);
+  assert.equal(totaisDoEstoque(linhasDeEstoque(unidadesComPainel(depois, doPainel), ctx())).qtDispApto, 4);
+}
+
+// ── 8. Carga de 10/11/2026: 42 apartamentos (Domus 15, Rozza 10, Tetra 17), sem repetido ──
+{
+  const carga = JSON.parse(readFileSync(new URL("../../scripts/dados/apartamentos-painel-2026-11-10.json", import.meta.url), "utf-8")) as {
+    empresas: { empresa: string; empreendimento: string; enterpriseId: number; area: number; unidades: string[] }[];
+  };
+  assert.deepEqual(carga.empresas.map(e => [e.empresa, e.enterpriseId, e.area, e.unidades.length]), [["DOMUS", 27, 0, 15], ["ROZZA", 17, 145, 10], ["TETRA", 31, 180, 17]]);
+  assert.equal(carga.empresas.reduce((n, e) => n + e.unidades.length, 0), 42);
+  for (const e of carga.empresas) {
+    assert.equal(new Set(e.unidades.map(chaveDoNome)).size, e.unidades.length, `${e.empresa}: unidade repetida`);
+    assert.ok(e.empreendimento.startsWith(e.empresa), e.empreendimento);
+  }
 }
 
 console.log("unidades-painel: ok");

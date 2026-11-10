@@ -6,8 +6,8 @@ import {
 } from "@/lib/db";
 import { ehSituacaoPainel, ehTipoPainel } from "@/lib/unidades-painel";
 
-// Unidades cadastradas só no painel (Painel › Resumo › Estoque): salas que não
-// estão no Sienge e contam no estoque. Regra em src/lib/unidades-painel.ts.
+// Unidades cadastradas só no painel (Painel › Resumo › Estoque): apartamentos e
+// salas que não estão no Sienge e contam no estoque. Regra em src/lib/unidades-painel.ts.
 //  GET    → { podeEditar, unidades[] }                         (qualquer usuário logado)
 //  POST   → { empresa, empreendimento, enterpriseId, unidade, tipo, area, situacao, preco }
 //  PUT    → { itens: [{ id, ...campos que mudam }] }  (preco null = sem preço)
@@ -38,7 +38,7 @@ function lerCampos(b: Record<string, unknown>, exigirTudo: boolean): { campos: C
   }
   if (exigirTudo || b.unidade !== undefined) {
     c.unidade = texto(b.unidade, 60).toLocaleUpperCase("pt-BR");
-    if (!c.unidade) return { erro: "Informe o nome da unidade (ex.: SALA 08)." };
+    if (!c.unidade) return { erro: "Informe o nome da unidade (ex.: 1702 ou SALA 08)." };
   }
   if (exigirTudo || b.tipo !== undefined) {
     const tipo = b.tipo ?? "Sala comercial";

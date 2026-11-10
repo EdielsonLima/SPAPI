@@ -867,6 +867,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   "user" (`session.user.role` do Portal; ausente conta como "user"). Quem já estava
   logado no Financeiro precisa abrir de novo pelo card do Portal (bilhete novo = sessão
   nova) para a edição liberar. Mudança no Portal se faz em sessão na pasta dele, não daqui.
+- **Desde 10/11/2026 o cadastro só no painel vale também para apartamento** e o botão
+  chama **Adicionar unidade** (ver "Planilha de disponibilidade do comercial × painel").
 - **Sala só no painel (Edielson, 09/11: "pode ser que algumas salas não estejam
   cadastradas no Sienge. Elas podem ser somente aqui pelo painel").** Botão **Adicionar
   sala** no modal do Estoque (quem edita: admin ou `TABELA_PRECOS_EMAILS`). Grava na
@@ -965,15 +967,33 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     1102, 1202, 1302, 1602, 1701, 2302, 2502, 2602, COBERTURA), Rozza 10 (101, 102, 201,
     202, 501, 502, 902, 1002, 1701, 1702) e Tetra 17 (101, 401, 501, 601, 801, 901, 1201,
     1301, 1401, 1501, 1601, 1701, 1801, 1901, 2001, 2301, 2401) = **42 apartamentos**.
-    Por isso o Resumo mostra Domus 1, Rozza 1 e Tetra 0. "Liberar unidade" não resolve
-    (não há unidade para liberar); o cadastro só no painel hoje aceita sala, não
-    apartamento. Pendente de decisão do Edielson (cadastrar só no painel × no Sienge, e
-    com que área e preço).
+    Por isso o Resumo mostrava Domus 1, Rozza 1 e Tetra 0, e "Liberar unidade" não
+    resolvia (não há unidade para liberar).
+  - **Os 42 foram cadastrados só no painel (Edielson, 10/11: "Sim, só no painel").** O
+    cadastro do painel passou a aceitar **Apartamento** (`TIPOS_PAINEL`; o botão do modal
+    virou **Adicionar unidade** e abre em Apartamento quando o filtro está em
+    apartamentos). Carga única do `scripts/migrate.js`
+    (`scripts/dados/apartamentos-painel-2026-11-10.json`) em `unidades_painel`:
+    Apartamento, Disponível, sem preço; `ajustes_aplicados` guarda os ids criados (desfaz
+    arquivando esses ids). A tabela `unidades_painel` entrou no `schema.sql` (mesma
+    definição do `ensureUnidadesPainel`) porque a carga grava nela. Área: Rozza 145 m² e
+    Tetra 180 m² (a dos apartamentos desses prédios que estão no Sienge); **Domus 0**,
+    porque nenhum apartamento do Domus tem área no Sienge — conta em Disp. Ap. e fica
+    sem valor até ter preço. Trava: itens 7 e 8 de `unidades-painel.test.ts`.
+    Local (dados de 10/11): Rozza Disp. Ap. 1 → 11 e Valor Estoque – → R$ 6.922.916,25;
+    Domus 1 → 16 (os 15 + a 1502 do Sienge) e sem valor; Tetra 0 → 17 e
+    R$ 14.609.740,50; total do Resumo Disp. Ap. 31 → 73 e Valor Estoque
+    R$ 64.558.882,73 → R$ 86.091.539,48. Como toda unidade do painel, não aparecem no
+    Quadro Espelho nem na Tabela de Preços (lá é só Sienge); preço se põe no modal
+    Estoque. Quando um deles for cadastrado no Sienge com o mesmo nome, vale o do Sienge
+    e o modal avisa para tirar o do painel.
   - Domus: a 1901 está livre na planilha e Vendida no Sienge (DOMUS.1901); a 1502 está
     Disponível no Sienge e fora da planilha.
   - Hannover: aba vazia, mas o Sienge tem 3 apartamentos Disponíveis (201, 801, 802).
     Siena não tem aba e tem 6 Disponíveis no Sienge. Tesla não tem aba (só salas).
-  - Nada disso foi alterado no painel em 10/11; só o Palácio.
+  - Alterado no painel em 10/11: Palácio e os 42 de Domus, Rozza e Tetra. Hannover,
+    Siena, a 1901 e a 1502 do Domus, a 701 do Palácio e a cobertura do Serenity ficaram
+    como estão, à espera de resposta do Edielson ou do comercial.
 
 ## Visão Geral - Regras (Criado em 2026-04-01)
 
