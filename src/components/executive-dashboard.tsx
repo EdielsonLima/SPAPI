@@ -5240,7 +5240,7 @@ export function ExecutiveDashboard() {
         const gruposResumo = [
           { rotulo: "Já realizado", colunas: 4 },
           { rotulo: "Ainda a entrar", colunas: 3 },
-          { rotulo: "À venda", colunas: 3 },
+          { rotulo: "Disponibilidade", colunas: 3 },
         ];
         // `inicio` marca a primeira coluna de cada bloco; `info` é a dica do "i"; `linhas` é o
         // título quebrado em duas linhas abaixo de 1760 px de largura. Tabela compacta de

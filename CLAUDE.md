@@ -831,7 +831,7 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   valores normais mesmo, completos" (nada de "96,7 mi").
   - Colunas agrupadas, com uma linha de título em cima e uma linha fina separando:
     **Já realizado** (Total Recebido, Total Pago, Lucro Realizado, Margem) · **Ainda a
-    entrar** (Total a Receber, Valor Estoque, Ainda a Entrar) · **À venda** (Disp. Ap.,
+    entrar** (Total a Receber, Valor Estoque, Ainda a Entrar) · **Disponibilidade** (era "À venda" até o fim de 10/11; Disp. Ap.,
     Disp. Sala, Res.Téc.). Lista em `colunasResumo`/`gruposResumo`.
   - Nomes: "Lucro Potencial" virou **Ainda a Entrar** (é A Receber + Estoque: não desconta
     o que falta gastar na obra, então não é lucro; no Tetra dava R$ 86,4 mi de "lucro"
