@@ -302,9 +302,7 @@ export function ExecutiveDashboard() {
     precos: dadosEstoque.precos,
     tabelasComerciais: dadosEstoque.tabelasComerciais,
     situacoesManuais: dadosEstoque.situacoesManuais,
-    fator: empresa => companySettings.find(cs => cs.companyName === empresa)?.factor || 0,
-    cub: cubData?.currentValue || 0,
-  })), [apiUnits, dadosEstoque.unidadesPainel, dadosEstoque.precos, dadosEstoque.tabelasComerciais, dadosEstoque.situacoesManuais, companySettings, cubData]);
+  })), [apiUnits, dadosEstoque.unidadesPainel, dadosEstoque.precos, dadosEstoque.tabelasComerciais, dadosEstoque.situacoesManuais]);
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   // Per-tab filters: save/restore when switching tabs. Companies tem o seu
   // proprio Record (perTabCompanies) por questao historica; os outros filtros
@@ -5178,8 +5176,9 @@ export function ExecutiveDashboard() {
 
         // Units: Qt. Disponíveis, Res. Técnica, Valor Estoque — regra única em
         // src/lib/estoque-resumo.ts (a mesma do modal Estoque). Apartamento e
-        // sala comercial (tipo do cadastro do Sienge) contam em Disp./Res.Téc.;
-        // sem preço de tabela somam área × fator × CUB. Os demais tipos só somam com preço.
+        // sala comercial (tipo do cadastro do Sienge) contam em Disp./Res.Téc.
+        // Valor Estoque = só o preço posto no painel; sem preço a unidade conta e
+        // não soma (Edielson, 10/11/2026; a estimativa área × fator × CUB saiu).
         // Disponíveis em duas colunas, Disp. Ap. e Disp. Sala (Edielson, 10/11/2026: os
         // 11 do 135 Jardins eram 5 apartamentos e 6 salas e a coluna única não dizia).
         totaisEstoque.forEach((t, co) => {
@@ -5289,8 +5288,8 @@ export function ExecutiveDashboard() {
                         const lucratividade = co.totalRecebido > 0 ? (lucroRealizado / co.totalRecebido) * 100 : 0;
                         const isFinalizada = co.status.toLowerCase().includes("finalizada");
                         const est = totaisEstoque.get(co.companyName);
-                        const dicaEstoque = est && est.comPreco + est.estimadas > 0
-                          ? `${est.comPreco} a preço de tabela · ${est.estimadas} por estimativa (m² × fator × CUB) · clique para ver e ajustar`
+                        const dicaEstoque = est && est.comPreco + est.semPreco > 0
+                          ? `${est.comPreco} com preço no painel${est.semPreco > 0 ? ` · ${est.semPreco} sem preço (não somam)` : ""} · clique para ver e ajustar`
                           : "Clique para ver e ajustar o estoque";
 
                         return (
@@ -5381,9 +5380,6 @@ export function ExecutiveDashboard() {
                 tipoInicial={estoqueAberto.tipo}
                 unidades={apiUnits}
                 dados={dadosEstoque}
-                fator={companySettings.find(cs => cs.companyName === estoqueAberto.empresa)?.factor || 0}
-                cub={cubData?.currentValue || 0}
-                cubMes={cubData?.currentMonth}
                 onFechar={() => setEstoqueAberto(null)}
               />
             )}

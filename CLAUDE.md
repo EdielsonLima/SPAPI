@@ -813,9 +813,10 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     empreendimento > **Sienge**. É a mesma do Quadro Espelho (`aplicarSituacaoManual`
     em `comercial-view.tsx`); a Tabela de Preços mostra a etiqueta "(manual)".
   - Valor da unidade Disponível: preço da **Tabela de Preços** do painel; sem ele, o da
-    tabela comercial; sem nenhum, a estimativa de sempre (área × fator × CUB).
-  - **Apartamento e sala comercial** contam em Disp./Res.Téc. e são estimados; vaga,
-    box e o resto ficam fora da conta e só somam no valor quando têm preço.
+    tabela comercial. **Sem preço não soma nada** (desde 10/11/2026; até então entrava a
+    estimativa área × fator × CUB — ver "Valor do estoque = só o preço do painel").
+  - **Apartamento e sala comercial** contam em Disp./Res.Téc.; vaga, box e o resto
+    ficam fora da conta. Qualquer tipo só soma no valor quando tem preço.
   - Reservada não soma no Valor Estoque (como antes).
 - Onde grava (nada vai para o Sienge): preço → `tabela_precos_unidades` pela rota
   `/api/tabela-precos` (com histórico); situação → tabela nova `situacao_manual_unidades`
@@ -934,6 +935,31 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   as liberações de produção): 135 Jardins 3 e 6, Tesla – e 3, Siena 6 e 4, Hannover 3 e
   2; total 32 e 15 (os 47 da coluna antiga). A 1366 px com o menu aberto a tabela do
   Resumo já rolava para o lado antes (11 colunas) e continua rolando.
+- **Valor do estoque = só o preço do painel (Edielson, 10/11/2026: "nós vamos considerar
+  o valor do estoque, o valor que nós colocarmos aqui no painel. O que vem ali do estoque
+  do Sienge não está nada certo [...] enquanto não for ajustado lá no Sienge, nós vamos
+  trabalhar somente com o valor aqui do painel").** NÃO voltar a estimar sem pedido.
+  - `valorEstoque` em `linhasDeEstoque` = preço (Tabela de Preços do painel, senão tabela
+    comercial; unidade do painel, o do cadastro dela) se a unidade está Disponível; sem
+    preço, **0**. Saíram a estimativa área privativa × fator × CUB (a área vinha do
+    Sienge, zerada no Domus e errada em parte da Rozza), os campos `estimativa`/`estimado`
+    da linha, `estimadas`/`valorEstimado`/`semValor` dos totais (agora `semPreco`:
+    apartamentos e salas disponíveis sem preço, que contam e não somam) e `fator`/`cub`
+    do `ContextoEstoque` e do `EstoqueModal`.
+  - Na tela: a coluna "No estoque" do modal mostra o preço ou "sem preço" (não há mais
+    "≈"); o cartão "Sem preço" diz quantas faltam; digitar em "Preço de tabela" ajusta
+    na hora o cartão "Valor do estoque" e grava no Salvar. Valor Estoque e Lucro
+    Potencial do Resumo somam só o que tem preço; a dica da célula diz quantas têm e
+    quantas não.
+  - Local em 10/11 (banco local só tem os preços da tabela comercial do Palácio):
+    Valor Estoque total R$ 86.091.539,48 → R$ 45.400.000,00 (Palácio, 10 com preço; a
+    1801 sem preço não soma); as demais empresas ficam com "-" até terem preço. Em
+    produção fica o que estiver digitado lá (no 135 Jardins havia R$ 4.250.000,00 em 5
+    apartamentos).
+  - **Não mudou:** o "VGV potencial" do Comercial › Visão Geral continua sendo a
+    estimativa área × fator × CUB (cartão rotulado como estimado) e o Orçamento
+    (m² × fator × CUB) não tem relação com isto.
+  - Trava: itens 1 a 5 de `estoque-resumo.test.ts` e 3 e 7 de `unidades-painel.test.ts`.
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
 
@@ -983,7 +1009,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     Local (dados de 10/11): Rozza Disp. Ap. 1 → 11 e Valor Estoque – → R$ 6.922.916,25;
     Domus 1 → 16 (os 15 + a 1502 do Sienge) e sem valor; Tetra 0 → 17 e
     R$ 14.609.740,50; total do Resumo Disp. Ap. 31 → 73 e Valor Estoque
-    R$ 64.558.882,73 → R$ 86.091.539,48. Como toda unidade do painel, não aparecem no
+    R$ 64.558.882,73 → R$ 86.091.539,48 (valores por estimativa, que saiu no mesmo dia:
+    hoje esses apartamentos só somam com preço digitado). Como toda unidade do painel, não aparecem no
     Quadro Espelho nem na Tabela de Preços (lá é só Sienge); preço se põe no modal
     Estoque. Quando um deles for cadastrado no Sienge com o mesmo nome, vale o do Sienge
     e o modal avisa para tirar o do painel.

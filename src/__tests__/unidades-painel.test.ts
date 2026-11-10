@@ -12,7 +12,6 @@ import {
 import { normalizarTabelaComercial } from "../lib/tabela-comercial";
 import type { ApiUnit } from "../lib/comercial-utils";
 
-const CUB = 3182.95;
 const sienge = (id: number, nome: string, estoque: string, area: number, tipo = "Salas Comerciais", emp = "135 JARDINS - COMERCIAL", enterpriseId = 10): ApiUnit => ({
   id, enterpriseId, enterpriseName: emp, companyName: "135 JARDINS", name: nome, propertyType: tipo,
   commercialStock: estoque, floor: "", contractNumber: "", privateArea: area,
@@ -25,7 +24,7 @@ const painel = (unidade: string, extra: Partial<UnidadePainel> = {}): UnidadePai
 });
 const ctx = (extra: Partial<ContextoEstoque> = {}): ContextoEstoque => ({
   precos: new Map(), tabelasComerciais: new Map(), situacoesManuais: new Map(),
-  fator: () => 1.5, cub: CUB, ...extra,
+  ...extra,
 });
 const perto = (a: number, b: number) => assert.ok(Math.abs(a - b) < 0.005, `${a} ≠ ${b}`);
 
@@ -76,11 +75,11 @@ assert.equal(api.companyName, "135 JARDINS");
   const t = totaisDoEstoque(linhas);
   assert.equal(t.qtDisp, 3);                                    // SALA 01 (Sienge), 08 e 09 (painel)
   assert.equal(t.qtResTec, 1);                                  // SALA 10
-  perto(t.valorEstoque, 56.24 * 1.5 * CUB + 80 * 1.5 * CUB + 450_000);
+  perto(t.valorEstoque, 450_000); // só a que tem preço soma; as sem preço contam e não somam
   assert.equal(t.valorReservado, 300_000);
   const l8 = linhas.find(l => l.unidade === "SALA 08")!;
   assert.equal(l8.origem, "painel");
-  assert.equal(l8.estimado, true);
+  assert.equal(l8.valorEstoque, 0); // sem preço: não soma
   assert.equal(l8.entraNaContagem, true);
   const l9 = linhas.find(l => l.unidade === "SALA 09")!;
   assert.equal(l9.origemPreco, "painel");
@@ -113,7 +112,7 @@ assert.equal(api.companyName, "135 JARDINS");
   assert.equal(totaisDoEstoque(linhas).qtDisp, 0);
 }
 
-// ── 7. Apartamento só no painel (10/11/2026): conta em Disp. Ap. e é estimado como o do Sienge ──
+// ── 7. Apartamento só no painel (10/11/2026): conta em Disp. Ap. e vale o preço do cadastro ──
 {
   assert.equal(ehTipoPainel("Apartamento"), true);
   assert.equal(ehTipoPainel("Sala comercial"), true);
@@ -129,10 +128,9 @@ assert.equal(api.companyName, "135 JARDINS");
   const t = totaisDoEstoque(linhas);
   assert.equal(t.qtDispApto, 5);      // 901 do Sienge + 4 do painel
   assert.equal(t.qtDispSala, 0);
-  assert.equal(t.estimadas, 2);       // 101 e 102: 145 m² × 1,5 × CUB
   assert.equal(t.comPreco, 1);        // 1702
-  assert.equal(t.semValor, 2);        // 901 (área zero no Sienge) e a cobertura sem área: contam, não somam
-  perto(t.valorEstoque, 2 * 145 * 1.5 * CUB + 2_900_000);
+  assert.equal(t.semPreco, 4);        // 901 (Sienge), 101, 102 e a cobertura: contam, não somam
+  perto(t.valorEstoque, 2_900_000);   // só o preço posto no painel
   const l101 = linhas.find(l => l.unidade === "101")!;
   assert.equal(l101.origem, "painel");
   assert.equal(l101.tipo, "Apartamento");

@@ -9,11 +9,18 @@
 //   3. Sienge      — estoque comercial do cadastro da unidade
 // É a mesma do Quadro Espelho; nada disso é gravado no Sienge.
 //
-// Valor de uma unidade Disponível:
-//   - preço de tabela do painel (Comercial › Tabela de Preços); sem ele, o da
-//     tabela comercial;
-//   - sem preço nenhum, APARTAMENTO e SALA COMERCIAL entram pela estimativa de
-//     sempre: área privativa × fator × CUB.
+// Valor de uma unidade Disponível = o preço posto NO PAINEL (Edielson,
+// 10/11/2026: "nós vamos considerar o valor do estoque, o valor que nós
+// colocarmos aqui no painel. O que vem do estoque do Sienge não está nada certo
+// [...] enquanto não for ajustado lá no Sienge, nós vamos trabalhar somente com
+// o valor aqui do painel"):
+//   - preço de tabela do painel (modal Estoque / Comercial › Tabela de Preços /
+//     cadastro da unidade do painel); sem ele, o da tabela comercial do
+//     empreendimento, que também é do painel.
+//   - sem preço, a unidade conta na quantidade e NÃO soma valor.
+// Até 10/11/2026 apartamento e sala sem preço entravam pela estimativa área
+// privativa × fator × CUB, com a área do Sienge (zerada ou errada em várias
+// obras). Saiu: não voltar sem pedido.
 // Disp. e Res.Téc. contam apartamento e sala comercial (contaNoEstoque). Vaga,
 // box e o resto não contam e só somam no valor quando têm preço.
 //
@@ -50,8 +57,8 @@ export function ehApartamento(u: Pick<ApiUnit, "name" | "propertyType">): boolea
 // O que é estoque à venda: apartamento e sala comercial (Edielson, 09/11/2026:
 // "além dos apartamentos, têm salas comerciais que elas devem contabilizar
 // como estoque"). Sala comercial é o grupo do tipo do Sienge ("Salas
-// Comerciais", loja); conta em Disp./Res.Téc. e, sem preço, é estimada como o
-// apartamento. Vaga, box e o resto continuam fora da conta.
+// Comerciais", loja); conta em Disp./Res.Téc. como o apartamento. Vaga, box e
+// o resto continuam fora da conta.
 export const GRUPOS_DO_ESTOQUE = ["Apartamento", "Sala comercial"];
 export function contaNoEstoque(u: Pick<ApiUnit, "name" | "propertyType">): boolean {
   return GRUPOS_DO_ESTOQUE.includes(grupoDoTipo(u.propertyType || inferUnitTypeFromName(u.name)));
@@ -61,8 +68,6 @@ export interface ContextoEstoque {
   precos: Map<number, number>;                      // tabela de preços do painel: unitId → R$
   tabelasComerciais: Map<string, TabelaComercial>;  // por chave do empreendimento
   situacoesManuais: Map<number, SituacaoManual>;    // unitId → situação posta à mão
-  fator: (empresa: string) => number;               // Configurações › Empreendimentos
-  cub: number;                                      // CUB do mês (R$/m²)
 }
 
 export type OrigemSituacao = "sienge" | "tabela" | "manual" | "painel";
@@ -85,18 +90,14 @@ export interface LinhaEstoque {
   precoTabela: number | null; // tabela de preços do painel (o que o modal edita)
   preco: number | null;       // preço que vale: tabela de preços, senão tabela comercial
   origemPreco: OrigemPreco | null;
-  entraNaContagem: boolean;   // apartamento ou sala comercial: conta em Disp. / Res.Téc. e pode ser estimado
-  estimativa: number;         // área × fator × CUB, se entra na contagem
-  valorEstoque: number;       // quanto soma no Valor Estoque (0 se não está Disponível)
-  estimado: boolean;          // o valor acima é a estimativa, não um preço
+  entraNaContagem: boolean;   // apartamento ou sala comercial: conta em Disp. / Res.Téc.
+  valorEstoque: number;       // quanto soma no Valor Estoque: o preço, se está Disponível; senão 0
 }
 
 export function linhasDeEstoque(unidades: ApiUnit[], ctx: ContextoEstoque): LinhaEstoque[] {
   const tabelaDe = new Map<string, TabelaComercial | null>();
-  const fatorDe = new Map<string, number>();
   return unidades.map(u => {
     if (!tabelaDe.has(u.enterpriseName)) tabelaDe.set(u.enterpriseName, tabelaComercialPara(u.enterpriseName, ctx.tabelasComerciais).tabela);
-    if (!fatorDe.has(u.companyName)) fatorDe.set(u.companyName, ctx.fator(u.companyName) || 0);
     const tc = tabelaDe.get(u.enterpriseName) ?? null;
     const unitId = u.id ?? null;
     // Cadastrada só no painel: a situação e o preço são os do cadastro, sem tabela comercial.
@@ -116,9 +117,8 @@ export function linhasDeEstoque(unidades: ApiUnit[], ctx: ContextoEstoque): Linh
 
     const area = u.privateArea || 0;
     const entraNaContagem = contaNoEstoque(u);
-    const estimativa = entraNaContagem ? area * fatorDe.get(u.companyName)! * (ctx.cub || 0) : 0;
-    const disponivel = situacao === "Disponível";
-    const valorEstoque = disponivel ? (preco ?? estimativa) : 0;
+    // Só o preço do painel vale; sem preço não soma (a estimativa por área saiu em 10/11/2026).
+    const valorEstoque = situacao === "Disponível" ? (preco ?? 0) : 0;
 
     return {
       unitId,
@@ -138,9 +138,7 @@ export function linhasDeEstoque(unidades: ApiUnit[], ctx: ContextoEstoque): Linh
       preco,
       origemPreco,
       entraNaContagem,
-      estimativa,
       valorEstoque,
-      estimado: disponivel && preco === null && estimativa > 0,
     };
   });
 }
@@ -151,18 +149,16 @@ export interface TotaisEstoque {
   qtDispSala: number;      // coluna Disp. Sala
   qtResTec: number;        // coluna Res.Téc.
   valorEstoque: number;    // coluna Valor Estoque
-  comPreco: number;        // disponíveis somadas pelo preço
+  comPreco: number;        // disponíveis com preço: as que somam no valor
   valorComPreco: number;
-  estimadas: number;       // disponíveis somadas pela estimativa
-  valorEstimado: number;
-  semValor: number;        // apartamentos e salas disponíveis sem preço e sem estimativa (área ou fator zero)
+  semPreco: number;        // apartamentos e salas disponíveis sem preço: contam, não somam
   foraDaContagem: number;  // disponíveis com preço que não entram na contagem (vaga, box…)
   valorReservado: number;  // reservadas a preço de tabela (informativo; não soma no estoque)
 }
 
 export const TOTAIS_VAZIOS: TotaisEstoque = {
   qtDisp: 0, qtDispApto: 0, qtDispSala: 0, qtResTec: 0, valorEstoque: 0, comPreco: 0, valorComPreco: 0,
-  estimadas: 0, valorEstimado: 0, semValor: 0, foraDaContagem: 0, valorReservado: 0,
+  semPreco: 0, foraDaContagem: 0, valorReservado: 0,
 };
 
 export function totaisDoEstoque(linhas: LinhaEstoque[]): TotaisEstoque {
@@ -179,11 +175,8 @@ export function totaisDoEstoque(linhas: LinhaEstoque[]): TotaisEstoque {
         t.comPreco++;
         t.valorComPreco += l.preco;
         if (!l.entraNaContagem) t.foraDaContagem++;
-      } else if (l.estimado) {
-        t.estimadas++;
-        t.valorEstimado += l.estimativa;
       } else if (l.entraNaContagem) {
-        t.semValor++;
+        t.semPreco++;
       }
     } else if (l.situacao === "Reservado") {
       if (l.entraNaContagem) t.qtResTec++;

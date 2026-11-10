@@ -1,7 +1,8 @@
 // Trava do estoque do Resumo Financeiro (Valor Estoque, Disp., Res.Téc.) e do
 // modal Estoque: apartamento e sala comercial contam (pelo tipo do cadastro do
 // Sienge), situação em camadas (manual > tabela comercial > Sienge) e valor por
-// preço de tabela, com a estimativa área × fator × CUB para os dois sem preço.
+// o preço posto no painel; sem preço a unidade conta e não soma (a estimativa
+// área × fator × CUB saiu em 10/11/2026).
 import assert from "node:assert/strict";
 import {
   linhasDeEstoque, totaisDoEstoque, totaisPorEmpresa, ehApartamento, contaNoEstoque, aplicarSituacaoManual,
@@ -16,20 +17,19 @@ const un = (empresa: string, nome: string, estoque: string, area: number, tipo =
   id: proximoId++, enterpriseId: 10, enterpriseName: empreendimento, companyName: empresa,
   name: nome, propertyType: tipo, commercialStock: estoque, floor: "", contractNumber: "", privateArea: area,
 });
-const CUB = 3182.95;
 const ctx = (extra: Partial<ContextoEstoque> = {}): ContextoEstoque => ({
-  precos: new Map(), tabelasComerciais: new Map(), situacoesManuais: new Map(),
-  fator: e => (e === "ROZZA" ? 1.2 : 1.5), cub: CUB, ...extra,
+  precos: new Map(), tabelasComerciais: new Map(), situacoesManuais: new Map(), ...extra,
 });
 const perto = (a: number, b: number) => assert.ok(Math.abs(a - b) < 0.005, `${a} ≠ ${b}`);
 
-// ── 1. Apartamento e sala comercial contam e são estimados ──
+// ── 1. Apartamento e sala comercial contam; sem preço no painel não somam valor ──
+// (Edielson, 10/11/2026: "nós vamos trabalhar somente com o valor aqui do painel".)
 // Até 09/11/2026 a regra olhava o nome e a vaga "G 63" contava como apartamento.
 // Desde 09/11/2026 (Edielson) a sala comercial também é estoque.
 const rozza = [
   un("ROZZA", "901", "Disponível", 137.75),
   un("ROZZA", "G 63", "Disponível", 22.5, "Vaga de Garagem Dupla"),   // vaga: fora da conta, só soma com preço
-  un("ROZZA", "SALA 01", "Disponível", 80, "Salas Comerciais"),        // sala: conta e é estimada como o apartamento
+  un("ROZZA", "SALA 01", "Disponível", 80, "Salas Comerciais"),        // sala: conta como o apartamento
   un("ROZZA", "201", "Reserva Técnica", 137.75),
   un("ROZZA", "301", "Vendida", 137.75),
   un("ROZZA", "401", "Proposta", 137.75),
@@ -42,20 +42,18 @@ const rozza = [
   assert.equal(t.qtDispApto, 1);                              // coluna Disp. Ap. do Resumo
   assert.equal(t.qtDispSala, 1);                              // coluna Disp. Sala
   assert.equal(t.qtResTec, 1);
-  perto(t.valorEstoque, 137.75 * 1.2 * CUB + 80 * 1.2 * CUB); // os dois pela estimativa
-  assert.equal(t.estimadas, 2);
+  assert.equal(t.valorEstoque, 0);                            // ninguém tem preço: nada soma, mesmo com área
+  assert.equal(t.semPreco, 2);                                // 901 e SALA 01: contam e aparecem como "sem preço"
   assert.equal(t.comPreco, 0);
   assert.equal(t.foraDaContagem, 0);
   const sala = linhas.find(l => l.unidade === "SALA 01")!;
   assert.equal(sala.entraNaContagem, true);
-  assert.equal(sala.estimado, true);
-  perto(sala.valorEstoque, 80 * 1.2 * CUB);
+  assert.equal(sala.valorEstoque, 0);
+  assert.equal(sala.preco, null);
   const vaga = linhas.find(l => l.unidade === "G 63")!;
   assert.equal(vaga.situacao, "Disponível");
   assert.equal(vaga.entraNaContagem, false);
-  assert.equal(vaga.estimativa, 0);
   assert.equal(vaga.valorEstoque, 0);
-  assert.equal(vaga.estimado, false);
 }
 
 // Quem é apartamento: o tipo do cadastro manda; sem tipo, o nome.
@@ -86,7 +84,7 @@ assert.equal(conta("ARMARIO BOX 03", "Armário Box"), false);
 assert.equal(conta("PER-CIVIC TOURING", "Veículos (Permuta)"), false);
 assert.equal(conta("TERRENO", "Terreno (Permuta)"), false);
 
-// ── 2. Preço de tabela entra no lugar da estimativa; outros tipos só com preço ──
+// ── 2. O preço posto no painel é o valor do estoque; outros tipos também só com preço ──
 {
   const precos = new Map<number, number>([[rozza[0].id!, 2_350_000], [rozza[1].id!, 120_000], [rozza[2].id!, 900_000], [rozza[3].id!, 2_400_000]]);
   const linhas = linhasDeEstoque(rozza, ctx({ precos }));
@@ -94,12 +92,18 @@ assert.equal(conta("TERRENO", "Terreno (Permuta)"), false);
   perto(t.valorEstoque, 2_350_000 + 120_000 + 900_000);
   assert.equal(t.qtDisp, 2);              // 901 e sala; a vaga soma no valor, não na contagem
   assert.equal(t.comPreco, 3);
-  assert.equal(t.estimadas, 0);
+  assert.equal(t.semPreco, 0);
   assert.equal(t.foraDaContagem, 1);      // só a vaga
   assert.equal(t.valorReservado, 2_400_000); // reservada com preço: informativo, fora do estoque
   const l901 = linhas.find(l => l.unidade === "901")!;
   assert.equal(l901.origemPreco, "tabela-precos");
-  assert.equal(l901.estimado, false);
+  assert.equal(l901.valorEstoque, 2_350_000);
+  // Só uma com preço: soma só ela; a outra conta e fica "sem preço".
+  const soUma = totaisDoEstoque(linhasDeEstoque(rozza, ctx({ precos: new Map([[rozza[0].id!, 2_350_000]]) })));
+  assert.equal(soUma.valorEstoque, 2_350_000);
+  assert.equal(soUma.qtDisp, 2);
+  assert.equal(soUma.comPreco, 1);
+  assert.equal(soUma.semPreco, 1);
   // Vendida com preço cadastrado não soma.
   assert.equal(linhasDeEstoque(rozza, ctx({ precos: new Map([[rozza[4].id!, 9_999_999]]) })).find(l => l.unidade === "301")!.valorEstoque, 0);
 }
@@ -115,7 +119,8 @@ assert.equal(conta("TERRENO", "Terreno (Permuta)"), false);
   const t = totaisDoEstoque(linhas);
   assert.equal(t.qtDisp, 2);       // a 301 e a SALA 01
   assert.equal(t.qtResTec, 2);     // 201 (Sienge) + 901 (manual)
-  perto(t.valorEstoque, 137.75 * 1.2 * CUB + 80 * 1.2 * CUB);
+  assert.equal(t.valorEstoque, 0); // sem preço, nada soma
+  assert.equal(t.semPreco, 2);
   const l301 = linhas.find(l => l.unidade === "301")!;
   assert.equal(l301.origem, "manual");
   assert.equal(l301.situacaoSienge, "Vendido");
@@ -147,8 +152,8 @@ assert.equal(ehSituacaoManual(null), false);
   const linhas = linhasDeEstoque(palacio, ctx({ tabelasComerciais }));
   const t = totaisDoEstoque(linhas);
   assert.equal(t.qtDisp, 3);
-  assert.equal(t.valorEstoque, 4_950_000 + 4_350_000 + 5_100_000);
-  assert.equal(t.estimadas, 0);
+  assert.equal(t.valorEstoque, 4_950_000 + 4_350_000 + 5_100_000); // preço da tabela comercial também é do painel
+  assert.equal(t.semPreco, 0);
   assert.equal(linhas.find(l => l.unidade === "1501")!.situacao, "Vendido");
   assert.equal(linhas.find(l => l.unidade === "1501")!.origem, "tabela");
   assert.equal(linhas.find(l => l.unidade === "3102")!.origemPreco, "tabela-comercial");
@@ -164,7 +169,8 @@ assert.equal(ehSituacaoManual(null), false);
   const manuais = new Map<number, SituacaoManual>([[palacio[2].id!, "Disponível"], [palacio[0].id!, "Vendido"], [palacio[5].id!, "Disponível"]]);
   const t2 = totaisDoEstoque(linhasDeEstoque(palacio, ctx({ tabelasComerciais, situacoesManuais: manuais })));
   assert.equal(t2.qtDisp, 3); // sai a 102, entra a 1501
-  perto(t2.valorEstoque, 4_350_000 + 5_100_000 + 170 * 1.5 * CUB); // 1501 sem preço → estimativa
+  assert.equal(t2.valorEstoque, 4_350_000 + 5_100_000); // 1501 sem preço: conta e não soma
+  assert.equal(t2.semPreco, 1);
 }
 
 // ── 5. Por empresa, e apartamento sem área/preço ──
@@ -174,9 +180,9 @@ assert.equal(ehSituacaoManual(null), false);
   assert.equal(por.get("ROZZA")!.qtDisp, 2);
   assert.equal(por.get("DOMUS")!.qtDisp, 1);
   assert.equal(por.get("DOMUS")!.valorEstoque, 0);
-  assert.equal(por.get("DOMUS")!.semValor, 1); // conta, mas não tem como valer nada: aparece no modal
-  // Sem fator cadastrado a estimativa é zero (como antes).
-  assert.equal(totaisDoEstoque(linhasDeEstoque(rozza, ctx({ fator: () => 0 }))).valorEstoque, 0);
+  assert.equal(por.get("DOMUS")!.semPreco, 1); // conta e aparece no modal como "sem preço"
+  assert.equal(por.get("ROZZA")!.semPreco, 2);
+  assert.equal(por.get("ROZZA")!.valorEstoque, 0);
 }
 
 // ── 6. Composição por tipo (o que fica fora da conta, no cartão Disponíveis do modal) ──

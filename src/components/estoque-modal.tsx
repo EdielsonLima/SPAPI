@@ -66,8 +66,8 @@ export function useDadosEstoque(): DadosEstoque {
   const [autores, setAutores] = useState<Map<number, { por: string; em: string }>>(new Map());
   const [podeEditar, setPodeEditar] = useState(false);
 
-  // Cada leitura falha sozinha: sem preço ou sem situação manual, o Resumo cai
-  // na regra de antes (Sienge + estimativa), nunca fica sem número.
+  // Cada leitura falha sozinha: sem situação manual vale a do Sienge; sem preço a
+  // unidade conta e não soma valor (só o preço do painel vale, 10/11/2026).
   const recarregar = useCallback(async () => {
     const [p, t, s, u] = await Promise.all([
       lerJson<{ podeEditar?: boolean; precos?: { unitId: number; valor: number }[] }>("/api/tabela-precos"),
@@ -166,15 +166,12 @@ function Cartao({ rotulo, valor, sub, cor, alerta }: { rotulo: string; valor: st
   );
 }
 
-export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, unidades, dados, fator, cub, cubMes, onFechar }: {
+export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, unidades, dados, onFechar }: {
   empresa: string;
   filtroInicial?: FiltroEstoque;
   tipoInicial?: string;         // grupo do tipo com que abre ("Sala comercial" ao clicar em Disp. Sala); sem ele, a regra de sempre
   unidades: ApiUnit[];          // todas as unidades carregadas; o modal fica com as da empresa
   dados: DadosEstoque;
-  fator: number;                // fator da empresa em Configurações › Empreendimentos
-  cub: number;                  // CUB do mês
-  cubMes?: string;
   onFechar: () => void;
 }) {
   const { podeEditar } = dados;
@@ -201,8 +198,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
 
   const ctxSalvo: ContextoEstoque = useMemo(() => ({
     precos: dados.precos, tabelasComerciais: dados.tabelasComerciais, situacoesManuais: dados.situacoesManuais,
-    fator: () => fator, cub,
-  }), [dados.precos, dados.tabelasComerciais, dados.situacoesManuais, fator, cub]);
+  }), [dados.precos, dados.tabelasComerciais, dados.situacoesManuais]);
   const salvas = useMemo(() => linhasDeEstoque(daEmpresa, ctxSalvo), [daEmpresa, ctxSalvo]);
 
   // Simulação: o salvo com o digitado por cima (preço inválido não entra).
@@ -488,7 +484,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
   // O que a coluna Disp. / Res.Téc. conta: "3 apartamentos · 2 salas comerciais".
   const contadasDisp = linhas.filter(l => l.situacao === "Disponível" && l.entraNaContagem);
   const contadasRes = linhas.filter(l => l.situacao === "Reservado" && l.entraNaContagem);
-  const semPreco = totais.estimadas + totais.semValor;
+  const semPreco = totais.semPreco;
   const mudou = (a: number, b: number) => Math.abs(a - b) > 0.004;
   const totalVisivel = visiveis.reduce((s, l) => s + l.valorEstoque, 0);
   const colunas = 8 + (variosEmpreendimentos ? 1 : 0);
@@ -518,7 +514,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
         <div className="grid grid-cols-2 gap-3 px-6 pt-4 lg:grid-cols-4">
           <Cartao
             rotulo="Valor do estoque" cor="bg-emerald-500" valor={formatCurrency(totais.valorEstoque)}
-            sub={totais.comPreco + totais.estimadas === 0 ? "nenhuma unidade disponível com valor" : `${totais.comPreco} a preço de tabela${totais.estimadas > 0 ? ` · ${totais.estimadas} por estimativa` : ""}`}
+            sub={totais.comPreco === 0 ? "nenhuma unidade disponível com preço" : `soma de ${totais.comPreco} unidade(s) com preço no painel`}
             alerta={mudou(totais.valorEstoque, totaisSalvos.valorEstoque) ? `antes: ${formatCurrency(totaisSalvos.valorEstoque)} · ainda não salvo` : undefined}
           />
           <Cartao
@@ -533,11 +529,11 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
           />
           <Cartao
             rotulo="Sem preço" cor={semPreco > 0 ? "bg-rose-500" : "bg-slate-400"} valor={String(semPreco)}
-            sub={totais.qtDisp === 0 ? "nenhum apartamento ou sala disponível" : semPreco === 0 ? "todos com preço de tabela" : totais.estimadas > 0 ? `${formatCurrency(totais.valorEstimado)} por estimativa${totais.semValor > 0 ? ` · ${totais.semValor} sem valor nenhum` : ""}` : "sem área ou fator: não somam nada"}
+            sub={totais.qtDisp === 0 ? "nenhum apartamento ou sala disponível" : semPreco === 0 ? "todos com preço no painel" : "contam na quantidade e não somam no valor"}
           />
         </div>
         <p className="px-6 pt-2 text-[11px] text-slate-500 dark:text-slate-400">
-          Sem preço, apartamento e sala comercial entram pela estimativa: área privativa × fator ({fator ? fator.toLocaleString("pt-BR", { maximumFractionDigits: 2 }) : "sem fator"}) × CUB ({cub ? `${formatCurrency(cub)}/m²` : "indisponível"}{cubMes ? `, ${cubMes}` : ""}). O preço digitado entra no lugar dela. Vaga e box só entram no valor com preço.
+          O valor do estoque é a soma do preço posto aqui no painel (ou o da tabela comercial do empreendimento). Unidade sem preço conta na quantidade e não soma valor; nenhum valor vem do Sienge.
         </p>
         {duplicadas.length > 0 && (
           <div className="mx-6 mt-2 space-y-1 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[11px] text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
@@ -621,7 +617,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
                 </select>
               </label>
               <label className="flex min-w-0 flex-col gap-1 text-[11px] font-medium text-slate-500 dark:text-slate-400 col-span-2 lg:col-span-1">Preço de tabela
-                <InputReais value={form.precoTxt} onChange={t => setForm({ ...form, precoTxt: t })} onKeyDown={e => { if (e.key === "Enter") gravarForm(); }} placeholder="vazio = estimativa" className="h-8 [&_input]:h-8 [&_input]:text-xs md:[&_input]:text-xs" />
+                <InputReais value={form.precoTxt} onChange={t => setForm({ ...form, precoTxt: t })} onKeyDown={e => { if (e.key === "Enter") gravarForm(); }} placeholder="vazio = sem preço" className="h-8 [&_input]:h-8 [&_input]:text-xs md:[&_input]:text-xs" />
               </label>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -794,8 +790,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
                     <td className="whitespace-nowrap py-1.5 pl-3 pr-6 text-right tabular-nums">
                       {!disponivel ? <span className="text-slate-400 dark:text-slate-500">—</span>
                         : l.preco !== null ? <span className="font-semibold text-slate-900 dark:text-slate-50">{formatCurrency(l.valorEstoque)}</span>
-                        : l.estimado ? <span className="text-slate-600 dark:text-slate-400" title="Estimativa: área privativa × fator × CUB">≈ {formatCurrency(l.valorEstoque)}</span>
-                        : <span className="text-amber-700 dark:text-amber-300" title={l.entraNaContagem ? "Sem preço e sem área ou fator para estimar" : "Só apartamento e sala comercial são estimados; este tipo de unidade soma no estoque quando tem preço"}>{l.entraNaContagem ? "sem valor" : "só com preço"}</span>}
+                        : <span className="text-amber-700 dark:text-amber-300" title="Sem preço no painel: conta na quantidade e não soma no valor do estoque">sem preço</span>}
                     </td>
                   </tr>
                 );
