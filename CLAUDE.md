@@ -851,6 +851,24 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     para o teste: Valor Estoque R$ 273.050.000,00, Ainda a Entrar R$ 433.218.517,17
     (produção: R$ 433.067.201,54, porque o A Receber do cache local é de 09/11). Sem
     rolagem lateral a 1848 e 1920; a 1366 com o menu aberto continua rolando.
+- **Resumo compacto para o notebook (Edielson, 10/11/2026: "o Carlos Humberto olha sempre
+  no notebook dele, que é uma tela pequena [...] tem um espaço sobrando entre cada coluna
+  [...] nem que os cabeçalhos fiquem em duas linhas").** NÃO alargar sem pedido.
+  - Títulos das colunas em **duas linhas** (`linhas` em `colunasResumo`: "Total /
+    Recebido", "Disp. / Ap."); colunas **sem largura mínima**; espaço lateral das células
+    `px-1.5` (`px-1` até 1320 px de largura); linha de total na mesma fonte das linhas
+    (`text-xs font-bold`, era `text-sm`: o valor do total era o que mais alargava).
+  - Cartões e tabela dentro de uma **coluna central de até 1240 px** (`mx-auto
+    max-w-[1240px]`): no monitor grande as colunas não se espalham; no notebook ocupa a
+    largura toda.
+  - Altura em dois degraus que não se sobrepõem: de 701 a 820 px de altura da janela as
+    linhas vão a `py-1` e os espaços caem; até 700 px, `py-0.5`. Acima de 820 px fica
+    como era (`py-1.5`).
+  - Medido local com os valores de produção, menu recolhido: largura mínima da tabela
+    1.109 px (era 1.405); sem rolagem lateral nem vertical a 1366×768, 1280×720 e
+    1366×650; a tabela termina em 692 px (tela de 768) e 632 px (tela de 650). Abaixo de
+    ~656 px de altura útil sobra uma faixa para rolar. Com o menu ABERTO a 1366 px ainda
+    rola para o lado (1.153 px numa área de 1.052 px); o menu agora abre recolhido.
 
 ## Resumo › Estoque por unidade: modal editável (Edielson, 09/11/2026)
 
