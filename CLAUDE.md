@@ -251,7 +251,8 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (card âmbar + coluna "Tabela comercial", só editores), com "Aplicar preços
   à tabela de preços" (grava com histórico). Seed único do Palácio em
   `scripts/dados/tabela-comercial-palacio-2026-10.json` pelo `migrate.js`
-  (12 à venda: 102, 201, 301, 401, 402, 501, 502, 601, 602, 1202, 3102, 3202).
+  (12 à venda: 102, 201, 301, 401, 402, 501, 502, 601, 602, 1202, 3102, 3202; **desde
+  10/11/2026 são 11**, ver "Planilha de disponibilidade do comercial × painel").
   Condições reais da mesma tabela em `CONFIG_PALACIO.condicoes` (10% +
   saldo em 100×, entrega 2030-12) = referência do modal até alguém salvar.
   **Resumo** (Edielson, 26/10; botão de gráfico na barra, também na tela
@@ -933,6 +934,46 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   Resumo já rolava para o lado antes (11 colunas) e continua rolando.
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
+
+## Planilha de disponibilidade do comercial × painel (Edielson, 10/11/2026)
+
+- O comercial da Silva Packer mantém a planilha "Relação apartamentos" (uma aba por
+  empreendimento, colunas APTO e NOMES): **linha sem nome = à venda**; linha com nome =
+  unidade de sócio (no Tetra, também permuta e cliente), fora da venda. Só apartamentos.
+  A versão de 10/11/2026 chegou como `Disponibilidade.xlsx` (pasta Downloads da máquina
+  do Edielson); a `Disponibilidade Estoque.xlsx` do OneDrive da Silva Packer é a antiga
+  (02/10/2025, outro formato, com STATUS e VALOR) e **não vale mais**.
+- **Palácio Elizabeth aplicado em 10/11** ("as disponibilidades são essas em branco"): a
+  lista de disponíveis da tabela comercial passou de 12 para **11**: 102, 201, 301, 401,
+  501, 502, 601, 602, 701, 1202, 1801. Saíram 402, 3102 e 3202 (unidades de sócio);
+  entraram 701 e 1801. Ajuste único do `scripts/migrate.js`
+  (`scripts/dados/disponibilidade-palacio-2026-11-10.json`): troca só `disponiveis`,
+  mantém preços e entrega; a tabela `ajustes_aplicados` guarda a marca (não roda de novo)
+  e o valor de antes (para desfazer). Depois, quem manda é a tela Tabela de preços.
+  Trava no fim de `tabela-comercial.test.ts`. Local: Disp. Ap. 12 → 11 e Valor Estoque
+  R$ 55.600.000,00 → R$ 46.152.290,23 (10 a preço de tabela = R$ 45.400.000,00 + a 1801
+  pela estimativa, R$ 752.290,23, porque não tem preço). **701 está Vendida no Sienge**
+  (contrato PALACIO.701) e livre na planilha.
+- **Cruzamento das outras abas com o Sienge (`/units` de 10/11, 1.438 unidades, igual ao
+  cache de 08/11):**
+  - 135 Jardins (5 livres) e Capri (1): batem com o painel (no 135, com a 2901 e a 2902
+    liberadas à mão em produção).
+  - Serenity (5 livres): bate na conta se "Cobertura" for a **2401** (no Sienge não há
+    unidade chamada cobertura; a 2401 está Disponível e fora da planilha).
+  - **Domus, Rozza e Tetra: o Sienge só tem cadastrados os apartamentos vendidos.** Dos
+    livres da planilha, não existem no Sienge: Domus 15 (101, 102, 201, 202, 301, 302,
+    1102, 1202, 1302, 1602, 1701, 2302, 2502, 2602, COBERTURA), Rozza 10 (101, 102, 201,
+    202, 501, 502, 902, 1002, 1701, 1702) e Tetra 17 (101, 401, 501, 601, 801, 901, 1201,
+    1301, 1401, 1501, 1601, 1701, 1801, 1901, 2001, 2301, 2401) = **42 apartamentos**.
+    Por isso o Resumo mostra Domus 1, Rozza 1 e Tetra 0. "Liberar unidade" não resolve
+    (não há unidade para liberar); o cadastro só no painel hoje aceita sala, não
+    apartamento. Pendente de decisão do Edielson (cadastrar só no painel × no Sienge, e
+    com que área e preço).
+  - Domus: a 1901 está livre na planilha e Vendida no Sienge (DOMUS.1901); a 1502 está
+    Disponível no Sienge e fora da planilha.
+  - Hannover: aba vazia, mas o Sienge tem 3 apartamentos Disponíveis (201, 801, 802).
+    Siena não tem aba e tem 6 Disponíveis no Sienge. Tesla não tem aba (só salas).
+  - Nada disso foi alterado no painel em 10/11; só o Palácio.
 
 ## Visão Geral - Regras (Criado em 2026-04-01)
 

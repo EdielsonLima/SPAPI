@@ -45,4 +45,33 @@ assert.equal(tabelaComercialPara("SERENITY", mapa).chave, "serenity");
 // Normalização limpa lixo.
 const n = normalizarTabelaComercial({ referencia: "  x ", disponiveis: ["ap1", "AP1", "", null as unknown as string], precos: { ap2: "10" as unknown as number, AP3: -5, AP4: 0 }, entrega: "12/2030" });
 assert.deepEqual(n, { referencia: "x", disponiveis: ["1"], precos: { "2": 10 } });
+// Ajuste de 10/11/2026: disponibilidade do Palácio pela planilha "Relação apartamentos"
+// do comercial (Edielson: "as disponibilidades são essas em branco"). O migrate troca só
+// a lista de disponíveis; os preços de outubro ficam.
+{
+  const ajuste = JSON.parse(readFileSync(new URL("../../scripts/dados/disponibilidade-palacio-2026-11-10.json", import.meta.url), "utf-8"));
+  assert.equal(ajuste.chave, seed.chave);
+  const t2 = normalizarTabelaComercial({ ...seed.dados, disponiveis: ajuste.disponiveis });
+  assert.equal(validarTabelaComercial(t2), null);
+  assert.deepEqual(t2.disponiveis, ["102", "201", "301", "401", "501", "502", "601", "602", "701", "1202", "1801"]);
+  assert.equal(new Set(t2.disponiveis).size, 11);
+  // Nenhuma unidade de sócio (linha com nome na planilha) na lista de disponíveis.
+  const foraDaVenda = ajuste._foraDaVenda as string[];
+  assert.equal(foraDaVenda.length, 15);
+  foraDaVenda.forEach(u => assert.ok(!t2.disponiveis.includes(u), u));
+  // Saem 402, 3102 e 3202; 1501 e 1502 seguem fora mesmo livres no Sienge.
+  assert.equal(aplicarTabelaComercial("Disponível", "402", t2), "Vendido");
+  assert.equal(aplicarTabelaComercial("Vendido", "3102", t2), "Vendido");
+  assert.equal(aplicarTabelaComercial("Permutante", "3202", t2), "Permutante");
+  assert.equal(aplicarTabelaComercial("Disponível", "1501", t2), "Vendido");
+  assert.equal(aplicarTabelaComercial("Disponível", "1502", t2), "Vendido");
+  // Entram 701 (vendida no Sienge, livre na planilha) e 1801 (livre nos dois).
+  assert.equal(aplicarTabelaComercial("Vendido", "701", t2), "Disponível");
+  assert.equal(aplicarTabelaComercial("Disponível", "1801", t2), "Disponível");
+  assert.equal(precoDaTabelaComercial("701", t2), 4500000); // preço de outubro
+  assert.equal(precoDaTabelaComercial("1801", t2), 0);      // sem preço: entra pela estimativa até cadastrarem
+  // Valor a preço de tabela das 10 com preço: R$ 45.400.000,00.
+  assert.equal(t2.disponiveis.reduce((s, u) => s + (t2.precos[u] || 0), 0), 45_400_000);
+}
+
 console.log("tabela-comercial: ok");

@@ -75,6 +75,48 @@ async function migrate() {
       console.warn("[migrate] tabela_comercial seed:", e.message);
     }
 
+    // Ajuste único (10/11/2026): disponibilidade do Palácio Elizabeth pela planilha
+    // "Relação apartamentos" do comercial (Edielson: "as disponibilidades são essas
+    // em branco"). Troca SÓ a lista `disponiveis` da tabela comercial; preços e
+    // entrega ficam como estiverem em produção. Entra UMA vez: a marca e o valor
+    // de antes ficam em ajustes_aplicados (dá para desfazer). Depois, quem manda
+    // é a tela Tabela de preços › Tabela comercial.
+    try {
+      const arq = path.join(__dirname, "dados", "disponibilidade-palacio-2026-11-10.json");
+      if (fs.existsSync(arq)) {
+        const j = JSON.parse(fs.readFileSync(arq, "utf-8"));
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const marca = await client.query(
+            `INSERT INTO ajustes_aplicados (chave) VALUES ($1) ON CONFLICT (chave) DO NOTHING RETURNING chave`, [j.ajuste]);
+          if (marca.rows.length === 1) {
+            const { rows } = await client.query(`SELECT dados FROM tabela_comercial WHERE chave = $1 FOR UPDATE`, [j.chave]);
+            if (rows.length === 1) {
+              const antes = rows[0].dados;
+              const base = String(antes.referencia || "").split(" · disponibilidade de ")[0];
+              const dados = { ...antes, disponiveis: j.disponiveis, referencia: [base, j.referencia].filter(Boolean).join(" · ") };
+              await client.query(
+                `UPDATE tabela_comercial SET dados = $2, atualizado_por = $3, atualizado_em = NOW() WHERE chave = $1`,
+                [j.chave, JSON.stringify(dados), "ajuste: disponibilidade de 10/11/2026 (planilha do comercial)"]);
+              await client.query(`UPDATE ajustes_aplicados SET antes = $2 WHERE chave = $1`, [j.ajuste, JSON.stringify(antes)]);
+              console.log(`[migrate] tabela_comercial: ${j.chave} com ${j.disponiveis.length} disponíveis (antes ${(antes.disponiveis || []).length}).`);
+            } else {
+              console.log(`[migrate] ajuste ${j.ajuste}: sem tabela comercial para ${j.chave}, nada a trocar.`);
+            }
+          }
+          await client.query("COMMIT");
+        } catch (e) {
+          await client.query("ROLLBACK");
+          throw e;
+        } finally {
+          client.release();
+        }
+      }
+    } catch (e) {
+      console.warn("[migrate] ajuste da disponibilidade do Palácio:", e.message);
+    }
+
     // Seed único das fotos da planta do Palácio Elizabeth (24/10/2026): os
     // renders em public/modelos/palacio-fotos entram no banco UMA vez (só
     // enquanto a sequência da tabela nunca foi usada). Depois disso quem manda

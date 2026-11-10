@@ -1,0 +1,13 @@
+{
+  "_fonte": "Planilha 'Relação apartamentos' do comercial da Silva Packer, aba do Palácio Elizabeth, recebida do Edielson em 10/11/2026 (\"No Palácio Elizabeth, as disponibilidades são essas em branco\"). Linha sem nome = disponível; linha com nome = unidade de sócio, fora da venda. Aplicado UMA vez pelo scripts/migrate.js sobre a tabela comercial (chave palacio-elizabeth): troca só a lista de disponíveis; preços e entrega ficam como estiverem. Depois, quem manda é a tela Tabela de preços.",
+  "ajuste": "palacio-disponibilidade-2026-11-10",
+  "chave": "palacio-elizabeth",
+  "referencia": "disponibilidade de 10/11/2026 (planilha do comercial)",
+  "disponiveis": ["102", "201", "301", "401", "501", "502", "601", "602", "701", "1202", "1801"],
+  "_foraDaVenda": ["402", "1501", "1502", "3101", "3102", "3201", "3202", "3301", "3302", "3401", "3402", "3501", "3502", "3601", "3602"],
+  "_notas": [
+    "Saem da lista de outubro: 402, 3102 e 3202 (unidades de sócio). Entram: 701 e 1801.",
+    "701: no Sienge está Vendida (contrato PALACIO.701) em 10/11/2026; a planilha traz como livre. Tem preço na tabela de outubro (R$ 4.500.000,00).",
+    "1801: Disponível no Sienge, sem preço na tabela de outubro: entra pela estimativa (área × fator × CUB) até alguém cadastrar o preço."
+  ]
+}

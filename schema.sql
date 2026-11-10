@@ -382,6 +382,16 @@ CREATE TABLE IF NOT EXISTS tabela_comercial (
   atualizado_em TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- ── Ajustes únicos de dados aplicados pelo scripts/migrate.js ──
+-- Uma linha por ajuste já aplicado (não roda de novo) e o valor que havia antes,
+-- para desfazer. Ex.: palacio-disponibilidade-2026-11-10 (lista de disponíveis
+-- da tabela comercial do Palácio pela planilha do comercial).
+CREATE TABLE IF NOT EXISTS ajustes_aplicados (
+  chave VARCHAR(80) PRIMARY KEY,
+  antes JSONB,
+  aplicado_em TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- ── Situação manual das unidades (Painel › Resumo › Estoque) ──
 -- Situação posta à mão no painel ("Disponível", "Reservado", "Vendido"), por cima
 -- do Sienge e da tabela comercial. Sem linha = automático. Não escreve no Sienge.
