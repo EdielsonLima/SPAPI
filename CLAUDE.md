@@ -292,6 +292,48 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (`lerAndamentoDoHtml`, trava `andamento-obra.test.ts`); senão vale o
   gravado (tabela `andamento_obra`, partida = site em 23/10: 100/100/55/15/
   2/2/0/0/0). Edita à mão quem edita a Tabela de Preços (lápis no card).
+- **Maquete do projeto no 3D: 135 Jardins (Edielson, 10/11/2026).** Pedido: "fazer a
+  maquete do prédio" com o SketchUp que a Lilian mandou
+  (`457_EM_3D_PRE EXECUTIVO_R01.skp`, estudo de 2019 do escritório de arquitetura;
+  original, vistas e scripts em `OneDrive\SILVA PACKER\135 JARDINS\Maquete 3D\`).
+  Diferente do Palácio (estudo de massa desenhado por código), aqui o prédio
+  inteiro vem do arquivo.
+  - **Conversão:** `py -I scripts/skp-para-maquete.py <arquivo.skp>
+    public/modelos/135-jardins.m3d` (o nome da saída escolhe o `CONFIG` do script).
+    Lê o .skp pelo `SketchUpAPI.dll` que vem com o Autodesk (não há SketchUp na
+    máquina), tira paredes internas e cortinas, troca por caixa o que é pequeno e
+    pesado (placa solar, chapa perfurada, arbusto) e corta cada componente
+    `TIPO`/`DIFERENCIADO` no eixo da torre. 1,84 milhão de triângulos → 273 mil,
+    1,2 MB (gzip por dentro; o navegador abre com `DecompressionStream`).
+    **Triângulo sem área sai na conversão:** a normal zero dele vira pixel inválido
+    e o bloom do modo noite deixava a tela preta (9.934 tirados).
+  - **Formato e leitura:** `src/lib/modelo-3d.ts` (puro; trava
+    `modelo-3d.test.ts`, que lê o arquivo publicado: 31 pavimentos × 2 lados = 62
+    fatias, 3,24 m piso a piso, faixas sem buraco). Metros, origem no eixo da
+    torre e na rua, frente (sacadas) em +z. `torre-3d-modelo.ts` baixa (uma vez
+    por aba) e monta a geometria.
+  - **No 3D:** `ConfigTorre.modelo` (`CONFIG_135` em `torre-3d.ts`). Com ele,
+    `torre-3d.tsx` pula todo o desenho por código e põe a casca (base, lazer,
+    topo, rua) e uma fatia por apartamento: o corpo multiplica a cor do projeto
+    por um tom da situação, o vidro leva a cor da situação; à noite o vidro de
+    quem tem dono acende pano a pano (cor por vértice, uniforme `uNoite`).
+    Clique, card, espelho ao lado, filtro da legenda, resumo e tela cheia são os
+    mesmos do Palácio. Sem mapa da cidade, andamento da obra e planta (falta
+    cadastrar `local` e `planta`; endereço: Rua 3420, nº 135, Barra Sul).
+  - **Qual fatia é qual unidade:** andar pelo NÚMERO (`andarNoModelo`: "2802" →
+    28º pavimento de apartamentos), porque o andar do cadastro do Sienge é o
+    pavimento do projeto (101 = 10º, 3102 = 40º); lado por `ordenarFinais`.
+    **Final 01 à esquerda olhando a frente é suposição** (a planta do site não
+    numera os apartamentos; mesma convenção do Palácio): se for o contrário,
+    inverter `ordemFinais` em `CONFIG_135`. "135 JARDINS - PERMUTA" (imóveis de
+    outros prédios) não usa a maquete.
+  - **Situação = a do Resumo** (Edielson, 10/11: "pegue as unidades que estão
+    disponíveis dali"): o 3D recebe as unidades do Quadro, que já passam por
+    ajuste manual > tabela comercial > Sienge. Em produção em 10/11: 101, 201,
+    2802, 2901 e 2902 disponíveis.
+  - Conferido local (Playwright, Chrome sem GPU): dia, noite, filtro, clique, card
+    da 2802 ("37º andar · lado direito") e o Palácio igual a antes. 127 chamadas
+    de desenho.
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no

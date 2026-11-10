@@ -49,6 +49,19 @@ export interface ConfigTorre {
   // Condições de pagamento de referência do empreendimento (tabela comercial),
   // usadas pelo modal Condições enquanto não há condições salvas no banco.
   condicoes?: Partial<CondicoesPagamento>;
+  // Maquete do projeto (SketchUp convertido): com ela o prédio inteiro vem do
+  // arquivo, e as medidas acima só servem de reserva. Ver ModeloTorre.
+  modelo?: ModeloTorre;
+}
+
+// Prédio modelado pelo escritório de arquitetura, convertido por
+// scripts/skp-para-maquete.py em public/modelos/<chave>.m3d (leitor em
+// lib/modelo-3d). Cada apartamento é uma fatia do arquivo, tingida pela situação.
+export interface ModeloTorre {
+  url: string;
+  altura: number;        // m da rua ao topo: enquadra a câmera antes de o arquivo chegar
+  ladoCamera?: 1 | -1;   // vista inicial pela direita (1) ou pela esquerda (-1) da frente
+  fonte: string;         // legenda do painel: de onde veio o modelo
 }
 
 // A imagem é a do final que NÃO é espelhado; os finais em `espelhar` mostram
@@ -205,10 +218,40 @@ export const CONFIG_PALACIO: ConfigTorre = {
   },
 };
 
+// 135 Jardins (Rua 3420, nº 135, Barra Sul): o prédio vem do SketchUp do
+// escritório de arquitetura ("457_EM_3D_PRE EXECUTIVO_R01", estudo de 2019,
+// enviado pela Lilian em 10/11/2026), convertido em /modelos/135-jardins.m3d.
+// 31 pavimentos de 2 apartamentos espelhados (101 a 3102), 3,24 m piso a piso;
+// no Sienge o "andar" é o pavimento do projeto (101 = 10º, 3102 = 40º).
+// A planta do site não diz qual lado é o final 01: aqui ele fica à esquerda
+// olhando a frente, como no Palácio. Se for o contrário, é só inverter
+// `ordemFinais`.
+export const CONFIG_135: ConfigTorre = {
+  nome: "135 Jardins",
+  largura: 30.7, profundidade: 14.5, peDireito: 3.24, sacada: 0, larguraSacada: 7, embasamento: 0,
+  ordemFinais: ["01", "02"],
+  janelas: { frente: 0, lateral: 0, fundos: 0 },
+  modelo: { url: "/modelos/135-jardins.m3d", altura: 140.7, ladoCamera: 1, fonte: "Modelo do projeto (SketchUp, estudo de 2019)" },
+};
+
 export function configDoEmpreendimento(nome: string): ConfigTorre {
   const n = (nome || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
   if (n.includes("PALACIO ELIZABETH")) return CONFIG_PALACIO;
+  // "135 JARDINS - PERMUTA" são imóveis de outros prédios recebidos em permuta.
+  if (n.includes("135 JARDINS") && !n.includes("PERMUTA")) return CONFIG_135;
   return CONFIG_PADRAO;
+}
+
+// Pavimento da unidade na maquete do projeto (0 = primeiro andar de
+// apartamentos), tirado do NÚMERO: "101" → 0, "2802" → 27. O andar do cadastro
+// do Sienge não serve: no 135 Jardins ele é o pavimento do projeto (101 = 10º).
+// Só nome que é o número ("2802", "AP 2802"): "PER-AREQUIPA.102" é apartamento
+// de outro prédio recebido em permuta e não tem lugar na torre.
+export function andarNoModelo(unidade: string): number | null {
+  const m = /^(?:AP\s*)?(\d{3,4})$/i.exec((unidade || "").trim());
+  if (!m) return null;
+  const n = parseInt(m[1].slice(0, -2), 10);
+  return n >= 1 ? n - 1 : null;
 }
 
 // "AP3001" → andar 30, final "01". Usa o pavimento do cadastro quando vier
