@@ -948,8 +948,11 @@ export function DreTab({
             /* ══════ DRE SIMPLES: Original view ══════ */
             <div className="mx-5 my-4">
               {/* Table — o painel "Insights da DRE" saiu em 09/11/2026 (Edielson:
-                  o Carlos não usa); no lugar, a coluna % da Receita. */}
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 w-full">
+                  o Carlos não usa); no lugar, a coluna % da Receita.
+                  Tabela central, até 896 px — a largura que ela tinha ao lado dos
+                  Insights (Edielson, 10/11/2026): na largura toda a conta ficava a
+                  ~1.300 px do valor e o olho se perdia na linha. */}
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden bg-white dark:bg-slate-900 w-full max-w-4xl mx-auto">
               {/* Table Header */}
           <div className="grid grid-cols-[auto_1fr_180px_96px] items-center px-5 py-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <span className="w-8" />

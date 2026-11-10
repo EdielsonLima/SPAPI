@@ -749,8 +749,11 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   de lucro não mudaram. Regra em `src/lib/dre-variacao.ts` (trava
   `dre-variacao.test.ts`); só a exibição do %, nenhum valor do DRE passa por ela.
 - **% da Receita no lugar dos Insights (Edielson, 09/11/2026: "o Carlos Humberto não usa
-  isso"):** o painel "Insights da DRE" (frases automáticas) saiu de vez e a tabela da DRE
-  Simples ocupa a largura toda. Coluna **% Receita** (análise vertical) na DRE Simples e
+  isso"):** o painel "Insights da DRE" (frases automáticas) saiu de vez. A tabela da DRE
+  Simples fica **central, com até 896 px** (`max-w-4xl mx-auto`, a largura que tinha ao
+  lado dos Insights) — Edielson, 10/11/2026: na largura toda a conta ficava a ~1.300 px
+  do valor e "a pessoa fica meio perdida na linha"; não voltar para `w-full` sozinho.
+  Cards, botões e a DRE Completa seguem na largura toda. Coluna **% Receita** (análise vertical) na DRE Simples e
   **% Rec.** depois do Total na DRE Completa: linha ÷ Receita Operacional do período.
   Custo/despesa sem sinal (custo variável 84,5 %), linhas de lucro com sinal = margem, a
   mesma conta da pílula dos cards (−4,7 %). Conta aberta (nível 2) mostra também o % da
