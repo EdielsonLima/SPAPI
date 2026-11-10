@@ -809,6 +809,32 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   passava 107 px da tela a 1848 px. Sem rolagem lateral a 1848 e 1920 com o menu aberto.
   Por isso o Tetra mostrava Lucro Potencial = Valor Estoque em 10/11: o Total a Receber
   dele é R$ 0,00 (a única parcela em aberto, título 1063, venceu em 20/05/2026).
+- **Resumo em três blocos (Edielson, 10/11/2026: "tem que ser algo fácil, porque o Carlos
+  Humberto não gosta de muitas coisas. Ele gosta de algo resumido e fácil de entender";
+  aprovado pela prévia com "Pode implementar").** NÃO abreviar valores: "ele gosta dos
+  valores normais mesmo, completos" (nada de "96,7 mi").
+  - Colunas agrupadas, com uma linha de título em cima e uma linha fina separando:
+    **Já realizado** (Total Recebido, Total Pago, Lucro Realizado, Margem) · **Ainda a
+    entrar** (Total a Receber, Valor Estoque, Ainda a Entrar) · **À venda** (Disp. Ap.,
+    Disp. Sala, Res.Téc.). Lista em `colunasResumo`/`gruposResumo`.
+  - Nomes: "Lucro Potencial" virou **Ainda a Entrar** (é A Receber + Estoque: não desconta
+    o que falta gastar na obra, então não é lucro; no Tetra dava R$ 86,4 mi de "lucro"
+    com a obra no começo) e "Lucratividade" virou **Margem**. As chaves de ordenação
+    continuam `lucroPotencial` e `lucratividade`. Um lucro projetado de verdade teria de
+    descontar o Saldo a Realizar do Orçamento: regra nova, não feita.
+  - Margem: verde quando positiva, vermelha quando negativa (`corMargemResumo`), sem a
+    barrinha. As faixas antigas (verde só acima de 50 %) deixavam 40,9 % em âmbar e
+    12,1 % em vermelho. Percentual com vírgula (`pctResumo`): "14,65%", "-1,9%".
+  - A coluna **Status saiu**: as finalizadas ficam embaixo de uma linha "Finalizadas"
+    (seguem esmaecidas e no fim da lista).
+  - Zero aparece como "-" também em Total a Receber; Valor Estoque mostra **"sem preço"**
+    quando a empresa tem unidade à venda e nenhuma com preço (Siena em 10/11).
+  - Cartões: Total Recebido · Total Pago · **Lucro Realizado** (era "Saldo"; a margem é o
+    selo dele) · **Ainda a Entrar** (era o cartão "Lucratividade").
+  - Conferido local com os preços de produção de 10/11 copiados para o banco local só
+    para o teste: Valor Estoque R$ 273.050.000,00, Ainda a Entrar R$ 433.218.517,17
+    (produção: R$ 433.067.201,54, porque o A Receber do cache local é de 09/11). Sem
+    rolagem lateral a 1848 e 1920; a 1366 com o menu aberto continua rolando.
 
 ## Resumo › Estoque por unidade: modal editável (Edielson, 09/11/2026)
 

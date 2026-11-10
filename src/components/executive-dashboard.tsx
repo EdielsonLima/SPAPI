@@ -5226,6 +5226,48 @@ export function ExecutiveDashboard() {
         const totPago = sorted.reduce((s, c) => s + c.totalPago, 0);
         const totSaldo = totRecebido - totPago;
         const totLucratividade = totRecebido > 0 ? (totSaldo / totRecebido) * 100 : 0;
+        const totAReceber = sorted.reduce((soma, c) => soma + c.totalAReceber, 0);
+        const totEstoque = sorted.reduce((soma, c) => soma + c.valorEstoque, 0);
+        const totAEntrar = totAReceber + totEstoque;
+
+        // Percentual no padrão brasileiro ("14,65%", "-1,9%"); antes saía com ponto.
+        const pctResumo = (v: number, casas = 1) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`;
+        // Margem: verde quando positiva, vermelha quando negativa. As faixas de antes (verde só
+        // acima de 50 %) pintavam de âmbar e vermelho margens boas, como 40,9 % e 12,1 %.
+        const corMargemResumo = (m: number) => (m > 0 ? "text-emerald-700 dark:text-emerald-400" : m < 0 ? "text-red-600 dark:text-red-300/70" : "text-slate-500 dark:text-slate-400");
+        // Linha fina que abre cada bloco de colunas.
+        const divisaResumo = "border-l border-slate-200 dark:border-slate-700";
+        const gruposResumo = [
+          { rotulo: "Já realizado", colunas: 4 },
+          { rotulo: "Ainda a entrar", colunas: 3 },
+          { rotulo: "À venda", colunas: 3 },
+        ];
+        // `inicio` marca a primeira coluna de cada bloco; `info` é a dica do "i".
+        const colunasResumo: { field: string; label: string; align: "left" | "right" | "center"; minW: string; sticky?: boolean; inicio?: boolean; info?: string }[] = [
+          { field: "companyName", label: "Empresa", align: "left", minW: "180px", sticky: true },
+          { field: "totalRecebido", label: "Total Recebido", align: "right", minW: "130px", inicio: true,
+            info: "Tudo o que já entrou no caixa, pelo valor líquido e pela data da baixa. É o mesmo número de CR › Contas Recebidas, com as empresas e o período escolhidos aqui em cima." },
+          { field: "totalPago", label: "Total Pago", align: "right", minW: "130px",
+            info: "Tudo o que já saiu do caixa, pelo valor líquido e pela data da baixa. É o mesmo número de CP › Contas Pagas, com as empresas e o período escolhidos aqui em cima." },
+          { field: "lucroRealizado", label: "Lucro Realizado", align: "right", minW: "130px",
+            info: "Cálculo: Total Recebido − Total Pago. É o que sobrou (ou faltou) do dinheiro que já entrou e saiu." },
+          { field: "lucratividade", label: "Margem", align: "right", minW: "70px",
+            info: "Cálculo: Lucro Realizado ÷ Total Recebido × 100. Quanto de cada R$ 100 recebidos sobrou. Em obra em andamento fica negativa enquanto se gasta mais do que se recebe." },
+          { field: "totalAReceber", label: "Total a Receber", align: "right", minW: "130px", inicio: true,
+            info: isHolding
+              ? "Saldo em aberto das parcelas a receber. Mostra a carteira inteira: não segue o filtro de anos e meses."
+              : "Saldo das parcelas que vencem de hoje em diante, sem permuta e sem aluguel. Parcela já vencida não entra aqui: fica em Inadimplência. Mostra a carteira inteira: não segue o filtro de anos e meses." },
+          { field: "valorEstoque", label: "Valor Estoque", align: "right", minW: "120px",
+            info: "Soma do preço posto no painel para as unidades disponíveis. Unidade sem preço não soma. Clique no valor para ver as unidades e ajustar o preço." },
+          { field: "lucroPotencial", label: "Ainda a Entrar", align: "right", minW: "130px",
+            info: "Cálculo: Total a Receber + Valor Estoque. É o dinheiro que ainda pode entrar: o que está vendido e falta receber, mais o que falta vender. Não desconta o que falta gastar para terminar a obra." },
+          { field: "qtDispApto", label: "Disp. Ap.", align: "center", minW: "70px", inicio: true,
+            info: "Apartamentos disponíveis para venda: os do Sienge, os liberados no painel e os cadastrados só no painel. Clique no número para ver a lista." },
+          { field: "qtDispSala", label: "Disp. Sala", align: "center", minW: "70px",
+            info: "Salas comerciais e lojas disponíveis para venda. Clique no número para ver a lista." },
+          { field: "qtResTec", label: "Res.Téc.", align: "center", minW: "60px",
+            info: "Apartamentos e salas em reserva técnica. Não somam no Valor Estoque." },
+        ];
 
         return (
           <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
@@ -5235,52 +5277,44 @@ export function ExecutiveDashboard() {
                 herdados da aba CP (selectedOpTypes) — Resumo bate 100% com
                 CP/CR sem o usuario ter que sincronizar dois filtros. */}
 
-            {/* KPI Cards */}
+            {/* KPI Cards — os nomes são os da tabela (o cartão "Saldo" era o Lucro Realizado) e a
+                margem virou selo do lucro; o quarto cartão mostra o que ainda falta entrar. */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <CardPainel rotulo="Total Recebido" valor={formatCurrency(totRecebido)} cor="bg-emerald-500" />
               <CardPainel rotulo="Total Pago" valor={formatCurrency(totPago)} cor="bg-amber-500" />
-              <CardPainel rotulo="Saldo" valor={formatCurrency(totSaldo)} cor={totSaldo >= 0 ? "bg-blue-500" : "bg-red-500"} corValor={totSaldo < 0 ? "text-red-600 dark:text-red-300/80" : undefined} />
-              <CardPainel rotulo="Lucratividade" valor={`${totLucratividade.toFixed(2)}%`} cor="bg-violet-500" />
+              <CardPainel
+                rotulo="Lucro Realizado" valor={formatCurrency(totSaldo)} cor={totSaldo >= 0 ? "bg-blue-500" : "bg-red-500"}
+                corValor={totSaldo < 0 ? "text-red-600 dark:text-red-300/80" : undefined}
+                sub="recebido − pago"
+                selo={`margem ${pctResumo(totLucratividade, 2)}`}
+                corSelo={totLucratividade >= 0 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"}
+                dicaSelo="Margem = Lucro Realizado ÷ Total Recebido × 100"
+              />
+              <CardPainel rotulo="Ainda a Entrar" valor={formatCurrency(totAEntrar)} cor="bg-violet-500" sub="a receber + estoque à venda" />
             </div>
 
-            {/* Table */}
+            {/* Table — três blocos de colunas (Edielson, 10/11/2026, "algo resumido e fácil de
+                entender" para o Carlos Humberto): o que já aconteceu, o que ainda entra e o que
+                está à venda. Valores sempre completos, nunca abreviados. */}
             <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
+                      <TableRow className="border-b-0 hover:bg-transparent">
+                        <TableHead className="h-8 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" />
+                        {gruposResumo.map(g => (
+                          <TableHead key={g.rotulo} colSpan={g.colunas} className={`h-8 px-2 pb-0 pt-2 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-300 ${divisaResumo}`}>
+                            <span className="block border-b-2 border-slate-300 pb-1 dark:border-slate-600">{g.rotulo}</span>
+                          </TableHead>
+                        ))}
+                      </TableRow>
                       <TooltipProvider delayDuration={120}>
                       <TableRow>
-                        {[
-                          { field: "companyName", label: "Empresa", align: "left", minW: "180px", sticky: true },
-                          { field: "status", label: "Status", align: "center", minW: "80px",
-                            info: "Ativa ou finalizada, como está em Configurações › Empreendimentos. As finalizadas ficam no fim da lista." },
-                          { field: "totalRecebido", label: "Total Recebido", align: "right", minW: "130px",
-                            info: "Tudo o que já entrou no caixa, pelo valor líquido e pela data da baixa. É o mesmo número de CR › Contas Recebidas, com as empresas e o período escolhidos aqui em cima." },
-                          { field: "totalPago", label: "Total Pago", align: "right", minW: "130px",
-                            info: "Tudo o que já saiu do caixa, pelo valor líquido e pela data da baixa. É o mesmo número de CP › Contas Pagas, com as empresas e o período escolhidos aqui em cima." },
-                          { field: "lucroRealizado", label: "Lucro Realizado", align: "right", minW: "130px",
-                            info: "Cálculo: Total Recebido − Total Pago. É o que sobrou (ou faltou) do dinheiro que já entrou e saiu." },
-                          { field: "totalAReceber", label: "Total a Receber", align: "right", minW: "130px",
-                            info: isHolding
-                              ? "Saldo em aberto das parcelas a receber. Mostra a carteira inteira: não segue o filtro de anos e meses."
-                              : "Saldo das parcelas que vencem de hoje em diante, sem permuta e sem aluguel. Parcela já vencida não entra aqui: fica em Inadimplência. Mostra a carteira inteira: não segue o filtro de anos e meses." },
-                          { field: "valorEstoque", label: "Valor Estoque", align: "right", minW: "120px",
-                            info: "Soma do preço posto no painel para as unidades disponíveis. Unidade sem preço não soma. Clique no valor para ver as unidades e ajustar o preço." },
-                          { field: "lucroPotencial", label: "Lucro Potencial", align: "right", minW: "130px",
-                            info: "Cálculo: Total a Receber + Valor Estoque. É o que ainda pode entrar: o que já está vendido e falta receber, mais o que falta vender." },
-                          { field: "qtDispApto", label: "Disp. Ap.", align: "center", minW: "70px",
-                            info: "Apartamentos disponíveis para venda: os do Sienge, os liberados no painel e os cadastrados só no painel. Clique no número para ver a lista." },
-                          { field: "qtDispSala", label: "Disp. Sala", align: "center", minW: "70px",
-                            info: "Salas comerciais e lojas disponíveis para venda. Clique no número para ver a lista." },
-                          { field: "qtResTec", label: "Res.Téc.", align: "center", minW: "60px",
-                            info: "Apartamentos e salas em reserva técnica. Não somam no Valor Estoque." },
-                          { field: "lucratividade", label: "Lucratividade", align: "right", minW: "100px",
-                            info: "Cálculo: Lucro Realizado ÷ Total Recebido × 100. Quanto de cada R$ 100 recebidos virou lucro." },
-                        ].map(col => (
+                        {colunasResumo.map(col => (
                           <TableHead
                             key={col.field}
-                            className={`text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" : ""}`}
+                            className={`text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" : ""} ${col.inicio ? divisaResumo : ""}`}
                             style={{ minWidth: col.minW }}
                             onClick={() => toggleResumoSort(col.field)}
                           >
@@ -5318,89 +5352,78 @@ export function ExecutiveDashboard() {
                       </TooltipProvider>
                     </TableHeader>
                     <TableBody>
-                      {sorted.map(co => {
+                      {sorted.map((co, idx) => {
                         const lucroRealizado = co.totalRecebido - co.totalPago;
-                        const lucroPotencial = co.totalAReceber + co.valorEstoque;
-                        const lucratividade = co.totalRecebido > 0 ? (lucroRealizado / co.totalRecebido) * 100 : 0;
+                        const aEntrar = co.totalAReceber + co.valorEstoque;
+                        const margem = co.totalRecebido > 0 ? (lucroRealizado / co.totalRecebido) * 100 : 0;
                         const isFinalizada = co.status.toLowerCase().includes("finalizada");
+                        // As finalizadas vêm no fim, embaixo de um divisor (a coluna Status saiu).
+                        const abreFinalizadas = isFinalizada && idx > 0 && !sorted[idx - 1].status.toLowerCase().includes("finalizada");
                         const est = totaisEstoque.get(co.companyName);
                         const dicaEstoque = est && est.comPreco + est.semPreco > 0
                           ? `${est.comPreco} com preço no painel${est.semPreco > 0 ? ` · ${est.semPreco} sem preço (não somam)` : ""} · clique para ver e ajustar`
                           : "Clique para ver e ajustar o estoque";
+                        // Tem unidade à venda e nenhuma com preço: diz "sem preço" em vez de um traço mudo.
+                        const estoqueSemPreco = co.valorEstoque <= 0 && (est?.semPreco ?? 0) > 0;
 
                         return (
-                          <TableRow key={co.companyName} className={isFinalizada ? "bg-slate-50/50 dark:bg-slate-800/30 opacity-70" : "hover:bg-slate-50 dark:hover:bg-slate-800"}>
-                            <TableCell className="text-xs font-semibold text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10">
-                              {co.companyName}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Badge variant={isFinalizada ? "secondary" : "outline"} className={`text-[10px] ${isFinalizada ? "bg-slate-200 dark:bg-slate-700 text-slate-500" : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800"}`}>
-                                {co.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-xs font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(co.totalRecebido)}</TableCell>
-                            <TableCell className="text-xs font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
-                            <TableCell className={`text-xs font-bold text-right tabular-nums ${lucroRealizado >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
-                              {formatCurrency(lucroRealizado)}
-                            </TableCell>
-                            <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{formatCurrency(co.totalAReceber)}</TableCell>
-                            <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">
-                              <button type="button" onClick={() => abrirEstoque(co.companyName, "estoque")} className={linkEstoque} title={dicaEstoque} aria-label={`Abrir o estoque de ${co.companyName}`}>
-                                {co.valorEstoque > 0 ? formatCurrency(co.valorEstoque) : "-"}
-                              </button>
-                            </TableCell>
-                            <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{lucroPotencial > 0 ? formatCurrency(lucroPotencial) : "-"}</TableCell>
-                            <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">
-                              <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Apartamento")} className={linkEstoque} title="Ver os apartamentos disponíveis" aria-label={`Abrir os apartamentos disponíveis de ${co.companyName}`}>
-                                {co.qtDispApto > 0 ? co.qtDispApto : "-"}
-                              </button>
-                            </TableCell>
-                            <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">
-                              <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Sala comercial")} className={linkEstoque} title="Ver as salas comerciais disponíveis" aria-label={`Abrir as salas comerciais disponíveis de ${co.companyName}`}>
-                                {co.qtDispSala > 0 ? co.qtDispSala : "-"}
-                              </button>
-                            </TableCell>
-                            <TableCell className="text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">
-                              <button type="button" onClick={() => abrirEstoque(co.companyName, "reservadas")} className={linkEstoque} title="Ver as unidades reservadas" aria-label={`Abrir as unidades reservadas de ${co.companyName}`}>
-                                {co.qtResTec > 0 ? co.qtResTec : "-"}
-                              </button>
-                            </TableCell>
-                            <TableCell className="text-xs text-right tabular-nums">
-                              <div className="flex items-center justify-end gap-2">
-                                <div className="w-16 h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-                                  <div
-                                    className={`h-full rounded-full ${lucratividade >= 80 ? "bg-emerald-500" : lucratividade >= 50 ? "bg-blue-500" : lucratividade >= 20 ? "bg-amber-500" : "bg-red-400"}`}
-                                    style={{ width: `${Math.min(100, Math.max(0, lucratividade))}%` }}
-                                  />
-                                </div>
-                                <span className={`font-semibold ${lucratividade >= 50 ? "text-emerald-700 dark:text-emerald-400" : lucratividade >= 20 ? "text-amber-700 dark:text-amber-400" : "text-red-600 dark:text-red-300/70"}`}>
-                                  {lucratividade.toFixed(1)}%
-                                </span>
-                              </div>
-                            </TableCell>
-                          </TableRow>
+                          <React.Fragment key={co.companyName}>
+                            {abreFinalizadas && (
+                              <TableRow className="bg-slate-50 hover:bg-slate-50 dark:bg-slate-800/60 dark:hover:bg-slate-800/60">
+                                <TableCell colSpan={colunasResumo.length} className="py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Finalizadas</TableCell>
+                              </TableRow>
+                            )}
+                            <TableRow className={isFinalizada ? "bg-slate-50/50 dark:bg-slate-800/30 opacity-70" : "hover:bg-slate-50 dark:hover:bg-slate-800"}>
+                              <TableCell className="text-xs font-semibold text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10 whitespace-nowrap">
+                                {co.companyName}
+                              </TableCell>
+                              <TableCell className={`text-xs font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{formatCurrency(co.totalRecebido)}</TableCell>
+                              <TableCell className="text-xs font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
+                              <TableCell className={`text-xs font-bold text-right tabular-nums ${lucroRealizado >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
+                                {formatCurrency(lucroRealizado)}
+                              </TableCell>
+                              <TableCell className={`text-xs font-semibold text-right tabular-nums ${corMargemResumo(margem)}`}>
+                                {co.totalRecebido > 0 ? pctResumo(margem) : "-"}
+                              </TableCell>
+                              <TableCell className={`text-xs text-right tabular-nums text-slate-600 dark:text-slate-400 ${divisaResumo}`}>{co.totalAReceber > 0 ? formatCurrency(co.totalAReceber) : "-"}</TableCell>
+                              <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">
+                                <button type="button" onClick={() => abrirEstoque(co.companyName, "estoque")} className={linkEstoque} title={dicaEstoque} aria-label={`Abrir o estoque de ${co.companyName}`}>
+                                  {co.valorEstoque > 0 ? formatCurrency(co.valorEstoque) : estoqueSemPreco ? <span className="font-semibold text-amber-700 dark:text-amber-300">sem preço</span> : "-"}
+                                </button>
+                              </TableCell>
+                              <TableCell className="text-xs font-semibold text-right tabular-nums text-slate-800 dark:text-slate-100">{aEntrar > 0 ? formatCurrency(aEntrar) : "-"}</TableCell>
+                              <TableCell className={`text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400 ${divisaResumo}`}>
+                                <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Apartamento")} className={linkEstoque} title="Ver os apartamentos disponíveis" aria-label={`Abrir os apartamentos disponíveis de ${co.companyName}`}>
+                                  {co.qtDispApto > 0 ? co.qtDispApto : "-"}
+                                </button>
+                              </TableCell>
+                              <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">
+                                <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Sala comercial")} className={linkEstoque} title="Ver as salas comerciais disponíveis" aria-label={`Abrir as salas comerciais disponíveis de ${co.companyName}`}>
+                                  {co.qtDispSala > 0 ? co.qtDispSala : "-"}
+                                </button>
+                              </TableCell>
+                              <TableCell className="text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">
+                                <button type="button" onClick={() => abrirEstoque(co.companyName, "reservadas")} className={linkEstoque} title="Ver as unidades reservadas" aria-label={`Abrir as unidades reservadas de ${co.companyName}`}>
+                                  {co.qtResTec > 0 ? co.qtResTec : "-"}
+                                </button>
+                              </TableCell>
+                            </TableRow>
+                          </React.Fragment>
                         );
                       })}
                       {/* Total Row */}
                       <TableRow className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 font-semibold">
                         <TableCell className="text-sm font-semibold text-slate-800 dark:text-slate-100 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10">Total</TableCell>
-                        <TableCell />
-                        <TableCell className="text-sm font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400">{formatCurrency(totRecebido)}</TableCell>
+                        <TableCell className={`text-sm font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{formatCurrency(totRecebido)}</TableCell>
                         <TableCell className="text-sm font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(totPago)}</TableCell>
                         <TableCell className={`text-sm font-semibold text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</TableCell>
-                        <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">
-                          {formatCurrency(sorted.reduce((s, c) => s + c.totalAReceber, 0))}
-                        </TableCell>
-                        <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">
-                          {formatCurrency(sorted.reduce((s, c) => s + c.valorEstoque, 0))}
-                        </TableCell>
-                        <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">
-                          {formatCurrency(sorted.reduce((s, c) => s + c.totalAReceber + c.valorEstoque, 0))}
-                        </TableCell>
-                        <TableCell className="text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDispApto, 0)}</TableCell>
+                        <TableCell className={`text-sm font-semibold text-right tabular-nums ${corMargemResumo(totLucratividade)}`}>{totRecebido > 0 ? pctResumo(totLucratividade, 2) : "-"}</TableCell>
+                        <TableCell className={`text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{formatCurrency(totAReceber)}</TableCell>
+                        <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">{formatCurrency(totEstoque)}</TableCell>
+                        <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-900 dark:text-slate-50">{formatCurrency(totAEntrar)}</TableCell>
+                        <TableCell className={`text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{sorted.reduce((s, c) => s + c.qtDispApto, 0)}</TableCell>
                         <TableCell className="text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDispSala, 0)}</TableCell>
                         <TableCell className="text-sm font-bold text-center tabular-nums text-slate-600 dark:text-slate-400">{sorted.reduce((s, c) => s + c.qtResTec, 0)}</TableCell>
-                        <TableCell className="text-sm font-semibold text-right tabular-nums text-violet-700 dark:text-violet-400">{totLucratividade.toFixed(2)}%</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
