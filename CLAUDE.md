@@ -796,6 +796,19 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   `src/lib/estoque-resumo.ts`), não mais pelo nome; ver a seção seguinte
 - Empresas Finalizadas sempre no final da tabela (case-insensitive)
 - Status Ativa/Finalizada vem de Configurações > Empreendimentos
+- **"i" de informação em cada coluna (Edielson, 10/11/2026: "deixando o mouse em cima, ele
+  mostra de onde vem esse valor ou qual é o cálculo").** Todas as colunas menos Empresa
+  têm o ícone ao lado do título; a dica (`Tooltip` do `ui/tooltip`, texto no campo `info`
+  da lista de colunas em `executive-dashboard.tsx`) diz o que é e a conta: Lucro
+  Realizado = Total Recebido − Total Pago; Lucro Potencial = Total a Receber + Valor
+  Estoque; Lucratividade = Lucro Realizado ÷ Total Recebido × 100; Total a Receber =
+  parcelas a vencer, sem permuta e sem aluguel (vencida fica em Inadimplência; não segue
+  anos/meses). Coluna nova ou regra que mudar: atualizar o `info` junto. Clicar no "i"
+  não ordena. Para caber, o título fica em uma linha (`whitespace-nowrap`) e **a seta
+  de ordenação aparece só na coluna ordenada**: com a seta apagada em todas, a tabela
+  passava 107 px da tela a 1848 px. Sem rolagem lateral a 1848 e 1920 com o menu aberto.
+  Por isso o Tetra mostrava Lucro Potencial = Valor Estoque em 10/11: o Total a Receber
+  dele é R$ 0,00 (a única parcela em aberto, título 1063, venceu em 20/05/2026).
 
 ## Resumo › Estoque por unidade: modal editável (Edielson, 09/11/2026)
 
@@ -956,9 +969,14 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     1801 sem preço não soma); as demais empresas ficam com "-" até terem preço. Em
     produção fica o que estiver digitado lá (no 135 Jardins havia R$ 4.250.000,00 em 5
     apartamentos).
-  - **Não mudou:** o "VGV potencial" do Comercial › Visão Geral continua sendo a
-    estimativa área × fator × CUB (cartão rotulado como estimado) e o Orçamento
-    (m² × fator × CUB) não tem relação com isto.
+  - **VGV potencial do Comercial › Visão Geral também (Edielson, 10/11: "Sim, trocar").**
+    Era a estimativa área × fator × CUB sobre o estoque cru do Sienge; agora é
+    `totaisDoEstoque(linhasDeEstoque(...)).valorEstoque` com as empresas do filtro do
+    Comercial — o mesmo Valor Estoque do Resumo (situação com tabela comercial e ajuste
+    manual, unidades só do painel, preço do painel). A nota do cartão diz quantas
+    unidades têm preço e quantas não somam; a "Área privativa" passou a somar as mesmas
+    unidades (apartamentos e salas disponíveis). Local: R$ 45,4 mi, igual ao total do
+    Resumo. O Orçamento (m² × fator × CUB) não tem relação com isto e não mudou.
   - Trava: itens 1 a 5 de `estoque-resumo.test.ts` e 3 e 7 de `unidades-painel.test.ts`.
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.

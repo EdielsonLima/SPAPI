@@ -37,7 +37,9 @@ import {
   BarChart3,
   LayoutGrid,
   Landmark,
+  Info,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   BarChart,
   Bar,
@@ -5247,39 +5249,73 @@ export function ExecutiveDashboard() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
+                      <TooltipProvider delayDuration={120}>
                       <TableRow>
                         {[
                           { field: "companyName", label: "Empresa", align: "left", minW: "180px", sticky: true },
-                          { field: "status", label: "Status", align: "center", minW: "80px" },
-                          { field: "totalRecebido", label: "Total Recebido", align: "right", minW: "130px" },
-                          { field: "totalPago", label: "Total Pago", align: "right", minW: "130px" },
-                          { field: "lucroRealizado", label: "Lucro Realizado", align: "right", minW: "130px" },
-                          { field: "totalAReceber", label: "Total a Receber", align: "right", minW: "130px" },
-                          { field: "valorEstoque", label: "Valor Estoque", align: "right", minW: "120px" },
-                          { field: "lucroPotencial", label: "Lucro Potencial", align: "right", minW: "130px" },
-                          { field: "qtDispApto", label: "Disp. Ap.", align: "center", minW: "70px", dica: "Apartamentos disponíveis" },
-                          { field: "qtDispSala", label: "Disp. Sala", align: "center", minW: "70px", dica: "Salas comerciais disponíveis" },
-                          { field: "qtResTec", label: "Res.Téc.", align: "center", minW: "60px" },
-                          { field: "lucratividade", label: "Lucratividade", align: "right", minW: "100px" },
+                          { field: "status", label: "Status", align: "center", minW: "80px",
+                            info: "Ativa ou finalizada, como está em Configurações › Empreendimentos. As finalizadas ficam no fim da lista." },
+                          { field: "totalRecebido", label: "Total Recebido", align: "right", minW: "130px",
+                            info: "Tudo o que já entrou no caixa, pelo valor líquido e pela data da baixa. É o mesmo número de CR › Contas Recebidas, com as empresas e o período escolhidos aqui em cima." },
+                          { field: "totalPago", label: "Total Pago", align: "right", minW: "130px",
+                            info: "Tudo o que já saiu do caixa, pelo valor líquido e pela data da baixa. É o mesmo número de CP › Contas Pagas, com as empresas e o período escolhidos aqui em cima." },
+                          { field: "lucroRealizado", label: "Lucro Realizado", align: "right", minW: "130px",
+                            info: "Cálculo: Total Recebido − Total Pago. É o que sobrou (ou faltou) do dinheiro que já entrou e saiu." },
+                          { field: "totalAReceber", label: "Total a Receber", align: "right", minW: "130px",
+                            info: isHolding
+                              ? "Saldo em aberto das parcelas a receber. Mostra a carteira inteira: não segue o filtro de anos e meses."
+                              : "Saldo das parcelas que vencem de hoje em diante, sem permuta e sem aluguel. Parcela já vencida não entra aqui: fica em Inadimplência. Mostra a carteira inteira: não segue o filtro de anos e meses." },
+                          { field: "valorEstoque", label: "Valor Estoque", align: "right", minW: "120px",
+                            info: "Soma do preço posto no painel para as unidades disponíveis. Unidade sem preço não soma. Clique no valor para ver as unidades e ajustar o preço." },
+                          { field: "lucroPotencial", label: "Lucro Potencial", align: "right", minW: "130px",
+                            info: "Cálculo: Total a Receber + Valor Estoque. É o que ainda pode entrar: o que já está vendido e falta receber, mais o que falta vender." },
+                          { field: "qtDispApto", label: "Disp. Ap.", align: "center", minW: "70px",
+                            info: "Apartamentos disponíveis para venda: os do Sienge, os liberados no painel e os cadastrados só no painel. Clique no número para ver a lista." },
+                          { field: "qtDispSala", label: "Disp. Sala", align: "center", minW: "70px",
+                            info: "Salas comerciais e lojas disponíveis para venda. Clique no número para ver a lista." },
+                          { field: "qtResTec", label: "Res.Téc.", align: "center", minW: "60px",
+                            info: "Apartamentos e salas em reserva técnica. Não somam no Valor Estoque." },
+                          { field: "lucratividade", label: "Lucratividade", align: "right", minW: "100px",
+                            info: "Cálculo: Lucro Realizado ÷ Total Recebido × 100. Quanto de cada R$ 100 recebidos virou lucro." },
                         ].map(col => (
                           <TableHead
                             key={col.field}
                             className={`text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" : ""}`}
                             style={{ minWidth: col.minW }}
-                            title={col.dica}
                             onClick={() => toggleResumoSort(col.field)}
                           >
-                            <span className="inline-flex items-center gap-1">
+                            <span className="inline-flex items-center gap-1 whitespace-nowrap">
                               {col.label}
-                              {resumoSort.field === col.field ? (
+                              {/* "i" de informação (Edielson, 10/11/2026): passando o mouse, diz o que é
+                                  a coluna e que conta é feita. Não ordena ao clicar. */}
+                              {col.info && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      type="button"
+                                      onClick={e => e.stopPropagation()}
+                                      aria-label={`O que é ${col.label}`}
+                                      className="rounded-full text-slate-400 transition-colors hover:text-slate-700 focus-visible:text-slate-700 focus-visible:outline-none dark:text-slate-500 dark:hover:text-slate-200 dark:focus-visible:text-slate-200"
+                                    >
+                                      <Info className="h-3 w-3" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="bottom" className="max-w-[280px] bg-slate-900 px-3 py-2 text-left text-xs font-normal normal-case leading-snug tracking-normal text-slate-50 dark:bg-slate-100 dark:text-slate-900">
+                                    <p className="mb-0.5 font-semibold">{col.label}</p>
+                                    <p>{col.info}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              )}
+                              {/* A seta aparece só na coluna ordenada: com o "i" em todas, a seta apagada de
+                                  cada coluna deixava a tabela mais larga que a tela (rolagem lateral a 1848 px). */}
+                              {resumoSort.field === col.field && (
                                 resumoSort.dir === "asc" ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
-                              ) : (
-                                <ArrowUpDown className="h-3 w-3 opacity-30" />
                               )}
                             </span>
                           </TableHead>
                         ))}
                       </TableRow>
+                      </TooltipProvider>
                     </TableHeader>
                     <TableBody>
                       {sorted.map(co => {

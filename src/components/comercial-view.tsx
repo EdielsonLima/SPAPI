@@ -29,8 +29,8 @@ import { CorretoresView } from "@/components/corretores-view";
 import { TabelaPrecosView } from "@/components/tabela-precos-view";
 import { semVenda } from "@/lib/tabela-precos";
 import { aplicarTabelaComercial, precoDaTabelaComercial, tabelaComercialPara } from "@/lib/tabela-comercial";
-import { aplicarSituacaoManual, contaNoEstoque } from "@/lib/estoque-resumo";
-import { unidadesComPainel } from "@/lib/unidades-painel";
+import { aplicarSituacaoManual, linhasDeEstoque, totaisDoEstoque } from "@/lib/estoque-resumo";
+import { unidadesComPainel, precosComPainel } from "@/lib/unidades-painel";
 import { useComercial, COMPANY_KEY, YEARS_KEY } from "@/components/comercial-provider";
 import { useCompanyMode } from "@/lib/company-context";
 import { SITUACOES, situacaoDaUnidade, ehVendida } from "@/lib/situacao-unidade";
@@ -55,7 +55,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
   const router = useRouter();
   const { isHolding } = useCompanyMode();
   const {
-    salesContracts, apiUnits, comissoes, cubData, companySettings, chartColors,
+    salesContracts, apiUnits, comissoes, chartColors,
     loading, refreshing, lastUpdate, refresh,
     allCompanyNames, availableYears,
     selectedCompanies, setSelectedCompanies,
@@ -486,20 +486,19 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
         const ovDispUn = ovUnits.filter(u => u.status === "Disponível").length;
         const ovPctVend = ovTotalUn > 0 ? (ovVendidasUn / ovTotalUn) * 100 : 0;
 
-        // VGV potencial do estoque disponível: área privativa × fator × CUB
-        // (mesma regra do Resumo Financeiro — apartamento e sala comercial, pelo
-        // tipo do cadastro do Sienge: contaNoEstoque em src/lib/estoque-resumo.ts),
-        // com as salas cadastradas só no painel (src/lib/unidades-painel.ts)
-        let ovEstoqueArea = 0;
-        let ovEstoqueVgv = 0;
-        unidadesComPainel(apiUnits, unidadesPainel).forEach(u => {
-          if (u.commercialStock !== "Disponível") return;
-          if (selectedCompanies.size > 0 && u.companyName && !selectedCompanies.has(u.companyName)) return;
-          if (!contaNoEstoque(u)) return;
-          ovEstoqueArea += u.privateArea || 0;
-          const factor = companySettings.find(cs => cs.companyName === u.companyName)?.factor || 0;
-          ovEstoqueVgv += (u.privateArea || 0) * factor * (cubData?.currentValue || 0);
-        });
+        // VGV potencial = o Valor Estoque do Resumo Financeiro: soma do preço posto no
+        // painel das unidades Disponíveis (regra única em src/lib/estoque-resumo.ts: situação
+        // com tabela comercial e ajuste manual, mais as unidades cadastradas só no painel).
+        // Sem preço a unidade não soma. Até 10/11/2026 era estimativa (área privativa ×
+        // fator × CUB); Edielson, 10/11: "nós vamos trabalhar somente com o valor aqui do painel".
+        const ovLinhasEstoque = linhasDeEstoque(
+          unidadesComPainel(apiUnits, unidadesPainel).filter(u => selectedCompanies.size === 0 || !u.companyName || selectedCompanies.has(u.companyName)),
+          { precos: precosComPainel(precosTabela, unidadesPainel), tabelasComerciais, situacoesManuais },
+        );
+        const ovEstoque = totaisDoEstoque(ovLinhasEstoque);
+        const ovEstoqueVgv = ovEstoque.valorEstoque;
+        // Área dos apartamentos e salas disponíveis (as mesmas unidades de Disp. Ap. e Disp. Sala do Resumo).
+        const ovEstoqueArea = ovLinhasEstoque.reduce((soma, l) => soma + (l.situacao === "Disponível" && l.entraNaContagem ? l.area : 0), 0);
 
         // Evolução anual (só contratos ativos)
         const ovYearMap = new Map<string, { value: number; count: number }>();
@@ -707,7 +706,7 @@ export function ComercialView({ aba }: { aba: ComercialAba }) {
                   </div>
                 </div>
                 <p className="text-[10px] text-slate-400 leading-snug">
-                  VGV potencial estimado: área privativa × fator da empresa × CUB atual{cubData?.currentMonth ? ` (${cubData.currentMonth})` : ""}. Considera só unidades tipo apartamento.
+                  VGV potencial: soma do preço posto no painel (Resumo › Estoque) {ovEstoque.comPreco === 1 ? "da unidade disponível" : `das ${ovEstoque.comPreco} unidades disponíveis`} com preço{ovEstoque.semPreco > 0 ? `; ${ovEstoque.semPreco} sem preço ${ovEstoque.semPreco === 1 ? "não soma" : "não somam"}` : ""}. Área: apartamentos e salas disponíveis.
                 </p>
                 <div className="flex items-center text-xs font-semibold text-emerald-600">
                   Ver unidades disponíveis <ChevronRight className="h-3.5 w-3.5 ml-0.5" />
