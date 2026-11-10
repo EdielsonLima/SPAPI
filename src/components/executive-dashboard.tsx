@@ -292,12 +292,12 @@ export function ExecutiveDashboard() {
   const [apiUnits, setApiUnits] = useState<ApiUnit[]>(() => cacheInicial?.apiUnits ?? []);
   const [cubData, setCubData] = useState<{ currentValue: number; currentMonth: string; monthlyVariation: number; yearlyAccumulated: number } | null>(null);
   const [companySettings, setCompanySettings] = useState<{ companyId: number; companyName: string; areaM2: number; factor: number; status: string; controlaOrcamento?: boolean }[]>([]);
-  // Estoque do Resumo (Valor Estoque, Disp., Res.Téc.): preço de tabela do painel,
+  // Estoque do Resumo (Valor Estoque, Disp. Ap., Disp. Sala, Res.Téc.): preço de tabela do painel,
   // tabela comercial e situação manual por cima do Sienge — regra única em
   // src/lib/estoque-resumo.ts. Clicar numa das três colunas abre o modal da empresa.
   // Entram também as salas cadastradas só no painel (src/lib/unidades-painel.ts).
   const dadosEstoque = useDadosEstoque();
-  const [estoqueAberto, setEstoqueAberto] = useState<{ empresa: string; filtro: FiltroEstoque } | null>(null);
+  const [estoqueAberto, setEstoqueAberto] = useState<{ empresa: string; filtro: FiltroEstoque; tipo?: string } | null>(null);
   const totaisEstoque = useMemo(() => totaisPorEmpresa(linhasDeEstoque(unidadesComPainel(apiUnits, dadosEstoque.unidadesPainel), {
     precos: dadosEstoque.precos,
     tabelasComerciais: dadosEstoque.tabelasComerciais,
@@ -5103,7 +5103,8 @@ export function ExecutiveDashboard() {
           totalRecebido: number;
           totalPago: number;
           totalAReceber: number;
-          qtDisp: number;
+          qtDispApto: number;
+          qtDispSala: number;
           qtResTec: number;
           valorEstoque: number;
           status: string;
@@ -5126,7 +5127,8 @@ export function ExecutiveDashboard() {
             totalRecebido: 0,
             totalPago: 0,
             totalAReceber: 0,
-            qtDisp: 0,
+            qtDispApto: 0,
+            qtDispSala: 0,
             qtResTec: 0,
             valorEstoque: 0,
             status: companySettings.find(cs => cs.companyName === co)?.status || "Ativa",
@@ -5178,13 +5180,16 @@ export function ExecutiveDashboard() {
         // src/lib/estoque-resumo.ts (a mesma do modal Estoque). Apartamento e
         // sala comercial (tipo do cadastro do Sienge) contam em Disp./Res.Téc.;
         // sem preço de tabela somam área × fator × CUB. Os demais tipos só somam com preço.
+        // Disponíveis em duas colunas, Disp. Ap. e Disp. Sala (Edielson, 10/11/2026: os
+        // 11 do 135 Jardins eram 5 apartamentos e 6 salas e a coluna única não dizia).
         totaisEstoque.forEach((t, co) => {
           if (!companySummary[co]) return;
-          companySummary[co].qtDisp = t.qtDisp;
+          companySummary[co].qtDispApto = t.qtDispApto;
+          companySummary[co].qtDispSala = t.qtDispSala;
           companySummary[co].qtResTec = t.qtResTec;
           companySummary[co].valorEstoque = t.valorEstoque;
         });
-        const abrirEstoque = (empresa: string, filtro: FiltroEstoque) => setEstoqueAberto({ empresa, filtro });
+        const abrirEstoque = (empresa: string, filtro: FiltroEstoque, tipo?: string) => setEstoqueAberto({ empresa, filtro, tipo });
         const linkEstoque = "tabular-nums underline decoration-dotted decoration-slate-300 dark:decoration-slate-600 underline-offset-4 hover:text-primary hover:decoration-primary transition-colors";
 
         // Sort: Ativa first, then by selected field
@@ -5253,7 +5258,8 @@ export function ExecutiveDashboard() {
                           { field: "totalAReceber", label: "Total a Receber", align: "right", minW: "130px" },
                           { field: "valorEstoque", label: "Valor Estoque", align: "right", minW: "120px" },
                           { field: "lucroPotencial", label: "Lucro Potencial", align: "right", minW: "130px" },
-                          { field: "qtDisp", label: "Disp.", align: "center", minW: "60px" },
+                          { field: "qtDispApto", label: "Disp. Ap.", align: "center", minW: "70px", dica: "Apartamentos disponíveis" },
+                          { field: "qtDispSala", label: "Disp. Sala", align: "center", minW: "70px", dica: "Salas comerciais disponíveis" },
                           { field: "qtResTec", label: "Res.Téc.", align: "center", minW: "60px" },
                           { field: "lucratividade", label: "Lucratividade", align: "right", minW: "100px" },
                         ].map(col => (
@@ -5261,6 +5267,7 @@ export function ExecutiveDashboard() {
                             key={col.field}
                             className={`text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"} ${col.sticky ? "sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" : ""}`}
                             style={{ minWidth: col.minW }}
+                            title={col.dica}
                             onClick={() => toggleResumoSort(col.field)}
                           >
                             <span className="inline-flex items-center gap-1">
@@ -5309,8 +5316,13 @@ export function ExecutiveDashboard() {
                             </TableCell>
                             <TableCell className="text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">{lucroPotencial > 0 ? formatCurrency(lucroPotencial) : "-"}</TableCell>
                             <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">
-                              <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis")} className={linkEstoque} title="Ver as unidades disponíveis" aria-label={`Abrir as unidades disponíveis de ${co.companyName}`}>
-                                {co.qtDisp > 0 ? co.qtDisp : "-"}
+                              <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Apartamento")} className={linkEstoque} title="Ver os apartamentos disponíveis" aria-label={`Abrir os apartamentos disponíveis de ${co.companyName}`}>
+                                {co.qtDispApto > 0 ? co.qtDispApto : "-"}
+                              </button>
+                            </TableCell>
+                            <TableCell className="text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400">
+                              <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Sala comercial")} className={linkEstoque} title="Ver as salas comerciais disponíveis" aria-label={`Abrir as salas comerciais disponíveis de ${co.companyName}`}>
+                                {co.qtDispSala > 0 ? co.qtDispSala : "-"}
                               </button>
                             </TableCell>
                             <TableCell className="text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">
@@ -5350,7 +5362,8 @@ export function ExecutiveDashboard() {
                         <TableCell className="text-sm font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">
                           {formatCurrency(sorted.reduce((s, c) => s + c.totalAReceber + c.valorEstoque, 0))}
                         </TableCell>
-                        <TableCell className="text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDisp, 0)}</TableCell>
+                        <TableCell className="text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDispApto, 0)}</TableCell>
+                        <TableCell className="text-sm font-bold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDispSala, 0)}</TableCell>
                         <TableCell className="text-sm font-bold text-center tabular-nums text-slate-600 dark:text-slate-400">{sorted.reduce((s, c) => s + c.qtResTec, 0)}</TableCell>
                         <TableCell className="text-sm font-semibold text-right tabular-nums text-violet-700 dark:text-violet-400">{totLucratividade.toFixed(2)}%</TableCell>
                       </TableRow>
@@ -5365,6 +5378,7 @@ export function ExecutiveDashboard() {
                 key={estoqueAberto.empresa}
                 empresa={estoqueAberto.empresa}
                 filtroInicial={estoqueAberto.filtro}
+                tipoInicial={estoqueAberto.tipo}
                 unidades={apiUnits}
                 dados={dadosEstoque}
                 fator={companySettings.find(cs => cs.companyName === estoqueAberto.empresa)?.factor || 0}

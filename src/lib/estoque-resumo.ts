@@ -146,7 +146,9 @@ export function linhasDeEstoque(unidades: ApiUnit[], ctx: ContextoEstoque): Linh
 }
 
 export interface TotaisEstoque {
-  qtDisp: number;          // coluna Disp.
+  qtDisp: number;          // apartamentos + salas disponíveis (qtDispApto + qtDispSala)
+  qtDispApto: number;      // coluna Disp. Ap.
+  qtDispSala: number;      // coluna Disp. Sala
   qtResTec: number;        // coluna Res.Téc.
   valorEstoque: number;    // coluna Valor Estoque
   comPreco: number;        // disponíveis somadas pelo preço
@@ -159,7 +161,7 @@ export interface TotaisEstoque {
 }
 
 export const TOTAIS_VAZIOS: TotaisEstoque = {
-  qtDisp: 0, qtResTec: 0, valorEstoque: 0, comPreco: 0, valorComPreco: 0,
+  qtDisp: 0, qtDispApto: 0, qtDispSala: 0, qtResTec: 0, valorEstoque: 0, comPreco: 0, valorComPreco: 0,
   estimadas: 0, valorEstimado: 0, semValor: 0, foraDaContagem: 0, valorReservado: 0,
 };
 
@@ -167,7 +169,11 @@ export function totaisDoEstoque(linhas: LinhaEstoque[]): TotaisEstoque {
   const t = { ...TOTAIS_VAZIOS };
   for (const l of linhas) {
     if (l.situacao === "Disponível") {
-      if (l.entraNaContagem) t.qtDisp++;
+      if (l.entraNaContagem) {
+        t.qtDisp++;
+        // Uma coluna para cada no Resumo (Edielson, 10/11/2026: "disp ap e disp sala").
+        if (grupoDoTipo(l.tipo) === "Sala comercial") t.qtDispSala++; else t.qtDispApto++;
+      }
       t.valorEstoque += l.valorEstoque;
       if (l.preco !== null) {
         t.comPreco++;

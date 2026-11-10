@@ -39,6 +39,8 @@ const rozza = [
   const linhas = linhasDeEstoque(rozza, ctx());
   const t = totaisDoEstoque(linhas);
   assert.equal(t.qtDisp, 2);                                  // 901 + SALA 01
+  assert.equal(t.qtDispApto, 1);                              // coluna Disp. Ap. do Resumo
+  assert.equal(t.qtDispSala, 1);                              // coluna Disp. Sala
   assert.equal(t.qtResTec, 1);
   perto(t.valorEstoque, 137.75 * 1.2 * CUB + 80 * 1.2 * CUB); // os dois pela estimativa
   assert.equal(t.estimadas, 2);
@@ -233,6 +235,8 @@ assert.equal(composicaoPorTipo(linhasDeEstoque(rozza, ctx()).filter(l => l.situa
   const depoisLinhas = linhasDeEstoque(jardins, ctx({ precos, situacoesManuais: liberadas }));
   const depois = totaisDoEstoque(depoisLinhas);
   assert.equal(depois.qtDisp, 3);
+  assert.equal(depois.qtDispApto, 3); // as duas liberadas entram na coluna Disp. Ap.
+  assert.equal(depois.qtDispSala, 0); // a única sala está vendida
   assert.equal(depois.qtResTec, 0);
   perto(depois.valorEstoque, antes.valorEstoque + 8_500_000);
   const l2901 = depoisLinhas.find(l => l.unidade === "2901")!;
@@ -247,6 +251,21 @@ assert.equal(composicaoPorTipo(linhasDeEstoque(rozza, ctx()).filter(l => l.situa
   assert.equal(segurada.situacao, "Vendido");
   assert.equal(situacaoParaLiberar(segurada), "auto");
   assert.equal(liberadaNoPainel(segurada), false);
+}
+
+// ── 8. Disp. Ap. + Disp. Sala = Disp., em qualquer mistura ──
+{
+  const mistura = [
+    un("X", "101", "Disponível", 100), un("X", "102", "Disponível", 100, "Apartamento (Permuta)"),
+    un("X", "SALA 01", "Disponível", 50, "Salas Comerciais"), un("X", "LOJA 02", "Disponível", 50, "Loja"),
+    un("X", "SALA 03", "Disponível", 50, "Sala Comercial (Permuta)"),
+    un("X", "G 1", "Disponível", 12, "Vaga de Garagem Simples"), un("X", "SALA 04", "Reserva Técnica", 50, "Salas Comerciais"),
+  ];
+  const t = totaisDoEstoque(linhasDeEstoque(mistura, ctx()));
+  assert.equal(t.qtDispApto, 2);
+  assert.equal(t.qtDispSala, 3);
+  assert.equal(t.qtDisp, t.qtDispApto + t.qtDispSala); // vaga fora das duas
+  assert.equal(t.qtResTec, 1);
 }
 
 console.log("estoque-resumo: ok");

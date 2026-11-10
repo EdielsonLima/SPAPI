@@ -166,9 +166,10 @@ function Cartao({ rotulo, valor, sub, cor, alerta }: { rotulo: string; valor: st
   );
 }
 
-export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dados, fator, cub, cubMes, onFechar }: {
+export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, unidades, dados, fator, cub, cubMes, onFechar }: {
   empresa: string;
   filtroInicial?: FiltroEstoque;
+  tipoInicial?: string;         // grupo do tipo com que abre ("Sala comercial" ao clicar em Disp. Sala); sem ele, a regra de sempre
   unidades: ApiUnit[];          // todas as unidades carregadas; o modal fica com as da empresa
   dados: DadosEstoque;
   fator: number;                // fator da empresa em Configurações › Empreendimentos
@@ -396,7 +397,10 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", unidades, dad
   // Tipo: abre só com os apartamentos (Edielson, 10/11/2026). Se a lista com que o
   // modal abre não tem apartamento (o estoque da Tesla é só sala, vaga e box), abre
   // com todos os tipos, senão viria vazia. Decidido uma vez, na abertura.
-  const [grupo, setGrupo] = useState(() => grupoInicialDoModal(salvas.filter(FILTROS.find(f => f.chave === filtroInicial)!.passa)));
+  // A coluna clicada no Resumo pode pedir o tipo (Disp. Ap., Disp. Sala), se a empresa tiver unidade dele.
+  const [grupo, setGrupo] = useState(() =>
+    tipoInicial && salvas.some(l => grupoDoTipo(l.tipo) === tipoInicial) ? tipoInicial
+      : grupoInicialDoModal(salvas.filter(FILTROS.find(f => f.chave === filtroInicial)!.passa)));
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<{ coluna: Coluna; dir: "asc" | "desc" }>({ coluna: "padrao", dir: "asc" });
 

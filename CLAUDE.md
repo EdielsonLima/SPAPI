@@ -789,7 +789,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
 - Total Pago usa filtro de Tipo Operação do próprio Resumo (não per-company)
 - Total Recebido vem de income payments (netAmount > 0)
 - Lucro Realizado = Total Recebido - Total Pago
-- Coluna Disp. conta apartamento e sala comercial (exclui vagas e boxes) — desde
+- Colunas Disp. Ap. e Disp. Sala (uma coluna só, "Disp.", até 10/11/2026) contam
+  apartamento e sala comercial (excluem vagas e boxes) — desde
   09/11/2026 pelo TIPO do cadastro do Sienge (`contaNoEstoque` em
   `src/lib/estoque-resumo.ts`), não mais pelo nome; ver a seção seguinte
 - Empresas Finalizadas sempre no final da tabela (case-insensitive)
@@ -918,6 +919,18 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     caíam em "Reservadas" e não em "Disponíveis". Teste local (dados de 08/11), liberando
     as duas a R$ 4.250.000,00: Disp. 9 → 11, Res.Téc. 2 → 0, Valor Estoque
     R$ 5.014.312,64 → R$ 13.514.312,64.
+- **Disp. Ap. e Disp. Sala (Edielson, 10/11/2026: "essa disponibilidade do 135 Jardins de
+  11, ela é 5 apartamentos e 6 salas [...] coloque uma coluna para cada um").** A coluna
+  única "Disp." do Resumo virou duas, uma depois da outra: **Disp. Ap.** e **Disp. Sala**
+  (`qtDispApto` e `qtDispSala` em `totaisDoEstoque`; `qtDisp` continua sendo a soma e é o
+  cartão "Disponíveis" do modal). Sala = grupo "Sala comercial" do `grupoDoTipo`; o resto
+  do que conta é apartamento. Clicar numa abre o modal em Disponíveis já no tipo da
+  coluna (`tipoInicial` do `EstoqueModal`; se a empresa não tem unidade do tipo, vale a
+  regra de abrir em apartamentos). Res.Téc. continua uma coluna só (apartamento + sala).
+  Trava: itens 1, 7 e 8 de `estoque-resumo.test.ts`. Local em 10/11 (dados de 08/11, sem
+  as liberações de produção): 135 Jardins 3 e 6, Tesla – e 3, Siena 6 e 4, Hannover 3 e
+  2; total 32 e 15 (os 47 da coluna antiga). A 1366 px com o menu aberto a tabela do
+  Resumo já rolava para o lado antes (11 colunas) e continua rolando.
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
 
