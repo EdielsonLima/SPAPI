@@ -89,9 +89,25 @@ function getTabGroup(tab: MainTab): string {
     default: return tab;
   }
 }
-function companyStorageKey(tab: MainTab): string {
-  return `dashboard_companies_${getTabGroup(tab)}`;
+// Chave do "Salvar padrão" de cada aba. O Resumo passou a "resumo_v2" em
+// 10/11/2026 (Edielson: o Resumo abre para todo mundo com as 10 obras, os tipos
+// de documento sem previsão e todos os anos) — um padrão salvo antes não vale mais.
+function grupoDoPadraoSalvo(tab: MainTab): string {
+  const g = getTabGroup(tab);
+  return g === "resumo" ? "resumo_v2" : g;
 }
+function companyStorageKey(tab: MainTab): string {
+  return `dashboard_companies_${grupoDoPadraoSalvo(tab)}`;
+}
+// Anos do padrão do painel: os últimos 10 + o atual (2016–2026 em 2026).
+function anosPadraoDoPainel(anoAtual: number): Set<string> {
+  const anos: string[] = [];
+  for (let y = anoAtual - 10; y <= anoAtual; y++) anos.push(String(y));
+  return new Set(anos);
+}
+// Tipos de operação fora do padrão (mesma lista de contas-table.tsx): o Sienge
+// "(por Credor) Sintético" não soma no Líquido (validado em 09/05/2026, 12 empresas).
+const OP_TYPES_FORA_DO_PADRAO = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
 
 // Aluguel (locação) — MESMA regra da página Aluguéis (src/lib/alugueis-utils.ts:
 // isAluguel), duplicada de propósito para não importar aqui o módulo isolado da
@@ -256,15 +272,8 @@ export function ExecutiveDashboard() {
     gridStroke: isDark ? "rgba(148,163,184,0.08)" : "#e2e8f0",
   }), [isDark]);
   const [section, setSection] = useState<Section>("cp");
-  const [selectedYears, setSelectedYears] = useState<Set<string>>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("dashboard_default_years");
-      if (saved) return new Set(JSON.parse(saved));
-    }
-    const years: string[] = [];
-    for (let y = currentYear - 10; y <= currentYear; y++) years.push(String(y));
-    return new Set(years);
-  });
+  // Valor até os dados chegarem; o padrão da aba entra em aplicarPadraoDaAba.
+  const [selectedYears, setSelectedYears] = useState<Set<string>>(() => anosPadraoDoPainel(currentYear));
   const [selectedDuePeriods, setSelectedDuePeriods] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<MainTab>("visao-geral");
   const [items, setItems] = useState<SiengeOutcome[]>(() => cacheInicial?.items ?? []);
@@ -308,7 +317,13 @@ export function ExecutiveDashboard() {
     docTypes?: Set<string>;
     opTypes?: Set<string>;
     docNumbers?: Set<string>;
+    duePeriods?: Set<string>;
+    drill?: string | null;
   }>>({});
+  // Grupo de aba que ainda não foi aberto nesta visita ao Painel e espera os
+  // dados da seção dele para abrir no PRÓPRIO padrão (aplicarPadraoDaAba). O
+  // Painel abre na Geral, então ela começa pendente.
+  const padraoPendente = useRef<string | null>(getTabGroup("visao-geral"));
   const [selectedDocTypes, setSelectedDocTypes] = useState<Set<string>>(new Set());
   const [selectedMonths, setSelectedMonths] = useState<Set<string>>(new Set());
   const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
@@ -330,27 +345,16 @@ export function ExecutiveDashboard() {
   const [showCounterpartDetail, setShowCounterpartDetail] = useState(false);
   const [overdueSort, setOverdueSort] = useState<{ field: string; dir: "asc" | "desc" }>({ field: "totalOverdue", dir: "desc" });
   const [selectedDocNumbers, setSelectedDocNumbers] = useState<Set<string>>(new Set());
-  const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(() => {
-    if (typeof window !== "undefined") {
-      // Key versionada com `_v2` (2026-05-09) — invalida configurações antigas
-      // de usuários com filtros desatualizados (sem por bens/permuta excluídos).
-      const saved = localStorage.getItem("dashboard_default_opTypes_v2");
-      if (saved) return new Set(JSON.parse(saved));
-    }
-    // Empty marker — actual defaults are populated by useEffect below once
-    // allOpTypes is known. Default exclui Substituição/Cancelamento/Abatimento/
-    // Devolução/Por Bens/Permuta — Sienge "(por Credor) Sintético" não soma
-    // essas no Líquido (validado 2026-05-09 em 12 empresas cravando exato).
-    return new Set();
-  });
-  const [opTypesInitialized, setOpTypesInitialized] = useState(false);
+  // Vazio até os dados chegarem; o padrão (sem OP_TYPES_FORA_DO_PADRAO) entra
+  // em aplicarPadraoDaAba.
+  const [selectedOpTypes, setSelectedOpTypes] = useState<Set<string>>(new Set());
 
   // === Filter persistence per tab ===
   // Cada filtro do header (Anos/Meses/Dias/Tipo Doc/Tipo Op/N° Doc) e salvo
   // por aba quando o usuario troca de aba. Primeira render mantem o valor
   // global atual (sem mudar comportamento). LocalStorage keys versionadas.
   const filterTabKey = useCallback((tab: MainTab, name: string) =>
-    `dashboard_${name}_${getTabGroup(tab)}`, []);
+    `dashboard_${name}_${grupoDoPadraoSalvo(tab)}`, []);
 
   const switchTab = useCallback((newTab: MainTab) => {
     const oldGroup = getTabGroup(activeTab);
@@ -362,7 +366,7 @@ export function ExecutiveDashboard() {
       return;
     }
 
-    // 1. Salvar filtros da aba atual no Record (memoria de sessao)
+    // 1. Guarda os filtros da aba que está saindo (memória desta visita ao Painel)
     perTabCompanies.current[oldGroup] = new Set(selectedCompanies);
     perTabFilters.current[oldGroup] = {
       years: new Set(selectedYears),
@@ -371,53 +375,35 @@ export function ExecutiveDashboard() {
       docTypes: new Set(selectedDocTypes),
       opTypes: new Set(selectedOpTypes),
       docNumbers: new Set(selectedDocNumbers),
+      duePeriods: new Set(selectedDuePeriods),
+      drill: drillCompany,
     };
 
-    const loadLs = (key: string): Set<string> | null => {
-      if (typeof window === "undefined") return null;
-      const raw = localStorage.getItem(key);
-      if (!raw) return null;
-      try { return new Set(JSON.parse(raw)); } catch { return null; }
-    };
-
-    // 2. Carregar Companies (lógica original preservada)
-    const cachedCo = perTabCompanies.current[newGroup];
-    if (cachedCo) {
-      setSelectedCompanies(cachedCo);
-    } else {
-      const ls = loadLs(companyStorageKey(newTab));
-      setSelectedCompanies(ls || new Set());
-    }
-
-    // 3. Carregar outros filtros: Record da sessao > localStorage per-tab.
-    //    Se nao tem nada salvo, MANTEM o valor atual (nao reseta) — assim
-    //    a primeira vez que muda de aba leva o filtro como default ate que
-    //    o usuario configure especificamente nesse contexto.
+    // 2. Cada aba tem os filtros DELA (Edielson, 10/11/2026: "cada aba tem que ser
+    //    individual, sem herdar nada dos filtros das anteriores"). Aba já aberta
+    //    nesta visita volta como foi deixada; aba nova abre no padrão dela
+    //    (aplicarPadraoDaAba, assim que os dados da seção dela estiverem prontos).
+    //    Antes a aba sem nada salvo herdava os da anterior: o Resumo aberto depois
+    //    do CR ficava com os 7 tipos de documento do CR e o Total Pago do 135
+    //    Jardins caía de R$ 98,6 mi para R$ 38,5 mi.
     const cached = perTabFilters.current[newGroup];
     if (cached) {
-      if (cached.years) setSelectedYears(cached.years);
-      if (cached.months) setSelectedMonths(cached.months);
-      if (cached.days) setSelectedDays(cached.days);
-      if (cached.docTypes) setSelectedDocTypes(cached.docTypes);
-      if (cached.opTypes) setSelectedOpTypes(cached.opTypes);
-      if (cached.docNumbers) setSelectedDocNumbers(cached.docNumbers);
+      setSelectedCompanies(perTabCompanies.current[newGroup] ?? new Set());
+      setSelectedYears(cached.years ?? anosPadraoDoPainel(currentYear));
+      setSelectedMonths(cached.months ?? new Set());
+      setSelectedDays(cached.days ?? new Set());
+      setSelectedDocTypes(cached.docTypes ?? new Set());
+      setSelectedOpTypes(cached.opTypes ?? new Set());
+      setSelectedDocNumbers(cached.docNumbers ?? new Set());
+      setSelectedDuePeriods(cached.duePeriods ?? new Set());
+      setDrillCompany(cached.drill ?? null);
+      padraoPendente.current = null;
     } else {
-      const lsYears = loadLs(filterTabKey(newTab, "years"));
-      if (lsYears) setSelectedYears(lsYears);
-      const lsMonths = loadLs(filterTabKey(newTab, "months"));
-      if (lsMonths) setSelectedMonths(lsMonths);
-      const lsDays = loadLs(filterTabKey(newTab, "days"));
-      if (lsDays) setSelectedDays(lsDays);
-      const lsDocTypes = loadLs(filterTabKey(newTab, "docTypes"));
-      if (lsDocTypes) setSelectedDocTypes(lsDocTypes);
-      const lsOpTypes = loadLs(filterTabKey(newTab, "opTypes"));
-      if (lsOpTypes) setSelectedOpTypes(lsOpTypes);
-      const lsDocNumbers = loadLs(filterTabKey(newTab, "docNumbers"));
-      if (lsDocNumbers) setSelectedDocNumbers(lsDocNumbers);
+      padraoPendente.current = newGroup;
     }
 
     setActiveTab(newTab);
-  }, [activeTab, selectedCompanies, selectedYears, selectedMonths, selectedDays, selectedDocTypes, selectedOpTypes, selectedDocNumbers, filterTabKey]);
+  }, [activeTab, selectedCompanies, selectedYears, selectedMonths, selectedDays, selectedDocTypes, selectedOpTypes, selectedDocNumbers, selectedDuePeriods, drillCompany, currentYear]);
 
   // Note: bankFees state was removed — bank movements are now synthesized as
   // outcome items via bankMovementsAsItems memo and flow through filteredPagas
@@ -841,38 +827,18 @@ export function ExecutiveDashboard() {
   useEffect(() => {
     if (prevMode.current !== isHolding) {
       prevMode.current = isHolding;
-      companiesInitialized.current = false;
+      // Outro modo, outras empresas: as abas esquecem os filtros desta visita e a
+      // aba atual volta ao padrão dela.
+      perTabCompanies.current = {};
+      perTabFilters.current = {};
       setSelectedCompanies(new Set());
       // Holding não tem Orçamento (o Comercial virou módulo próprio, fora do Painel) — redireciona pra Geral
-      if (isHolding && activeTab === "orcamento") {
-        setActiveTab("visao-geral");
-      }
+      const destino: MainTab = isHolding && activeTab === "orcamento" ? "visao-geral" : activeTab;
+      padraoPendente.current = getTabGroup(destino);
+      if (destino !== activeTab) setActiveTab(destino);
     }
   }, [isHolding, activeTab]);
 
-  // Auto-initialize company filter from localStorage or excluding admin/holding companies
-  const companiesInitialized = useRef(false);
-  useEffect(() => {
-    if (allCompanyNames.length > 0 && !companiesInitialized.current) {
-      companiesInitialized.current = true;
-      // Try per-tab key first, then legacy global key
-      const perTabKey = companyStorageKey(activeTab);
-      const saved = localStorage.getItem(perTabKey) || localStorage.getItem("dashboard_default_companies");
-      if (saved) {
-        const savedSet = new Set<string>(JSON.parse(saved));
-        const valid = new Set([...savedSet].filter(c => allCompanyNames.includes(c)));
-        if (valid.size > 0) {
-          setSelectedCompanies(valid);
-          perTabCompanies.current[getTabGroup(activeTab)] = valid;
-          return;
-        }
-      }
-      const defaults = defaultCompanies();
-      if (defaults.size < allCompanyNames.length) {
-        setSelectedCompanies(defaults);
-      }
-    }
-  }, [allCompanyNames, defaultCompanies]);
 
   // PREVISÃO: documentos de previsão financeira (não realizados)
   // CONTRATO DE LOCAÇÃO / CONTRATO DE LOCACAO NAO CONTABIL (LOC/LNC):
@@ -891,24 +857,6 @@ export function ExecutiveDashboard() {
     return Array.from(types).sort();
   }, [activeItems]);
 
-  // Auto-initialize docType filter from localStorage or excluding previsão types
-  const docTypesInitialized = useRef(false);
-  useEffect(() => {
-    if (allDocTypes.length > 0 && !docTypesInitialized.current) {
-      docTypesInitialized.current = true;
-      const saved = localStorage.getItem("dashboard_default_docTypes");
-      if (saved) {
-        const savedSet = new Set<string>(JSON.parse(saved));
-        const valid = new Set([...savedSet].filter(t => allDocTypes.includes(t)));
-        if (valid.size > 0) {
-          setSelectedDocTypes(valid);
-          return;
-        }
-      }
-      const defaults = allDocTypes.filter(t => !isExcludedDocType(t));
-      setSelectedDocTypes(new Set(defaults));
-    }
-  }, [allDocTypes]);
 
   // === Toggle helpers ===
   const toggleInSet = useCallback((setter: React.Dispatch<React.SetStateAction<Set<string>>>, name: string) => {
@@ -985,30 +933,6 @@ export function ExecutiveDashboard() {
     return Array.from(types).sort();
   }, [activeItems, allBankMovements, section]);
 
-  // Initialize selectedOpTypes once data arrives. Skips Substituição,
-  // Cancelamento, Estorno and Abatimento — reversal/replacement entries that
-  // the Sienge "Contas Pagas Sintético" report does not include.
-  // "Por Bens" stays in by default because Sienge "por Data" includes it;
-  // companies whose source PDF was "por Credor" (which excludes Por Bens)
-  // should save a per-empresa filter via the standalone page.
-  useEffect(() => {
-    if (opTypesInitialized || allOpTypes.length === 0) return;
-    if (typeof window !== "undefined" && localStorage.getItem("dashboard_default_opTypes_v2")) {
-      // User has a saved default (v2); respect it (already loaded by useState init)
-      setOpTypesInitialized(true);
-      return;
-    }
-    // Mesma lista que contas-table.tsx — vide comentário lá. Default exclui
-    // op types que o Sienge "(por Credor) Sintético" não soma no Líquido
-    // (validado 2026-05-09 cravando 12 empresas exato).
-    const EXCLUDED = ["substitui", "cancelamento", "abatimento", "devolu", "por bens", "permuta"];
-    const initial = allOpTypes.filter(op => {
-      const lower = op.toLowerCase();
-      return !EXCLUDED.some(x => lower.includes(x));
-    });
-    setSelectedOpTypes(new Set(initial));
-    setOpTypesInitialized(true);
-  }, [allOpTypes, opTypesInitialized]);
 
   // When exactly 1 company is selected, sync selectedOpTypes with the
   // standalone Contas Pagas page logic:
@@ -1067,6 +991,50 @@ export function ExecutiveDashboard() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [section, allOpTypes, allDocTypes]);
+
+  // Padrão de uma aba: o "Salvar padrão" DELA (só valores que existem nos dados
+  // da seção dela), senão o padrão do painel — obras sem holding/administradora/
+  // construtora/galpão, tipos de documento sem previsão, últimos 10 anos + o atual,
+  // tipos de operação sem OP_TYPES_FORA_DO_PADRAO, sem mês, dia, vencimento nem
+  // empresa clicada. Nunca olha o que se mexeu em outra aba nem as chaves globais
+  // antigas (dashboard_default_*). Vale ao abrir o Painel, ao entrar numa aba pela
+  // 1ª vez na visita, na troca de modo e no X da barra de filtros.
+  const aplicarPadraoDaAba = (tab: MainTab) => {
+    const salvo = (chave: string): string[] | null => {
+      try {
+        const v = JSON.parse(localStorage.getItem(chave) || "null");
+        return Array.isArray(v) ? v.map(String) : null;
+      } catch { return null; }
+    };
+    const dentre = (lista: string[] | null, opcoes: string[]) => {
+      const v = (lista || []).filter(x => opcoes.includes(x));
+      return v.length > 0 ? new Set(v) : null;
+    };
+    const obras = defaultCompanies();
+    setSelectedCompanies(dentre(salvo(companyStorageKey(tab)), allCompanyNames)
+      ?? (obras.size < allCompanyNames.length ? obras : new Set<string>()));
+    setSelectedDocTypes(dentre(salvo(filterTabKey(tab, "docTypes")), allDocTypes)
+      ?? new Set(allDocTypes.filter(t => !isExcludedDocType(t))));
+    setSelectedOpTypes(dentre(salvo(filterTabKey(tab, "opTypes")), allOpTypes)
+      ?? new Set(allOpTypes.filter(op => !OP_TYPES_FORA_DO_PADRAO.some(x => op.toLowerCase().includes(x)))));
+    const anos = salvo(filterTabKey(tab, "years"));
+    setSelectedYears(anos && anos.length > 0 ? new Set(anos) : anosPadraoDoPainel(currentYear));
+    setSelectedMonths(new Set(salvo(filterTabKey(tab, "months")) || []));
+    setSelectedDays(new Set(salvo(filterTabKey(tab, "days")) || []));
+    setSelectedDocNumbers(new Set(salvo(filterTabKey(tab, "docNumbers")) || []));
+    setSelectedDuePeriods(new Set());
+    setDrillCompany(null);
+  };
+  // A aba pendente recebe o padrão quando a carga terminou (os tipos de operação
+  // dependem dos movimentos bancários, que chegam depois do CP).
+  useEffect(() => {
+    if (loading) return;
+    const grupo = padraoPendente.current;
+    if (!grupo || grupo !== getTabGroup(activeTab) || allCompanyNames.length === 0) return;
+    padraoPendente.current = null;
+    aplicarPadraoDaAba(activeTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, activeTab, allCompanyNames, allDocTypes, allOpTypes, isHolding]);
 
   // Fecha a tabela de detalhamento por credor/cliente ao trocar de aba.
   useEffect(() => { setShowCounterpartDetail(false); }, [activeTab]);
@@ -3263,25 +3231,7 @@ export function ExecutiveDashboard() {
             variant="ghost"
             size="sm"
             onClick={() => {
-              setDrillCompany(null);
-              const savedCo = localStorage.getItem(companyStorageKey(activeTab)) || localStorage.getItem("dashboard_default_companies");
-              setSelectedCompanies(savedCo ? new Set(JSON.parse(savedCo)) : defaultCompanies());
-              const savedDoc = localStorage.getItem(filterTabKey(activeTab, "docTypes")) || localStorage.getItem("dashboard_default_docTypes");
-              setSelectedDocTypes(savedDoc ? new Set(JSON.parse(savedDoc)) : new Set(allDocTypes.filter(t => !isExcludedDocType(t))));
-              setSelectedMonths(new Set());
-              setSelectedDays(new Set());
-              setSelectedDuePeriods(new Set());
-              setSelectedDocNumbers(new Set());
-              const savedOp = localStorage.getItem(filterTabKey(activeTab, "opTypes")) || localStorage.getItem("dashboard_default_opTypes_v2");
-              setSelectedOpTypes(savedOp ? new Set(JSON.parse(savedOp)) : new Set(["Pagamento"]));
-              const savedYrs = localStorage.getItem(filterTabKey(activeTab, "years")) || localStorage.getItem("dashboard_default_years");
-              if (savedYrs) {
-                setSelectedYears(new Set(JSON.parse(savedYrs)));
-              } else {
-                const defaultYrs: string[] = [];
-                for (let y = currentYear - 10; y <= currentYear; y++) defaultYrs.push(String(y));
-                setSelectedYears(new Set(defaultYrs));
-              }
+              aplicarPadraoDaAba(activeTab);
             }}
             className="text-slate-500 dark:text-slate-400 px-2"
           >

@@ -901,11 +901,32 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
 
 ## Filtros por Aba
 
-- Cada aba tem seu próprio filtro de empresas salvo no localStorage
-- Chave: `dashboard_companies_{tabGroup}` onde tabGroup = cp|cr|orcamento|comercial|dre|saldos|visao-geral|resumo
-- CP (a-pagar, pagas, atrasadas) compartilham filtro
-- CR (a-receber, recebidas, inadimplencia) compartilham filtro
-- Demais abas têm filtro independente
+- **Nenhuma aba herda filtro de outra (Edielson, 10/11/2026: "cada aba tem que ser
+  individual, sem herdar nada dos filtros das anteriores").** Grupo = `getTabGroup`:
+  CP (a-pagar, pagas, atrasadas, calendário de pagamento) e CR (a-receber, recebidas,
+  inadimplência, calendário de recebimento) dividem filtro dentro do grupo; Geral,
+  Orçamento, DRE, Saldos, Resumo, Indicadores e Comparativo são um grupo cada.
+- Aba já aberta nesta visita ao Painel volta como foi deixada (`perTabCompanies` +
+  `perTabFilters`: empresas, anos, meses, dias, tipo doc, tipo operação, nº documento,
+  vencimento e empresa clicada). Aba aberta pela 1ª vez abre no PADRÃO DELA
+  (`aplicarPadraoDaAba`, via `padraoPendente`, só depois da carga completa): o "Salvar
+  padrão" daquela aba (`dashboard_<filtro>_<grupo>`, só valores que existem nos dados
+  da seção), senão o padrão do painel = obras (sem holding/administradora/construtora/
+  empreendimentos/galpão), tipos de documento sem previsão, últimos 10 anos + o atual,
+  tipos de operação sem `OP_TYPES_FORA_DO_PADRAO`, sem mês/dia/vencimento/clique. O X
+  da barra de filtros faz o mesmo. As chaves globais antigas `dashboard_default_*` não
+  são mais lidas pelo Painel (o Comercial ainda lê `dashboard_default_years`).
+- **Resumo** (`resumo_v2` nas chaves salvas, padrão salvo antes de 10/11 não vale):
+  abre para todo mundo com as 10 obras, os 26 tipos de documento e os 11 anos. Antes,
+  aberto depois do CR, ficava com os 7 tipos de documento do CR: Total Pago do 135
+  Jardins R$ 38.480.600,27 em vez de R$ 98.581.904,25 (local, dados de 08/11).
+- **Movimento Bancário sempre no padrão:** antes o tipo de operação era montado quando
+  o CP chegava, antes dos movimentos bancários, e numa carga do zero o "Movimento
+  Bancário" ficava de fora — o Total Pago perdia os avulsos (135 Jardins: −R$ 1.281,14
+  = Aviso de Lançamento 1.253,98 + Taxa 25,08 + tarifa de boleto 2,08). Agora o padrão
+  só entra com a carga completa.
+- Conferido em 10/11 com Playwright local (CP com anos mexidos → Resumo; CR → Resumo;
+  volta ao CP mantém os anos dele; X volta ao padrão). Não há teste automático no repo.
 
 ## Autenticação
 
