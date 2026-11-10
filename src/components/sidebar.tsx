@@ -199,7 +199,9 @@ const menuItems: MenuItem[] = [
 ];
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  // O menu abre recolhido (Edielson, 10/11/2026: "ao abrir o sistema, o sidebar venha
+  // fechado"), para o Painel Executivo ocupar a tela; a seta do topo abre e fecha.
+  const [collapsed, setCollapsed] = useState(true);
   // Todos os grupos nascem fechados (Edielson, 06/11/2026: "Financeiro sempre
   // fechado, igual o Comercial"); o useEffect abaixo abre só o da rota atual.
   const [openSubmenus, setOpenSubmenus] = useState<string[]>([]);

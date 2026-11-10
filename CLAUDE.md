@@ -378,6 +378,22 @@ Power BI "CONTAS À PAGAR" (anos e meses em botões, clique na empresa filtra tu
   Docker `spapi-sp-db` na porta 5447 e login `admin-local`); `node scripts/migrate.js`
   com `DATABASE_URL` exportada. Primeira carga puxa 10 anos do Sienge (~3 min).
 
+## Entra direto no Painel Executivo, com o menu recolhido (Edielson, 10/11/2026)
+
+- Pedido: "para ficar mais fácil para o Carlos Humberto, eu quero que, ao abrir o sistema,
+  o sidebar venha fechado e já com o painel executivo selecionado. Já entre direto no
+  painel executivo."
+- `PAGINA_INICIAL` em `src/lib/pagina-inicial.ts` = `/financeiro/painel-executivo`. É
+  para onde vão a raiz (`src/app/page.tsx`), o `/login` com sessão aberta, o login por
+  senha e por Google (`login-form.tsx`) e a chegada pelo Portal (`sso/portal/portal-sso.tsx`).
+  Até 10/11 era `/dashboard`, que continua no menu. Mudar o destino = mudar só a constante.
+- O menu lateral nasce recolhido (`useState(true)` em `sidebar.tsx`, 72 px em vez de
+  260 px); a seta do topo abre e fecha, e a escolha vale até recarregar a página (não é
+  gravada). Com ele recolhido a área útil ganha 188 px.
+- Local: depois do login cai em `/financeiro/painel-executivo` com o menu a 72 px; a raiz
+  e o `/login` com sessão levam ao mesmo lugar. A chegada pelo Portal usa a mesma
+  constante, mas não foi exercitada no local (precisa do bilhete do Portal).
+
 ## Painel Executivo abre direto com o que já carregou (Edielson, 09/11/2026)
 
 - Pedido: "toda vez que clica no painel executivo, ele fica carregando". Cada abertura

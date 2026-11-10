@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PAGINA_INICIAL } from "@/lib/pagina-inicial";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -33,7 +34,7 @@ export function LoginForm() {
         setError("Usuario ou senha invalidos");
         setLoading(false);
       } else if (result?.ok) {
-        router.push("/dashboard");
+        router.push(PAGINA_INICIAL);
       } else {
         setError("Erro ao conectar. Tente novamente.");
         setLoading(false);
@@ -61,7 +62,7 @@ export function LoginForm() {
             type="button"
             variant="outline"
             className="w-full h-11 border-slate-200 hover:bg-slate-50 font-medium mb-4"
-            onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+            onClick={() => signIn("google", { callbackUrl: PAGINA_INICIAL })}
           >
             <svg className="h-5 w-5 mr-2" viewBox="0 0 24 24">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />

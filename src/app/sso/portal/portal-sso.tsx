@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { PAGINA_INICIAL } from "@/lib/pagina-inicial";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -29,7 +30,7 @@ export function PortalSso({ token }: { token: string }) {
     }
     signIn("portal", { token, redirect: false })
       .then((r) => {
-        if (r?.ok && !r.error) router.replace("/dashboard");
+        if (r?.ok && !r.error) router.replace(PAGINA_INICIAL);
         else setErro(MENSAGENS[r?.error ?? ""] ?? MENSAGENS["bilhete-invalido"]);
       })
       .catch(() => setErro("Erro de conexão. Tente novamente pelo Portal."));
