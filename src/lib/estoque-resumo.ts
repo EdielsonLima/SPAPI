@@ -214,6 +214,22 @@ const SINGULAR: Record<string, string> = {
 };
 export const ORDEM_GRUPOS = ["Apartamento", "Sala comercial", "Vaga", "Box", "Outros"];
 
+// "apartamentos", "salas comerciais": o grupo no plural, para frases do modal.
+export const pluralDoGrupo = (grupo: string): string => PLURAL[grupo] ?? grupo.toLowerCase();
+
+// Valor do estoque que o filtro de TIPO do modal deixa fora da lista (Edielson,
+// 10/11/2026: no Hannover o cartão dizia R$ 3.000.000,00 e a lista, aberta só em
+// apartamentos, não tinha nenhum preço — o valor era das 2 salas comerciais).
+// Os cartões são da empresa inteira; a lista segue o tipo. Devolve as unidades
+// disponíveis com preço que não são do tipo filtrado, a soma delas e os grupos
+// em que estão (na ordem de ORDEM_GRUPOS). Sem filtro de tipo, nada fica de fora.
+export function valorForaDoTipo(linhas: LinhaEstoque[], grupo: string): { valor: number; linhas: LinhaEstoque[]; grupos: string[] } {
+  if (!grupo) return { valor: 0, linhas: [], grupos: [] };
+  const fora = linhas.filter(l => l.situacao === "Disponível" && l.valorEstoque > 0 && grupoDoTipo(l.tipo) !== grupo);
+  const grupos = ORDEM_GRUPOS.filter(g => fora.some(l => grupoDoTipo(l.tipo) === g));
+  return { valor: fora.reduce((soma, l) => soma + l.valorEstoque, 0), linhas: fora, grupos };
+}
+
 export function composicaoPorTipo(linhas: LinhaEstoque[]): string {
   const n = new Map<string, number>();
   for (const l of linhas) n.set(grupoDoTipo(l.tipo), (n.get(grupoDoTipo(l.tipo)) || 0) + 1);

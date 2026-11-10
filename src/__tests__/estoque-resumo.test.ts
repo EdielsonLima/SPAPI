@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import {
   linhasDeEstoque, totaisDoEstoque, totaisPorEmpresa, ehApartamento, contaNoEstoque, aplicarSituacaoManual,
   ehSituacaoManual, composicaoPorTipo, grupoDoTipo, grupoInicialDoModal, candidatasALiberar, situacaoParaLiberar,
-  liberadaNoPainel, type ContextoEstoque, type SituacaoManual,
+  liberadaNoPainel, valorForaDoTipo, pluralDoGrupo, type ContextoEstoque, type SituacaoManual,
 } from "../lib/estoque-resumo";
 import { normalizarTabelaComercial, type TabelaComercial } from "../lib/tabela-comercial";
 import type { ApiUnit } from "../lib/comercial-utils";
@@ -272,6 +272,32 @@ assert.equal(composicaoPorTipo(linhasDeEstoque(rozza, ctx()).filter(l => l.situa
   assert.equal(t.qtDispSala, 3);
   assert.equal(t.qtDisp, t.qtDispApto + t.qtDispSala); // vaga fora das duas
   assert.equal(t.qtResTec, 1);
+}
+
+// ── 9. Valor do estoque que o filtro de tipo esconde da lista (aviso do modal) ──
+// Hannover em 10/11/2026: 2 salas a R$ 1.500.000,00, 3 apartamentos reservados sem preço;
+// o modal abre em Apartamento e o cartão mostrava R$ 3.000.000,00 sem nenhuma linha com preço.
+{
+  const hannover = [
+    un("HANNOVER", "201", "Reserva Técnica", 120.95), un("HANNOVER", "801", "Reserva Técnica", 120.95),
+    un("HANNOVER", "SALA 01", "Disponível", 60, "Salas Comerciais"), un("HANNOVER", "SALA 02", "Disponível", 60, "Salas Comerciais"),
+    un("HANNOVER", "G 10", "Disponível", 12, "Vaga de Garagem Simples"), un("HANNOVER", "SALA 03", "Vendida", 60, "Salas Comerciais"),
+  ];
+  const precos = new Map([[hannover[2].id!, 1_500_000], [hannover[3].id!, 1_500_000], [hannover[5].id!, 1_500_000]]);
+  const linhas = linhasDeEstoque(hannover, ctx({ precos }));
+  const fora = valorForaDoTipo(linhas, "Apartamento");
+  assert.equal(fora.valor, 3_000_000);                       // as duas salas disponíveis; a vendida com preço não conta
+  assert.deepEqual(fora.linhas.map(l => l.unidade), ["SALA 01", "SALA 02"]);
+  assert.deepEqual(fora.grupos, ["Sala comercial"]);
+  assert.equal(composicaoPorTipo(fora.linhas), "2 salas comerciais");
+  assert.equal(valorForaDoTipo(linhas, "Sala comercial").valor, 0); // as salas estão na lista: nada de fora
+  assert.equal(valorForaDoTipo(linhas, "").valor, 0);               // sem filtro de tipo, nada de fora
+  // Vaga com preço também fica de fora quando a lista está em apartamentos: dois grupos, na ordem.
+  const comVaga = valorForaDoTipo(linhasDeEstoque(hannover, ctx({ precos: new Map([...precos, [hannover[4].id!, 80_000]]) })), "Apartamento");
+  assert.equal(comVaga.valor, 3_080_000);
+  assert.deepEqual(comVaga.grupos, ["Sala comercial", "Vaga"]);
+  assert.equal(pluralDoGrupo("Apartamento"), "apartamentos");
+  assert.equal(pluralDoGrupo("Sala comercial"), "salas comerciais");
 }
 
 console.log("estoque-resumo: ok");

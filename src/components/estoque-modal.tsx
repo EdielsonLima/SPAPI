@@ -30,7 +30,7 @@ import { normalizarTabelaComercial, type TabelaComercial } from "@/lib/tabela-co
 import { COR_SITUACAO } from "@/lib/situacao-unidade";
 import {
   linhasDeEstoque, totaisDoEstoque, composicaoPorTipo, grupoDoTipo, ehSituacaoManual,
-  grupoInicialDoModal, candidatasALiberar, situacaoParaLiberar, liberadaNoPainel,
+  grupoInicialDoModal, candidatasALiberar, situacaoParaLiberar, liberadaNoPainel, valorForaDoTipo, pluralDoGrupo,
   ORDEM_GRUPOS, SITUACOES_MANUAIS, type ContextoEstoque, type LinhaEstoque, type SituacaoManual,
 } from "@/lib/estoque-resumo";
 import {
@@ -38,7 +38,7 @@ import {
   SITUACOES_PAINEL, TIPOS_PAINEL, type SituacaoPainel, type UnidadePainel,
 } from "@/lib/unidades-painel";
 import type { ApiUnit } from "@/lib/comercial-utils";
-import { ArrowDown, ArrowUp, ArrowUpDown, Lock, LockOpen, Pencil, Plus, Save, Search, Trash2, Undo2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Info, Lock, LockOpen, Pencil, Plus, Save, Search, Trash2, Undo2, X } from "lucide-react";
 
 // ── Dados que o estoque usa além das unidades (preços, tabela comercial, situação manual) ──
 export interface DadosEstoque {
@@ -478,6 +478,11 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
   const desfazerLiberacao = (l: LinhaEstoque) =>
     setSitPend(prev => { const m = new Map(prev); m.delete(l.unitId!); return m; });
 
+  // Valor do estoque que o filtro de tipo deixa fora da lista: os cartões são da empresa
+  // inteira e a lista segue o tipo, então o aviso diz onde está o valor que não aparece.
+  const foraDoTipo = useMemo(() => valorForaDoTipo(linhas, grupo), [linhas, grupo]);
+  const botaoAviso = "h-7 rounded-md border border-amber-400 bg-white px-2.5 text-xs font-medium text-amber-900 transition-colors hover:bg-amber-100 dark:border-amber-500/50 dark:bg-transparent dark:text-amber-100 dark:hover:bg-amber-500/20";
+
   // ── Cartões ──
   // Disponíveis fora da conta (vaga, box…): o Resumo não conta e só somam com preço.
   const outrasDisponiveis = linhas.filter(l => l.situacao === "Disponível" && !l.entraNaContagem);
@@ -485,6 +490,8 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
   const contadasDisp = linhas.filter(l => l.situacao === "Disponível" && l.entraNaContagem);
   const contadasRes = linhas.filter(l => l.situacao === "Reservado" && l.entraNaContagem);
   const semPreco = totais.semPreco;
+  // As disponíveis com preço, para o cartão dizer de que tipo é o valor ("2 salas comerciais").
+  const comPrecoDisp = linhas.filter(l => l.situacao === "Disponível" && l.preco !== null);
   const mudou = (a: number, b: number) => Math.abs(a - b) > 0.004;
   const totalVisivel = visiveis.reduce((s, l) => s + l.valorEstoque, 0);
   const colunas = 8 + (variosEmpreendimentos ? 1 : 0);
@@ -514,7 +521,7 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
         <div className="grid grid-cols-2 gap-3 px-6 pt-4 lg:grid-cols-4">
           <Cartao
             rotulo="Valor do estoque" cor="bg-emerald-500" valor={formatCurrency(totais.valorEstoque)}
-            sub={totais.comPreco === 0 ? "nenhuma unidade disponível com preço" : `soma de ${totais.comPreco} unidade(s) com preço no painel`}
+            sub={totais.comPreco === 0 ? "nenhuma unidade disponível com preço" : `${composicaoPorTipo(comPrecoDisp)} com preço no painel`}
             alerta={mudou(totais.valorEstoque, totaisSalvos.valorEstoque) ? `antes: ${formatCurrency(totaisSalvos.valorEstoque)} · ainda não salvo` : undefined}
           />
           <Cartao
@@ -582,6 +589,22 @@ export function EstoqueModal({ empresa, filtroInicial = "estoque", tipoInicial, 
             </div>
           )}
         </div>
+
+        {/* O filtro de tipo esconde unidade disponível com preço: diz onde está o valor do cartão */}
+        {foraDoTipo.valor > 0 && (
+          <div role="status" className="mx-6 mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-200">
+            <Info className="h-4 w-4 shrink-0" aria-hidden />
+            <p className="min-w-[16rem] flex-1">
+              A lista mostra só {pluralDoGrupo(grupo)}. <span className="font-semibold tabular-nums">{formatCurrency(foraDoTipo.valor)}</span> do valor do estoque {foraDoTipo.linhas.length === 1 ? "está" : "estão"} em {composicaoPorTipo(foraDoTipo.linhas)}, que não {foraDoTipo.linhas.length === 1 ? "aparece" : "aparecem"} aqui.
+            </p>
+            <div className="flex gap-2">
+              {foraDoTipo.grupos.length === 1 && (
+                <button type="button" onClick={() => setGrupo(foraDoTipo.grupos[0])} className={botaoAviso}>Ver {pluralDoGrupo(foraDoTipo.grupos[0])}</button>
+              )}
+              <button type="button" onClick={() => setGrupo("")} className={botaoAviso}>Ver todos os tipos</button>
+            </div>
+          </div>
+        )}
 
         {/* Cadastro / edição de unidade só no painel */}
         {form && (

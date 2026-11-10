@@ -978,6 +978,17 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     unidades (apartamentos e salas disponíveis). Local: R$ 45,4 mi, igual ao total do
     Resumo. O Orçamento (m² × fator × CUB) não tem relação com isto e não mudou.
   - Trava: itens 1 a 5 de `estoque-resumo.test.ts` e 3 e 7 de `unidades-painel.test.ts`.
+- **Aviso quando o filtro de tipo esconde valor (Edielson, 10/11/2026: "No Hannover, por
+  que tá dando 3 milhões se está tudo sem preço?").** Os cartões do modal são da empresa
+  inteira e a lista segue o filtro de tipo (que abre em Apartamento): no Hannover o
+  cartão dizia R$ 3.000.000,00 (2 salas a R$ 1.500.000,00) e a lista, só de apartamentos,
+  não tinha preço nenhum. Agora, quando o tipo filtrado deixa de fora unidade disponível
+  com preço, aparece uma faixa âmbar entre os filtros e a lista: "A lista mostra só
+  apartamentos. R$ 3.000.000,00 do valor do estoque estão em 2 salas comerciais, que não
+  aparecem aqui", com os atalhos **Ver salas comerciais** (só quando o valor está num tipo
+  só) e **Ver todos os tipos**. Sem valor escondido não há faixa. O cartão "Valor do
+  estoque" passou a dizer o tipo ("2 salas comerciais com preço no painel"). Regra em
+  `valorForaDoTipo` e `pluralDoGrupo` (`estoque-resumo.ts`, trava no item 9 do teste).
 - `InputReais` saiu de `tabela-precos-view.tsx` para `src/components/input-reais.tsx`
   (compartilhado). `/api/situacao-unidades` ainda não está no MCP.
 
