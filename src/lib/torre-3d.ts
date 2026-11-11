@@ -64,6 +64,7 @@ export interface ConfigTorre {
 export interface ModeloTorre {
   url: string;
   altura: number;        // m da rua ao topo: enquadra a câmera antes de o arquivo chegar
+  zRua: number;          // z (m) do eixo da rua da frente na maquete: é onde o mapa da cidade encosta
   ladoCamera?: 1 | -1;   // vista inicial pela direita (1) ou pela esquerda (-1) da frente
   fonte: string;         // legenda do painel: de onde veio o modelo
 }
@@ -237,10 +238,22 @@ export const CONFIG_135: ConfigTorre = {
   largura: 30.7, profundidade: 14.5, peDireito: 3.24, sacada: 0, larguraSacada: 7, embasamento: 0,
   ordemFinais: ["01", "02"],
   janelas: { frente: 0, lateral: 0, fundos: 0 },
-  modelo: { url: "/modelos/135-jardins.m3d", altura: 140.7, ladoCamera: 1, fonte: "Modelo do projeto (SketchUp, estudo de 2019)" },
-  // Andamento da obra e fotos (Edielson, 11/11/2026: "vamos pegar do site. E
-  // também as fotos da galeria"). Sem `local`: não há mapa da cidade.
-  obra: { chave: "135-jardins", site: "https://silvapacker.com.br/empreendimentos/135-jardins/" },
+  modelo: { url: "/modelos/135-jardins.m3d", altura: 140.1, zRua: 12.1, ladoCamera: 1, fonte: "Modelo do projeto (SketchUp, estudo de 2019)" },
+  // Mapa da cidade (Edielson, 11/11/2026: "igual à que foi feita com o
+  // Palácio"). O lote fica na esquina da Rua 3420 com a Av. Brasil, do lado do
+  // mar da avenida e a leste da 3420 (fundos para a Rua 3500): a frente (as
+  // sacadas) olha para a Rua 3420, a oeste, e o lazer fica do lado da Av.
+  // Brasil — conferido pelo terreno do SketchUp e pelas vistas aéreas do site.
+  // A 3420 curva perto da orla, então o lote é ancorado na esquina: o eixo da
+  // torre fica a 30 m do cruzamento, andando pela 3420 para o lado do mar.
+  // A mesma chave serve ao andamento da obra (lido de `site`) e às fotos.
+  local: {
+    chave: "135-jardins", rua: "3420", numero: 135, ruaFundos: "3500",
+    esquina: { rua: "Avenida Brasil", distancia: 30 },
+    lote: { x0: -30, x1: 50, fundo: 50 },
+    bbox: [-27.05, -48.665, -26.95, -48.59],
+    site: "https://silvapacker.com.br/empreendimentos/135-jardins/",
+  },
   // Planta humanizada do pavimento tipo, do site (135-IMG-PLH-TIPOS): os dois
   // apartamentos na mesma imagem, a frente (livings) embaixo.
   planta: {
@@ -388,7 +401,7 @@ export function descricaoDaPosicao(indice: number, total: number): string {
   return `${indice + 1}º da esquerda para a direita (olhando a frente)`;
 }
 
-export const CONFIGS_COM_ENTORNO: ConfigTorre[] = [CONFIG_PALACIO];
+export const CONFIGS_COM_ENTORNO: ConfigTorre[] = [CONFIG_PALACIO, CONFIG_135];
 
 // Chave e site do empreendimento para andamento da obra, fotos e condições:
 // a do mapa da cidade (`local`), senão a de `obra`.
@@ -396,8 +409,7 @@ export function obraDaConfig(cfg: ConfigTorre): { chave: string; site?: string }
   if (cfg.local) return { chave: cfg.local.chave, site: cfg.local.site };
   return cfg.obra ?? null;
 }
-const CONFIGS_DE_OBRA: ConfigTorre[] = [CONFIG_PALACIO, CONFIG_135];
 export function obraDaChave(chave: string): { chave: string; site?: string } | null {
-  for (const c of CONFIGS_DE_OBRA) { const o = obraDaConfig(c); if (o && o.chave === chave) return o; }
+  for (const c of CONFIGS_COM_ENTORNO) { const o = obraDaConfig(c); if (o && o.chave === chave) return o; }
   return null;
 }

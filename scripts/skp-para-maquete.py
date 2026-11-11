@@ -12,13 +12,15 @@ O que faz:
   - separa cada apartamento: os componentes PAVIMENTOS (um por andar, de baixo
     para cima) são cortados no eixo da torre em lado esquerdo e direito
     (olhando a frente), e dentro de cada um o vidro fica à parte do resto;
-  - grava em metros, com a origem no centro da torre e no nível da rua:
-    x para a direita, y para cima, z para a frente (a fachada das sacadas).
+  - grava em metros, com a origem no centro da torre e no nível da calçada:
+    x para a direita, y para cima, z para a frente (a fachada das sacadas);
+  - deixa à parte o terreno desenhado pelo arquiteto (ruas e grama em volta):
+    o 3D só mostra ele enquanto o mapa da cidade não chega.
 
 Formato .m3d (gzip): "M3D1" + uint32 tamanho do cabeçalho + cabeçalho JSON +
 posições (uint16 × 9 por triângulo, quantizadas na caixa do cabeçalho) +
 cores (uint8 × 3 por triângulo). O cabeçalho diz a faixa de triângulos da
-casca e de cada unidade (`opaco` e `vidro`: [início, quantidade]).
+casca, do terreno e de cada unidade (`opaco` e `vidro`: [início, quantidade]).
 Leitor: src/lib/modelo-3d.ts.
 
 Ajustes por empreendimento ficam em CONFIG, pelo nome do arquivo de saída.
@@ -44,6 +46,9 @@ CONFIG = {
         "frente": "-y",
         # Fora da maquete: não se vê de fora e pesa.
         "ignorar": r"paredes internas|^curtain$",
+        # Altura (m) da calçada acima do ponto mais baixo do arquivo: é o y = 0
+        # da cena, para o prédio assentar no mapa da cidade (que é plano).
+        "calcada": 0.55,
     },
 }
 
@@ -308,9 +313,13 @@ def caixa_de(sub):
     return cantos[CAIXA], (int(media[0]), int(media[1]), int(media[2]), 255)
 
 
+TERRENO = "terreno"  # destino das peças do chão em volta (em vez de um pavimento)
+
+
 class Saida:
     def __init__(self):
         self.casca = []      # [(tris mundo, cor)]
+        self.terreno = []    # ruas e grama desenhadas em volta do prédio
         self.andares = {}    # id do pavimento -> [(tris, cor)]
         self.caixas = 0
         self.ignorados = 0
@@ -318,7 +327,8 @@ class Saida:
     def por(self, tris, c, andar):
         if not len(tris):
             return
-        (self.casca if andar is None else self.andares.setdefault(andar, [])).append((tris, c))
+        destino = self.casca if andar is None else self.terreno if andar == TERRENO else self.andares.setdefault(andar, [])
+        destino.append((tris, c))
 
 
 def percorrer(ents, M, herdado, andar, cfg, saida, raiz=False):
@@ -338,6 +348,12 @@ def percorrer(ents, M, herdado, andar, cfg, saida, raiz=False):
         if andar is None and re.search(cfg["pavimentos"], nome):
             meu_andar = id(Mf)  # um por instância; a ordem vem da cota
             saida.andares[meu_andar] = []
+        elif andar is None:
+            # Chapa baixa e muito maior que o prédio = o terreno em volta.
+            cx_, _ = caixa_de(sub)
+            dims = np.ptp((aplicar(Mw, cx_) * POL).reshape(-1, 3), axis=0)
+            if dims[2] < 2.5 and max(dims[0], dims[1]) > 80:
+                meu_andar = TERRENO
         if n > LIMITE_TRI:
             cantos, cmedia = caixa_de(sub)
             mundo = aplicar(Mw, cantos) * POL
@@ -407,8 +423,9 @@ def main():
     mn = np.min([p[2] for p in pav], axis=0)
     mx = np.max([p[3] for p in pav], axis=0)
     cx, cy = (mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2
-    # Nível da rua: a face mais baixa da casca fica em y = 0.
-    z0 = min(t[:, :, 2].min() for t, _ in saida.casca)
+    # y = 0 na calçada (o ponto mais baixo do arquivo fica um pouco abaixo).
+    fundo = min(t[:, :, 2].min() for t, _ in saida.casca + saida.terreno)
+    z0 = fundo + cfg.get("calcada", 0.0)
 
     def para_cena(t):
         """Arquivo (x, y, z para cima; frente em -y) → cena (x, y para cima, z para a frente)."""
@@ -422,7 +439,7 @@ def main():
         sys.exit("Só a frente em -y está implementada.")
 
     # Caixa de tudo, para quantizar as posições em uint16 (2 mm de passo).
-    todos = [t for t, _ in saida.casca] + [t for itens in saida.andares.values() for t, _ in itens]
+    todos = [t for t, _ in saida.casca + saida.terreno] + [t for itens in saida.andares.values() for t, _ in itens]
     pts = np.concatenate([para_cena(t).reshape(-1, 3) for t in todos if len(t)])
     pmin, pmax = pts.min(0), pts.max(0)
     passo = (pmax - pmin) / 65535
@@ -455,6 +472,7 @@ def main():
 
     cab = {"versao": 1, "origem": os.path.basename(src), "andares": [], "unidades": []}
     cab["casca"] = {"opaco": gravar(saida.casca, False), "vidro": gravar(saida.casca, True)}
+    cab["terreno"] = gravar(saida.terreno, False)
     for i, (zmin, k, bmn, bmx) in enumerate(pav):
         cab["andares"].append({"piso": round(float(zmin - z0), 2), "topo": round(float(bmx[2] - z0), 2)})
         lados = ([], [])
@@ -481,7 +499,8 @@ def main():
     print(f"{dst}: {total} triângulos, {len(pav)} pavimentos, {len(cab['unidades'])} unidades")
     print(f"  casca {cab['casca']} · caixas no lugar de peças pesadas: {saida.caixas} · nós ignorados: {saida.ignorados} · triângulos sem área tirados: {degenerados}")
     print(f"  cru {len(cru) / 1e6:.1f} MB, gzip {os.path.getsize(dst) / 1e6:.2f} MB")
-    print(f"  caixa (m): {pmin.round(2)} a {pmax.round(2)} · eixo da torre no arquivo x={cx:.2f} y={cy:.2f} · rua em z={z0:.2f}")
+    print(f"  caixa (m): {pmin.round(2)} a {pmax.round(2)} · eixo da torre no arquivo x={cx:.2f} y={cy:.2f} · calçada em z={z0:.2f}")
+    print(f"  terreno {cab['terreno']}")
     print("  pisos:", [a["piso"] for a in cab["andares"]])
     if previa:
         # Mesmo formato do render de conferência (um grupo por cor, eixos do arquivo).

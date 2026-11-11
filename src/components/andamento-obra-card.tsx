@@ -29,6 +29,9 @@ export function AndamentoObraCard({ chave }: { chave: string }) {
   const [erro, setErro] = useState("");
   useEffect(() => {
     let vivo = true;
+    // Outro prédio: some o andamento do anterior até o dele chegar (senão os
+    // números de um apareciam por um instante sob o nome do outro).
+    setDados(null); setEdicao(null); setErro("");
     fetch(`/api/andamento-obra?chave=${encodeURIComponent(chave)}`).then(r => r.ok ? r.json() : null).then(d => { if (vivo && d?.etapas) setDados(d); }).catch(() => {});
     return () => { vivo = false; };
   }, [chave]);

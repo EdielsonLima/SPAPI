@@ -236,6 +236,35 @@ async function migrate() {
       console.warn("[migrate] fotos do 135 Jardins:", e.message);
     }
 
+    // Mapa da cidade em volta da maquete 3D (tabela entorno_3d), já pronto: os
+    // arquivos de scripts/dados/entorno/<chave>.json são o que o servidor
+    // montaria baixando do OpenStreetMap (Overpass), que vive sobrecarregado —
+    // em 11/11/2026 levou 9 minutos para responder. Entra só quando o banco não
+    // tem o mapa daquela chave ou tem numa versão mais antiga que a do arquivo;
+    // nunca troca um mapa igual ou mais novo (o servidor continua refazendo
+    // sozinho quando a versão do código sobe).
+    try {
+      const dir = path.join(__dirname, "dados", "entorno");
+      const arquivos = fs.existsSync(dir) ? fs.readdirSync(dir).filter(a => /^[a-z0-9-]+\.json$/.test(a)) : [];
+      if (arquivos.length) {
+        await pool.query(`CREATE TABLE IF NOT EXISTS entorno_3d (
+          chave TEXT PRIMARY KEY, dados JSONB NOT NULL, atualizado_em TIMESTAMP NOT NULL DEFAULT NOW())`);
+        for (const a of arquivos) {
+          const chave = a.replace(/\.json$/, "");
+          const texto = fs.readFileSync(path.join(dir, a), "utf-8");
+          const versao = Number(JSON.parse(texto).versao) || 1;
+          const { rows } = await pool.query(`SELECT COALESCE((dados->>'versao')::int, 1) AS versao FROM entorno_3d WHERE chave = $1`, [chave]);
+          if (rows.length && rows[0].versao >= versao) continue;
+          await pool.query(
+            `INSERT INTO entorno_3d (chave, dados, atualizado_em) VALUES ($1, $2, NOW())
+             ON CONFLICT (chave) DO UPDATE SET dados = EXCLUDED.dados, atualizado_em = NOW()`, [chave, texto]);
+          console.log(`[migrate] entorno_3d: mapa da cidade de ${chave} na versão ${versao}${rows.length ? ` (era ${rows[0].versao})` : ""}.`);
+        }
+      }
+    } catch (e) {
+      console.warn("[migrate] mapa da cidade (entorno_3d):", e.message);
+    }
+
     // Migration: ensure dre_excel_supplementary has month column in PK
     try {
       const { rows } = await pool.query(`

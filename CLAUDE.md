@@ -318,8 +318,7 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
     por um tom da situação, o vidro leva a cor da situação; à noite o vidro de
     quem tem dono acende pano a pano (cor por vértice, uniforme `uNoite`).
     Clique, card, espelho ao lado, filtro da legenda, resumo e tela cheia são os
-    mesmos do Palácio. Sem mapa da cidade (falta cadastrar `local`; endereço:
-    Rua 3420, nº 135, Barra Sul).
+    mesmos do Palácio; o mapa da cidade entrou em 11/11 (último item desta lista).
   - **Qual fatia é qual unidade:** andar pelo NÚMERO (`andarNoModelo`: "2802" →
     28º pavimento de apartamentos), porque o andar do cadastro do Sienge é o
     pavimento do projeto (101 = 10º, 3102 = 40º); lado por `ordenarFinais`.
@@ -336,12 +335,12 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
     da 2802 ("37º andar · lado direito") e o Palácio igual a antes. 127 chamadas
     de desenho.
   - **Andamento da obra, planta e fotos, do site (Edielson, 11/11/2026: "Momento
-    da obra: vamos pegar do site. E também as fotos da galeria").** Como o 135
-    não tem `local` (mapa), a chave do banco vem de `ConfigTorre.obra`
-    (`{ chave: "135-jardins", site }`); `obraDaConfig`/`obraDaChave` em
-    `torre-3d.ts` devolvem a do mapa ou a de `obra`, e é o que o 3D, o cartão de
-    andamento, a aba Fotos, as condições e `/api/andamento-obra` usam (a chave é
-    a mesma que as condições já usavam para "135 JARDINS").
+    da obra: vamos pegar do site. E também as fotos da galeria").** A chave do
+    banco é `135-jardins`: `obraDaConfig`/`obraDaChave` em `torre-3d.ts` devolvem
+    a do mapa (`local`) ou, para empreendimento sem mapa, a de `ConfigTorre.obra`;
+    é o que o 3D, o cartão de andamento, a aba Fotos, as condições e
+    `/api/andamento-obra` usam (a chave é a mesma que as condições já usavam
+    para "135 JARDINS").
     **Andamento:** mesma leitura do Palácio (`lerAndamentoDoHtml`; no 135 os
     anéis são `jet-circle-progress`, com o número em `data-value` e
     `data-to-value`, coberto no teste). Partida em `ANDAMENTO_INICIAL` = site em
@@ -359,6 +358,54 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
     miniaturas a fila alargava o diálogo e jogava a foto grande para fora.
     Conferido local: andamento "site · 11/11/2026" com os 9 números, planta da
     2802 e as 25 fotos carregadas; migração rodada duas vezes sem duplicar.
+    O cartão de andamento some ao trocar de prédio até chegar o dele (mostrava
+    por um instante os números do anterior).
+  - **Mapa da cidade no 135 Jardins e mar refeito nos dois mapas (Edielson,
+    11/11/2026: "um mapa da cidade de uma forma igual à que foi feita com o
+    Palácio, que fique uma coisa leve [...] que fique bonito").**
+    **Onde fica:** esquina da Rua 3420 com a Av. Brasil, do lado do mar da
+    avenida e a leste da 3420 (fundos para a Rua 3500). A frente (sacadas) olha
+    para a Rua 3420, a OESTE, e o lazer fica do lado da Av. Brasil. Tirado do
+    terreno que veio no SketchUp (rua na frente, avenida em diagonal à direita,
+    rua 47 m atrás = a 3500, que no mapa fica a 54 m) e das vistas aéreas da
+    galeria do site; o SketchUp não tem norte gravado. `CONFIG_135.local`.
+    **Lote pela esquina:** a 3420 curva perto da orla, e a régua do Palácio
+    ("número = metros em linha reta desde a ponta") erra 39 m. `LocalEntorno`
+    ganhou `esquina: { rua, distancia }` (a origem fica a `distancia` m do
+    cruzamento, andando pela rua da frente para o lado do mar, acompanhando as
+    curvas; aqui 30 m) e `lote: { x0, x1, fundo }` (caixa do lote de onde saem
+    os prédios do mapa; o padrão é o do Palácio). `localizarPelaEsquina` em
+    `entorno-osm.ts`.
+    **Na maquete do projeto:** `ModeloTorre.zRua` (12,1 m) é o eixo da rua da
+    frente, onde o mapa encosta. O conversor passou a gravar o terreno desenhado
+    pelo arquiteto em faixa própria (`terreno` no cabeçalho do .m3d) e o y = 0 na
+    calçada: o 3D mostra esse terreno só enquanto o mapa não chega e esconde
+    quando chega. O carregador do mapa (`carregarMapa` em `torre-3d.tsx`) serve
+    aos dois caminhos (estudo de massa e maquete do projeto).
+    **Mar refeito (versão 3 do mapa, vale para o Palácio também):** até a
+    versão 2 o mar era uma faixa de 3 km à direita de cada trecho da costa. Com
+    a ilha, a ponta da Barra Sul e a foz do rio, as faixas passavam por cima da
+    cidade (o 135 ficava inteiro no azul; o Palácio tinha riscos azuis). Agora
+    `marDaCosta`: grade de 20 m, as células cortadas pela costa viram muro e a
+    água se espalha a partir de pontos logo à direita da costa, dentro do raio
+    da consulta; sai em retângulos + uma faixa exata de 48 m junto à costa.
+    Costa aberta é prolongada reta para fora do raio; se a água alcançar um
+    ponto que é terra (costa com buraco), fica só a faixa. **A areia nunca tinha
+    aparecido:** a Praia Central é uma relação (multipolígono) e a consulta só
+    pedia ways; agora pede `relation["natural"~"beach|sand|water"]` com
+    `out geom` e junta os trechos em anéis. Trava: `entorno-osm.test.ts` (ilha,
+    rio, canal estreito, costa curta, costa contraditória, praia em dois trechos).
+    **Mapas prontos no deploy:** `scripts/dados/entorno/<chave>.json` (135 e
+    Palácio, versão 3, gerados no servidor local). O `migrate.js` grava em
+    `entorno_3d` só se o banco não tem o mapa ou tem versão menor. Motivo: os
+    servidores do Overpass estavam sobrecarregados em 11/11 (502/429/504; o
+    servidor local levou 9 min). Ao subir `VERSAO_ENTORNO`, gerar de novo esses
+    arquivos (abrir o 3D no local e copiar `dados` da tabela) ou apagá-los.
+    Conferido local: prédio assentado na esquina, ruas com nome, praia, mar e
+    bússola (norte à esquerda de quem olha a frente), de dia e à noite; 191
+    chamadas de desenho e 344 mil triângulos com o mapa. Outro jeito de mostrar
+    a cidade "de verdade" (foto aérea no chão, ou a malha 3D do Google) foi só
+    conversado; não está feito.
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no

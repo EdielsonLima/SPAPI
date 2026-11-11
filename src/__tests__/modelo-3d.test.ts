@@ -5,7 +5,7 @@ import { gunzipSync } from "node:zlib";
 import path from "node:path";
 import { ehGzip, lerModelo, posicoesDaFaixa, coresDaFaixa, unidadesPorChave, chaveDaUnidade, type Faixa } from "../lib/modelo-3d";
 import { existsSync } from "node:fs";
-import { andarNoModelo, andarEFinal, ordenarFinais, configDoEmpreendimento, plantaDaUnidade, obraDaConfig, obraDaChave, CONFIG_135, CONFIG_PADRAO, CONFIG_PALACIO } from "../lib/torre-3d";
+import { andarNoModelo, andarEFinal, ordenarFinais, configDoEmpreendimento, plantaDaUnidade, obraDaConfig, obraDaChave, CONFIG_135, CONFIG_PADRAO, CONFIG_PALACIO, CONFIGS_COM_ENTORNO } from "../lib/torre-3d";
 import { ANDAMENTO_INICIAL, ANDAMENTO_INICIAL_EM, etapasValidas } from "../lib/andamento-obra";
 import { chaveDoEmpreendimento } from "../lib/condicoes-pagamento";
 
@@ -26,12 +26,16 @@ assert.deepEqual(andarEFinal("2802", "37º"), { andar: 37, final: "02" });
 assert.deepEqual(ordenarFinais(["02", "01"], CONFIG_135), ["01", "02"]);
 
 // ── Andamento da obra, fotos e planta (11/11/2026) ──
-// Sem mapa da cidade (`local`), a chave vem de `obra`; o Palácio segue pela do mapa.
-assert.equal(CONFIG_135.local, undefined);
+// A chave vem do mapa da cidade (`local`); sem mapa, viria de `obra`.
 assert.deepEqual(obraDaConfig(CONFIG_135), { chave: "135-jardins", site: "https://silvapacker.com.br/empreendimentos/135-jardins/" });
+assert.deepEqual(obraDaConfig({ ...CONFIG_PADRAO, obra: { chave: "x" } }), { chave: "x" });
+// Mapa da cidade: lote na esquina da Rua 3420 com a Av. Brasil, fundos para a 3500.
+assert.ok(CONFIGS_COM_ENTORNO.includes(CONFIG_135));
+assert.equal(CONFIG_135.local!.rua, "3420"); assert.equal(CONFIG_135.local!.ruaFundos, "3500");
+assert.deepEqual(CONFIG_135.local!.esquina, { rua: "Avenida Brasil", distancia: 30 });
 assert.equal(obraDaConfig(CONFIG_PALACIO)!.chave, "palacio-elizabeth");
 assert.equal(obraDaConfig(CONFIG_PADRAO), null);
-assert.equal(obraDaChave("135-jardins")!.site, CONFIG_135.obra!.site);
+assert.equal(obraDaChave("135-jardins")!.site, CONFIG_135.local!.site);
 assert.equal(obraDaChave("palacio-elizabeth")!.chave, "palacio-elizabeth");
 assert.equal(obraDaChave("outro"), null);
 // A chave é a mesma que as condições de pagamento já usavam para "135 JARDINS" (nada se perde).
@@ -79,10 +83,21 @@ for (let andar = 0; andar < 31; andar++) for (const lado of [0, 1]) assert.ok(fa
 for (let i = 1; i < 31; i++) assert.ok(Math.abs(cab.andares[i].piso - cab.andares[i - 1].piso - 3.24) < 0.02, `piso do ${i}`);
 // Altura do prédio = a que a câmera usa antes de o arquivo chegar.
 assert.ok(Math.abs(cab.max[1] - CONFIG_135.modelo!.altura) < 0.5, `altura ${cab.max[1]}`);
-assert.ok(Math.abs(cab.min[1]) < 0.01, "a rua fica em y = 0");
+// y = 0 é a calçada: só o terreno desenhado em volta desce um pouco abaixo.
+assert.ok(cab.min[1] < -0.3 && cab.min[1] > -1, `fundo do terreno em ${cab.min[1]}`);
+assert.ok(cab.terreno && cab.terreno[1] > 100, "o terreno vem em faixa própria");
+{
+  const t = posicoesDaFaixa(m, cab.terreno!);
+  let maxY = -Infinity, larg = 0, minX = Infinity, maxX = -Infinity;
+  for (let i = 0; i < t.length; i += 3) { maxY = Math.max(maxY, t[i + 1]); minX = Math.min(minX, t[i]); maxX = Math.max(maxX, t[i]); }
+  larg = maxX - minX;
+  assert.ok(maxY < 1 && larg > 100, `terreno baixo e largo (até ${maxY.toFixed(2)} m, ${larg.toFixed(0)} m)`);
+  // A rua da frente do terreno do projeto fica onde o mapa da cidade encosta (zRua).
+  assert.ok(CONFIG_135.modelo!.zRua > 9.5 && CONFIG_135.modelo!.zRua < 14.7);
+}
 
 // As faixas cobrem o arquivo inteiro, sem buraco nem sobreposição.
-const faixas: Faixa[] = [cab.casca.opaco, cab.casca.vidro, ...cab.unidades.flatMap(u => [u.opaco, u.vidro])];
+const faixas: Faixa[] = [cab.casca.opaco, cab.casca.vidro, cab.terreno!, ...cab.unidades.flatMap(u => [u.opaco, u.vidro])];
 let cursor = 0;
 faixas.forEach(([ini, qtd]) => { assert.equal(ini, cursor); cursor += qtd; });
 assert.equal(cursor, cab.triangulos);

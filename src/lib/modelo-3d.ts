@@ -4,7 +4,7 @@
 // O arquivo (já sem o gzip): "M3D1" + uint32 tamanho do cabeçalho + cabeçalho
 // JSON + posições (uint16 × 9 por triângulo, quantizadas na caixa min–max) +
 // cores (uint8 × 3 por triângulo, sRGB). Metros; origem no eixo da torre e no
-// nível da rua; x para a direita, y para cima, z para a frente (as sacadas).
+// nível da calçada; x para a direita, y para cima, z para a frente (as sacadas).
 //
 // A casca (base, lazer, topo, rua) vem numa faixa só; cada apartamento tem a
 // sua, com o vidro separado do resto — é o que o 3D pinta pela situação.
@@ -27,6 +27,9 @@ export interface CabecalhoModelo {
   min: [number, number, number];
   max: [number, number, number];
   casca: { opaco: Faixa; vidro: Faixa };
+  // Ruas e grama que o arquiteto desenhou em volta: o 3D só mostra enquanto o
+  // mapa da cidade não chega (arquivos antigos não têm; aí vai tudo na casca).
+  terreno?: Faixa;
   andares: { piso: number; topo: number }[];
   unidades: UnidadeModelo[];
 }
