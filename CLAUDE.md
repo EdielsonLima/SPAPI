@@ -442,9 +442,18 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
     para o teste): 49 tiles e 0,81 MB no 135, 51 tiles e 0,97 MB no Palácio,
     foto alinhada com ruas e praia, de dia e à noite, desligar volta ao mapa,
     religar não baixa de novo, falha simulada avisa e desliga; sem chave, botão
-    ausente e rota em 503 (400 fora da região ou em outro zoom). **O
-    caminho servidor → Esri só roda com a chave real**, que depende do Edielson
-    criar a conta. O teste de 11/11 comparou também a ortofoto do Estado
+    ausente e rota em 503 (400 fora da região ou em outro zoom).
+    **Chave criada pelo Edielson em 11/11/2026 e no ar no mesmo dia:** conta da
+    DT no ArcGIS Location Platform (portal `dtconsultorias.maps.arcgis.com`,
+    cobrança "pay-as-you-go" desligada), item "SPAPI foto aerea", chave de API
+    com o privilégio Mapas Base, sem URL de referência, **vence em 11/11/2027**
+    (renovar antes: gerar outra no mesmo item, trocar `ARCGIS_API_KEY` no
+    EasyPanel e publicar). Com a chave real: local, 49 tiles com 200 e a foto
+    na cena; produção, `diag` com `conta.ok` e `teste.ok`, botão na barra, 49
+    tiles com 200 (786 kB) e foto na cena em menos de 1 s, mar igual ao do mapa
+    com a foto ligada e desligada, sem tremor entre as camadas. A tela de
+    produção foi conferida por medida dentro da página, não por imagem (a
+    captura de tela do Chrome falha). O teste de 11/11 comparou também a ortofoto do Estado
     (2010–2012, dado público) e a foto inteira com o mar; material em
     `OneDrive\SILVA PACKER\135 JARDINS\Maquete 3D\teste-foto-aerea\`.
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
