@@ -192,6 +192,50 @@ async function migrate() {
       console.warn("[migrate] plantas_fotos seed:", e.message);
     }
 
+    // Carga única (11/11/2026): fotos da galeria do site do 135 Jardins na aba
+    // "Fotos" do "Ver planta" (Edielson: "E também as fotos da galeria"). As 25
+    // imagens de scripts/dados/fotos-135-jardins entram UMA vez, depois das que
+    // já houver nessa chave; ajustes_aplicados guarda a marca e os ids criados
+    // (para desfazer, apagar esses ids). Depois quem manda é a tela: renomear,
+    // mover ou apagar ali não é desfeito. Fica DEPOIS do seed do Palácio, que
+    // só roda enquanto a sequência da tabela nunca foi usada.
+    try {
+      const dir = path.join(__dirname, "dados", "fotos-135-jardins");
+      const arq = path.join(dir, "fotos.json");
+      if (fs.existsSync(arq)) {
+        const j = JSON.parse(fs.readFileSync(arq, "utf-8"));
+        const mime = a => /\.webp$/i.test(a) ? "image/webp" : /\.png$/i.test(a) ? "image/png" : "image/jpeg";
+        const client = await pool.connect();
+        try {
+          await client.query("BEGIN");
+          const marca = await client.query(
+            `INSERT INTO ajustes_aplicados (chave) VALUES ($1) ON CONFLICT (chave) DO NOTHING RETURNING chave`, [j.ajuste]);
+          if (marca.rows.length === 1) {
+            const { rows: ja } = await client.query(`SELECT COALESCE(MAX(ordem), 0) AS ultima FROM plantas_fotos WHERE chave = $1`, [j.chave]);
+            let ordem = Number(ja[0].ultima) || 0;
+            const criadas = [];
+            for (const f of j.fotos) {
+              const dados = fs.readFileSync(path.join(dir, f.arquivo));
+              const { rows } = await client.query(
+                `INSERT INTO plantas_fotos (chave, titulo, ordem, mime, tamanho, dados) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+                [j.chave, f.titulo, ++ordem, mime(f.arquivo), dados.length, dados]);
+              criadas.push(rows[0].id);
+            }
+            await client.query(`UPDATE ajustes_aplicados SET antes = $2 WHERE chave = $1`, [j.ajuste, JSON.stringify({ criadas })]);
+            console.log(`[migrate] plantas_fotos: ${criadas.length} foto(s) da galeria do 135 Jardins.`);
+          }
+          await client.query("COMMIT");
+        } catch (e) {
+          await client.query("ROLLBACK");
+          throw e;
+        } finally {
+          client.release();
+        }
+      }
+    } catch (e) {
+      console.warn("[migrate] fotos do 135 Jardins:", e.message);
+    }
+
     // Migration: ensure dre_excel_supplementary has month column in PK
     try {
       const { rows } = await pool.query(`

@@ -4,7 +4,10 @@ import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
 import path from "node:path";
 import { ehGzip, lerModelo, posicoesDaFaixa, coresDaFaixa, unidadesPorChave, chaveDaUnidade, type Faixa } from "../lib/modelo-3d";
-import { andarNoModelo, andarEFinal, ordenarFinais, configDoEmpreendimento, CONFIG_135, CONFIG_PADRAO } from "../lib/torre-3d";
+import { existsSync } from "node:fs";
+import { andarNoModelo, andarEFinal, ordenarFinais, configDoEmpreendimento, plantaDaUnidade, obraDaConfig, obraDaChave, CONFIG_135, CONFIG_PADRAO, CONFIG_PALACIO } from "../lib/torre-3d";
+import { ANDAMENTO_INICIAL, ANDAMENTO_INICIAL_EM, etapasValidas } from "../lib/andamento-obra";
+import { chaveDoEmpreendimento } from "../lib/condicoes-pagamento";
 
 // ── De qual empreendimento é a maquete e onde cada unidade cai nela ──
 assert.equal(configDoEmpreendimento("135 JARDINS"), CONFIG_135);
@@ -21,6 +24,39 @@ assert.equal(andarNoModelo("G 108"), null);
 assert.deepEqual(andarEFinal("2802", "37º"), { andar: 37, final: "02" });
 // Final 01 à esquerda (lado 0), 02 à direita (lado 1), olhando a frente.
 assert.deepEqual(ordenarFinais(["02", "01"], CONFIG_135), ["01", "02"]);
+
+// ── Andamento da obra, fotos e planta (11/11/2026) ──
+// Sem mapa da cidade (`local`), a chave vem de `obra`; o Palácio segue pela do mapa.
+assert.equal(CONFIG_135.local, undefined);
+assert.deepEqual(obraDaConfig(CONFIG_135), { chave: "135-jardins", site: "https://silvapacker.com.br/empreendimentos/135-jardins/" });
+assert.equal(obraDaConfig(CONFIG_PALACIO)!.chave, "palacio-elizabeth");
+assert.equal(obraDaConfig(CONFIG_PADRAO), null);
+assert.equal(obraDaChave("135-jardins")!.site, CONFIG_135.obra!.site);
+assert.equal(obraDaChave("palacio-elizabeth")!.chave, "palacio-elizabeth");
+assert.equal(obraDaChave("outro"), null);
+// A chave é a mesma que as condições de pagamento já usavam para "135 JARDINS" (nada se perde).
+assert.equal(chaveDoEmpreendimento(undefined, "135 JARDINS"), "135-jardins");
+// Partida do andamento = o site em 11/11/2026.
+assert.deepEqual(ANDAMENTO_INICIAL["135-jardins"].map(e => e.pct), [100, 100, 100, 100, 96, 94, 65, 63, 0]);
+assert.deepEqual(etapasValidas(ANDAMENTO_INICIAL["135-jardins"]), ANDAMENTO_INICIAL["135-jardins"]);
+assert.equal(ANDAMENTO_INICIAL_EM["135-jardins"], "2026-11-11");
+// Planta: o pavimento inteiro numa imagem só, sem espelhar; o título diz qual é o apartamento.
+const p01 = plantaDaUnidade(CONFIG_135, "2801")!, p02 = plantaDaUnidade(CONFIG_135, "2802")!;
+assert.equal(p01.url, "/modelos/135-jardins-planta-tipo.webp");
+assert.ok(existsSync(path.join(__dirname, "../../public", p01.url)), "a imagem da planta está publicada");
+assert.equal(p01.espelhada, false); assert.equal(p02.espelhada, false);
+assert.match(p01.lado!, /esquerda/); assert.match(p02.lado!, /direita/);
+// Fotos da galeria: manifesto da carga única confere com os arquivos.
+const dirFotos = path.join(__dirname, "../../scripts/dados/fotos-135-jardins");
+const manifesto = JSON.parse(readFileSync(path.join(dirFotos, "fotos.json"), "utf-8")) as { ajuste: string; chave: string; fotos: { arquivo: string; titulo: string }[] };
+assert.equal(manifesto.chave, obraDaConfig(CONFIG_135)!.chave);
+assert.equal(manifesto.fotos.length, 25);
+manifesto.fotos.forEach(f => {
+  const b = readFileSync(path.join(dirFotos, f.arquivo));
+  assert.ok(b.length > 10_000 && b.length < 8 * 1024 * 1024, f.arquivo);
+  assert.ok(b[0] === 0xff && b[1] === 0xd8, `${f.arquivo} é JPEG`);
+  assert.ok(f.titulo.length > 2 && f.titulo.length <= 120);
+});
 
 // ── O arquivo publicado ──
 const arq = readFileSync(path.join(__dirname, "../../public", CONFIG_135.modelo!.url));

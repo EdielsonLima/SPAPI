@@ -318,8 +318,8 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
     por um tom da situação, o vidro leva a cor da situação; à noite o vidro de
     quem tem dono acende pano a pano (cor por vértice, uniforme `uNoite`).
     Clique, card, espelho ao lado, filtro da legenda, resumo e tela cheia são os
-    mesmos do Palácio. Sem mapa da cidade, andamento da obra e planta (falta
-    cadastrar `local` e `planta`; endereço: Rua 3420, nº 135, Barra Sul).
+    mesmos do Palácio. Sem mapa da cidade (falta cadastrar `local`; endereço:
+    Rua 3420, nº 135, Barra Sul).
   - **Qual fatia é qual unidade:** andar pelo NÚMERO (`andarNoModelo`: "2802" →
     28º pavimento de apartamentos), porque o andar do cadastro do Sienge é o
     pavimento do projeto (101 = 10º, 3102 = 40º); lado por `ordenarFinais`.
@@ -335,6 +335,30 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   - Conferido local (Playwright, Chrome sem GPU): dia, noite, filtro, clique, card
     da 2802 ("37º andar · lado direito") e o Palácio igual a antes. 127 chamadas
     de desenho.
+  - **Andamento da obra, planta e fotos, do site (Edielson, 11/11/2026: "Momento
+    da obra: vamos pegar do site. E também as fotos da galeria").** Como o 135
+    não tem `local` (mapa), a chave do banco vem de `ConfigTorre.obra`
+    (`{ chave: "135-jardins", site }`); `obraDaConfig`/`obraDaChave` em
+    `torre-3d.ts` devolvem a do mapa ou a de `obra`, e é o que o 3D, o cartão de
+    andamento, a aba Fotos, as condições e `/api/andamento-obra` usam (a chave é
+    a mesma que as condições já usavam para "135 JARDINS").
+    **Andamento:** mesma leitura do Palácio (`lerAndamentoDoHtml`; no 135 os
+    anéis são `jet-circle-progress`, com o número em `data-value` e
+    `data-to-value`, coberto no teste). Partida em `ANDAMENTO_INICIAL` = site em
+    11/11: 100/100/100/100/96/94/65/63/0.
+    **Planta:** `public/modelos/135-jardins-planta-tipo.webp` (do site,
+    `135-IMG-PLH-TIPOS`): o pavimento inteiro, os dois apartamentos, frente
+    embaixo; não espelha, e `planta.lados` diz no título qual é o da unidade
+    ("este é o apartamento da direita").
+    **Fotos:** as 25 da galeria do site, na ordem de lá, em
+    `scripts/dados/fotos-135-jardins/` (`fotos.json` = arquivo + título). Carga
+    única do `migrate.js` em `plantas_fotos` (marca `fotos-135-jardins-2026-11-11`
+    em `ajustes_aplicados`, com os ids criados); fica DEPOIS do seed do Palácio,
+    que só roda com a sequência da tabela intocada. Depois quem manda é a aba
+    (renomear, mover, apagar). `planta-fotos.tsx` ganhou `min-w-0`: com 25
+    miniaturas a fila alargava o diálogo e jogava a foto grande para fora.
+    Conferido local: andamento "site · 11/11/2026" com os 9 números, planta da
+    2802 e as 25 fotos carregadas; migração rodada duas vezes sem duplicar.
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no

@@ -10,10 +10,14 @@ export interface AndamentoObra { etapas: EtapaObra[]; fonte: "site" | "painel"; 
 
 export const ETAPAS_OBRA = ["Projeto", "Fundação", "Estrutura", "Alvenaria", "Instalações", "Reboco", "Pintura", "Esquadrias", "Decoração"];
 
-// Site em 23/10/2026 (print do Edielson): ponto de partida do painel.
+// Ponto de partida do painel, enquanto o site não é lido: o que o site mostrava
+// no print do Edielson (Palácio em 23/10/2026, 135 Jardins em 11/11/2026).
+const partida = (pcts: number[]) => pcts.map((pct, i) => ({ etapa: ETAPAS_OBRA[i], pct }));
 export const ANDAMENTO_INICIAL: Record<string, EtapaObra[]> = {
-  "palacio-elizabeth": [100, 100, 55, 15, 2, 2, 0, 0, 0].map((pct, i) => ({ etapa: ETAPAS_OBRA[i], pct })),
+  "palacio-elizabeth": partida([100, 100, 55, 15, 2, 2, 0, 0, 0]),
+  "135-jardins": partida([100, 100, 100, 100, 96, 94, 65, 63, 0]),
 };
+export const ANDAMENTO_INICIAL_EM: Record<string, string> = { "palacio-elizabeth": "2026-10-23", "135-jardins": "2026-11-11" };
 
 const sem = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().trim();
 

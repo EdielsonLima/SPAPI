@@ -49,6 +49,10 @@ export interface ConfigTorre {
   // Condições de pagamento de referência do empreendimento (tabela comercial),
   // usadas pelo modal Condições enquanto não há condições salvas no banco.
   condicoes?: Partial<CondicoesPagamento>;
+  // Identidade do empreendimento para o que o banco guarda por chave
+  // (andamento da obra, fotos, condições), quando ele não tem `local` (mapa
+  // da cidade). `site` = página dele no site, de onde sai o andamento.
+  obra?: { chave: string; site?: string };
   // Maquete do projeto (SketchUp convertido): com ela o prédio inteiro vem do
   // arquivo, e as medidas acima só servem de reserva. Ver ModeloTorre.
   modelo?: ModeloTorre;
@@ -69,6 +73,9 @@ export interface ModeloTorre {
 // a planta aparece com a `nota` (ex.: pavimento diferenciado).
 export interface PlantaTipo {
   url: string; titulo: string; espelhar?: string[]; andares?: [number, number]; nota?: string;
+  // Imagem com o pavimento inteiro (mais de um apartamento): qual deles é o de
+  // cada final, para dizer no título do diálogo ("01" → "o da esquerda").
+  lados?: Record<string, string>;
   // Aba "Tour 3D": maquete da planta (planta-dollhouse.tsx). Sem isso, só a imagem.
   tour?: TourPlanta;
 }
@@ -82,12 +89,12 @@ export interface TourPlanta {
   vidros?: [number, number, number, number][]; // [x, y, w, h] px: esquadrias de vidro (varanda)
 }
 
-export function plantaDaUnidade(cfg: ConfigTorre, unidade: string): { url: string; titulo: string; espelhada: boolean; nota: string | null; tour: TourPlanta | null } | null {
+export function plantaDaUnidade(cfg: ConfigTorre, unidade: string): { url: string; titulo: string; espelhada: boolean; nota: string | null; tour: TourPlanta | null; lado: string | null } | null {
   const p = cfg.planta; if (!p) return null;
   const af = andarEFinal(unidade);
   const espelhada = !!af && (p.espelhar || []).includes(af.final);
   const fora = !!af && !!p.andares && (af.andar < p.andares[0] || af.andar > p.andares[1]);
-  return { url: p.url, titulo: p.titulo, espelhada, nota: fora ? p.nota || null : null, tour: p.tour || null };
+  return { url: p.url, titulo: p.titulo, espelhada, nota: fora ? p.nota || null : null, tour: p.tour || null, lado: (af && p.lados?.[af.final]) || null };
 }
 
 // pos = m do centro da janela até a quina de fora (frente/fundos) ou até a
@@ -231,6 +238,15 @@ export const CONFIG_135: ConfigTorre = {
   ordemFinais: ["01", "02"],
   janelas: { frente: 0, lateral: 0, fundos: 0 },
   modelo: { url: "/modelos/135-jardins.m3d", altura: 140.7, ladoCamera: 1, fonte: "Modelo do projeto (SketchUp, estudo de 2019)" },
+  // Andamento da obra e fotos (Edielson, 11/11/2026: "vamos pegar do site. E
+  // também as fotos da galeria"). Sem `local`: não há mapa da cidade.
+  obra: { chave: "135-jardins", site: "https://silvapacker.com.br/empreendimentos/135-jardins/" },
+  // Planta humanizada do pavimento tipo, do site (135-IMG-PLH-TIPOS): os dois
+  // apartamentos na mesma imagem, a frente (livings) embaixo.
+  planta: {
+    url: "/modelos/135-jardins-planta-tipo.webp", titulo: "Planta humanizada · pavimento tipo",
+    lados: { "01": "este é o apartamento da esquerda", "02": "este é o apartamento da direita" },
+  },
 };
 
 export function configDoEmpreendimento(nome: string): ConfigTorre {
@@ -373,3 +389,15 @@ export function descricaoDaPosicao(indice: number, total: number): string {
 }
 
 export const CONFIGS_COM_ENTORNO: ConfigTorre[] = [CONFIG_PALACIO];
+
+// Chave e site do empreendimento para andamento da obra, fotos e condições:
+// a do mapa da cidade (`local`), senão a de `obra`.
+export function obraDaConfig(cfg: ConfigTorre): { chave: string; site?: string } | null {
+  if (cfg.local) return { chave: cfg.local.chave, site: cfg.local.site };
+  return cfg.obra ?? null;
+}
+const CONFIGS_DE_OBRA: ConfigTorre[] = [CONFIG_PALACIO, CONFIG_135];
+export function obraDaChave(chave: string): { chave: string; site?: string } | null {
+  for (const c of CONFIGS_DE_OBRA) { const o = obraDaConfig(c); if (o && o.chave === chave) return o; }
+  return null;
+}

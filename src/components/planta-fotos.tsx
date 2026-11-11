@@ -75,8 +75,10 @@ export default function PlantaFotos({ chave }: { chave: string }) {
   const btn = "inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800";
   const idx = f ? fotos!.indexOf(f) : -1;
   return (
-    <div className="flex flex-col gap-2">
-      {fotos === null && <div className="flex h-[40vh] items-center justify-center text-xs text-slate-500">Carregando as fotos…</div>}
+    // min-w-0: com muitas fotos a fila de miniaturas é mais larga que o diálogo;
+    // sem isto ela alargava a aba inteira e empurrava a foto grande para fora.
+    <div className="flex min-w-0 flex-col gap-2">
+      {fotos === null &&<div className="flex h-[40vh] items-center justify-center text-xs text-slate-500">Carregando as fotos…</div>}
       {erro && <p className="text-xs text-amber-700 dark:text-amber-300">{erro}</p>}
       {fotos && !fotos.length && !erro && (
         <div className="flex h-[40vh] flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 text-xs text-slate-500 dark:border-slate-600">

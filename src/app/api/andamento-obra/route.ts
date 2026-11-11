@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { lerAndamento, gravarAndamento } from "@/lib/db";
-import { CONFIGS_COM_ENTORNO } from "@/lib/torre-3d";
+import { obraDaChave } from "@/lib/torre-3d";
 import { podeEditarNaSessao } from "@/app/api/tabela-precos/acesso";
-import { ANDAMENTO_INICIAL, etapasValidas, lerAndamentoDoHtml } from "@/lib/andamento-obra";
+import { ANDAMENTO_INICIAL, ANDAMENTO_INICIAL_EM, etapasValidas, lerAndamentoDoHtml } from "@/lib/andamento-obra";
 
 // Andamento da obra (maquete 3D).
 //  GET ?chave= → etapas; relê o site a cada 6 h (se a leitura fechar, grava).
@@ -24,8 +24,9 @@ export async function GET(req: NextRequest) {
   const s = await getServerSession(authOptions);
   if (!s) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const chave = req.nextUrl.searchParams.get("chave") || "";
-  const local = CONFIGS_COM_ENTORNO.find(c => c.local?.chave === chave)?.local;
+  const local = obraDaChave(chave);
   if (!local) return NextResponse.json({ error: "Empreendimento sem andamento." }, { status: 404 });
+  const partidaEm = ANDAMENTO_INICIAL_EM[chave] ?? "2026-10-23";
   const podeEditar = podeEditarNaSessao(s);
   try {
     if (local.site && Date.now() - (lidoEm.get(chave) ?? 0) > SEIS_HORAS) {
@@ -36,11 +37,11 @@ export async function GET(req: NextRequest) {
     const linha = await lerAndamento(chave);
     const etapas = etapasValidas(linha?.etapas) ?? ANDAMENTO_INICIAL[chave] ?? null;
     if (!etapas) return NextResponse.json({ error: "Sem andamento." }, { status: 404 });
-    return NextResponse.json({ etapas, fonte: linha?.fonte ?? "painel", atualizadoEm: linha?.atualizadoEm ?? "2026-10-23", podeEditar });
+    return NextResponse.json({ etapas, fonte: linha?.fonte ?? "painel", atualizadoEm: linha?.atualizadoEm ?? partidaEm, podeEditar });
   } catch (e) {
     console.error("[andamento-obra]", e);
     const etapas = ANDAMENTO_INICIAL[chave];
-    return etapas ? NextResponse.json({ etapas, fonte: "painel", atualizadoEm: "2026-10-23", podeEditar: false }) : NextResponse.json({ error: "Falha." }, { status: 500 });
+    return etapas ? NextResponse.json({ etapas, fonte: "painel", atualizadoEm: partidaEm, podeEditar: false }) : NextResponse.json({ error: "Falha." }, { status: 500 });
   }
 }
 
@@ -50,7 +51,7 @@ export async function PUT(req: NextRequest) {
   if (!podeEditarNaSessao(s)) return NextResponse.json({ error: "Sem permissão para alterar o andamento." }, { status: 403 });
   const body = await req.json().catch(() => null) as { chave?: string; etapas?: unknown } | null;
   const etapas = etapasValidas(body?.etapas);
-  if (!body?.chave || !CONFIGS_COM_ENTORNO.some(c => c.local?.chave === body.chave) || !etapas) {
+  if (!body?.chave || !obraDaChave(body.chave) || !etapas) {
     return NextResponse.json({ error: "Andamento inválido (0 a 100% em cada etapa)." }, { status: 400 });
   }
   await gravarAndamento(body.chave, etapas, "painel", s.user?.email || "");

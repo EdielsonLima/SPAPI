@@ -36,7 +36,7 @@ const MUSICA_PREF = "quadro3d_musica";
 const MUSICA_VOL_PREF = "quadro3d_volume";
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
-  configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, plantaDaUnidade, andarNoModelo, type Bloco, type Janela,
+  configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, plantaDaUnidade, andarNoModelo, obraDaConfig, type Bloco, type Janela,
 } from "@/lib/torre-3d";
 import { chaveDaUnidade, unidadesPorChave } from "@/lib/modelo-3d";
 import { baixarModelo, geometriaDaFaixa, materialDoVidro } from "@/components/torre-3d-modelo";
@@ -203,6 +203,8 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
   }, []);
 
   const cfg = useMemo(() => configDoEmpreendimento(empreendimento), [empreendimento]);
+  // Chave do empreendimento no banco (andamento da obra, fotos, condições).
+  const chaveObra = obraDaConfig(cfg)?.chave;
   // Layout: finais de cada andar na ordem da frente.
   const layout = useMemo(() => {
     const porAndar = new Map<number, Unidade3D[]>();
@@ -830,9 +832,9 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           <p className="text-[10px] text-slate-400 pt-1.5">{cfg.modelo ? cfg.modelo.fonte : cfg.cotaRef ? "Pelo projeto: planta tipo, cortes e garagens" : cfg.janelasTipo ? "Torre pela planta tipo · base e lazer estimados" : "Estudo de massa: medidas estimadas"}</p>
         </div>
       </div>
-      {cfg.local && (
+      {chaveObra && (
         <div className={`pointer-events-none absolute bottom-3 left-[248px] right-3 flex ${sel ? "justify-start" : "justify-center"} max-md:hidden`}>
-          <AndamentoObraCard chave={cfg.local.chave} />
+          <AndamentoObraCard chave={chaveObra} />
         </div>
       )}
       <div ref={bussola} style={{ display: "none" }} title="Norte" className="pointer-events-none absolute top-14 right-3 h-16 w-16 items-center justify-center rounded-full bg-white/85 dark:bg-slate-900/80 shadow ring-1 ring-slate-200 dark:ring-slate-700">
@@ -922,7 +924,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           <DialogContent container={cheia ? caixa.current : undefined} className="max-h-[92vh] max-w-5xl gap-3 overflow-y-auto p-5 dark:bg-slate-900">
             <DialogTitle className="text-base">Apartamento {sel.u.unit} · {sel.u.andar}º andar · {empreendimento}</DialogTitle>
             <DialogDescription className="text-xs">Valor de tabela, condições de pagamento e fluxo. Os campos podem ser alterados para simular uma proposta.</DialogDescription>
-            <CondicoesPagamentoModal chave={chaveDoEmpreendimento(cfg.local?.chave, empreendimento)} empreendimento={empreendimento} unidade={sel.u.unit} andar={sel.u.andar} posicao={descricaoDaPosicao(sel.indice, sel.total)} area={sel.u.area} preco={sel.u.preco} entregaConfig={cfg.entrega} condicoesConfig={cfg.condicoes} />
+            <CondicoesPagamentoModal chave={chaveDoEmpreendimento(chaveObra, empreendimento)} empreendimento={empreendimento} unidade={sel.u.unit} andar={sel.u.andar} posicao={descricaoDaPosicao(sel.indice, sel.total)} area={sel.u.area} preco={sel.u.preco} entregaConfig={cfg.entrega} condicoesConfig={cfg.condicoes} />
           </DialogContent>
         </Dialog>
       )}
@@ -933,14 +935,14 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         if (!pl) return null;
         const abas: { id: "planta" | "tour" | "fotos"; rotulo: string }[] = [{ id: "planta", rotulo: "Planta" }];
         if (pl.tour) abas.push({ id: "tour", rotulo: "Tour 3D" });
-        if (cfg.local?.chave) abas.push({ id: "fotos", rotulo: "Fotos" });
+        if (chaveObra) abas.push({ id: "fotos", rotulo: "Fotos" });
         const aba = abas.some(a => a.id === abaPlanta) ? abaPlanta : "planta";
         return (
           <Dialog open={plantaAberta} onOpenChange={setPlantaAberta}>
             <DialogContent container={cheia ? caixa.current : undefined} className="max-w-5xl gap-3 p-5 dark:bg-slate-900">
               <DialogTitle className="text-base">Apartamento {sel.u.unit} · {sel.u.andar}º andar</DialogTitle>
               <DialogDescription className="text-xs">
-                {pl.titulo}{sel.u.area > 0 ? ` · ${sel.u.area.toLocaleString("pt-BR")} m² privativos` : ""}{pl.espelhada ? " · espelhada (final " + sel.u.unit.slice(-2) + ")" : ""}
+                {pl.titulo}{sel.u.area > 0 ? ` · ${sel.u.area.toLocaleString("pt-BR")} m² privativos` : ""}{pl.espelhada ? " · espelhada (final " + sel.u.unit.slice(-2) + ")" : ""}{pl.lado ? " · " + pl.lado : ""}
               </DialogDescription>
               {abas.length > 1 && (
                 <div className="flex w-fit gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800" role="tablist">
@@ -956,7 +958,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
                 {pl.nota && <p className="text-[11px] text-amber-700 dark:text-amber-300/80">{pl.nota}</p>}
               </>)}
               {aba === "tour" && pl.tour && <PlantaDollhouse imagem={pl.url} tour={pl.tour} espelhada={pl.espelhada} escuro={escuro} />}
-              {aba === "fotos" && cfg.local?.chave && <PlantaFotos chave={cfg.local.chave} />}
+              {aba === "fotos" && chaveObra && <PlantaFotos chave={chaveObra} />}
               <p className="text-[10px] text-slate-500">Imagem ilustrativa. Móveis e decoração não fazem parte do imóvel.</p>
             </DialogContent>
           </Dialog>
