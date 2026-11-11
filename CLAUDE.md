@@ -1061,6 +1061,42 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     numa área de 1.052 px); o menu agora abre recolhido. O limite de 1760 px é da janela,
     não da área: com o menu aberto entre 1760 e ~1790 px pode faltar largura.
 
+## Resumo em HTML, no padrão do Fechamento de Caixa (Edielson, 11/11/2026)
+
+- Pedido: "um HTML bonito no mesmo padrão daquele que a gente já manda para o João Paulo
+  do fechamento de caixa, para ele ter esse resumo aqui também em forma de HTML".
+- Botão **HTML** na barra de filtros da aba Resumo (depois de Meses, onde a aba A Pagar
+  tem o "PDF"; não acrescenta linha à tela). Baixa
+  `Resumo-Financeiro-Silva-Packer-AAAA-MM-DD.html`: arquivo único, sem script, com o logo
+  embutido (`/logo-full.jpg`), que abre igual em qualquer aparelho.
+- **Os números são os da tela.** A aba Resumo guarda as linhas que acabou de desenhar em
+  `resumoHtmlRef` (ordem, filtros e "sem preço" incluídos) e `baixarResumoHtml` só monta o
+  arquivo; nenhuma regra de cálculo nova. Por isso só gera com a aba aberta: não existe
+  Resumo calculado no servidor (Total Recebido, Total Pago e Total a Receber são contas
+  feitas no navegador).
+- Gerador puro em `src/lib/resumo-html.ts` (`montarResumoHtml`), trava
+  `resumo-html.test.ts` com a tela de produção de 11/11/2026 às 07:30: Recebido
+  R$ 374.890.544,57 · Pago R$ 320.073.644,01 · Lucro Realizado R$ 54.816.900,56 (margem
+  14,62%) · Ainda a Entrar R$ 432.338.085,04. Para ver o relatório com esses números:
+  `RESUMO_HTML_SAIDA=arquivo.html npx tsx src/__tests__/resumo-html.test.ts`.
+- Visual = o do `gen_fechamento.py` (repositório `rotinas-silvapacker`, pasta
+  `C:\Projetos Clientes\fechamento-caixa-cloud`): cabeçalho azul com logo, 4 cartões
+  escuros (Total Recebido, Total Pago, Lucro Realizado, Ainda a Entrar), seções brancas,
+  rodapé. **A partir de 1240 px de largura sai a tabela da tela** (os três blocos);
+  **abaixo disso, um cartão por empreendimento** e um "Total geral": são 10 números por
+  empreendimento, que não cabem em tabela no celular, onde o João Paulo abre o
+  fechamento. Finalizadas embaixo de um divisor. A seção "Como ler" repete as contas do
+  "i" das colunas: mudou a dica lá, mudar aqui.
+- Rodapé: hora em que o arquivo foi gerado e a carga mais ANTIGA entre CP e CR ("Dados do
+  Sienge atualizados em…"). O período dos cartões vem do filtro de anos e meses
+  (`rotuloPeriodo`).
+- Conferido local (Playwright, 1366×768): tabela do arquivo igual à da tela, célula a
+  célula (12 linhas × 11 colunas), cartões iguais, tela sem rolagem nova; o arquivo não
+  estoura a 1920, 1366, 900, 390 e 360 px.
+- **Não feito, à espera do Edielson:** mandar ao João Paulo por link fixo e WhatsApp, como
+  o fechamento, e rotina automática. Rotina sem ninguém abrir o painel pede o Resumo
+  calculado no servidor, que ainda não existe.
+
 ## Resumo › Estoque por unidade: modal editável (Edielson, 09/11/2026)
 
 - Pedido: "o valor do estoque, ao clicar nele, abra um modal com a empresa filtrada e

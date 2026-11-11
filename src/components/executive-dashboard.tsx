@@ -75,6 +75,7 @@ import { EstoqueModal, useDadosEstoque, type FiltroEstoque } from "@/components/
 import { linhasDeEstoque, totaisPorEmpresa } from "@/lib/estoque-resumo";
 import { unidadesComPainel } from "@/lib/unidades-painel";
 import { periodosDoPainel } from "@/lib/painel-periodos";
+import { montarResumoHtml, nomeArquivoResumo, rotuloPeriodo, type LinhaResumoHtml } from "@/lib/resumo-html";
 
 type Section = "cp" | "cr";
 type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores" | "comparativo";
@@ -300,6 +301,8 @@ export function ExecutiveDashboard() {
   // Entram também as salas cadastradas só no painel (src/lib/unidades-painel.ts).
   const dadosEstoque = useDadosEstoque();
   const [estoqueAberto, setEstoqueAberto] = useState<{ empresa: string; filtro: FiltroEstoque; tipo?: string } | null>(null);
+  // Linhas que a aba Resumo desenhou por último, para o botão "HTML" (baixarResumoHtml).
+  const resumoHtmlRef = useRef<LinhaResumoHtml[]>([]);
   const totaisEstoque = useMemo(() => totaisPorEmpresa(linhasDeEstoque(unidadesComPainel(apiUnits, dadosEstoque.unidadesPainel), {
     precos: dadosEstoque.precos,
     tabelasComerciais: dadosEstoque.tabelasComerciais,
@@ -2762,6 +2765,63 @@ export function ExecutiveDashboard() {
     });
   };
 
+  // Resumo em HTML, no padrão do Fechamento de Caixa (Edielson, 11/11/2026, para o João
+  // Paulo ter o Resumo no mesmo formato). O arquivo sai das linhas que a aba Resumo acabou
+  // de desenhar (guardadas em resumoHtmlRef), então os números são os da tela, com os
+  // filtros que estiverem nela. O HTML é montado em src/lib/resumo-html.ts.
+  const baixarResumoHtml = async () => {
+    const linhas = resumoHtmlRef.current;
+    if (linhas.length === 0) {
+      toast.error("O Resumo está vazio: não há o que exportar.");
+      return;
+    }
+    const dois = (n: number) => String(n).padStart(2, "0");
+    const dataHora = (d: Date, sep: string) => `${dois(d.getDate())}/${dois(d.getMonth() + 1)}/${d.getFullYear()}${sep}${dois(d.getHours())}:${dois(d.getMinutes())}`;
+    const agora = new Date();
+    const data = dataHora(agora, " ").slice(0, 10);
+    // O dado mais antigo entre CP e CR: é até onde o relatório inteiro está atualizado.
+    const cargas = [lastUpdatedCp, lastUpdatedCr]
+      .map(t => (t ? new Date(t) : null))
+      .filter((d): d is Date => d !== null && !Number.isNaN(d.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime());
+    // Logo embutido no arquivo, para abrir igual em qualquer aparelho, mesmo sem internet.
+    let logo: string | undefined;
+    try {
+      const resposta = await fetch("/logo-full.jpg");
+      if (resposta.ok) {
+        const imagem = await resposta.blob();
+        logo = await new Promise<string>((ok, falha) => {
+          const leitor = new FileReader();
+          leitor.onload = () => ok(String(leitor.result));
+          leitor.onerror = () => falha(leitor.error);
+          leitor.readAsDataURL(imagem);
+        });
+      }
+    } catch {
+      // Sem o logo o cabeçalho sai só com o texto.
+    }
+    const marca = isHolding ? "Silva Packer Holding" : "Silva Packer";
+    const html = montarResumoHtml({
+      linhas,
+      marca,
+      data,
+      geradoEm: dataHora(agora, " "),
+      atualizadoEm: cargas.length > 0 ? dataHora(cargas[0], " às ") : undefined,
+      periodo: rotuloPeriodo(selectedYears, selectedMonths),
+      logo,
+      holding: isHolding,
+    });
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nomeArquivoResumo(marca, data);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    toast.success("Resumo em HTML baixado.");
+  };
+
   return (
     <div className="flex flex-col gap-3 md:h-[calc(100vh-7rem)] md:min-h-[600px]">
       {/* Refresh progress modal */}
@@ -3225,6 +3285,12 @@ export function ExecutiveDashboard() {
             <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-slate-600 dark:text-slate-300" onClick={exportarPdfAPagar} title="Exportar PDF das contas a pagar filtradas">
               <FileDown className="h-3.5 w-3.5" />
               PDF
+            </Button>
+          )}
+          {activeTab === "resumo" && (
+            <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs text-slate-600 dark:text-slate-300" onClick={baixarResumoHtml} title="Baixar este resumo em HTML, no padrão do Fechamento de Caixa, para enviar">
+              <FileDown className="h-3.5 w-3.5" />
+              HTML
             </Button>
           )}
           <Button
@@ -5229,6 +5295,21 @@ export function ExecutiveDashboard() {
         const totAReceber = sorted.reduce((soma, c) => soma + c.totalAReceber, 0);
         const totEstoque = sorted.reduce((soma, c) => soma + c.valorEstoque, 0);
         const totAEntrar = totAReceber + totEstoque;
+
+        // As linhas desta tela, na ordem em que aparecem, para o botão "HTML" da barra de
+        // filtros (baixarResumoHtml). Fica num ref porque o botão é desenhado fora deste bloco.
+        resumoHtmlRef.current = sorted.map(co => ({
+          empresa: co.companyName,
+          finalizada: co.status.toLowerCase().includes("finalizada"),
+          totalRecebido: co.totalRecebido,
+          totalPago: co.totalPago,
+          totalAReceber: co.totalAReceber,
+          valorEstoque: co.valorEstoque,
+          estoqueSemPreco: co.valorEstoque <= 0 && (totaisEstoque.get(co.companyName)?.semPreco ?? 0) > 0,
+          qtDispApto: co.qtDispApto,
+          qtDispSala: co.qtDispSala,
+          qtResTec: co.qtResTec,
+        }));
 
         // Percentual no padrão brasileiro ("14,65%", "-1,9%"); antes saía com ponto.
         const pctResumo = (v: number, casas = 1) => `${v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas })}%`;
