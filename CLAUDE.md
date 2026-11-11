@@ -409,7 +409,17 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
     chamadas de desenho e 344 mil triângulos com o mapa. A foto aérea no chão
     entrou no mesmo dia (item seguinte); a malha 3D do Google foi só conversada.
   - **Foto aérea no chão do mapa (Edielson, 11/11/2026: "Sim, testar" e, vendo
-    as quatro versões do teste, "B, foto recente").** Botão do satélite na barra
+    as quatro versões do teste, "B, foto recente").**
+    **DESLIGADA em produção no mesmo dia.** Depois de testar no ar, o Edielson
+    reprovou: "não foi isso que eu imaginava. Eu imaginei que iriam aparecer
+    realmente os prédios ali, reais da cidade, e aparece só uma foto achatada
+    [...] Fica muito feio. Os blocos estão melhores". A variável
+    `ARCGIS_API_KEY` saiu do serviço `spapi` no EasyPanel (o botão some sem
+    ela); o código e a trava ficaram no repositório, dormindo, e a chave segue
+    no `.env.local` e na conta da Esri (vence em 11/11/2027). NÃO religar sem
+    pedido dele. O que ele imaginava é a cidade em 3D de verdade (a malha
+    fotorrealista do Google), que não está feita. O resto deste item descreve
+    como a foto funciona, para o caso de voltar. Botão do satélite na barra
     do 3D (vale na tela cheia; desligado por padrão; lembrado em
     `localStorage.quadro3d_foto`), nos prédios com mapa (135 Jardins e Palácio).
     Ligado, o chão em 900 m em volta do lote vira a imagem de satélite recente
