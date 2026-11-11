@@ -55,6 +55,15 @@ assert.ok(r2970.every(p => Math.abs(p[1] + 65) < 0.2), "Rua 2970 atrás do lote"
 const atl = d.ruas.find(r => r.n === "Avenida Atlântica")!.p;
 assert.ok(atl.every(p => Math.abs(p[0] + 255) < 0.3), "Atlântica a 255 m, à esquerda");
 assert.ok(d.mar.length > 0 && d.mar.every(q => q.reduce((s, p) => s + p[0], 0) / q.length < -300), "mar do lado da orla");
+// Margem de rio marcada como coastline (entra 600 m na cidade, no meio da
+// orla) não pode virar mar sobre as quadras: o polígono do mar fica todo do
+// lado da orla (x < -300) e não tem nenhum vértice em terra.
+{
+  const rio: ElementoOSM = { type: "way", tags: { natural: "coastline" }, geometry: [ll(300, 0), ll(300, 600), ll(350, 600), ll(350, 0)] };
+  const d2 = processarEntorno([...els, rio], lote, local);
+  assert.equal(d2.mar.length, 1, "um polígono de mar só");
+  assert.ok(d2.mar[0].every(p => p[0] < -300), "mar não entra na cidade pela margem do rio");
+}
 // Nada de prédio dentro do lote; os demais ficam.
 assert.ok(d.predios.length > 50);
 assert.ok(!d.predios.some(b => { const cx = b.p.reduce((s, p) => s + p[0], 0) / b.p.length, cz = b.p.reduce((s, p) => s + p[1], 0) / b.p.length; return Math.abs(cx) < 30 && cz < -10 && cz > -50; }));
