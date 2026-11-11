@@ -223,9 +223,8 @@ export const CONFIG_PALACIO: ConfigTorre = {
 // enviado pela Lilian em 10/11/2026), convertido em /modelos/135-jardins.m3d.
 // 31 pavimentos de 2 apartamentos espelhados (101 a 3102), 3,24 m piso a piso;
 // no Sienge o "andar" é o pavimento do projeto (101 = 10º, 3102 = 40º).
-// A planta do site não diz qual lado é o final 01: aqui ele fica à esquerda
-// olhando a frente, como no Palácio. Se for o contrário, é só inverter
-// `ordemFinais`.
+// Final 01 à esquerda e 02 à direita, olhando a frente (confirmado pelo
+// Edielson em 11/11/2026; a planta do site não numera os apartamentos).
 export const CONFIG_135: ConfigTorre = {
   nome: "135 Jardins",
   largura: 30.7, profundidade: 14.5, peDireito: 3.24, sacada: 0, larguraSacada: 7, embasamento: 0,

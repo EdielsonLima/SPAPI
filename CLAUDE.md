@@ -323,10 +323,11 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   - **Qual fatia é qual unidade:** andar pelo NÚMERO (`andarNoModelo`: "2802" →
     28º pavimento de apartamentos), porque o andar do cadastro do Sienge é o
     pavimento do projeto (101 = 10º, 3102 = 40º); lado por `ordenarFinais`.
-    **Final 01 à esquerda olhando a frente é suposição** (a planta do site não
-    numera os apartamentos; mesma convenção do Palácio): se for o contrário,
-    inverter `ordemFinais` em `CONFIG_135`. "135 JARDINS - PERMUTA" (imóveis de
-    outros prédios) não usa a maquete.
+    **Final 01 à esquerda e 02 à direita, olhando a frente: confirmado pelo
+    Edielson em 11/11/2026** ("Sim, à esquerda"; a planta do site não numera os
+    apartamentos; mesma convenção do Palácio). O lado se ajusta só em
+    `ordemFinais` de `CONFIG_135`. "135 JARDINS - PERMUTA" (imóveis de outros
+    prédios) não usa a maquete.
   - **Situação = a do Resumo** (Edielson, 10/11: "pegue as unidades que estão
     disponíveis dali"): o 3D recebe as unidades do Quadro, que já passam por
     ajuste manual > tabela comercial > Sienge. Em produção em 10/11: 101, 201,
