@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { gradeDaFoto, tileDe, tileNaArea, urlDoTile, erroDaEsri, ZOOM_FOTO, RAIO_FOTO, LADO_TILE, SERVICO_ESRI } from "../lib/foto-aerea";
+import { gradeDaFoto, tileDe, tileNaArea, urlDoTile, erroDaEsri, uvDaFoto, ZOOM_FOTO, RAIO_FOTO, LADO_TILE, SERVICO_ESRI } from "../lib/foto-aerea";
 import { CONFIGS_COM_ENTORNO } from "../lib/torre-3d";
 import type { DadosEntorno } from "../lib/entorno-osm";
 
@@ -45,6 +45,15 @@ for (const cfg of CONFIGS_COM_ENTORNO) {
     perto(j, (z + RAIO_FOTO) / m, 1, `${local.chave}: j de (${x}, ${z})`);
   }
 
+  // 3b. Os blocos dos vizinhos pegam a foto pelo mesmo caminho: o ponto da
+  // textura na prumada de (x, z) é o pixel onde a foto pôs aquele lugar
+  // (v = 1 no alto da imagem, como a textura do canvas).
+  for (const [x, z] of [[0, 0], [120, -340], [-610, 480]]) {
+    const [i, j] = paraFoto(...noMosaico(...latLon(x, z))), [u, v] = uvDaFoto(x, z);
+    perto(u * LADO, i, 1, `${local.chave}: u de (${x}, ${z})`);
+    perto((1 - v) * LADO, j, 1, `${local.chave}: v de (${x}, ${z})`);
+  }
+
   // 4. Gira sem espelhar e sem esticar: escala igual à do zoom nos dois eixos (0,7 % de folga, o achatamento da Terra).
   assert.ok(a * dd - b * c > 0, `${local.chave}: a foto sairia espelhada`);
   const escala = (40075016.686 * Math.cos((d.lote.lat * Math.PI) / 180)) / (2 ** g.z * LADO_TILE) / m; // px da foto por px do tile
@@ -67,6 +76,11 @@ for (const cfg of CONFIGS_COM_ENTORNO) {
   for (const t of g.tiles) assert.ok(tileNaArea(g.z, t.x, t.y, local.bbox), `${local.chave}: tile ${t.x},${t.y} fora da região`);
   console.log(`${local.chave}: ${g.tiles.length} tiles (mosaico ${g.colunas} × ${g.linhas}), ${m.toFixed(2)} m por pixel`);
 }
+
+// 6b. Cantos da textura: fundo do lote à esquerda no alto, rua à direita embaixo.
+assert.deepEqual(uvDaFoto(0, 0), [0.5, 0.5]);
+assert.deepEqual(uvDaFoto(-RAIO_FOTO, -RAIO_FOTO), [0, 1]);
+assert.deepEqual(uvDaFoto(RAIO_FOTO, RAIO_FOTO), [1, 0]);
 
 // 7. …e recusa o resto: outro zoom, outra cidade, número quebrado.
 const bbox = CONFIGS_COM_ENTORNO[0].local!.bbox;

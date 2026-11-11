@@ -69,6 +69,14 @@ export function gradeDaFoto(lote: { lat: number; lon: number }, norte: [number, 
 }
 
 /**
+ * Ponto da foto pronta que fica na prumada de (x, z) da maquete, em coordenada
+ * de textura (0 a 1; v = 1 no alto da foto, que é o fundo do lote). É por onde
+ * os blocos dos vizinhos pegam a foto do lugar onde estão.
+ */
+export const uvDaFoto = (x: number, z: number, raio = RAIO_FOTO): [number, number] =>
+  [(x + raio) / (2 * raio), 1 - (z + raio) / (2 * raio)];
+
+/**
  * O tile está na região de um empreendimento com mapa? `bbox` = sul, oeste,
  * norte, leste (o mesmo de LocalEntorno). O servidor só busca esses, para a
  * rota não virar um repassador aberto de imagens da Esri.

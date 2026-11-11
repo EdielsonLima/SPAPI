@@ -286,7 +286,10 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
   (navegador só libera áudio após um clique), para ao sair; botão de
   alto-falante liga/desliga a qualquer hora e grava a escolha em
   `localStorage.quadro3d_musica` (`off` = não entra sozinha). Aba escondida
-  pausa e volta. Trocar a faixa = trocar o arquivo e o LEIA-ME. (5) **Andamento da obra** (anéis no
+  pausa e volta. Trocar a faixa = trocar o arquivo e o LEIA-ME. Em 11/11/2026 o
+  degradê do volume (`fade`) ganhou piso em 0: o 1º quadro podia vir com a hora
+  antes do início, o volume saía negativo, o navegador recusava e a música
+  ficava muda naquela entrada. (5) **Andamento da obra** (anéis no
   rodapé do 3D): `/api/andamento-obra` relê a página do site
   (`local.site`) a cada 6 h e só aceita se achar as 9 etapas
   (`lerAndamentoDoHtml`, trava `andamento-obra.test.ts`); senão vale o
@@ -437,6 +440,18 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
     (`foto` do `montarEntorno`, por cima do chão e por baixo dos nomes de rua).
     Crédito exigido pela Esri (`CREDITO_FOTO`) entra na linha do © OpenStreetMap,
     com fundo para ficar legível.
+    **Blocos dos vizinhos com a foto ligada (Edielson, 11/11/2026, vendo a
+    1ª versão no ar: "um sobrepondo o outro [...] ficou esquisito").** Brancos,
+    por cima da foto, os blocos tapavam a cidade que a própria foto mostra.
+    Agora cada bloco recebe a foto do lugar onde está: o telhado inteiro e a
+    parede em 55 % (`PAREDE_FOTO`), mais escura (`TOM_PAREDE`), para o volume
+    continuar se lendo; na borda da foto e sobre o mar (onde ela é
+    transparente) o bloco volta à cor do mapa. `prepararParaFoto` e
+    `materialDosBlocosComFoto` em `torre-3d-entorno.ts`, `uvDaFoto` em
+    `foto-aerea.ts` (trava no mesmo teste). Com a foto desligada os blocos são
+    os do mapa, como antes. NÃO voltar aos blocos brancos sobre a foto. A
+    alternativa "sem blocos, só a foto no chão" foi mostrada a ele na mesma
+    comparação (`teste-foto-aerea\blocos\comparacao-blocos.jpg`).
     Conferido local nos dois prédios com a chave SIMULADA no navegador de teste
     (as respostas de `/api/foto-aerea` trocadas por tiles baixados uma vez, só
     para o teste): 49 tiles e 0,81 MB no 135, 51 tiles e 0,97 MB no Palácio,

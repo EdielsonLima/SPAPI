@@ -10,7 +10,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { DadosEntorno } from "@/lib/entorno-osm";
-import { RAIO_FOTO } from "@/lib/foto-aerea";
+import { RAIO_FOTO, uvDaFoto } from "@/lib/foto-aerea";
 import { texturaDaFoto } from "@/components/torre-3d-foto";
 
 // foto: liga ou desliga a foto aérea no chão; resolve em false se ela não veio.
@@ -70,6 +70,50 @@ function texturaNome(nome: string, escuro: boolean) {
   return { t, aspecto: c.width / c.height };
 }
 
+// Blocos dos vizinhos com a foto aérea ligada. Brancos, em cima da foto, eles
+// tapavam a cidade que a própria foto mostra (Edielson, 11/11/2026: "um
+// sobrepondo o outro [...] ficou esquisito"). Agora cada bloco recebe a foto do
+// lugar onde está: o telhado inteiro, e a parede em parte (PAREDE_FOTO), mais
+// escura, para o volume continuar se lendo. Cada vértice leva o ponto da foto
+// na prumada dele (uv) e uma cor que separa telhado (1) de parede (TOM_PAREDE).
+const TOM_PAREDE = 0.74;
+const PAREDE_FOTO = 0.55;
+
+function prepararParaFoto(g: THREE.BufferGeometry) {
+  const p = g.getAttribute("position"), n = p.count;
+  const uv = new Float32Array(n * 2), cor = new Float32Array(n * 3);
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let i = 0; i + 2 < n; i += 3) {
+    a.fromBufferAttribute(p, i); b.fromBufferAttribute(p, i + 1); c.fromBufferAttribute(p, i + 2);
+    const ux = b.x - a.x, uz = b.z - a.z, vx = c.x - a.x, vz = c.z - a.z;
+    const ny = uz * vx - ux * vz, L = Math.hypot((b.y - a.y) * vz - uz * (c.y - a.y), ny, ux * (c.y - a.y) - (b.y - a.y) * vx) || 1;
+    const tom = ny / L > 0.7 ? 1 : TOM_PAREDE; // normal para cima = telhado
+    [a, b, c].forEach((v, k) => {
+      const [u, w] = uvDaFoto(v.x, v.z);
+      uv[(i + k) * 2] = u; uv[(i + k) * 2 + 1] = w;
+      cor[(i + k) * 3] = cor[(i + k) * 3 + 1] = cor[(i + k) * 3 + 2] = tom;
+    });
+  }
+  g.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+  g.setAttribute("color", new THREE.BufferAttribute(cor, 3));
+}
+
+// Mistura a cor do bloco com a foto, na medida da transparência dela: na borda
+// da foto e sobre o mar (onde ela é transparente) o bloco volta à cor do mapa.
+function materialDosBlocosComFoto(cor: string, uParede: { value: number }) {
+  const m = new THREE.MeshLambertMaterial({ color: cor, vertexColors: true });
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uParede = uParede;
+    sh.fragmentShader = "uniform float uParede;\n" + sh.fragmentShader.replace("#include <map_fragment>", `
+#ifdef USE_MAP
+  vec4 tFoto = texture2D( map, vMapUv );
+  float ehTelhado = step( 0.9, vColor.r );
+  diffuseColor.rgb = mix( diffuseColor.rgb, tFoto.rgb, tFoto.a * mix( uParede, 1.0, ehTelhado ) );
+#endif`);
+  };
+  return m;
+}
+
 const curto = (n: string) => n.replace(/^Avenida /i, "Av. ").replace(/^Rua /i, "R. ");
 
 export function montarEntorno(d: DadosEntorno, escuro: boolean): Entorno {
@@ -93,11 +137,19 @@ export function montarEntorno(d: DadosEntorno, escuro: boolean): Entorno {
     g.rotateX(-Math.PI / 2);
     gp.push(g.index ? g.toNonIndexed() : g);
   });
+  let blocos: { mesh: THREE.Mesh; mapa: THREE.Material; foto: THREE.MeshLambertMaterial } | null = null;
   if (gp.length) {
     const g = mergeGeometries(gp, false); gp.forEach(x => x.dispose());
-    const m = new THREE.MeshLambertMaterial({ color: escuro ? "#475569" : "#e7e3dc" });
-    descarte.push(g, m);
-    grupo.add(new THREE.Mesh(g, m));
+    prepararParaFoto(g);
+    const cor = escuro ? "#475569" : "#e7e3dc";
+    const m = new THREE.MeshLambertMaterial({ color: cor });
+    const uParede = { value: PAREDE_FOTO };
+    const mf = materialDosBlocosComFoto(cor, uParede);
+    descarte.push(g, m, mf);
+    const mesh = new THREE.Mesh(g, m);
+    mesh.name = "blocos";
+    grupo.add(mesh);
+    blocos = { mesh, mapa: m, foto: mf };
   }
 
   // Nomes das ruas: deitados no asfalto, no sentido da rua, um a cada ~300 m.
@@ -144,15 +196,21 @@ export function montarEntorno(d: DadosEntorno, escuro: boolean): Entorno {
     let carga: Promise<boolean> | null = null, ligada = false;
     foto = v => {
       ligada = v;
-      if (!v) { chapa.visible = false; return Promise.resolve(true); }
+      if (!v) { chapa.visible = false; if (blocos) blocos.mesh.material = blocos.mapa; return Promise.resolve(true); }
       if (!carga) {
         carga = texturaDaFoto(d).then(t => {
           if (morto) { t.dispose(); return false; }
           descarte.push(t); m.map = t; m.needsUpdate = true;
+          if (blocos) { blocos.foto.map = t; blocos.foto.needsUpdate = true; }
           return true;
         }).catch(() => { carga = null; return false; }); // falhou: o próximo clique tenta de novo
       }
-      return carga.then(ok => { chapa.visible = ok && ligada && !morto; return ok; });
+      return carga.then(ok => {
+        const mostra = ok && ligada && !morto;
+        chapa.visible = mostra;
+        if (blocos) blocos.mesh.material = mostra ? blocos.foto : blocos.mapa;
+        return ok;
+      });
     };
   }
 

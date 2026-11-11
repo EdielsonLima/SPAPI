@@ -185,8 +185,10 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     if (fadeAtual.current) cancelAnimationFrame(fadeAtual.current);
     const de = a.volume, t0 = performance.now();
     const passo = (t: number) => {
-      const k = Math.min(1, (t - t0) / ms);
-      a.volume = de + (alvo - de) * k;
+      // O 1º quadro pode vir com a hora um pouco ANTES de t0: sem o piso em 0 o
+      // volume saía negativo, o navegador recusava e a música ficava muda.
+      const k = Math.min(1, Math.max(0, (t - t0) / ms));
+      a.volume = Math.min(1, Math.max(0, de + (alvo - de) * k));
       if (k < 1) fadeAtual.current = requestAnimationFrame(passo); else { fadeAtual.current = null; fim?.(); }
     };
     fadeAtual.current = requestAnimationFrame(passo);
