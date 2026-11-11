@@ -403,9 +403,50 @@ Total R$ 2.328.855,21 · Silva Packer R$ 1.444.930,96 · Holding R$ 473.940,83 �
     arquivos (abrir o 3D no local e copiar `dados` da tabela) ou apagá-los.
     Conferido local: prédio assentado na esquina, ruas com nome, praia, mar e
     bússola (norte à esquerda de quem olha a frente), de dia e à noite; 191
-    chamadas de desenho e 344 mil triângulos com o mapa. Outro jeito de mostrar
-    a cidade "de verdade" (foto aérea no chão, ou a malha 3D do Google) foi só
-    conversado; não está feito.
+    chamadas de desenho e 344 mil triângulos com o mapa. A foto aérea no chão
+    entrou no mesmo dia (item seguinte); a malha 3D do Google foi só conversada.
+  - **Foto aérea no chão do mapa (Edielson, 11/11/2026: "Sim, testar" e, vendo
+    as quatro versões do teste, "B, foto recente").** Botão do satélite na barra
+    do 3D (vale na tela cheia; desligado por padrão; lembrado em
+    `localStorage.quadro3d_foto`), nos prédios com mapa (135 Jardins e Palácio).
+    Ligado, o chão em 900 m em volta do lote vira a imagem de satélite recente
+    (World Imagery da Esri) na terra e na areia. O MAR continua o desenhado do
+    mapa (na foto ele vem com nuvem e água escura) e os vizinhos continuam
+    blocos. O mapa desenhado segue sendo a vista normal: a foto ganha vista do
+    alto; de perto do prédio aparece como manchas entre os blocos.
+    **Licença, por que é ao vivo e tem chave:** a imagem da Esri pede conta e
+    chave (ArcGIS Location Platform, location.arcgis.com, permissão Location
+    services > Basemaps; 2 milhões de tiles grátis por mês, cada foto gasta ~50)
+    e não pode ir guardada no repositório. O navegador pede os tiles do zoom 17
+    a `/api/foto-aerea/z/y/x`; o servidor confere a sessão e a região (`bbox` dos
+    prédios com mapa, `tileNaArea`), busca na Esri com **`ARCGIS_API_KEY`** e
+    repassa (nada guardado no servidor; o navegador guarda 1 dia). **Sem a
+    variável o botão não aparece** (`/api/foto-aerea` → `disponivel`).
+    `/api/foto-aerea?diag=1` diz se a chave é aceita pela conta (`conta.ok`) e
+    se um tile de teste veio (`teste.ok`). Vale o `conta.ok`: em 11/11 o serviço
+    de imagens devolveu tile até com token inventado (só recusa quando não vem
+    token nenhum), então tile chegando não prova chave boa. A chave vence (até
+    1 ano): se a Esri recusar, a tela avisa "Foto aérea indisponível agora" e
+    volta sozinha ao mapa desenhado. NÃO usar o endereço sem chave da Esri nem
+    embutir a imagem.
+    **Montagem** (`torre-3d-foto.ts`): mosaico dos tiles → gira para o
+    referencial da rua (`gradeDaFoto` em `src/lib/foto-aerea.ts`, trava
+    `foto-aerea.test.ts`: lote no centro, erro abaixo de 1 pixel até a borda,
+    sem espelhar, tiles só do círculo, ~50 por foto) → o mar sai pelos polígonos
+    do mapa → borda redonda em degradê → uma textura de 2048 px numa chapa só
+    (`foto` do `montarEntorno`, por cima do chão e por baixo dos nomes de rua).
+    Crédito exigido pela Esri (`CREDITO_FOTO`) entra na linha do © OpenStreetMap,
+    com fundo para ficar legível.
+    Conferido local nos dois prédios com a chave SIMULADA no navegador de teste
+    (as respostas de `/api/foto-aerea` trocadas por tiles baixados uma vez, só
+    para o teste): 49 tiles e 0,81 MB no 135, 51 tiles e 0,97 MB no Palácio,
+    foto alinhada com ruas e praia, de dia e à noite, desligar volta ao mapa,
+    religar não baixa de novo, falha simulada avisa e desliga; sem chave, botão
+    ausente e rota em 503 (400 fora da região ou em outro zoom). **O
+    caminho servidor → Esri só roda com a chave real**, que depende do Edielson
+    criar a conta. O teste de 11/11 comparou também a ortofoto do Estado
+    (2010–2012, dado público) e a foto inteira com o mar; material em
+    `OneDrive\SILVA PACKER\135 JARDINS\Maquete 3D\teste-foto-aerea\`.
 - **Tabela de Preços (23/10, da Leven).** `/comercial/tabela-precos`
   (`tabela-precos-view.tsx`): preço de tabela por unidade cadastrado no painel
   (não no Sienge), reajuste em lote por %, valor fixo ou CUB (calculado no

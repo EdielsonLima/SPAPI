@@ -17,7 +17,8 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { useTheme } from "next-themes";
-import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX, Banknote, Moon, Sun, BarChart3 } from "lucide-react";
+import { RotateCw, X, Maximize2, Minimize2, Home, Layers, ChevronUp, LayoutGrid, Volume2, VolumeX, Banknote, Moon, Sun, BarChart3, Satellite } from "lucide-react";
+import { CREDITO_FOTO } from "@/lib/foto-aerea";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import { VERSAO_ENTORNO, type DadosEntorno } from "@/lib/entorno-osm";
 import { AndamentoObraCard } from "@/components/andamento-obra-card";
@@ -34,6 +35,13 @@ const MUSICA_URL = "/audio/quadro-3d-ambiente.mp3";
 const MUSICA_VOLUME = 0.7; // padrão; o controle ao lado do botão guarda o escolhido
 const MUSICA_PREF = "quadro3d_musica";
 const MUSICA_VOL_PREF = "quadro3d_volume";
+// O servidor tem a chave da foto aérea? Perguntado uma vez por aba; se a
+// pergunta falhar, a próxima abertura do 3D pergunta de novo.
+let fotoAereaPergunta: Promise<boolean> | null = null;
+const fotoAereaDisponivel = () => fotoAereaPergunta ??= fetch("/api/foto-aerea", { cache: "no-store" })
+  .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+  .then((j: { disponivel?: boolean }) => !!j.disponivel)
+  .catch(() => { fotoAereaPergunta = null; return false; });
 import { COR_SITUACAO, SITUACOES } from "@/lib/situacao-unidade";
 import {
   configDoEmpreendimento, ordenarFinais, blocoDaUnidade, sacadaDaUnidade, cotaDoAndar, alturaEmbasamento, descricaoDaPosicao, baseDaTorre, janelasDaUnidade, plantaDaUnidade, andarNoModelo, obraDaConfig, type Bloco, type Janela,
@@ -92,7 +100,28 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     try { localStorage.setItem("quadro3d_noite", v ? "on" : "off"); } catch { /* sem storage */ }
     api.current?.noite(v);
   };
-  const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void; focar: (id: string) => void; filtrar: (sits: string[]) => void; noite: (v: boolean) => void } | null>(null);
+  const api = useRef<{ resetar: () => void; girar: (v: boolean) => void; marcar: (id: string | null) => void; focar: (id: string) => void; filtrar: (sits: string[]) => void; noite: (v: boolean) => void; foto: (v: boolean) => void } | null>(null);
+  // Foto aérea no chão do mapa (Edielson, 11/11/2026: "B, foto recente"): botão
+  // na barra, vale na tela cheia e fica lembrado no navegador. Só existe nos
+  // prédios com mapa e com a chave da Esri no servidor (src/lib/foto-aerea.ts).
+  const [fotoAerea, setFotoAerea] = useState(false);
+  const [fotoDisp, setFotoDisp] = useState(false);
+  const [avisoFoto, setAvisoFoto] = useState("");
+  const fotoRef = useRef(false);
+  useEffect(() => {
+    let vivo = true;
+    fotoAereaDisponivel().then(ok => {
+      if (!vivo || !ok) return;
+      setFotoDisp(true);
+      try { if (localStorage.getItem("quadro3d_foto") === "on") { fotoRef.current = true; setFotoAerea(true); api.current?.foto(true); } } catch { /* sem storage */ }
+    });
+    return () => { vivo = false; };
+  }, []);
+  const alternarFoto = () => {
+    const v = !fotoRef.current; fotoRef.current = v; setFotoAerea(v);
+    try { localStorage.setItem("quadro3d_foto", v ? "on" : "off"); } catch { /* sem storage */ }
+    api.current?.foto(v);
+  };
   const [espelhoAberto, setEspelhoAberto] = useState(true);
   const etiqueta = useRef<HTMLDivElement>(null);
   const bussola = useRef<HTMLDivElement>(null);
@@ -298,7 +327,23 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
 
     // O que a interação usa depois, venha o prédio do estudo de massa ou da
     // maquete do projeto.
-    let vivo = true, entorno: { grupo: THREE.Group; dispose: () => void } | null = null;
+    let vivo = true, entorno: { grupo: THREE.Group; dispose: () => void; foto?: (ligada: boolean) => Promise<boolean> } | null = null;
+    // Liga ou desliga a foto aérea no mapa que está na cena (sem mapa, não faz nada).
+    setAvisoFoto("");
+    const aplicarFoto = (v: boolean) => {
+      const f = entorno?.foto;
+      if (!f) return;
+      if (!v) { void f(false); setAvisoFoto(""); return; }
+      setAvisoFoto("Carregando a foto aérea…");
+      void f(true).then(ok => {
+        if (!vivo) return;
+        if (ok) { setAvisoFoto(""); return; }
+        // Não veio (Esri fora do ar, chave recusada): avisa e volta ao mapa desenhado.
+        setAvisoFoto("Foto aérea indisponível agora");
+        fotoRef.current = false; setFotoAerea(false);
+        setTimeout(() => { if (vivo) setAvisoFoto(""); }, 6000);
+      });
+    };
     let norte: THREE.Vector2 | null = null; // direção do norte na cena (x, z), vinda do mapa
     const blocos: THREE.Object3D[] = [];
     // corpo e "sacada" (na maquete do projeto: o vidro) de cada unidade; acesa = tem dono (luz à noite).
@@ -338,6 +383,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
               const e = montarEntorno(d, escuro);
               e.grupo.position.set(-(local.ajusteX || 0), 0, zRua);
               scene.add(e.grupo); entorno = e; versaoNaCena = versao;
+              if (fotoRef.current) aplicarFoto(true);
               setFonteMapa(d.fonte);
               if (d.norte) norte = new THREE.Vector2(d.norte[0], d.norte[1]).normalize();
               aoChegar?.();
@@ -684,6 +730,7 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
     if (noiteRef.current) aplicarNoite(true);
     api.current = {
       noite: aplicarNoite,
+      foto: aplicarFoto,
       resetar: () => { voo = { pos: posInicial.clone(), alvo: alvo.clone() }; },
       focar: id => {
         const f = focos.get(id); if (!f) return;
@@ -864,7 +911,8 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
           </g>
         </svg>
       </div>
-      {(fonteMapa || avisoMapa) && <span className="pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 text-[10px] text-slate-500/80">{avisoMapa || fonteMapa}</span>}
+      {/* Com a foto ligada o crédito ganha fundo: a Esri exige que ele seja legível, e em cima da foto o cinza some. */}
+      {(fonteMapa || avisoMapa || avisoFoto) && <span className={`pointer-events-none absolute top-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] ${fotoAerea && fotoDisp && cfg.local ? "rounded bg-white/75 px-1.5 text-slate-600 dark:bg-slate-900/70 dark:text-slate-300" : "text-slate-500/80"}`}>{avisoMapa || avisoFoto || (fonteMapa + (fotoAerea && fotoDisp && cfg.local ? " · " + CREDITO_FOTO : ""))}</span>}
       {/* Resumo do empreendimento (botão da barra): cards no topo, entre a legenda e os controles */}
       {resumo && (
         <div className="pointer-events-none absolute left-[252px] right-[372px] top-3 z-10 max-md:left-2 max-md:right-2 max-md:top-14">
@@ -884,6 +932,11 @@ export default function Torre3D({ unidades, empreendimento, mostrarValores, temC
         <button type="button" onClick={() => setResumo(v => !v)} aria-pressed={resumo} title={resumo ? "Esconder o resumo" : "Resumo: unidades, vendas, VGV, ticket e R$/m²"} className={`${botao} w-8 ${resumo ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
           <BarChart3 className="h-4 w-4" />
         </button>
+        {fotoDisp && cfg.local && (
+          <button type="button" onClick={alternarFoto} aria-pressed={fotoAerea} title={fotoAerea ? "Voltar ao mapa desenhado" : "Foto aérea no chão do mapa"} className={`${botao} w-8 ${fotoAerea ? "!bg-blue-50 !border-blue-200 !text-blue-700" : ""}`}>
+            <Satellite className="h-4 w-4" />
+          </button>
+        )}
         <button type="button" onClick={alternarNoite} title={noite ? "Modo dia (cores por situação)" : "Modo noite: janelas acesas = vendidas ou permutadas"} className={`${botao} w-8 ${noite ? "!bg-indigo-50 !border-indigo-200 !text-indigo-700" : ""}`}>
           {noite ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>

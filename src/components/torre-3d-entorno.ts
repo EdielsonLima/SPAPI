@@ -10,8 +10,11 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { DadosEntorno } from "@/lib/entorno-osm";
+import { RAIO_FOTO } from "@/lib/foto-aerea";
+import { texturaDaFoto } from "@/components/torre-3d-foto";
 
-export interface Entorno { grupo: THREE.Group; dispose: () => void }
+// foto: liga ou desliga a foto aérea no chão; resolve em false se ela não veio.
+export interface Entorno { grupo: THREE.Group; dispose: () => void; foto?: (ligada: boolean) => Promise<boolean> }
 
 function forma(p: number[][]): THREE.Shape | null {
   if (p.length < 3) return null;
@@ -124,5 +127,34 @@ export function montarEntorno(d: DadosEntorno, escuro: boolean): Entorno {
     });
   });
 
-  return { grupo, dispose: () => descarte.forEach(x => x.dispose()) };
+  // Foto aérea (botão do 3D): uma chapa só, por cima das camadas do chão e por
+  // baixo dos nomes das ruas e dos prédios. A textura já vem girada para o
+  // referencial da rua, sem o mar e com a borda transparente, então emenda com
+  // o mapa desenhado, que continua em volta. Só é baixada quando ligam.
+  let foto: Entorno["foto"];
+  let morto = false;
+  if (d.norte) {
+    const g = new THREE.PlaneGeometry(2 * RAIO_FOTO, 2 * RAIO_FOTO); g.rotateX(-Math.PI / 2);
+    const m = new THREE.MeshLambertMaterial({ transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -5, polygonOffsetUnits: -20 });
+    descarte.push(g, m);
+    const chapa = new THREE.Mesh(g, m);
+    chapa.name = "foto-aerea";
+    chapa.position.y = 0.1; chapa.renderOrder = 1; chapa.receiveShadow = true; chapa.visible = false;
+    grupo.add(chapa);
+    let carga: Promise<boolean> | null = null, ligada = false;
+    foto = v => {
+      ligada = v;
+      if (!v) { chapa.visible = false; return Promise.resolve(true); }
+      if (!carga) {
+        carga = texturaDaFoto(d).then(t => {
+          if (morto) { t.dispose(); return false; }
+          descarte.push(t); m.map = t; m.needsUpdate = true;
+          return true;
+        }).catch(() => { carga = null; return false; }); // falhou: o próximo clique tenta de novo
+      }
+      return carga.then(ok => { chapa.visible = ok && ligada && !morto; return ok; });
+    };
+  }
+
+  return { grupo, dispose: () => { morto = true; descarte.forEach(x => x.dispose()); }, foto };
 }
