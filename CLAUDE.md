@@ -1023,7 +1023,7 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     entrar** (Total a Receber, Valor Estoque, Ainda a Entrar) · **Disponibilidade** (era "À venda" até o fim de 10/11; Disp. Ap.,
     Disp. Sala, Res.Téc.). Lista em `colunasResumo`/`gruposResumo`. **Desde 16/11/2026 o
     bloco do meio é "Ainda a realizar" (com Ainda a Sair e Lucro a Realizar) e a Res.Téc.
-    saiu:** ver "Resumo › Ainda a Sair e Lucro a Realizar".
+    saiu:** ver "Resumo › Ainda a Sair, Lucro a Realizar e Margem Final".
   - Nomes: "Lucro Potencial" virou **Ainda a Entrar** (é A Receber + Estoque: não desconta
     o que falta gastar na obra, então não é lucro; no Tetra dava R$ 86,4 mi de "lucro"
     com a obra no começo) e "Lucratividade" virou **Margem**. As chaves de ordenação
@@ -1064,9 +1064,9 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     numa área de 1.052 px); o menu agora abre recolhido. O limite de 1760 px é da janela,
     não da área: com o menu aberto entre 1760 e ~1790 px pode faltar largura. Estas
     medidas são da tabela de 11 colunas; as da de 12 colunas (16/11/2026) estão na seção
-    "Resumo › Ainda a Sair e Lucro a Realizar".
+    "Resumo › Ainda a Sair, Lucro a Realizar e Margem Final".
 
-## Resumo › Ainda a Sair e Lucro a Realizar; Res.Téc. fora (Edielson, 16/11/2026)
+## Resumo › Ainda a Sair, Lucro a Realizar e Margem Final; Res.Téc. fora (Edielson, 16/11/2026)
 
 - Pedido: "aquela última coluna, que é a reserva técnica, ela não precisa. Pode tirar" e
   "ali [no Ainda a Entrar] nós não estamos considerando ainda também o que tem de pagar
@@ -1084,8 +1084,20 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
 - **Lucro a Realizar** = Ainda a Entrar − Ainda a Sair (`lucroARealizar`), o espelho do
   Lucro Realizado (Recebido − Pago). Pode ficar negativo e aparece em vermelho. O bloco
   "Ainda a entrar" virou **"Ainda a realizar"** (Total a Receber · Valor Estoque · Ainda a
-  Entrar · Ainda a Sair · Lucro a Realizar) e "Disponibilidade" ficou com Disp. Ap. e
-  Disp. Sala: 12 colunas. Chaves de ordenação novas: `aindaASair` e `lucroARealizar`.
+  Entrar · Ainda a Sair · Lucro a Realizar · Margem Final) e "Disponibilidade" ficou com
+  Disp. Ap. e Disp. Sala: 13 colunas. Chaves de ordenação novas: `aindaASair`,
+  `lucroARealizar` e `margemFinal`.
+- **Margem Final** (mesmo dia, vendo a 1ª versão no ar: "Teria espaço? Ficaria bom no
+  notebook, logo após o lucro [a] realizar, ter ali mais uma coluna chamada 'margem
+  final'"): a margem esperada da obra quando tudo terminar, a Margem da tela levada até o
+  fim. `margemFinal` em `resumo-projecao.ts` = (Lucro Realizado + Lucro a Realizar) ÷
+  (Total Recebido + Ainda a Entrar) × 100; sem receita nenhuma não há margem (traço).
+  Verde/vermelha como a Margem; uma casa na linha, duas no total. Usa os números da linha,
+  então só faz sentido com todos os anos marcados (a dica diz). Produção em 16/11 às
+  16:27: 135 Jardins 23,8% (Margem do realizado −2,2%) · Palácio 25,3% · Rozza 31,3% ·
+  Domus 38,6% · Serenity 18,4% (−17,0% no realizado) · Tetra 26,3% · total **26,34%**. O
+  título dela fica em duas linhas também no monitor grande (`sempreDuasLinhas`): em uma
+  linha pedia ~45 px a mais e a tabela deixava de caber a 1848 px.
 - Produção em 16/11 às 16:27 (as telas que ele mandou): 135 Jardins R$ 42.735.670,61 −
   R$ 7.441.112,38 = R$ 35.294.558,23; total R$ 417.493.064,94 − R$ 263.327.700,60 =
   R$ 154.165.364,34.
@@ -1101,40 +1113,59 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   `#c03f55`; rose-300 no escuro). No HTML: `.az` (#2563eb) e `.sa` (#c03f55) na tabela e
   nos cartões de celular; nos cartões do topo, azul claro e o rosa do Total Pago. Célula
   sem valor mostra o traço em cinza. Antes as duas saíam iguais, em tinta.
-- **O "R$" some quando a caixa é estreita, para caber no notebook.** Com 12 colunas a
-  tabela pede 1.339 px no modo compacto e 1.588 px no de monitor grande; no notebook de
-  1366 px a caixa tem 1.240 px. Em vez de diminuir a letra ou abreviar ("ele gosta dos
-  valores normais mesmo, completos"), cada célula é `moedaResumo(v)`: o número inteiro, com
-  o "R$" num `span` que some por consulta de contêiner (`[container-type:inline-size]` na
-  caixa do Resumo; `semCifrao`: caixa abaixo de 1400 px, ou abaixo de 1600 px com janela de
-  1760 px ou mais) e o canto vazio do cabeçalho passa a dizer "Valores em R$"
-  (`soSemCifrao`). Sem o "R$" a tabela pede 1.185 px (1.145 px até 1320 px de janela). Os
-  cartões de cima mantêm o "R$". No monitor grande com a caixa abaixo de 1600 px (menu
-  aberto) os títulos também quebram em duas linhas. `TableBody` leva
+- **Letra menor em tela estreita, com o "R$" sempre (Edielson, 16/11/2026: "Prefiro letra
+  menor").** Com 13 colunas a tabela pede 1.419 px no modo compacto (uns 10 px a mais com
+  os números de produção) e 1.673 px no de monitor grande; no notebook de 1366 px a caixa
+  tem 1.240 px. A 1ª versão do dia tirava o "R$" das células em caixa estreita e punha
+  "Valores em R$" no canto; perguntado, ele preferiu diminuir a letra. **NÃO tirar o "R$"
+  nem abreviar valor para ganhar largura.** Regra em `ajusteTabelaResumo` (classes na
+  `<Table>` do Resumo), pela largura da CAIXA e não da janela (consulta de contêiner,
+  `[container-type:inline-size]` na caixa do Resumo; vale também com o menu aberto):
+
+  | Caixa (px) | Janela, menu recolhido | Letra | Células |
+  |---|---|---|---|
+  | 1450 ou mais | 1576 ou mais | 12 px | `px-1.5` |
+  | 1310 a 1449 | 1436 a 1575 (1440, 1536) | 11 px | `px-1` |
+  | 1215 a 1309 | 1341 a 1435 (**1366**) | 11 px | `px-0.5` e números com `tracking-tight` |
+  | até 1214 | até 1340 (1280) | 10 px (título também) | `px-0.5` e `tracking-tight` |
+
+  As faixas não se sobrepõem de propósito, para a ordem das regras no CSS não decidir
+  nada. No monitor grande (janela de 1760 px ou mais) com a caixa abaixo de 1700 px (menu
+  aberto, ou janela de 1760 a 1825 px) vale a compactação do modo de baixo: células
+  `px-1.5`, total em 12 px e títulos em duas linhas. `TableBody` leva
   `[&_td]:whitespace-nowrap`: valor negativo quebrava depois do "-" e a linha dobrava de
-  altura. NÃO diminuir a letra nem abreviar valor para ganhar largura.
+  altura. Ao pôr ou tirar coluna, medir de novo a largura mínima de cada faixa (tabela com
+  `width: 1px`) e acertar os limites.
 - Medido local (Playwright; pagos, recebidos e orçamento iguais aos de produção; o estoque
   local só tem preço no Palácio, então o Lucro a Realizar local sai negativo, que é o pior
-  caso de largura): sem rolagem lateral nem vertical a 1920×1080, 1848×950, 1760×900,
-  1700, 1600, 1536×864, 1440, 1366×768, 1366×650 e 1280×720 (com "R$" de 1536 px para
-  cima, sem ele de 1440 px para baixo); a tabela termina em 690 px (tela de 768) e 630 px
-  (tela de 650). Menu aberto: cabe a 1920, 1848, 1760 e 1536; **a 1366 com o menu aberto
-  ainda rola** (1.185 px numa caixa de 1.052 px). Banco local: `company_settings` recebeu
-  em 16/11 a área, o fator e o "controla orçamento" de produção (a aba Orçamento local
-  vinha vazia e o Ainda a Sair, todo em traço).
+  caso de largura), sem rolagem lateral nem vertical em todas: 1920×1080 e 1848×950 (como
+  antes: 12 px, total em 14 px, títulos em uma linha; mínimo 1.673 px) · 1760×900 (modo
+  compacto, mínimo 1.410 px) · 1700 e 1600 (12 px, mínimo 1.419 px) · 1536×864 e 1440
+  (11 px, mínimo 1.285 px) · 1366×768 e 1366×650 (11 px, mínimo 1.200 px numa caixa de
+  1.240 px) · 1280×720 (10 px, mínimo 1.108 px numa caixa de 1.154 px). A tabela termina
+  em 690 px (tela de 768) e 630 px (tela de 650). Menu aberto: cabe a 1920, 1848, 1760 e
+  1536; **a 1366 com o menu aberto ainda rola** (1.108 px numa caixa de 1.052 px). Banco
+  local: `company_settings` recebeu em 16/11 a área, o fator e o "controla orçamento" de
+  produção (a aba Orçamento local vinha vazia e o Ainda a Sair, todo em traço).
 - **HTML:** `LinhaResumoHtml` perdeu `qtResTec` e ganhou `aindaASair` (chega calculado da
-  tela); seis cartões em duas fileiras de três; tabela de 12 colunas a partir de
-  **1366 px** de largura (abaixo, um cartão por empreendimento) e página de até 1360 px.
-  O arquivo baixado pelo botão bate célula a célula com a tela (12 linhas × 12 colunas).
+  tela); seis cartões em duas fileiras de três (o do Lucro a Realizar leva "margem final
+  26,34%", como o do Lucro Realizado leva a margem); tabela de 13 colunas a partir de
+  **1366 px** de largura (abaixo, um cartão por empreendimento, com a linha "Margem
+  final"), página de até 1440 px e letra da tabela em 11 px abaixo de 1440 px (mínimo
+  1.227 px numa caixa de 1.288 px a 1366; 1.311 px em 1.362 px de 1440 para cima). A
+  Margem Final é calculada no gerador pela mesma `margemFinal`. O arquivo baixado pelo
+  botão bate célula a célula com a tela (12 linhas × 13 colunas).
 - **No ar em 16/11/2026 às 17:30 (Brasília), commit `fd1a798`** (`commit.sha` do
   `inspectService` e `deployment` em `done`). Conferido em produção por medida dentro da
   página (janela 1616×893; a captura de tela do Chrome falha): Ainda a Sair de cada obra
   igual a Orçamento › A Realizar, total R$ 263.327.700,60 = cartão "Saldo a Realizar";
   Lucro a Realizar total R$ 154.165.364,34 (135 Jardins R$ 35.294.558,23); tabela de
   1.490 px = caixa (mínimo 1.350 px), com "R$", sem rolagem; seis cartões numa linha.
-- **Não feito:** não há coluna de "resultado final do empreendimento" (Lucro Realizado +
-  Lucro a Realizar); a dica do Lucro a Realizar diz que a soma dos dois dá o resultado
-  esperado. Parcela vencida continua fora do Ainda a Entrar (fica em Inadimplência).
+  (Esse foi o deploy da 1ª versão, a que tirava o "R$" e ainda não tinha a Margem Final.)
+- **Não feito:** o resultado final do empreendimento aparece só em percentual (Margem
+  Final); não há coluna com ele em reais (Lucro Realizado + Lucro a Realizar). Parcela
+  vencida continua fora do Ainda a Entrar (fica em Inadimplência), então também fora do
+  Lucro a Realizar e da Margem Final.
 
 ## Resumo em HTML, no padrão do Fechamento de Caixa (Edielson, 11/11/2026)
 
@@ -1161,7 +1192,7 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   Ainda a Sair, Lucro a Realizar — eram 4 até 16/11/2026), seções brancas,
   rodapé. **A partir de 1366 px de largura sai a tabela da tela** (os três blocos; 1240 px
   até 16/11/2026, com 11 colunas);
-  **abaixo disso, um cartão por empreendimento** e um "Total geral": são 11 números por
+  **abaixo disso, um cartão por empreendimento** e um "Total geral": são 12 números por
   empreendimento, que não cabem em tabela no celular, onde o João Paulo abre o
   fechamento. Finalizadas embaixo de um divisor. A seção "Como ler" repete as contas do
   "i" das colunas: mudou a dica lá, mudar aqui.

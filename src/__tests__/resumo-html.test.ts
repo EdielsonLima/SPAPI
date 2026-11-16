@@ -45,6 +45,8 @@ centavos(t.aEntrar, 417493064.94, "Ainda a Entrar");
 centavos(t.aSair, 263327700.60, "Ainda a Sair = cartão Saldo a Realizar do Orçamento");
 centavos(t.lucroARealizar, 154165364.34, "Lucro a Realizar");
 assert.equal(porcento(t.margem!, 2), "14,57%");
+// Margem Final = (54.739.718,95 + 154.165.364,34) ÷ (375.595.583,37 + 417.493.064,94).
+assert.equal(porcento(t.margemFinal!, 2), "26,34%");
 assert.deepEqual([t.dispApto, t.dispSala], [69, 22]);
 
 // 2. Formato igual ao da tela.
@@ -88,12 +90,20 @@ assert.ok(html.includes("7 apartamentos · 1 sala<"));
 assert.ok(html.includes("69 apartamentos · 22 salas"));
 // A reserva técnica saiu do Resumo (Edielson, 16/11/2026).
 assert.ok(!/Res\. ?T[ée]c|Reserva t[ée]cnica/i.test(html), "sem reserva técnica");
-// Tabela com 12 colunas: empreendimento + 4 + 5 + 2.
-assert.ok(html.includes('<th colspan="5" class="ini"><span>Ainda a realizar</span></th><th colspan="2" class="ini"><span>Disponibilidade</span></th>'));
-assert.ok(html.includes("<th>Ainda a Sair</th><th>Lucro a Realizar</th>"));
-assert.ok(html.includes('<td colspan="12">Finalizadas</td>'));
+// Tabela com 13 colunas: empreendimento + 4 + 6 + 2.
+assert.ok(html.includes('<th colspan="6" class="ini"><span>Ainda a realizar</span></th><th colspan="2" class="ini"><span>Disponibilidade</span></th>'));
+assert.ok(html.includes("<th>Ainda a Sair</th><th>Lucro a Realizar</th><th>Margem<br>Final</th>"));
+assert.ok(html.includes('<td colspan="13">Finalizadas</td>'));
 const primeiraLinha = html.slice(html.indexOf("<tbody>"), html.indexOf("</tr>", html.indexOf("<tbody>")));
-assert.equal(primeiraLinha.split("<td").length - 1, 12, "12 células por linha");
+assert.equal(primeiraLinha.split("<td").length - 1, 13, "13 células por linha");
+// Margem Final (Edielson, 16/11/2026), depois do Lucro a Realizar: na linha, no cartão de
+// celular, no total e no cartão do topo (junto do Lucro a Realizar).
+assert.ok(primeiraLinha.includes('<td class="b pos">R$ 35.294.558,23</td><td><span class="tag pos">23,8%</span></td>'), "135 Jardins: 23,8%");
+assert.ok(html.includes('<div class="lin b"><span>Margem final</span><span class="pos">23,8%</span></div>'));
+for (const v of ["25,3%", "31,3%", "38,6%", "18,4%", "26,3%", "24,0%", "15,2%", "23,7%", "15,9%"]) assert.ok(vezes(v) >= 2, `margem final ${v} na tabela e no cartão`);
+assert.ok(html.includes('<td><span class="tag pos">26,34%</span></td>'), "margem final no total");
+assert.ok(html.includes('<div class="lin b"><span>Margem final</span><span class="pos">26,34%</span></div>'));
+assert.ok(html.includes("a entrar &minus; a sair &middot; margem final 26,34%"), "margem final no cartão do topo");
 // Cor (Edielson, 16/11/2026): Ainda a Entrar em azul, Ainda a Sair no vermelho suave do
 // cartão Total Pago — na tabela, na linha de total, nos cartões de celular e nos do topo.
 assert.ok(primeiraLinha.includes('<td class="b az">R$ 42.735.670,61</td><td class="b sa">R$ 7.441.112,38</td>'), "linha colorida");
@@ -126,9 +136,10 @@ assert.ok(!perigoso.includes("<b>\"X\"</b>"));
 assert.ok(!perigoso.includes(">Finalizadas<"), "sem finalizada, sem divisor");
 assert.ok(perigoso.includes("60,0%"));
 
-// 7. Sem recebimento não há margem; lista vazia não quebra.
+// 7. Sem recebimento não há margem (nem margem final, sem nada a entrar); lista vazia não quebra.
 const semReceita = montarResumoHtml({ linhas: [linha("OBRA NOVA", false, 0, 500, 0, 0, 0, 0, 0)], marca: "X", data: "01/02/2026", geradoEm: "01/02/2026 08:00" });
 assert.ok(!semReceita.includes("margem -"));
+assert.ok(!semReceita.includes("Margem final</span>") && !semReceita.includes("margem final "), "sem receita, sem margem final");
 assert.ok(semReceita.includes("-R$ 500,00"));
 assert.equal(totaisDoResumo([]).margem, null);
 assert.ok(montarResumoHtml({ linhas: [], marca: "X", data: "01/02/2026", geradoEm: "01/02/2026 08:00" }).includes("Resumo Financeiro"));
@@ -150,6 +161,10 @@ assert.ok(noVermelho.includes('<td class="b neg">-R$ 300,00</td>'));
 assert.ok(noVermelho.includes('<span class="neg">-R$ 300,00</span>'));
 assert.ok(noVermelho.includes('<div class="val r">-R$ 300,00</div>'));
 centavos(totaisDoResumo([linha("OBRA CARA", false, 1000, 400, 300, 200, 800, 2, 0)]).lucroARealizar, -300, "negativo");
+// A mesma obra: (600 − 300) ÷ (1000 + 500) = 20,0 % de margem final.
+assert.ok(noVermelho.includes('<span class="tag pos">20,0%</span>'));
+// Margem final negativa aparece em vermelho.
+assert.ok(montarResumoHtml({ linhas: [linha("OBRA RUIM", false, 1000, 900, 300, 200, 800, 0, 0)], marca: "X", data: "01/02/2026", geradoEm: "01/02/2026 08:00" }).includes('<span class="tag neg">-13,3%</span>'));
 
 const saida = process.env.RESUMO_HTML_SAIDA;
 if (saida) {

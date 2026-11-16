@@ -11,13 +11,16 @@
 //
 // O visual (cabeçalho azul com logo, cartões escuros, seções brancas) é o do
 // gen_fechamento.py do repositório rotinas-silvapacker. Diferença de propósito: o Resumo
-// tem 11 números por empreendimento, que não cabem em tabela no celular. Em tela larga
-// sai a tabela da tela (três blocos); abaixo de 1366 px, um cartão por empreendimento.
+// tem 12 números por empreendimento, que não cabem em tabela no celular. Em tela larga
+// sai a tabela da tela (três blocos; letra de 11 px abaixo de 1440 px, como ele preferiu
+// na tela); abaixo de 1366 px, um cartão por empreendimento.
 // Desde 16/11/2026 (Edielson): sem a reserva técnica, com Ainda a Sair e Lucro a Realizar,
 // e seis cartões no topo em dois trios (já realizado / ainda a realizar). No mesmo dia ele
-// pediu cor: Ainda a Entrar em azul e Ainda a Sair no vermelho suave do cartão Total Pago.
+// pediu cor: Ainda a Entrar em azul e Ainda a Sair no vermelho suave do cartão Total Pago;
+// e a coluna Margem Final, depois do Lucro a Realizar (conta em resumo-projecao.ts).
 
 import { formatCurrency } from "./dashboard-utils";
+import { margemFinal } from "./resumo-projecao";
 
 export interface LinhaResumoHtml {
   empresa: string;
@@ -68,6 +71,8 @@ export interface TotaisResumoHtml {
   aSair: number;
   /** Ainda a Entrar − Ainda a Sair. */
   lucroARealizar: number;
+  /** (Lucro Realizado + Lucro a Realizar) ÷ (Recebido + Ainda a Entrar) × 100; null sem receita. */
+  margemFinal: number | null;
   dispApto: number;
   dispSala: number;
 }
@@ -100,6 +105,7 @@ export function totaisDoResumo(linhas: LinhaResumoHtml[]): TotaisResumoHtml {
     recebido, pago, lucro: recebido - pago, margem: margemDe(recebido, pago),
     aReceber, estoque, aEntrar: aReceber + estoque,
     aSair, lucroARealizar: aReceber + estoque - aSair,
+    margemFinal: margemFinal(recebido, pago, aReceber + estoque, aSair),
     dispApto: soma(l => l.qtDispApto), dispSala: soma(l => l.qtDispSala),
   };
 }
@@ -144,7 +150,7 @@ const CSS = `
 html,body{max-width:100%;overflow-x:hidden}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:'Segoe UI',Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.45;-webkit-text-size-adjust:100%}
 img{max-width:100%;height:auto}
-.wrap{max-width:1360px;margin:0 auto;padding:0 16px 48px}
+.wrap{max-width:1440px;margin:0 auto;padding:0 16px 48px}
 header{background:linear-gradient(135deg,var(--nav),var(--nav2));color:#fff;padding:28px 0;margin-bottom:22px}
 .eyebrow{text-transform:uppercase;letter-spacing:.14em;font-size:11px;opacity:.8;margin:0}h1{margin:6px 0 2px;font-size:26px;font-weight:700;overflow-wrap:anywhere}.sub{opacity:.85;font-size:13px}
 .hd{display:flex;align-items:center;gap:18px}.logo{background:#fff;border-radius:12px;padding:7px 10px;flex:0 0 auto;box-shadow:0 4px 12px rgba(0,0,0,.18)}.logo img{height:54px;width:auto;display:block}
@@ -184,6 +190,7 @@ table.tbl{width:100%;border-collapse:collapse;font-size:12px}
 .ler{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin:10px 0 0;padding:0;list-style:none;font-size:12.5px;color:var(--muted)}
 .ler b{color:var(--ink)}
 footer{color:var(--muted);font-size:11px;text-align:center;margin-top:26px;line-height:1.6}
+@media(max-width:1439px){table.tbl{font-size:11px}.tbl thead th{font-size:10px}.tbl tr.tot-row td{font-size:11.5px}}
 @media(max-width:1365px){.tabela{display:none}.cartoes{display:block}}
 @media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}.kpi .val{font-size:clamp(13px,3.6vw,20px)}.ler{grid-template-columns:1fr}}
 @media(max-width:760px){.grade{grid-template-columns:1fr}}
@@ -198,6 +205,7 @@ function linhaTabela(l: LinhaResumoHtml): string {
   const margem = margemDe(l.totalRecebido, l.totalPago);
   const aEntrar = l.totalAReceber + l.valorEstoque;
   const aRealizar = aEntrar - l.aindaASair;
+  const mFinal = margemFinal(l.totalRecebido, l.totalPago, aEntrar, l.aindaASair);
   const estoque = l.valorEstoque > 0 ? reais(l.valorEstoque) : l.estoqueSemPreco ? '<span class="sp">sem preço</span>' : "-";
   return `<tr${l.finalizada ? ' class="fin"' : ""}>`
     + `<td class="emp">${esc(l.empresa)}</td>`
@@ -210,6 +218,7 @@ function linhaTabela(l: LinhaResumoHtml): string {
     + `<td class="b az">${aEntrar > 0 ? reais(aEntrar) : "-"}</td>`
     + `<td class="b sa">${l.aindaASair > 0 ? reais(l.aindaASair) : "-"}</td>`
     + `<td class="b ${sinal(aRealizar)}">${aEntrar > 0 || l.aindaASair > 0 ? reais(aRealizar) : "-"}</td>`
+    + `<td>${mFinal === null ? "-" : `<span class="tag ${sinal(mFinal)}">${porcento(mFinal)}</span>`}</td>`
     + `<td class="ini c">${l.qtDispApto > 0 ? l.qtDispApto : "-"}</td>`
     + `<td class="c">${l.qtDispSala > 0 ? l.qtDispSala : "-"}</td>`
     + "</tr>";
@@ -220,6 +229,7 @@ function cartao(l: LinhaResumoHtml): string {
   const margem = margemDe(l.totalRecebido, l.totalPago);
   const aEntrar = l.totalAReceber + l.valorEstoque;
   const aRealizar = aEntrar - l.aindaASair;
+  const mFinal = margemFinal(l.totalRecebido, l.totalPago, aEntrar, l.aindaASair);
   const estoque = l.valorEstoque > 0 ? reais(l.valorEstoque) : l.estoqueSemPreco ? '<span class="sp">sem preço</span>' : "-";
   return '<div class="emp-card">'
     + `<div class="emp-head"><span>${esc(l.empresa)}</span>${margem === null ? "" : `<span class="tag ${sinal(margem)}">margem ${porcento(margem)}</span>`}</div>`
@@ -234,6 +244,7 @@ function cartao(l: LinhaResumoHtml): string {
     + `<div class="lin"><span>Ainda a entrar</span><span class="az">${aEntrar > 0 ? reais(aEntrar) : "-"}</span></div>`
     + `<div class="lin"><span>Ainda a sair</span><span class="sa">${l.aindaASair > 0 ? reais(l.aindaASair) : "-"}</span></div>`
     + `<div class="lin b"><span>Lucro a realizar</span><span class="${sinal(aRealizar)}">${aEntrar > 0 || l.aindaASair > 0 ? reais(aRealizar) : "-"}</span></div>`
+    + (mFinal === null ? "" : `<div class="lin b"><span>Margem final</span><span class="${sinal(mFinal)}">${porcento(mFinal)}</span></div>`)
     + '<div class="blk">Disponibilidade</div>'
     + `<div class="lin"><span>À venda</span><span>${disponiveis(l.qtDispApto, l.qtDispSala)}</span></div>`
     + "</div></div>";
@@ -247,6 +258,7 @@ export function montarResumoHtml(dados: DadosResumoHtml): string {
   const marca = esc(dados.marca);
   const periodo = dados.periodo ? esc(dados.periodo) : "";
   const margemTotal = t.margem === null ? "-" : porcento(t.margem, 2);
+  const margemFinalTotal = t.margemFinal === null ? "-" : porcento(t.margemFinal, 2);
 
   const titulo = `Resumo Financeiro ${dados.data} | ${dados.marca}`;
   const descricao = `Recebido ${reais(t.recebido)} · Pago ${reais(t.pago)} · Lucro realizado ${reais(t.lucro)} · Ainda a entrar ${reais(t.aEntrar)} · Ainda a sair ${reais(t.aSair)}`;
@@ -278,23 +290,24 @@ export function montarResumoHtml(dados: DadosResumoHtml): string {
     + `<div class="kpi"><div class="lbl">Lucro Realizado</div><div class="val ${t.lucro >= 0 ? "g" : "r"}">${reais(t.lucro)}</div><div class="qt">recebido &minus; pago${t.margem === null ? "" : ` &middot; margem ${margemTotal}`}</div></div>`
     + `<div class="kpi"><div class="lbl">Ainda a Entrar</div><div class="val b">${reais(t.aEntrar)}</div><div class="qt">a receber + estoque &agrave; venda</div></div>`
     + `<div class="kpi"><div class="lbl">Ainda a Sair</div><div class="val r">${reais(t.aSair)}</div><div class="qt">saldo do or&ccedil;amento das obras</div></div>`
-    + `<div class="kpi"><div class="lbl">Lucro a Realizar</div><div class="val ${t.lucroARealizar >= 0 ? "g" : "r"}">${reais(t.lucroARealizar)}</div><div class="qt">a entrar &minus; a sair</div></div>`
+    + `<div class="kpi"><div class="lbl">Lucro a Realizar</div><div class="val ${t.lucroARealizar >= 0 ? "g" : "r"}">${reais(t.lucroARealizar)}</div><div class="qt">a entrar &minus; a sair${t.margemFinal === null ? "" : ` &middot; margem final ${margemFinalTotal}`}</div></div>`
     + "</div>");
 
-  // Tela larga: a tabela da aba Resumo, com os três blocos de colunas (12 colunas).
+  // Tela larga: a tabela da aba Resumo, com os três blocos de colunas (13 colunas).
   const corpoTabela = ativas.map(linhaTabela).join("")
-    + (finalizadas.length > 0 ? `<tr class="div"><td colspan="12">Finalizadas</td></tr>${finalizadas.map(linhaTabela).join("")}` : "")
+    + (finalizadas.length > 0 ? `<tr class="div"><td colspan="13">Finalizadas</td></tr>${finalizadas.map(linhaTabela).join("")}` : "")
     + '<tr class="tot-row"><td>Total</td>'
     + `<td class="ini">${reais(t.recebido)}</td><td>${reais(t.pago)}</td><td class="${sinal(t.lucro)}">${reais(t.lucro)}</td>`
     + `<td>${t.margem === null ? "-" : `<span class="tag ${sinal(t.margem)}">${margemTotal}</span>`}</td>`
     + `<td class="ini">${reais(t.aReceber)}</td><td>${reais(t.estoque)}</td><td class="az">${reais(t.aEntrar)}</td>`
     + `<td class="sa">${reais(t.aSair)}</td><td class="${sinal(t.lucroARealizar)}">${reais(t.lucroARealizar)}</td>`
+    + `<td>${t.margemFinal === null ? "-" : `<span class="tag ${sinal(t.margemFinal)}">${margemFinalTotal}</span>`}</td>`
     + `<td class="ini c">${t.dispApto}</td><td class="c">${t.dispSala}</td></tr>`;
   const tabela = '<div class="tabela"><table class="tbl"><thead>'
-    + '<tr class="grp"><th></th><th colspan="4" class="ini"><span>Já realizado</span></th><th colspan="5" class="ini"><span>Ainda a realizar</span></th><th colspan="2" class="ini"><span>Disponibilidade</span></th></tr>'
+    + '<tr class="grp"><th></th><th colspan="4" class="ini"><span>Já realizado</span></th><th colspan="6" class="ini"><span>Ainda a realizar</span></th><th colspan="2" class="ini"><span>Disponibilidade</span></th></tr>'
     + "<tr><th>Empreendimento</th>"
     + '<th class="ini">Total Recebido</th><th>Total Pago</th><th>Lucro Realizado</th><th>Margem</th>'
-    + '<th class="ini">Total a Receber</th><th>Valor Estoque</th><th>Ainda a Entrar</th><th>Ainda a Sair</th><th>Lucro a Realizar</th>'
+    + '<th class="ini">Total a Receber</th><th>Valor Estoque</th><th>Ainda a Entrar</th><th>Ainda a Sair</th><th>Lucro a Realizar</th><th>Margem<br>Final</th>'
     + '<th class="ini c">Disp. Ap.</th><th class="c">Disp. Sala</th></tr>'
     + `</thead><tbody>${corpoTabela}</tbody></table></div>`;
 
@@ -312,6 +325,7 @@ export function montarResumoHtml(dados: DadosResumoHtml): string {
     + `<div class="lin"><span>Ainda a entrar</span><span class="az">${reais(t.aEntrar)}</span></div>`
     + `<div class="lin"><span>Ainda a sair</span><span class="sa">${reais(t.aSair)}</span></div>`
     + `<div class="lin b"><span>Lucro a realizar</span><span class="${sinal(t.lucroARealizar)}">${reais(t.lucroARealizar)}</span></div>`
+    + (t.margemFinal === null ? "" : `<div class="lin b"><span>Margem final</span><span class="${sinal(t.margemFinal)}">${margemFinalTotal}</span></div>`)
     + '<div class="blk">Disponibilidade</div>'
     + `<div class="lin"><span>À venda</span><span>${disponiveis(t.dispApto, t.dispSala)}</span></div>`
     + "</div></div>";
@@ -338,6 +352,7 @@ export function montarResumoHtml(dados: DadosResumoHtml): string {
     + "<li><b>Ainda a Entrar</b> = Total a Receber + Valor Estoque. É o que está vendido e falta receber, mais o que falta vender.</li>"
     + "<li><b>Ainda a Sair</b>: o que falta gastar para terminar a obra, pelo saldo do orçamento (orçado &minus; já realizado). Obra finalizada ou sem orçamento fica sem valor.</li>"
     + "<li><b>Lucro a Realizar</b> = Ainda a Entrar &minus; Ainda a Sair. É o que deve sobrar do que ainda vai entrar, depois de pagar o que falta da obra.</li>"
+    + "<li><b>Margem Final</b> = (Lucro Realizado + Lucro a Realizar) &divide; (Total Recebido + Ainda a Entrar). É a margem esperada da obra no fim, juntando o que já aconteceu com o que ainda falta.</li>"
     + "<li><b>Disponibilidade</b>: apartamentos e salas comerciais à venda.</li>"
     + "</ul></section>");
 

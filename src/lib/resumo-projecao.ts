@@ -50,6 +50,22 @@ export function lucroARealizar(aindaAEntrar: number, saida: number): number {
   return aindaAEntrar - saida;
 }
 
+/**
+ * Margem Final (Edielson, 16/11/2026: "mais uma coluna chamada 'margem final'"): a margem
+ * esperada da obra quando tudo terminar. É a Margem da tela (Lucro Realizado ÷ Total
+ * Recebido) levada até o fim: junta o que já aconteceu com o que ainda falta.
+ *   resultado esperado = Lucro Realizado + Lucro a Realizar
+ *                      = (Recebido − Pago) + (Ainda a Entrar − Ainda a Sair)
+ *   receita esperada   = Total Recebido + Ainda a Entrar
+ *   Margem Final       = resultado esperado ÷ receita esperada × 100
+ * Sem receita nenhuma (nada recebido e nada a entrar) não há margem: null.
+ */
+export function margemFinal(totalRecebido: number, totalPago: number, aindaAEntrar: number, saida: number): number | null {
+  const receita = totalRecebido + aindaAEntrar;
+  if (!(receita > 0)) return null;
+  return ((totalRecebido - totalPago + aindaAEntrar - saida) / receita) * 100;
+}
+
 /** Texto da dica quando a célula de Ainda a Sair fica sem valor. */
 export const DICA_SEM_SAIDA: Record<MotivoSemSaida, string> = {
   finalizada: "Obra finalizada: não há mais saída prevista pelo orçamento.",

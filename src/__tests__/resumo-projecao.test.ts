@@ -2,7 +2,7 @@
 // Números = abas Resumo e Orçamento do Painel Executivo em produção, 16/11/2026 às 16:27
 // (Silva Packer, 10 empresas), as duas telas que o Edielson mandou ao pedir a coluna.
 import assert from "node:assert/strict";
-import { aindaASair, lucroARealizar, DICA_SEM_SAIDA } from "../lib/resumo-projecao";
+import { aindaASair, lucroARealizar, margemFinal, DICA_SEM_SAIDA } from "../lib/resumo-projecao";
 
 const centavos = (a: number, b: number, o: string) => assert.ok(Math.abs(a - b) < 0.005, `${o}: ${a} ≠ ${b}`);
 
@@ -65,6 +65,45 @@ assert.deepEqual(aindaASair({ orcado: 1000, realizado: 1000 }, false), { valor: 
 
 // 7. Sai mais do que entra: o lucro a realizar fica negativo (não é escondido).
 centavos(lucroARealizar(1000, 1500), -500, "negativo");
+
+// 9. Margem Final = (Lucro Realizado + Lucro a Realizar) ÷ (Total Recebido + Ainda a Entrar).
+//    empresa → [total recebido, total pago] da aba Resumo de 16/11/2026 às 16:27.
+const caixa: Record<string, [number, number]> = {
+  "EDIFICIO 135 JARDINS": [96907390.94, 99031477.52],
+  "PALACIO ELIZABETH": [66621424.24, 39273195.25],
+  "ROZZA": [27364836.76, 15871450.60],
+  "DOMUS": [22295949.08, 11483293.94],
+  "SERENITY": [16705801.95, 19552903.19],
+  "TETRA": [4295000, 6569283.17],
+  "TESLA RESIDENCIAL": [55592659.27, 48881848.79],
+  "SOLAR DI CAPRI": [31899964.67, 31517406.99],
+  "SOLAR DI SIENA": [27783607.89, 21602819.59],
+  "RESIDENCIAL HANNOVER": [26128948.57, 27072185.38],
+};
+const pct = (v: number | null, casas = 1) => (v === null ? "-" : v.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas }) + "%");
+const mf = (nome: string) => margemFinal(caixa[nome][0], caixa[nome][1], obras.find(x => x[0] === nome)![4], saida(nome).valor);
+// 135 Jardins: (−2.124.086,58 + 35.294.558,23) ÷ (96.907.390,94 + 42.735.670,61) = 33.170.471,65 ÷ 139.643.061,55
+centavos(mf("EDIFICIO 135 JARDINS")!, (33170471.65 / 139643061.55) * 100, "margem final do 135 Jardins");
+assert.deepEqual(
+  ["EDIFICIO 135 JARDINS", "PALACIO ELIZABETH", "ROZZA", "DOMUS", "SERENITY", "TETRA", "TESLA RESIDENCIAL", "SOLAR DI CAPRI", "SOLAR DI SIENA", "RESIDENCIAL HANNOVER"].map(n => pct(mf(n))),
+  ["23,8%", "25,3%", "31,3%", "38,6%", "18,4%", "26,3%", "24,0%", "15,2%", "23,7%", "15,9%"],
+);
+// Obra que hoje está no vermelho (margem −17,0 % no realizado) fecha positiva: Serenity.
+assert.ok(mf("SERENITY")! > 0 && caixa["SERENITY"][0] < caixa["SERENITY"][1]);
+// Total: 208.905.083,29 ÷ 793.088.648,31.
+const totRecebido = Object.values(caixa).reduce((s, c) => s + c[0], 0);
+const totPago = Object.values(caixa).reduce((s, c) => s + c[1], 0);
+centavos(totRecebido, 375595583.37, "total recebido");
+centavos(totPago, 320855864.42, "total pago");
+assert.equal(pct(margemFinal(totRecebido, totPago, totalEntrar, totalSaida), 2), "26,34%");
+// Obra finalizada sem nada a entrar: a margem final é a margem do realizado.
+centavos(margemFinal(1000, 600, 0, 0)!, 40, "finalizada = margem do realizado");
+// Sem receita nenhuma não há margem; só com receita futura, há.
+assert.equal(margemFinal(0, 500, 0, 0), null);
+assert.equal(margemFinal(0, 0, 0, 800), null);
+centavos(margemFinal(0, 500, 2000, 1000)!, 25, "obra que ainda não recebeu nada");
+// Pode ficar negativa.
+assert.ok(margemFinal(1000, 900, 500, 800)! < 0);
 
 // 8. Todo motivo tem texto de dica.
 for (const m of ["finalizada", "sem-orcamento", "estourado"] as const) assert.ok(DICA_SEM_SAIDA[m].length > 20);
