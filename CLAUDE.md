@@ -1126,6 +1126,12 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   tela); seis cartões em duas fileiras de três; tabela de 12 colunas a partir de
   **1366 px** de largura (abaixo, um cartão por empreendimento) e página de até 1360 px.
   O arquivo baixado pelo botão bate célula a célula com a tela (12 linhas × 12 colunas).
+- **No ar em 16/11/2026 às 17:30 (Brasília), commit `fd1a798`** (`commit.sha` do
+  `inspectService` e `deployment` em `done`). Conferido em produção por medida dentro da
+  página (janela 1616×893; a captura de tela do Chrome falha): Ainda a Sair de cada obra
+  igual a Orçamento › A Realizar, total R$ 263.327.700,60 = cartão "Saldo a Realizar";
+  Lucro a Realizar total R$ 154.165.364,34 (135 Jardins R$ 35.294.558,23); tabela de
+  1.490 px = caixa (mínimo 1.350 px), com "R$", sem rolagem; seis cartões numa linha.
 - **Não feito:** não há coluna de "resultado final do empreendimento" (Lucro Realizado +
   Lucro a Realizar); a dica do Lucro a Realizar diz que a soma dos dois dá o resultado
   esperado. Parcela vencida continua fora do Ainda a Entrar (fica em Inadimplência).
