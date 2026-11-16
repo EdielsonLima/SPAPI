@@ -1162,6 +1162,14 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   Lucro a Realizar total R$ 154.165.364,34 (135 Jardins R$ 35.294.558,23); tabela de
   1.490 px = caixa (mínimo 1.350 px), com "R$", sem rolagem; seis cartões numa linha.
   (Esse foi o deploy da 1ª versão, a que tirava o "R$" e ainda não tinha a Margem Final.)
+- **Versão final no ar em 16/11/2026 às 17:52 (Brasília), commit `af2cd7d`** (Margem Final
+  e letra menor com "R$"). Conferido em produção por medida dentro da página: 13 colunas;
+  Margem Final 135 Jardins 23,8% · Palácio 25,3% · Rozza 31,3% · Domus 38,6% · Serenity
+  18,4% · Tetra 26,3% · total 26,34%; na janela de 1616 px, 12 px com "R$", mínimo
+  1.429 px numa caixa de 1.490 px, sem rolagem. Caixa do notebook simulada na própria
+  página (largura posta à mão no contêiner), com os números de produção: 1.410 e 1.314 px
+  → 11 px, mínimo 1.294 px · **1.240 px (janela de 1366) → 11 px, mínimo 1.209 px** ·
+  1.154 px (1280) → 10 px, mínimo 1.116 px; todas cabem.
 - **Não feito:** o resultado final do empreendimento aparece só em percentual (Margem
   Final); não há coluna com ele em reais (Lucro Realizado + Lucro a Realizar). Parcela
   vencida continua fora do Ainda a Entrar (fica em Inadimplência), então também fora do
