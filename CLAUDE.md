@@ -1106,6 +1106,12 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   (`xl:grid-cols-6`); abaixo de 1760 px o valor usa fonte menor (`fonteCartaoResumo`) e o
   selo da margem perde a palavra "margem". `CardPainel` ganhou `fonteValor` e o `selo`
   aceita nó, não só texto.
+  O cartão **Lucro a Realizar leva a Margem Final no selo** ("margem final 26,34%"), no
+  mesmo padrão do Lucro Realizado (Edielson, 16/11/2026: "só faltou essa margem final
+  ficar lá no card [...] para ficar no mesmo padrão ali do lucro realizado"). As palavras
+  "margem final" só aparecem com janela de 1760 px ou mais E caixa de 1650 px ou mais
+  (1848 e 1920 com o menu recolhido); abaixo disso fica só o percentual, senão cortava o
+  "a entrar − a sair".
 - **Cor (mesmo dia, vendo a prévia do HTML: "ainda a entrar numa cor, talvez um azul, e
   ainda a sair [...] tipo um vermelho, mas não um vermelho muito forte [...] ali do total
   pago").** Ainda a Entrar em azul (`corAEntrar`: sky, para não se confundir com o azul do

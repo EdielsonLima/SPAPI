@@ -5456,6 +5456,12 @@ export function ExecutiveDashboard() {
                 rotulo="Lucro a Realizar" valor={formatCurrency(totLucroARealizar)} cor={totLucroARealizar >= 0 ? "bg-blue-500" : "bg-red-500"}
                 corValor={totLucroARealizar < 0 ? "text-red-600 dark:text-red-300/80" : undefined}
                 sub="a entrar − a sair" fonteValor={fonteCartaoResumo}
+                // Margem Final no selo, no mesmo padrão do cartão Lucro Realizado (Edielson,
+                // 16/11/2026). As palavras "margem final" só aparecem com o cartão largo: janela
+                // de 1760 px ou mais E caixa de 1650 px ou mais; senão cortariam o "a entrar − a sair".
+                selo={totMargemFinal === null ? undefined : <><span className="max-[1759px]:hidden [@container_(max-width:1649px)]:hidden">margem final </span>{pctResumo(totMargemFinal, 2)}</>}
+                corSelo={(totMargemFinal ?? 0) >= 0 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"}
+                dicaSelo="Margem Final = (Lucro Realizado + Lucro a Realizar) ÷ (Total Recebido + Ainda a Entrar) × 100"
               />
             </div>
 
