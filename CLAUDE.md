@@ -1112,6 +1112,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   "margem final" só aparecem com janela de 1760 px ou mais E caixa de 1650 px ou mais
   (1848 e 1920 com o menu recolhido); abaixo disso fica só o percentual, senão cortava o
   "a entrar − a sair".
+  No ar em 16/11/2026 às 18:01 (Brasília), commit `77e2af7`; em produção, na janela de
+  1616 px, o cartão mostra "a entrar − a sair" e "26,34%", sem texto cortado.
 - **Cor (mesmo dia, vendo a prévia do HTML: "ainda a entrar numa cor, talvez um azul, e
   ainda a sair [...] tipo um vermelho, mas não um vermelho muito forte [...] ali do total
   pago").** Ainda a Entrar em azul (`corAEntrar`: sky, para não se confundir com o azul do
