@@ -1021,12 +1021,14 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   - Colunas agrupadas, com uma linha de título em cima e uma linha fina separando:
     **Já realizado** (Total Recebido, Total Pago, Lucro Realizado, Margem) · **Ainda a
     entrar** (Total a Receber, Valor Estoque, Ainda a Entrar) · **Disponibilidade** (era "À venda" até o fim de 10/11; Disp. Ap.,
-    Disp. Sala, Res.Téc.). Lista em `colunasResumo`/`gruposResumo`.
+    Disp. Sala, Res.Téc.). Lista em `colunasResumo`/`gruposResumo`. **Desde 16/11/2026 o
+    bloco do meio é "Ainda a realizar" (com Ainda a Sair e Lucro a Realizar) e a Res.Téc.
+    saiu:** ver "Resumo › Ainda a Sair e Lucro a Realizar".
   - Nomes: "Lucro Potencial" virou **Ainda a Entrar** (é A Receber + Estoque: não desconta
     o que falta gastar na obra, então não é lucro; no Tetra dava R$ 86,4 mi de "lucro"
     com a obra no começo) e "Lucratividade" virou **Margem**. As chaves de ordenação
     continuam `lucroPotencial` e `lucratividade`. Um lucro projetado de verdade teria de
-    descontar o Saldo a Realizar do Orçamento: regra nova, não feita.
+    descontar o Saldo a Realizar do Orçamento: feito em 16/11/2026 (coluna Lucro a Realizar).
   - Margem: verde quando positiva, vermelha quando negativa (`corMargemResumo`), sem a
     barrinha. As faixas antigas (verde só acima de 50 %) deixavam 40,9 % em âmbar e
     12,1 % em vermelho. Percentual com vírgula (`pctResumo`): "14,65%", "-1,9%".
@@ -1035,7 +1037,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   - Zero aparece como "-" também em Total a Receber; Valor Estoque mostra **"sem preço"**
     quando a empresa tem unidade à venda e nenhuma com preço (Siena em 10/11).
   - Cartões: Total Recebido · Total Pago · **Lucro Realizado** (era "Saldo"; a margem é o
-    selo dele) · **Ainda a Entrar** (era o cartão "Lucratividade").
+    selo dele) · **Ainda a Entrar** (era o cartão "Lucratividade"). Desde 16/11/2026 são
+    seis (mais Ainda a Sair e Lucro a Realizar).
   - Conferido local com os preços de produção de 10/11 copiados para o banco local só
     para o teste: Valor Estoque R$ 273.050.000,00, Ainda a Entrar R$ 433.218.517,17
     (produção: R$ 433.067.201,54, porque o A Receber do cache local é de 09/11). Sem
@@ -1059,7 +1062,73 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
     1920 fica na largura toda (1.722 e 1.794 px). Abaixo de ~656 px de altura útil sobra
     uma faixa para rolar. Com o menu ABERTO a 1366 px ainda rola para o lado (1.153 px
     numa área de 1.052 px); o menu agora abre recolhido. O limite de 1760 px é da janela,
-    não da área: com o menu aberto entre 1760 e ~1790 px pode faltar largura.
+    não da área: com o menu aberto entre 1760 e ~1790 px pode faltar largura. Estas
+    medidas são da tabela de 11 colunas; as da de 12 colunas (16/11/2026) estão na seção
+    "Resumo › Ainda a Sair e Lucro a Realizar".
+
+## Resumo › Ainda a Sair e Lucro a Realizar; Res.Téc. fora (Edielson, 16/11/2026)
+
+- Pedido: "aquela última coluna, que é a reserva técnica, ela não precisa. Pode tirar" e
+  "ali [no Ainda a Entrar] nós não estamos considerando ainda também o que tem de pagar
+  para esse empreendimento se finalizar. Eu pensei em pegar o saldo do orçamento dele e
+  fazer essa conta [...] uma coluna chamada 'ainda a sair' [...] Veja como fica melhor".
+- **Res.Téc. saiu** da tabela e do HTML. As reservadas continuam no modal do Estoque
+  (filtro "Reservadas"); `qtResTec` segue em `estoque-resumo.ts` por causa do modal.
+- **Ainda a Sair** = saldo do Orçamento da obra (orçado − realizado), o número da coluna
+  "A Realizar" da aba Orçamento (`budgetData`, sem filtro de anos). Regra em
+  `src/lib/resumo-projecao.ts` (`aindaASair`, trava `resumo-projecao.test.ts`): obra
+  **finalizada**, **sem orçamento** (não controla orçamento ou sem área) ou **acima do
+  orçamento** fica sem valor (traço, com o motivo na dica da célula). Por isso o total da
+  coluna é o cartão "Saldo a Realizar" da aba Orçamento, com as mesmas empresas marcadas
+  (R$ 263.327.700,60 em 16/11). Não segue anos/meses, como o Total a Receber.
+- **Lucro a Realizar** = Ainda a Entrar − Ainda a Sair (`lucroARealizar`), o espelho do
+  Lucro Realizado (Recebido − Pago). Pode ficar negativo e aparece em vermelho. O bloco
+  "Ainda a entrar" virou **"Ainda a realizar"** (Total a Receber · Valor Estoque · Ainda a
+  Entrar · Ainda a Sair · Lucro a Realizar) e "Disponibilidade" ficou com Disp. Ap. e
+  Disp. Sala: 12 colunas. Chaves de ordenação novas: `aindaASair` e `lucroARealizar`.
+- Produção em 16/11 às 16:27 (as telas que ele mandou): 135 Jardins R$ 42.735.670,61 −
+  R$ 7.441.112,38 = R$ 35.294.558,23; total R$ 417.493.064,94 − R$ 263.327.700,60 =
+  R$ 154.165.364,34.
+- **Cartões: seis**, dois trios espelhados: Total Recebido · Total Pago · Lucro Realizado
+  ‖ Ainda a Entrar · Ainda a Sair · Lucro a Realizar. Seis numa linha a partir de 1280 px
+  (`xl:grid-cols-6`); abaixo de 1760 px o valor usa fonte menor (`fonteCartaoResumo`) e o
+  selo da margem perde a palavra "margem". `CardPainel` ganhou `fonteValor` e o `selo`
+  aceita nó, não só texto.
+- **Cor (mesmo dia, vendo a prévia do HTML: "ainda a entrar numa cor, talvez um azul, e
+  ainda a sair [...] tipo um vermelho, mas não um vermelho muito forte [...] ali do total
+  pago").** Ainda a Entrar em azul (`corAEntrar`: sky, para não se confundir com o azul do
+  Lucro Realizado / Lucro a Realizar) e Ainda a Sair em vermelho suave (`corASair`:
+  `#c03f55`; rose-300 no escuro). No HTML: `.az` (#2563eb) e `.sa` (#c03f55) na tabela e
+  nos cartões de celular; nos cartões do topo, azul claro e o rosa do Total Pago. Célula
+  sem valor mostra o traço em cinza. Antes as duas saíam iguais, em tinta.
+- **O "R$" some quando a caixa é estreita, para caber no notebook.** Com 12 colunas a
+  tabela pede 1.339 px no modo compacto e 1.588 px no de monitor grande; no notebook de
+  1366 px a caixa tem 1.240 px. Em vez de diminuir a letra ou abreviar ("ele gosta dos
+  valores normais mesmo, completos"), cada célula é `moedaResumo(v)`: o número inteiro, com
+  o "R$" num `span` que some por consulta de contêiner (`[container-type:inline-size]` na
+  caixa do Resumo; `semCifrao`: caixa abaixo de 1400 px, ou abaixo de 1600 px com janela de
+  1760 px ou mais) e o canto vazio do cabeçalho passa a dizer "Valores em R$"
+  (`soSemCifrao`). Sem o "R$" a tabela pede 1.185 px (1.145 px até 1320 px de janela). Os
+  cartões de cima mantêm o "R$". No monitor grande com a caixa abaixo de 1600 px (menu
+  aberto) os títulos também quebram em duas linhas. `TableBody` leva
+  `[&_td]:whitespace-nowrap`: valor negativo quebrava depois do "-" e a linha dobrava de
+  altura. NÃO diminuir a letra nem abreviar valor para ganhar largura.
+- Medido local (Playwright; pagos, recebidos e orçamento iguais aos de produção; o estoque
+  local só tem preço no Palácio, então o Lucro a Realizar local sai negativo, que é o pior
+  caso de largura): sem rolagem lateral nem vertical a 1920×1080, 1848×950, 1760×900,
+  1700, 1600, 1536×864, 1440, 1366×768, 1366×650 e 1280×720 (com "R$" de 1536 px para
+  cima, sem ele de 1440 px para baixo); a tabela termina em 690 px (tela de 768) e 630 px
+  (tela de 650). Menu aberto: cabe a 1920, 1848, 1760 e 1536; **a 1366 com o menu aberto
+  ainda rola** (1.185 px numa caixa de 1.052 px). Banco local: `company_settings` recebeu
+  em 16/11 a área, o fator e o "controla orçamento" de produção (a aba Orçamento local
+  vinha vazia e o Ainda a Sair, todo em traço).
+- **HTML:** `LinhaResumoHtml` perdeu `qtResTec` e ganhou `aindaASair` (chega calculado da
+  tela); seis cartões em duas fileiras de três; tabela de 12 colunas a partir de
+  **1366 px** de largura (abaixo, um cartão por empreendimento) e página de até 1360 px.
+  O arquivo baixado pelo botão bate célula a célula com a tela (12 linhas × 12 colunas).
+- **Não feito:** não há coluna de "resultado final do empreendimento" (Lucro Realizado +
+  Lucro a Realizar); a dica do Lucro a Realizar diz que a soma dos dois dá o resultado
+  esperado. Parcela vencida continua fora do Ainda a Entrar (fica em Inadimplência).
 
 ## Resumo em HTML, no padrão do Fechamento de Caixa (Edielson, 11/11/2026)
 
@@ -1075,15 +1144,18 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   Resumo calculado no servidor (Total Recebido, Total Pago e Total a Receber são contas
   feitas no navegador).
 - Gerador puro em `src/lib/resumo-html.ts` (`montarResumoHtml`), trava
-  `resumo-html.test.ts` com a tela de produção de 11/11/2026 às 07:30: Recebido
-  R$ 374.890.544,57 · Pago R$ 320.073.644,01 · Lucro Realizado R$ 54.816.900,56 (margem
-  14,62%) · Ainda a Entrar R$ 432.338.085,04. Para ver o relatório com esses números:
+  `resumo-html.test.ts` com as telas de produção de 16/11/2026 às 16:27 (até 16/11 eram as
+  de 11/11): Recebido R$ 375.595.583,37 · Pago R$ 320.855.864,42 · Lucro Realizado
+  R$ 54.739.718,95 (margem 14,57%) · Ainda a Entrar R$ 417.493.064,94 · Ainda a Sair
+  R$ 263.327.700,60 · Lucro a Realizar R$ 154.165.364,34. Para ver o relatório com esses números:
   `RESUMO_HTML_SAIDA=arquivo.html npx tsx src/__tests__/resumo-html.test.ts`.
 - Visual = o do `gen_fechamento.py` (repositório `rotinas-silvapacker`, pasta
-  `C:\Projetos Clientes\fechamento-caixa-cloud`): cabeçalho azul com logo, 4 cartões
-  escuros (Total Recebido, Total Pago, Lucro Realizado, Ainda a Entrar), seções brancas,
-  rodapé. **A partir de 1240 px de largura sai a tabela da tela** (os três blocos);
-  **abaixo disso, um cartão por empreendimento** e um "Total geral": são 10 números por
+  `C:\Projetos Clientes\fechamento-caixa-cloud`): cabeçalho azul com logo, 6 cartões
+  escuros em duas fileiras (Total Recebido, Total Pago, Lucro Realizado; Ainda a Entrar,
+  Ainda a Sair, Lucro a Realizar — eram 4 até 16/11/2026), seções brancas,
+  rodapé. **A partir de 1366 px de largura sai a tabela da tela** (os três blocos; 1240 px
+  até 16/11/2026, com 11 colunas);
+  **abaixo disso, um cartão por empreendimento** e um "Total geral": são 11 números por
   empreendimento, que não cabem em tabela no celular, onde o João Paulo abre o
   fechamento. Finalizadas embaixo de um divisor. A seção "Como ler" repete as contas do
   "i" das colunas: mudou a dica lá, mudar aqui.

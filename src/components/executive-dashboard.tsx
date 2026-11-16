@@ -76,6 +76,7 @@ import { linhasDeEstoque, totaisPorEmpresa } from "@/lib/estoque-resumo";
 import { unidadesComPainel } from "@/lib/unidades-painel";
 import { periodosDoPainel } from "@/lib/painel-periodos";
 import { montarResumoHtml, nomeArquivoResumo, rotuloPeriodo, type LinhaResumoHtml } from "@/lib/resumo-html";
+import { aindaASair, lucroARealizar, DICA_SEM_SAIDA, type MotivoSemSaida } from "@/lib/resumo-projecao";
 
 type Section = "cp" | "cr";
 type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores" | "comparativo";
@@ -5171,8 +5172,9 @@ export function ExecutiveDashboard() {
           totalAReceber: number;
           qtDispApto: number;
           qtDispSala: number;
-          qtResTec: number;
           valorEstoque: number;
+          aindaASair: number;
+          motivoSemSaida: MotivoSemSaida | null;
           status: string;
         }> = {};
 
@@ -5187,7 +5189,17 @@ export function ExecutiveDashboard() {
           ? new Set([...allCos].filter(co => selectedCompanies.has(co)))
           : allCos;
 
+        // Ainda a Sair (Edielson, 16/11/2026) = saldo do Orçamento da obra, o mesmo número
+        // da coluna "A Realizar" da aba Orçamento (budgetData: orçado − realizado, sem
+        // filtro de anos). Regra em src/lib/resumo-projecao.ts: obra finalizada, sem
+        // orçamento ou acima do orçamento fica sem valor, então o total é o cartão "Saldo
+        // a Realizar" daquela aba.
+        const orcamentoDaEmpresa = new Map(budgetData.map(b => [b.companyName, b]));
+
         for (const co of filteredCos) {
+          const status = companySettings.find(cs => cs.companyName === co)?.status || "Ativa";
+          const orc = orcamentoDaEmpresa.get(co);
+          const saida = aindaASair(orc ? { orcado: orc.budget, realizado: orc.realized } : null, status.toLowerCase().includes("finalizada"));
           companySummary[co] = {
             companyName: co,
             totalRecebido: 0,
@@ -5195,9 +5207,10 @@ export function ExecutiveDashboard() {
             totalAReceber: 0,
             qtDispApto: 0,
             qtDispSala: 0,
-            qtResTec: 0,
             valorEstoque: 0,
-            status: companySettings.find(cs => cs.companyName === co)?.status || "Ativa",
+            aindaASair: saida.valor,
+            motivoSemSaida: saida.motivo,
+            status,
           };
         }
 
@@ -5242,18 +5255,19 @@ export function ExecutiveDashboard() {
           companySummary[co].totalAReceber += effectiveAmount(item);
         });
 
-        // Units: Qt. Disponíveis, Res. Técnica, Valor Estoque — regra única em
+        // Units: Qt. Disponíveis e Valor Estoque — regra única em
         // src/lib/estoque-resumo.ts (a mesma do modal Estoque). Apartamento e
-        // sala comercial (tipo do cadastro do Sienge) contam em Disp./Res.Téc.
+        // sala comercial (tipo do cadastro do Sienge) contam em Disp.
         // Valor Estoque = só o preço posto no painel; sem preço a unidade conta e
         // não soma (Edielson, 10/11/2026; a estimativa área × fator × CUB saiu).
         // Disponíveis em duas colunas, Disp. Ap. e Disp. Sala (Edielson, 10/11/2026: os
         // 11 do 135 Jardins eram 5 apartamentos e 6 salas e a coluna única não dizia).
+        // A coluna Res.Téc. saiu em 16/11/2026 (Edielson: "ela não precisa"); as
+        // reservadas continuam no modal do Estoque, filtro "Reservadas".
         totaisEstoque.forEach((t, co) => {
           if (!companySummary[co]) return;
           companySummary[co].qtDispApto = t.qtDispApto;
           companySummary[co].qtDispSala = t.qtDispSala;
-          companySummary[co].qtResTec = t.qtResTec;
           companySummary[co].valorEstoque = t.valorEstoque;
         });
         const abrirEstoque = (empresa: string, filtro: FiltroEstoque, tipo?: string) => setEstoqueAberto({ empresa, filtro, tipo });
@@ -5267,6 +5281,7 @@ export function ExecutiveDashboard() {
         const getVal = (c: any, field: string): number => {
           if (field === "lucroRealizado") return c.totalRecebido - c.totalPago;
           if (field === "lucroPotencial") return c.totalAReceber + c.valorEstoque;
+          if (field === "lucroARealizar") return lucroARealizar(c.totalAReceber + c.valorEstoque, c.aindaASair);
           if (field === "lucratividade") return c.totalRecebido > 0 ? (c.totalRecebido - c.totalPago) / c.totalRecebido * 100 : 0;
           if (field === "companyName") return 0; // handled separately
           return c[field] || 0;
@@ -5295,6 +5310,8 @@ export function ExecutiveDashboard() {
         const totAReceber = sorted.reduce((soma, c) => soma + c.totalAReceber, 0);
         const totEstoque = sorted.reduce((soma, c) => soma + c.valorEstoque, 0);
         const totAEntrar = totAReceber + totEstoque;
+        const totASair = sorted.reduce((soma, c) => soma + c.aindaASair, 0);
+        const totLucroARealizar = lucroARealizar(totAEntrar, totASair);
 
         // As linhas desta tela, na ordem em que aparecem, para o botão "HTML" da barra de
         // filtros (baixarResumoHtml). Fica num ref porque o botão é desenhado fora deste bloco.
@@ -5306,9 +5323,9 @@ export function ExecutiveDashboard() {
           totalAReceber: co.totalAReceber,
           valorEstoque: co.valorEstoque,
           estoqueSemPreco: co.valorEstoque <= 0 && (totaisEstoque.get(co.companyName)?.semPreco ?? 0) > 0,
+          aindaASair: co.aindaASair,
           qtDispApto: co.qtDispApto,
           qtDispSala: co.qtDispSala,
-          qtResTec: co.qtResTec,
         }));
 
         // Percentual no padrão brasileiro ("14,65%", "-1,9%"); antes saía com ponto.
@@ -5318,10 +5335,35 @@ export function ExecutiveDashboard() {
         const corMargemResumo = (m: number) => (m > 0 ? "text-emerald-700 dark:text-emerald-400" : m < 0 ? "text-red-600 dark:text-red-300/70" : "text-slate-500 dark:text-slate-400");
         // Linha fina que abre cada bloco de colunas.
         const divisaResumo = "border-l border-slate-200 dark:border-slate-700";
+        // Valor de célula da tabela: o número inteiro, sempre. Com 12 colunas (16/11/2026) a
+        // tabela não cabe no notebook de 1366 px; em vez de diminuir a letra ou abreviar, o
+        // "R$" de cada célula some quando a caixa da tabela é estreita (consulta de contêiner,
+        // então vale também com o menu aberto) e o canto da tabela diz "Valores em R$". Os
+        // cartões de cima mantêm o "R$". Limites medidos: a tabela pede ~1.350 px no modo
+        // compacto e ~1.560 px no modo de monitor grande (1760 px ou mais de janela).
+        const semCifrao = "[@container_(max-width:1399px)]:hidden min-[1760px]:[@container_(max-width:1599px)]:hidden";
+        const soSemCifrao = "hidden [@container_(max-width:1399px)]:inline min-[1760px]:[@container_(max-width:1599px)]:inline";
+        const moedaResumo = (v: number) => {
+          const partes = formatCurrency(v).match(/^(-?)R\$\s?(.*)$/);
+          if (!partes) return formatCurrency(v);
+          return <>{partes[1]}<span className={semCifrao}>R$&nbsp;</span>{partes[2]}</>;
+        };
+        // Cor de Ainda a Entrar e Ainda a Sair (Edielson, 16/11/2026: "ainda a entrar numa cor,
+        // talvez um azul, e ainda a sair [...] tipo um vermelho, mas não um vermelho muito
+        // forte"). Antes as duas saíam iguais, em tinta. O azul é o sky, para não se confundir
+        // com o azul do Lucro Realizado / Lucro a Realizar. Contraste ≥ 4,5:1 nos dois temas.
+        const corAEntrar = "text-sky-700 dark:text-sky-400";
+        const corASair = "text-[#c03f55] dark:text-rose-300";
+        // Sem valor, o traço fica cinza como nas outras colunas (não na cor da coluna).
+        const tracoResumo = <span className="font-normal text-slate-500 dark:text-slate-400">-</span>;
+        // Seis cartões numa linha: valor um pouco menor abaixo de 1760 px (como os 7 da aba A Pagar).
+        const fonteCartaoResumo = "text-[clamp(0.9rem,0.95vw,1.3rem)] min-[1760px]:text-[clamp(1rem,1.15vw,1.5rem)]";
+        // "Ainda a realizar" é o espelho do "Já realizado": o que entra, o que sai e o que
+        // sobra, só que do que ainda está por vir (Edielson, 16/11/2026).
         const gruposResumo = [
           { rotulo: "Já realizado", colunas: 4 },
-          { rotulo: "Ainda a entrar", colunas: 3 },
-          { rotulo: "Disponibilidade", colunas: 3 },
+          { rotulo: "Ainda a realizar", colunas: 5 },
+          { rotulo: "Disponibilidade", colunas: 2 },
         ];
         // `inicio` marca a primeira coluna de cada bloco; `info` é a dica do "i"; `linhas` é o
         // título quebrado em duas linhas abaixo de 1760 px de largura. Tabela compacta de
@@ -5345,13 +5387,15 @@ export function ExecutiveDashboard() {
           { field: "valorEstoque", label: "Valor Estoque", linhas: ["Valor", "Estoque"], align: "right",
             info: "Soma do preço posto no painel para as unidades disponíveis. Unidade sem preço não soma. Clique no valor para ver as unidades e ajustar o preço." },
           { field: "lucroPotencial", label: "Ainda a Entrar", linhas: ["Ainda a", "Entrar"], align: "right",
-            info: "Cálculo: Total a Receber + Valor Estoque. É o dinheiro que ainda pode entrar: o que está vendido e falta receber, mais o que falta vender. Não desconta o que falta gastar para terminar a obra." },
+            info: "Cálculo: Total a Receber + Valor Estoque. É o dinheiro que ainda pode entrar: o que está vendido e falta receber, mais o que falta vender. O que falta gastar para terminar a obra está na coluna Ainda a Sair." },
+          { field: "aindaASair", label: "Ainda a Sair", linhas: ["Ainda a", "Sair"], align: "right",
+            info: "O que falta gastar para terminar a obra: o saldo do Orçamento (orçado − já realizado), o mesmo número da coluna A Realizar da aba Orçamento. Obra finalizada, sem orçamento cadastrado ou que já passou do orçamento fica sem valor. Não segue o filtro de anos e meses." },
+          { field: "lucroARealizar", label: "Lucro a Realizar", linhas: ["Lucro a", "Realizar"], align: "right",
+            info: "Cálculo: Ainda a Entrar − Ainda a Sair. É o que deve sobrar do que ainda vai entrar, depois de pagar o que falta da obra. Somado ao Lucro Realizado, dá o resultado esperado do empreendimento." },
           { field: "qtDispApto", label: "Disp. Ap.", linhas: ["Disp.", "Ap."], align: "center", inicio: true,
             info: "Apartamentos disponíveis para venda: os do Sienge, os liberados no painel e os cadastrados só no painel. Clique no número para ver a lista." },
           { field: "qtDispSala", label: "Disp. Sala", linhas: ["Disp.", "Sala"], align: "center",
             info: "Salas comerciais e lojas disponíveis para venda. Clique no número para ver a lista." },
-          { field: "qtResTec", label: "Res.Téc.", linhas: ["Res.", "Téc."], align: "center",
-            info: "Apartamentos e salas em reserva técnica. Não somam no Valor Estoque." },
         ];
 
         return (
@@ -5368,33 +5412,46 @@ export function ExecutiveDashboard() {
                 em duas linhas, menos espaço lateral e, em tela baixa, linhas mais apertadas (dois
                 degraus de altura que não se sobrepõem). Uma coluna central estreita em qualquer
                 tela foi tentada no mesmo dia e ficou feia no monitor grande: não voltar. */}
-            <div className="space-y-4 [@media(min-height:701px)_and_(max-height:820px)]:space-y-2.5 [@media(max-height:700px)]:space-y-2">
+            <div className="[container-type:inline-size] space-y-4 [@media(min-height:701px)_and_(max-height:820px)]:space-y-2.5 [@media(max-height:700px)]:space-y-2">
             {/* KPI Cards — os nomes são os da tabela (o cartão "Saldo" era o Lucro Realizado) e a
-                margem virou selo do lucro; o quarto cartão mostra o que ainda falta entrar. */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 [@media(min-height:701px)_and_(max-height:820px)]:[&>div]:py-2 [@media(max-height:700px)]:[&>div]:py-1.5">
-              <CardPainel rotulo="Total Recebido" valor={formatCurrency(totRecebido)} cor="bg-emerald-500" />
-              <CardPainel rotulo="Total Pago" valor={formatCurrency(totPago)} cor="bg-amber-500" />
+                margem virou selo do lucro. Desde 16/11/2026 são seis, em dois trios espelhados:
+                o que já entrou, saiu e sobrou; e o que ainda entra, ainda sai e deve sobrar.
+                Seis numa linha a partir de 1280 px; abaixo de 1760 px a fonte do valor desce um
+                pouco para "R$ 417.493.064,94" caber no cartão com o menu aberto. */}
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 [@media(min-height:701px)_and_(max-height:820px)]:[&>div]:py-2 [@media(max-height:700px)]:[&>div]:py-1.5">
+              <CardPainel rotulo="Total Recebido" valor={formatCurrency(totRecebido)} cor="bg-emerald-500" fonteValor={fonteCartaoResumo} />
+              <CardPainel rotulo="Total Pago" valor={formatCurrency(totPago)} cor="bg-amber-500" fonteValor={fonteCartaoResumo} />
               <CardPainel
                 rotulo="Lucro Realizado" valor={formatCurrency(totSaldo)} cor={totSaldo >= 0 ? "bg-blue-500" : "bg-red-500"}
                 corValor={totSaldo < 0 ? "text-red-600 dark:text-red-300/80" : undefined}
                 sub="recebido − pago"
-                selo={`margem ${pctResumo(totLucratividade, 2)}`}
+                selo={<><span className="max-[1759px]:hidden">margem </span>{pctResumo(totLucratividade, 2)}</>}
                 corSelo={totLucratividade >= 0 ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"}
                 dicaSelo="Margem = Lucro Realizado ÷ Total Recebido × 100"
+                fonteValor={fonteCartaoResumo}
               />
-              <CardPainel rotulo="Ainda a Entrar" valor={formatCurrency(totAEntrar)} cor="bg-violet-500" sub="a receber + estoque à venda" />
+              <CardPainel rotulo="Ainda a Entrar" valor={formatCurrency(totAEntrar)} cor="bg-sky-500" sub="a receber + estoque" fonteValor={fonteCartaoResumo} />
+              <CardPainel rotulo="Ainda a Sair" valor={formatCurrency(totASair)} cor="bg-rose-500" sub="saldo do orçamento" fonteValor={fonteCartaoResumo} />
+              <CardPainel
+                rotulo="Lucro a Realizar" valor={formatCurrency(totLucroARealizar)} cor={totLucroARealizar >= 0 ? "bg-blue-500" : "bg-red-500"}
+                corValor={totLucroARealizar < 0 ? "text-red-600 dark:text-red-300/80" : undefined}
+                sub="a entrar − a sair" fonteValor={fonteCartaoResumo}
+              />
             </div>
 
             {/* Table — três blocos de colunas (Edielson, 10/11/2026, "algo resumido e fácil de
-                entender" para o Carlos Humberto): o que já aconteceu, o que ainda entra e o que
-                está à venda. Valores sempre completos, nunca abreviados. */}
+                entender" para o Carlos Humberto): o que já aconteceu, o que ainda está por vir
+                (entra, sai e sobra; o "sai" entrou em 16/11/2026) e o que está à venda. Valores
+                sempre completos, nunca abreviados. */}
             <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
                       <TableRow className="border-b-0 hover:bg-transparent">
-                        <TableHead className="h-7 px-1.5 [@media(min-height:701px)_and_(max-height:820px)]:h-6 [@media(max-height:700px)]:h-5 min-[1760px]:h-8 min-[1760px]:px-2 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20" />
+                        <TableHead className="h-7 px-1.5 [@media(min-height:701px)_and_(max-height:820px)]:h-6 [@media(max-height:700px)]:h-5 min-[1760px]:h-8 min-[1760px]:px-2 sticky left-0 bg-slate-50 dark:bg-slate-800 z-20 text-left align-bottom">
+                          <span className={`${soSemCifrao} whitespace-nowrap text-[10px] font-medium normal-case tracking-normal text-slate-500 dark:text-slate-400`}>Valores em R$</span>
+                        </TableHead>
                         {gruposResumo.map(g => (
                           <TableHead key={g.rotulo} colSpan={g.colunas} className={`h-7 px-1.5 pb-0 pt-1.5 [@media(min-height:701px)_and_(max-height:820px)]:h-6 [@media(min-height:701px)_and_(max-height:820px)]:pt-1 [@media(max-height:700px)]:h-5 [@media(max-height:700px)]:pt-0.5 min-[1760px]:h-8 min-[1760px]:px-2 min-[1760px]:pt-2 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-300 ${divisaResumo}`}>
                             <span className="block border-b-2 border-slate-300 pb-1 dark:border-slate-600">{g.rotulo}</span>
@@ -5410,7 +5467,7 @@ export function ExecutiveDashboard() {
                             onClick={() => toggleResumoSort(col.field)}
                           >
                             <span className="inline-flex items-end gap-1 whitespace-nowrap leading-[1.2]">
-                              {col.linhas ? <span>{col.linhas[0]} <br className="min-[1760px]:hidden" />{col.linhas[1]}</span> : col.label}
+                              {col.linhas ? <span>{col.linhas[0]} <br className="min-[1760px]:hidden min-[1760px]:[@container_(max-width:1599px)]:inline" />{col.linhas[1]}</span> : col.label}
                               {/* "i" de informação (Edielson, 10/11/2026): passando o mouse, diz o que é
                                   a coluna e que conta é feita. Não ordena ao clicar. */}
                               {col.info && (
@@ -5442,10 +5499,11 @@ export function ExecutiveDashboard() {
                       </TableRow>
                       </TooltipProvider>
                     </TableHeader>
-                    <TableBody>
+                    <TableBody className="[&_td]:whitespace-nowrap">
                       {sorted.map((co, idx) => {
                         const lucroRealizado = co.totalRecebido - co.totalPago;
                         const aEntrar = co.totalAReceber + co.valorEstoque;
+                        const lucroFuturo = lucroARealizar(aEntrar, co.aindaASair);
                         const margem = co.totalRecebido > 0 ? (lucroRealizado / co.totalRecebido) * 100 : 0;
                         const isFinalizada = co.status.toLowerCase().includes("finalizada");
                         // As finalizadas vêm no fim, embaixo de um divisor (a coluna Status saiu).
@@ -5468,21 +5526,31 @@ export function ExecutiveDashboard() {
                               <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-slate-900 z-10 whitespace-nowrap">
                                 {co.companyName}
                               </TableCell>
-                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{formatCurrency(co.totalRecebido)}</TableCell>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(co.totalPago)}</TableCell>
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{moedaResumo(co.totalRecebido)}</TableCell>
+                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{moedaResumo(co.totalPago)}</TableCell>
                               <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-bold text-right tabular-nums ${lucroRealizado >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
-                                {formatCurrency(lucroRealizado)}
+                                {moedaResumo(lucroRealizado)}
                               </TableCell>
                               <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums ${corMargemResumo(margem)}`}>
                                 {co.totalRecebido > 0 ? pctResumo(margem) : "-"}
                               </TableCell>
-                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-right tabular-nums text-slate-600 dark:text-slate-400 ${divisaResumo}`}>{co.totalAReceber > 0 ? formatCurrency(co.totalAReceber) : "-"}</TableCell>
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-right tabular-nums text-slate-600 dark:text-slate-400 ${divisaResumo}`}>{co.totalAReceber > 0 ? moedaResumo(co.totalAReceber) : "-"}</TableCell>
                               <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-right tabular-nums text-slate-600 dark:text-slate-400">
                                 <button type="button" onClick={() => abrirEstoque(co.companyName, "estoque")} className={linkEstoque} title={dicaEstoque} aria-label={`Abrir o estoque de ${co.companyName}`}>
-                                  {co.valorEstoque > 0 ? formatCurrency(co.valorEstoque) : estoqueSemPreco ? <span className="font-semibold text-amber-700 dark:text-amber-300">sem preço</span> : "-"}
+                                  {co.valorEstoque > 0 ? moedaResumo(co.valorEstoque) : estoqueSemPreco ? <span className="font-semibold text-amber-700 dark:text-amber-300">sem preço</span> : "-"}
                                 </button>
                               </TableCell>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums text-slate-800 dark:text-slate-100">{aEntrar > 0 ? formatCurrency(aEntrar) : "-"}</TableCell>
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums ${corAEntrar}`}>{aEntrar > 0 ? moedaResumo(aEntrar) : tracoResumo}</TableCell>
+                              {/* Ainda a Sair: saldo do orçamento da obra. Sem valor, a dica diz por quê. */}
+                              <TableCell
+                                title={co.motivoSemSaida ? DICA_SEM_SAIDA[co.motivoSemSaida] : "Saldo do orçamento da obra: o mesmo valor de Orçamento › A Realizar"}
+                                className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-semibold text-right tabular-nums ${corASair}`}
+                              >
+                                {co.aindaASair > 0 ? moedaResumo(co.aindaASair) : tracoResumo}
+                              </TableCell>
+                              <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs font-bold text-right tabular-nums ${lucroFuturo >= 0 ? "text-blue-600 dark:text-blue-400" : "text-red-600 dark:text-red-300/70"}`}>
+                                {aEntrar > 0 || co.aindaASair > 0 ? moedaResumo(lucroFuturo) : "-"}
+                              </TableCell>
                               <TableCell className={`px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-center tabular-nums font-semibold text-slate-600 dark:text-slate-400 ${divisaResumo}`}>
                                 <button type="button" onClick={() => abrirEstoque(co.companyName, "disponiveis", "Apartamento")} className={linkEstoque} title="Ver os apartamentos disponíveis" aria-label={`Abrir os apartamentos disponíveis de ${co.companyName}`}>
                                   {co.qtDispApto > 0 ? co.qtDispApto : "-"}
@@ -5493,11 +5561,6 @@ export function ExecutiveDashboard() {
                                   {co.qtDispSala > 0 ? co.qtDispSala : "-"}
                                 </button>
                               </TableCell>
-                              <TableCell className="px-1.5 py-1.5 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1 [@media(max-height:700px)]:py-0.5 min-[1760px]:px-2 min-[1760px]:py-2 text-xs text-center tabular-nums text-slate-500 dark:text-slate-400">
-                                <button type="button" onClick={() => abrirEstoque(co.companyName, "reservadas")} className={linkEstoque} title="Ver as unidades reservadas" aria-label={`Abrir as unidades reservadas de ${co.companyName}`}>
-                                  {co.qtResTec > 0 ? co.qtResTec : "-"}
-                                </button>
-                              </TableCell>
                             </TableRow>
                           </React.Fragment>
                         );
@@ -5505,16 +5568,17 @@ export function ExecutiveDashboard() {
                       {/* Total Row */}
                       <TableRow className="bg-slate-50 dark:bg-slate-800/60 border-t border-slate-200 dark:border-slate-700 font-semibold">
                         <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-slate-800 dark:text-slate-100 sticky left-0 bg-slate-50 dark:bg-slate-800 z-10">Total</TableCell>
-                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{formatCurrency(totRecebido)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{formatCurrency(totPago)}</TableCell>
-                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{formatCurrency(totSaldo)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-emerald-700 dark:text-emerald-400 ${divisaResumo}`}>{moedaResumo(totRecebido)}</TableCell>
+                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-amber-700 dark:text-amber-400">{moedaResumo(totPago)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums ${totSaldo >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{moedaResumo(totSaldo)}</TableCell>
                         <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums ${corMargemResumo(totLucratividade)}`}>{totRecebido > 0 ? pctResumo(totLucratividade, 2) : "-"}</TableCell>
-                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{formatCurrency(totAReceber)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">{formatCurrency(totEstoque)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-slate-900 dark:text-slate-50">{formatCurrency(totAEntrar)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{moedaResumo(totAReceber)}</TableCell>
+                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums text-slate-700 dark:text-slate-300">{moedaResumo(totEstoque)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums ${corAEntrar}`}>{moedaResumo(totAEntrar)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums ${corASair}`}>{moedaResumo(totASair)}</TableCell>
+                        <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-right tabular-nums ${totLucroARealizar >= 0 ? "text-blue-700 dark:text-blue-400" : "text-red-700 dark:text-red-300/70"}`}>{moedaResumo(totLucroARealizar)}</TableCell>
                         <TableCell className={`px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-center tabular-nums text-slate-700 dark:text-slate-300 ${divisaResumo}`}>{sorted.reduce((s, c) => s + c.qtDispApto, 0)}</TableCell>
                         <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-center tabular-nums text-slate-700 dark:text-slate-300">{sorted.reduce((s, c) => s + c.qtDispSala, 0)}</TableCell>
-                        <TableCell className="px-1.5 py-2 max-[1320px]:px-1 [@media(min-height:701px)_and_(max-height:820px)]:py-1.5 [@media(max-height:700px)]:py-1 min-[1760px]:px-2 text-xs font-bold min-[1760px]:text-sm min-[1760px]:font-semibold text-center tabular-nums text-slate-600 dark:text-slate-400">{sorted.reduce((s, c) => s + c.qtResTec, 0)}</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -5592,16 +5656,17 @@ export function ExecutiveDashboard() {
 // sem sombra nem ícone colorido, ponto de estado antes do rótulo e valor em
 // fonte fluida que nunca é cortado. Usado nas abas Geral e Orçamento; os cards
 // das abas CP/CR têm o mesmo desenho inline (com clique/active próprios).
-function CardPainel({ rotulo, valor, sub, cor, corValor, onClick, selo, corSelo, dicaSelo }: {
+function CardPainel({ rotulo, valor, sub, cor, corValor, onClick, selo, corSelo, dicaSelo, fonteValor }: {
   rotulo: string;
   valor: string;
   sub?: string;
   cor: string;        // classe do ponto, ex.: "bg-blue-500"
   corValor?: string;  // classe de cor do valor (padrão: tinta)
   onClick?: () => void;
-  selo?: string;      // pílula discreta à direita da linha de baixo, ex.: "42.7%"
+  selo?: React.ReactNode; // pílula discreta à direita da linha de baixo, ex.: "42.7%"
   corSelo?: string;   // fundo + texto da pílula (contraste ≥ 4,5:1 nos dois temas)
   dicaSelo?: string;  // texto ao passar o mouse na pílula
+  fonteValor?: string; // classe de tamanho do valor (padrão: a fonte fluida dos cards)
 }) {
   const clicavel = Boolean(onClick);
   return (
@@ -5616,7 +5681,7 @@ function CardPainel({ rotulo, valor, sub, cor, corValor, onClick, selo, corSelo,
         <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cor}`} />
         <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 truncate">{rotulo}</p>
       </div>
-      <p className={`mt-1.5 font-semibold tabular-nums whitespace-nowrap leading-tight text-[clamp(1rem,1.15vw,1.5rem)] ${corValor || "text-slate-900 dark:text-slate-50"}`}>{valor}</p>
+      <p className={`mt-1.5 font-semibold tabular-nums whitespace-nowrap leading-tight ${fonteValor || "text-[clamp(1rem,1.15vw,1.5rem)]"} ${corValor || "text-slate-900 dark:text-slate-50"}`}>{valor}</p>
       {/* Selo na linha de baixo, à direita: na do rótulo ele cortava "Custo
           Realizado"/"Saldo a Realizar" com seis cards por linha a 1536 px. */}
       {selo ? (
