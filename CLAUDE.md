@@ -1009,6 +1009,21 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   `3a15ae2`** (`commit.sha` do `inspectService`, deployment `done`); conferido em
   produção pelo Chrome com os mesmos 4 totais, 17 contas, "CH"/"JP" no BTG e "Aplicação"
   no Bradesco e na Caixa. Aba aberta antes do deploy continua com a tela antiga até o F5.
+- **"Resetar padrão" das Contas pede confirmação no modal do painel (Edielson, 17/11/2026:
+  "tem que tomar cuidado [...] se ele faz isso automaticamente ou vai aparecer um modal para
+  confirmar").** Até 17/11 era o `window.confirm` do navegador e, sem contas carregadas
+  (API de saldos com erro), gravava `[]` em `dashboard_saldos_accounts_v2`, que o painel lê
+  como TODAS as 32 contas. Agora (`resetContasSaldos` em `src/lib/saldos-padrao.ts`, trava
+  `saldos-padrao.test.ts`): sem contas da relação carregadas, não faz nada e avisa; já no
+  padrão (seleção = as 17 e nada diferente salvo), só avisa "já estão no padrão"; senão abre
+  o modal "Voltar as contas ao padrão?" com quantas estão marcadas hoje, a lista do que
+  **Sai** e do que **Entra** (banco, número, empresa) e, se o "Salvar padrão" gravado for
+  outro, o aviso de que ele também volta. O foco abre em **Cancelar** (Enter não reseta);
+  Esc e o X também cancelam. Comparação contra a seleção EFETIVA (vazia = todas; id salvo
+  que não existe mais na lista não conta). NÃO voltar ao reset direto nem ao `confirm`
+  nativo. Local em 17/11 (Playwright): 2 contas → modal "Entram (15)", Cancelar/Esc mantêm
+  R$ 923.278,03, confirmar → 17 contas e R$ 18.351.104,00; seleção vazia → "Saem (15)" (as
+  da Holding); nenhum diálogo nativo; celular (390 px) e escuro ok.
 
 ## Resumo Financeiro - Regras (Criado em 2026-04-05)
 

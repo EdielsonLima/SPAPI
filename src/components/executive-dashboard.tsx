@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useState, useMemo, useRef } from "react";
 import { useTheme } from "next-themes";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 // Select removed - year filter now uses MultiSelectFilter
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -78,6 +78,7 @@ import { periodosDoPainel } from "@/lib/painel-periodos";
 import { montarResumoHtml, nomeArquivoResumo, rotuloPeriodo, type LinhaResumoHtml } from "@/lib/resumo-html";
 import { aindaASair, lucroARealizar, margemFinal, DICA_SEM_SAIDA, type MotivoSemSaida } from "@/lib/resumo-projecao";
 import { agruparPorBanco } from "@/lib/saldos-por-banco";
+import { resetContasSaldos } from "@/lib/saldos-padrao";
 
 type Section = "cp" | "cr";
 type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores" | "comparativo";
@@ -435,6 +436,8 @@ export function ExecutiveDashboard() {
     }
     return new Set<string>(); // empty = all selected (will be initialized after fetch)
   });
+  // Modal de confirmação do "Resetar padrão" da aba Saldos
+  const [confirmarResetContas, setConfirmarResetContas] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [bankAccountsInitialized, setBankAccountsInitialized] = useState(false);
   const [dailyBalances, setDailyBalances] = useState<Record<string, { accountId: string; amount: number }[]> | null>(null);
@@ -4594,6 +4597,16 @@ export function ExecutiveDashboard() {
             // Account filter dropdown always shows ALL accounts (not filtered by company)
             const allAccountNums = Array.from(new Set(bankAccounts.map(a => String(a.bankAccountId)))).sort();
             const effectiveSelected = selectedBankAccounts.size > 0 ? selectedBankAccounts : new Set(allAccountNums);
+            // Padrão = as contas da relação canônica (isInDimBanco); regra em saldos-padrao.ts
+            const padraoContas = bankAccounts.filter(a => a.isInDimBanco).map(a => String(a.bankAccountId));
+            let salvoContas: string | null = null;
+            try { salvoContas = localStorage.getItem("dashboard_saldos_accounts_v2"); } catch { /* sem armazenamento */ }
+            const resetContas = resetContasSaldos({
+              selecionadas: selectedBankAccounts,
+              todas: allAccountNums,
+              padrao: padraoContas,
+              salvo: salvoContas,
+            });
 
             // Filtra SÓ pelo seletor de Contas (selectedBankAccounts). NÃO aplica o
             // filtro de "Empresas" (selectedCompanies): ele é orientado a CP/CR e não
@@ -4670,21 +4683,87 @@ export function ExecutiveDashboard() {
                     size="sm"
                     className="h-7 text-xs text-slate-500 dark:text-slate-400"
                     onClick={() => {
-                      if (!window.confirm("Tem certeza que deseja resetar o filtro de contas para o padrão? Suas seleções atuais serão perdidas.")) return;
-                      localStorage.removeItem("dashboard_saldos_accounts_v2");
-                      const validNums = new Set<string>(
-                        bankAccounts
-                          .filter(a => a.isInDimBanco)
-                          .map(a => String(a.bankAccountId))
-                      );
-                      setSelectedBankAccounts(validNums);
-                      localStorage.setItem("dashboard_saldos_accounts_v2", JSON.stringify(Array.from(validNums)));
-                      toast.success("Filtro resetado para padrao DimBanco!");
+                      // Nunca reseta direto: sem contas carregadas gravaria seleção vazia
+                      // (= todas as contas); com algo a mudar, pergunta no modal abaixo.
+                      if (resetContas.semPadrao) {
+                        toast.error("As contas ainda não carregaram. Tente de novo em instantes.");
+                        return;
+                      }
+                      if (resetContas.igualAoPadrao && !resetContas.trocaPadraoSalvo) {
+                        toast.info(`As contas já estão no padrão (${resetContas.padrao} contas).`);
+                        return;
+                      }
+                      setConfirmarResetContas(true);
                     }}
                   >
-                    <RefreshCw className="h-3 w-3 mr-1" /> Resetar padrao
+                    <RefreshCw className="h-3 w-3 mr-1" /> Resetar padrão
                   </Button>
                 </div>
+
+                {/* Confirmação do "Resetar padrão": mostra o que entra e o que sai */}
+                <Dialog open={confirmarResetContas} onOpenChange={setConfirmarResetContas}>
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Voltar as contas ao padrão?</DialogTitle>
+                      <DialogDescription>
+                        A seleção volta para as {resetContas.padrao} contas da relação da Silva Packer.
+                        {" "}Hoje {resetContas.atuais === 1 ? "está marcada 1 conta" : `estão marcadas ${resetContas.atuais} contas`}.
+                      </DialogDescription>
+                    </DialogHeader>
+                    {([
+                      ["Saem", resetContas.saem, "bg-rose-500"],
+                      ["Entram", resetContas.entram, "bg-emerald-500"],
+                    ] as const).map(([titulo, ids, cor]) => ids.length > 0 && (
+                      <div key={titulo}>
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">
+                          {titulo} ({ids.length})
+                        </p>
+                        <ul className="max-h-36 overflow-y-auto rounded-lg border border-slate-200 dark:border-slate-700 divide-y divide-slate-100 dark:divide-slate-800">
+                          {ids.map(id => {
+                            const acc = bankAccounts.find(a => String(a.bankAccountId) === id);
+                            return (
+                              <li key={id} className="flex items-center gap-2 px-3 py-1.5 text-xs">
+                                <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${cor}`} />
+                                <span className="text-slate-700 dark:text-slate-200 truncate">
+                                  {acc?.bankName ? `${acc.bankName} (${acc.accountNumber})` : acc?.accountNumber || id}
+                                </span>
+                                <span className="ml-auto text-slate-500 dark:text-slate-400 truncate">{acc?.companyName || ""}</span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ))}
+                    {resetContas.trocaPadraoSalvo && (
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        O padrão gravado em Contas › Salvar padrão também volta a ser esse.
+                      </p>
+                    )}
+                    <DialogFooter className="gap-2 sm:gap-0">
+                      <Button variant="outline" onClick={() => setConfirmarResetContas(false)}>
+                        Cancelar
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          if (resetContas.semPadrao) {
+                            setConfirmarResetContas(false);
+                            toast.error("As contas ainda não carregaram. Nada foi alterado.");
+                            return;
+                          }
+                          const ids = new Set(padraoContas);
+                          setSelectedBankAccounts(ids);
+                          try {
+                            localStorage.setItem("dashboard_saldos_accounts_v2", JSON.stringify(Array.from(ids)));
+                          } catch { /* só não lembra depois do F5 */ }
+                          setConfirmarResetContas(false);
+                          toast.success(`Contas de volta ao padrão (${ids.size} contas).`);
+                        }}
+                      >
+                        Voltar ao padrão
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
 
                 {/* KPI Card */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
