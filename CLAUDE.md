@@ -1023,7 +1023,12 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   que não existe mais na lista não conta). NÃO voltar ao reset direto nem ao `confirm`
   nativo. Local em 17/11 (Playwright): 2 contas → modal "Entram (15)", Cancelar/Esc mantêm
   R$ 923.278,03, confirmar → 17 contas e R$ 18.351.104,00; seleção vazia → "Saem (15)" (as
-  da Holding); nenhum diálogo nativo; celular (390 px) e escuro ok.
+  da Holding); nenhum diálogo nativo; celular (390 px) e escuro ok. **No ar em 17/11/2026
+  às 16:37 (Brasília), commit `6b8e567`** (`commit.sha` do `inspectService`, deployment
+  `done`); conferido em produção pelo Chrome: com as 17 marcadas, só o aviso "já estão no
+  padrão (17 contas)"; com uma desmarcada na tela, modal "Hoje estão marcadas 16 contas ·
+  Entram (1) Banco do Brasil (924-5) SERENITY", foco em Cancelar, Cancelar fecha sem gravar
+  (salvo continuou com 17). Produção tem 60 contas no seletor (local, 32).
 
 ## Resumo Financeiro - Regras (Criado em 2026-04-05)
 
