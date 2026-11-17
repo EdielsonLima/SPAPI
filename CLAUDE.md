@@ -1005,7 +1005,10 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   Local em 17/11 (Playwright): por banco BTG Pactual R$ 8.969.754,77 · Banco do Brasil
   R$ 6.052.610,92 · Caixa Econômica R$ 1.933.519,88 · Bradesco R$ 1.395.218,43 = R$
   18.351.104,00, o mesmo total por empresa; escolha mantida depois do F5; sem rolagem
-  lateral a 1366, 1280 e 390 px.
+  lateral a 1366, 1280 e 390 px. **No ar em 17/11/2026 às 14:40 (Brasília), commit
+  `3a15ae2`** (`commit.sha` do `inspectService`, deployment `done`); conferido em
+  produção pelo Chrome com os mesmos 4 totais, 17 contas, "CH"/"JP" no BTG e "Aplicação"
+  no Bradesco e na Caixa. Aba aberta antes do deploy continua com a tela antiga até o F5.
 
 ## Resumo Financeiro - Regras (Criado em 2026-04-05)
 
