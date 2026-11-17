@@ -77,6 +77,7 @@ import { unidadesComPainel } from "@/lib/unidades-painel";
 import { periodosDoPainel } from "@/lib/painel-periodos";
 import { montarResumoHtml, nomeArquivoResumo, rotuloPeriodo, type LinhaResumoHtml } from "@/lib/resumo-html";
 import { aindaASair, lucroARealizar, margemFinal, DICA_SEM_SAIDA, type MotivoSemSaida } from "@/lib/resumo-projecao";
+import { agruparPorBanco } from "@/lib/saldos-por-banco";
 
 type Section = "cp" | "cr";
 type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores" | "comparativo";
@@ -416,6 +417,17 @@ export function ExecutiveDashboard() {
   const [bankAccounts, setBankAccounts] = useState<{ bankAccountId: number; bankAccountDescription: string; bankCode: string; bankName: string; agencyNumber: string; accountNumber: string; companyId: number; companyName: string; currentBalance: number; isInDimBanco?: boolean }[]>([]);
   const [loadingBankAccounts, setLoadingBankAccounts] = useState(false);
   const [expandedBankCompanies, setExpandedBankCompanies] = useState<Set<string>>(new Set());
+  // Saldos › tabela da direita: "Contas por Empresa" ou "Contas por Banco" (Edielson, 17/11/2026).
+  const [saldosAgrupar, setSaldosAgrupar] = useState<"empresa" | "banco">(() => {
+    try {
+      if (typeof window !== "undefined" && localStorage.getItem("dashboard_saldos_agrupar") === "banco") return "banco";
+    } catch { /* sem localStorage: abre por empresa */ }
+    return "empresa";
+  });
+  const trocarSaldosAgrupar = (modo: "empresa" | "banco") => {
+    setSaldosAgrupar(modo);
+    try { localStorage.setItem("dashboard_saldos_agrupar", modo); } catch { /* só não lembra */ }
+  };
   const [selectedBankAccounts, setSelectedBankAccounts] = useState<Set<string>>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("dashboard_saldos_accounts_v2");
@@ -4733,21 +4745,92 @@ export function ExecutiveDashboard() {
 
                   {/* Table */}
                   <Card className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-none rounded-2xl">
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Contas por Empresa</CardTitle>
-                      <CardDescription className="text-xs text-slate-500 dark:text-slate-400">Clique na empresa para ver as contas</CardDescription>
+                    <CardHeader className="pb-2 flex flex-row items-start justify-between gap-3 space-y-0">
+                      <div className="min-w-0">
+                        <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+                          {saldosAgrupar === "banco" ? "Contas por Banco" : "Contas por Empresa"}
+                        </CardTitle>
+                        <CardDescription className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          {saldosAgrupar === "banco" ? "Clique no banco para ver as contas" : "Clique na empresa para ver as contas"}
+                        </CardDescription>
+                      </div>
+                      <div role="group" aria-label="Agrupar contas por" className="flex shrink-0 items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                        {(["empresa", "banco"] as const).map(modo => (
+                          <button
+                            key={modo}
+                            type="button"
+                            aria-pressed={saldosAgrupar === modo}
+                            onClick={() => trocarSaldosAgrupar(modo)}
+                            className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-all ${saldosAgrupar === modo ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm" : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"}`}
+                          >
+                            {modo === "empresa" ? "Por empresa" : "Por banco"}
+                          </button>
+                        ))}
+                      </div>
                     </CardHeader>
                     <CardContent className="p-0">
                       <Table>
                         <TableHeader className="bg-slate-50 dark:bg-slate-800">
                           <TableRow>
                             <TableHead className="w-[40px]" />
-                            <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Empresa</TableHead>
+                            <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{saldosAgrupar === "banco" ? "Banco" : "Empresa"}</TableHead>
                             <TableHead className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 text-right">Saldo Atual</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {companies.map((company) => {
+                          {saldosAgrupar === "banco" && agruparPorBanco(filteredAccounts).map(({ banco, total, contas }) => {
+                            const chaveBanco = `banco::${banco}`;
+                            const aberto = expandedBankCompanies.has(chaveBanco);
+                            return (
+                              <React.Fragment key={chaveBanco}>
+                                {/* Nível 1: banco */}
+                                <TableRow
+                                  className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
+                                  onClick={() => {
+                                    setExpandedBankCompanies(prev => {
+                                      const next = new Set(prev);
+                                      if (next.has(chaveBanco)) next.delete(chaveBanco);
+                                      else next.add(chaveBanco);
+                                      return next;
+                                    });
+                                  }}
+                                >
+                                  <TableCell className="w-[40px] px-2">
+                                    {aberto
+                                      ? <ChevronDown className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                      : <ChevronRight className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                                    }
+                                  </TableCell>
+                                  <TableCell className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                                    <Landmark className="h-4 w-4 inline-block mr-1.5 -mt-0.5 text-slate-500 dark:text-slate-400" />
+                                    {banco}
+                                    <Badge variant="secondary" className="ml-2 text-[10px] px-1" title={`${contas.length} ${contas.length === 1 ? "conta" : "contas"}`}>{contas.length}</Badge>
+                                  </TableCell>
+                                  <TableCell className={`text-sm font-bold text-right tabular-nums ${total >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-600 dark:text-red-300/60"}`}>
+                                    {formatCurrency(total)}
+                                  </TableCell>
+                                </TableRow>
+
+                                {/* Nível 2: contas do banco, com a empresa dona */}
+                                {aberto && contas.map(({ conta, detalhe }) => (
+                                  <TableRow key={conta.bankAccountId} className="bg-slate-50/50 dark:bg-slate-800/30">
+                                    <TableCell />
+                                    <TableCell className="pl-6">
+                                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{conta.companyName}</span>
+                                      <span className="ml-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">{conta.accountNumber}</span>
+                                      {detalhe && (
+                                        <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 font-medium">{detalhe}</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className={`text-xs font-semibold text-right tabular-nums ${conta.currentBalance >= 0 ? "text-slate-700 dark:text-slate-300" : "text-red-500 dark:text-red-300/60"}`}>
+                                      {formatCurrency(conta.currentBalance)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </React.Fragment>
+                            );
+                          })}
+                          {saldosAgrupar === "empresa" && companies.map((company) => {
                             const companyTotal = company.accounts.reduce((s, a) => s + a.currentBalance, 0);
                             const companyKey = company.companyName;
                             const isCompanyExpanded = expandedBankCompanies.has(companyKey);

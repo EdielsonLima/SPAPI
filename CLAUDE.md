@@ -989,6 +989,23 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   seleção antiga quando a lista canônica muda); `REPORT_EXCLUDED_ACCOUNTS` vazio
   (o relatório MCP espelha a tela)
 - Gráfico de evolução diária com cache no banco (dias passados não mudam)
+- **Tabela da direita: Por empresa | Por banco (Edielson, 17/11/2026: "um toggle que mude
+  para mostrar contas por empresa e mostrar contas por banco").** Botão no canto do card;
+  a escolha fica em `localStorage.dashboard_saldos_agrupar` ("empresa" é o padrão). Por
+  empresa = como antes (Empresa › Banco › Conta). Por banco = Banco › Conta, cada conta com
+  a empresa dona, o número e o que a separa das outras do mesmo banco ("Aplicação", "CH",
+  "JP"). Agrupa pela INSTITUIÇÃO (`instituicaoDaConta` em `src/lib/saldos-por-banco.ts`,
+  trava `saldos-por-banco.test.ts`): "Banco Bradesco" + "Aplicação Bradesco" = Bradesco,
+  "BTG Pactual - CH" + "- JP" = BTG Pactual; as 17 contas viram 4 bancos (Banco do Brasil
+  10, Bradesco 3, Caixa Econômica 2, BTG Pactual 2). Conta fora do mapa (seletor de
+  Contas com outras marcadas) vai para "Outras contas", por último: a rota não manda o
+  código do banco e a descrição dela é o número da conta. Mesmas contas e mesmo total; só
+  muda o agrupamento. O gráfico "Saldo por Empresa" à esquerda não muda. Conta nova em
+  `BANK_NAMES` com banco que não está em `POR_NOME` → acrescentar lá (a trava falha).
+  Local em 17/11 (Playwright): por banco BTG Pactual R$ 8.969.754,77 · Banco do Brasil
+  R$ 6.052.610,92 · Caixa Econômica R$ 1.933.519,88 · Bradesco R$ 1.395.218,43 = R$
+  18.351.104,00, o mesmo total por empresa; escolha mantida depois do F5; sem rolagem
+  lateral a 1366, 1280 e 390 px.
 
 ## Resumo Financeiro - Regras (Criado em 2026-04-05)
 
