@@ -988,7 +988,36 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
 - Seleção salva no localStorage `dashboard_saldos_accounts_v2` (o `_v2` reseta a
   seleção antiga quando a lista canônica muda); `REPORT_EXCLUDED_ACCOUNTS` vazio
   (o relatório MCP espelha a tela)
-- Gráfico de evolução diária com cache no banco (dias passados não mudam)
+- **Gráfico Evolução do Saldo: saldo recalculado desde 18/11/2026** (Edielson: "Sim, corrigir").
+  Até então somava a foto diária de `cached_daily_balances` (cache no banco, dias passados não
+  mudavam), que é tirada na manhã seguinte e não enxerga o que é lançado depois: fim de semana
+  e feriado saíam errados e o gráfico não batia com o Fechamento de Caixa. Agora a aba lê
+  `GET /api/saldos-diarios?month=AAAA-MM|last7` (mesmo formato `{ dailyBalances }`): saldo que o
+  Sienge devolve hoje para a última data com movimento de cada empresa ± os movimentos
+  bancários da conta (`src/lib/saldos-diarios.ts`, trava `saldos-diarios.test.ts`; busca e
+  memória em `saldos-diarios-servidor.ts`). É a mesma conta do Fechamento (`saldoNaData`), por
+  isso os dois batem dia a dia. Empresa parada na janela: vale a foto (o saldo não mudou).
+  - Se a rota nova falhar, a aba cai na foto (`/api/sienge/bank-accounts?daily=true`), como era.
+  - O último ponto do mês corrente só é igualado ao cartão Saldo Total quando a série é a foto;
+    com a série recalculada ele fica recalculado (`saldosRecalculados`). **O cartão Saldo Total
+    e a tabela de contas continuam na regra antiga** (ao vivo + foto para conta que a API não
+    devolve): de manhã, empresa sem movimento no dia aparece com o saldo da foto das 07:30 e o
+    cartão pode ficar atrás do Fechamento pelo que foi lançado depois (R$ 19,25 em 18/11).
+  - Memória do servidor por mês: com menos de 2 min volta direto; mais velho, volta na hora e
+    é refeito ao fundo; o mês corrente fica pronto ao subir e depois da rotina diária.
+  - A foto continua sendo gravada (rotina diária e modo `daily` da rota antiga): o MCP
+    `saldos_bancarios` e o fechamento das 07:30 leem dela.
+  - Local em 18/11 (Playwright), novembro nas 17 contas: gráfico = dia a dia do Fechamento em
+    18 de 18 dias; a foto diferia em 8 (01 e 02/11 R$ 1.229.496,46 · 07 e 08/11 R$ 489.920,66 ·
+    14 e 15/11 R$ 473.372,49 · 16/11 R$ 4.035,04 · 03 e 04/11 valores menores); variação do
+    mês R$ 20.165.695,48 → R$ 19.073.133,74 (−R$ 1.092.561,74).
+  - **No ar em 18/11/2026 às 13:08 (Brasília), commit `717485b`** (`commit.sha` do
+    `inspectService`, deployment `done`); conferido em produção pelo Chrome: a rota responde em
+    1,3 s, o gráfico é igual ao dia a dia do Fechamento em 18 de 18 dias e a tela mostra
+    "R$ 20.2M → R$ 19.1M −5.4% (−R$ 1.092.561,74)". Em produção a foto diferia do Sienge de
+    hoje nos 18 dias do mês (de −R$ 77.478,68 em 13/11 a +R$ 1.502.754,14 em 01 e 02/11). O
+    total da tabela de contas (regra antiga) estava em R$ 19.073.152,99, R$ 19,25 acima do
+    último ponto do gráfico e do Fechamento (R$ 19.073.133,74).
 - **Tabela da direita: Por empresa | Por banco (Edielson, 17/11/2026: "um toggle que mude
   para mostrar contas por empresa e mostrar contas por banco").** Botão no canto do card;
   a escolha fica em `localStorage.dashboard_saldos_agrupar` ("empresa" é o padrão). Por
@@ -1090,8 +1119,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   seguinte e não enxerga lançamento feito depois (em 01 e 02/11/2026 ficou R$ 1.502.754,14
   abaixo do que o Sienge mostra hoje; em 16/11, R$ 4.035,04). Só entra como reserva, com a linha
   marcada "estimado", para conta que o Sienge não devolver em data nenhuma. O gráfico "Evolução do
-  Saldo" da aba Saldos continua nessas fotos e pode diferir do Fechamento em dia com lançamento
-  atrasado.
+  Saldo" da aba Saldos também saiu das fotos no mesmo dia (ver "Saldos Bancários - Regras") e
+  bate com o Fechamento; o cartão Saldo Total da aba Saldos continua na regra antiga.
 
 ### Servidor, memória e HTML
 - `GET /api/fechamento-caixa?de=&ate=[&fresco=1]` (`src/app/api/fechamento-caixa/route.ts`,
