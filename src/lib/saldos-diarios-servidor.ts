@@ -3,9 +3,10 @@
 // saldo de cada conta em cada dia no formato que o gráfico Evolução do Saldo já lia.
 // Regras em `saldos-diarios.ts`; as buscas são as do Fechamento de Caixa.
 //
-// Memória: o último resultado de cada mês fica guardado. Com menos de 2 minutos volta
-// direto; mais velho, volta na hora assim mesmo e é refeito em segundo plano (o próximo
-// a abrir já pega o novo). Só mês nunca pedido espera a consulta.
+// Memória: o último resultado de cada mês fica guardado e, com menos de 2 minutos, volta
+// direto. Mais velho: mês que já fechou volta na hora e é refeito em segundo plano; período
+// que inclui hoje espera a consulta nova (1 a 2 s), porque dele saem o saldo de hoje do
+// cartão Saldo Total e o último ponto do gráfico, que têm de ser o mesmo número.
 import { expectedDimBancoKeys } from "@/lib/dimBanco";
 import { buscarMovimentos, buscarSaldos, fotoGravada } from "@/lib/fechamento-caixa-servidor";
 import type { SaldosPorData } from "@/lib/fechamento-caixa";
@@ -76,17 +77,40 @@ function buscar(chave: string, de: string, ate: string): Promise<RespostaSaldosD
 
 /** Saldo diário do mês ("AAAA-MM" ou "last7"); null se o mês for inválido ou futuro. */
 export async function obterSaldosDiarios(mes: string): Promise<RespostaSaldosDiarios | null> {
-  const periodo = periodoDoMes(mes, hojeEmBrasilia());
+  const hoje = hojeEmBrasilia();
+  const periodo = periodoDoMes(mes, hoje);
   if (!periodo) return null;
   const chave = `${periodo.de}|${periodo.ate}`;
   const guardado = estado.guardados.get(chave);
-  if (guardado) {
-    if (Date.now() - guardado.em > NOVO_MS) {
-      buscar(chave, periodo.de, periodo.ate).catch((e) => console.error("[saldos-diarios] renovação falhou:", e instanceof Error ? e.message : e));
-    }
+  if (!guardado) return buscar(chave, periodo.de, periodo.ate);
+  if (Date.now() - guardado.em <= NOVO_MS) return guardado.dados;
+  if (periodo.ate < hoje) {
+    buscar(chave, periodo.de, periodo.ate).catch((e) => console.error("[saldos-diarios] renovação falhou:", e instanceof Error ? e.message : e));
     return guardado.dados;
   }
-  return buscar(chave, periodo.de, periodo.ate);
+  try {
+    return await buscar(chave, periodo.de, periodo.ate);
+  } catch (e) {
+    console.error("[saldos-diarios] Sienge não respondeu; fica o último resultado:", e instanceof Error ? e.message : e);
+    return guardado.dados;
+  }
+}
+
+/**
+ * Saldo de hoje de cada conta, atualizado: { "empresa:conta": saldo }. É o último dia do
+ * saldo diário do mês corrente, o mesmo dado do gráfico. null se o Sienge não responder.
+ */
+export async function saldosAtualizadosDeHoje(): Promise<Map<string, number> | null> {
+  const hoje = hojeEmBrasilia();
+  try {
+    const dados = await obterSaldosDiarios(hoje.slice(0, 7));
+    const doDia = dados?.dailyBalances[hoje];
+    if (!doDia || doDia.length === 0) return null;
+    return new Map(doDia.map((c) => [c.accountId, c.amount]));
+  } catch (e) {
+    console.error("[saldos-diarios] saldo de hoje indisponível:", e instanceof Error ? e.message : e);
+    return null;
+  }
 }
 
 /** Deixa pronto o mês corrente, que é o que o gráfico abre. */

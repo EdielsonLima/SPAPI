@@ -5104,8 +5104,8 @@ export function ExecutiveDashboard() {
 
                     // Com a foto gravada (reserva), o último ponto do mês corrente é igualado ao cartão
                     // Saldo Total. Com a série recalculada ele fica como veio: é o saldo de hoje pelos
-                    // movimentos, o mesmo do Fechamento de Caixa (o cartão ainda usa a foto para
-                    // empresa sem movimento hoje e pode estar atrás).
+                    // movimentos, o mesmo do Fechamento de Caixa e, desde 18/11/2026, do cartão Saldo
+                    // Total (a rota do saldo de hoje usa o mesmo dado).
                     const nowMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
                     if (!saldosRecalculados && lineData.length > 0 && (saldosMonth === nowMonth || saldosMonth === "last7") && grandTotal > 0) {
                       lineData[lineData.length - 1].total = grandTotal;

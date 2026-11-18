@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { siengeGet } from "@/lib/sienge";
 import { getCachedDailyBalance, cacheDailyBalance } from "@/lib/db";
 import pool from "@/lib/db";
+import { saldosAtualizadosDeHoje } from "@/lib/saldos-diarios-servidor";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type R = any;
@@ -256,7 +257,23 @@ export async function GET(request: NextRequest) {
     }
 
     // ── STANDARD MODE (today's balances) ──
-    const allAccounts = await fetchBalancesForDate(today, companiesMap, companyIds);
+    // Saldo atualizado (Edielson, 18/11/2026: "Sim, pode usar o saldo atualizado"). O Sienge só
+    // devolve hoje as contas das empresas que já tiveram movimento hoje. As demais contas da
+    // relação vinham da foto gravada de manhã, que não enxerga o que a caixa lança depois com
+    // data de ontem (tarifa, recebimento). Agora vêm do saldo recalculado (o que o Sienge
+    // devolve hoje para a última data com movimento da empresa, mais os movimentos), o mesmo
+    // do gráfico Evolução do Saldo e do Fechamento de Caixa. A foto fica de reserva.
+    const [allAccounts, atualizados] = await Promise.all([
+      fetchBalancesForDate(today, companiesMap, companyIds),
+      saldosAtualizadosDeHoje(),
+    ]);
+    if (atualizados) {
+      // Contas da relação que o Sienge devolveu: mesmo valor do gráfico (uma consulta só decide).
+      for (const a of allAccounts as R[]) {
+        const chave = `${a.companyId}:${a.accountNumber}`;
+        if (isInDimBanco(a.accountNumber || "", a.companyId || 0) && atualizados.has(chave)) a.amount = atualizados.get(chave);
+      }
+    }
 
     // Fill in missing DimBanco accounts using exact account→company mapping
     const seenAccountKeys = new Set(allAccounts.map((a: R) => `${a.companyId}:${a.accountNumber}`));
@@ -268,13 +285,29 @@ export async function GET(request: NextRequest) {
     if (missingAccounts.length > 0) {
       console.log(`[accounts-balances] Missing DimBanco accounts: ${missingAccounts.map(m => m.key).join(", ")}`);
 
+      // 1º o saldo atualizado; o que ele não trouxer segue para a foto gravada, como antes.
+      if (atualizados) {
+        for (const missing of missingAccounts) {
+          if (!atualizados.has(missing.key)) continue;
+          allAccounts.push({
+            accountNumber: missing.accountNumber,
+            companyId: missing.companyId,
+            amount: atualizados.get(missing.key),
+            reconciledAmount: 0,
+            accountStatus: "ENABLED",
+            links: [],
+          });
+        }
+      }
+
       // Try cache — search multiple recent days to find each missing account
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       try {
         const { rows } = await pool.query(
           `SELECT balance_date, data FROM cached_daily_balances ORDER BY balance_date DESC LIMIT 10`
         );
-        const stillNeeded = new Set(missingAccounts.map(m => m.key));
+        const jaPreenchidas = new Set(allAccounts.map((a: R) => `${a.companyId}:${a.accountNumber}`));
+        const stillNeeded = new Set(missingAccounts.map(m => m.key).filter(k => !jaPreenchidas.has(k)));
         for (const row of rows) {
           if (stillNeeded.size === 0) break;
           const cachedDay = row.data as { accountId: string; amount: number }[];
@@ -316,7 +349,7 @@ export async function GET(request: NextRequest) {
 
     const enriched = mapAccounts(allAccounts);
 
-    return NextResponse.json({ data: enriched });
+    return NextResponse.json({ data: enriched, saldosAtualizados: Boolean(atualizados) });
   } catch (error) {
     console.error("Error fetching accounts-balances:", error);
     return NextResponse.json({ error: "Failed to fetch account balances", details: String(error) }, { status: 500 });
