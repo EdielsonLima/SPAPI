@@ -984,7 +984,26 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   companyId 1 (Silva Packer) mesmo a Cátia listando sob "Sul Brasil"
 - Serenity (`924-5`/comp10) e Rozza (`1241-6`/comp11) só vêm da API em dias alternados;
   o cache cobre os dias vazios — NÃO remover do mapa por parecerem "faltantes"
-- Contas faltantes da API são preenchidas do cache PostgreSQL (cached_daily_balances)
+- **Contas faltantes da API: saldo atualizado desde 18/11/2026** (Edielson: "Sim, pode usar o
+  saldo atualizado"). O Sienge só devolve hoje as contas das empresas que já tiveram movimento
+  hoje. Até então as demais contas da relação vinham do cache PostgreSQL
+  (`cached_daily_balances`, a foto gravada às 07:30), que não enxerga o que a caixa lança depois
+  com data de ontem. Agora, no modo normal de `/api/sienge/bank-accounts`
+  (`saldosAtualizadosDeHoje` em `saldos-diarios-servidor.ts`): conta da relação que o Sienge
+  não devolveu → saldo do último ponto do saldo diário recalculado; conta da relação que ele
+  devolveu → o mesmo valor do gráfico (uma consulta só decide). **A foto continua de reserva**
+  (Sienge sem responder, ou conta que o recalculado não trouxer) e depois dela o zero, como
+  antes. A resposta traz `saldosAtualizados: true|false`. Vale para o cartão Saldo Total, a
+  tabela de contas, o Saldo por Empresa e, na aba Geral, o cartão Saldo Bancário e o ponto de
+  partida do Fluxo de Caixa Projetado (é o mesmo dado). Conta fora da relação não muda. NÃO
+  voltar a preencher direto da foto.
+  **No ar em 18/11/2026 às 13:21 (Brasília), commit `d217739`** (`commit.sha` do
+  `inspectService`, deployment `done`); conferido em produção pelo Chrome: cartão Saldo Total,
+  total da tabela, Geral › Saldo Bancário, último ponto do gráfico e Fechamento de hoje em
+  **R$ 19.073.133,74**, iguais nas 17 contas (antes o cartão mostrava R$ 19.073.152,99). A
+  diferença para a foto de 17/11 ficou só nas três contas com tarifa lançada de manhã
+  (275226-3 R$ 15,14 · 274-7 R$ 2,04 · 924-5 R$ 2,07). A rota respondeu em 4,4 s nessa
+  abertura (a consulta do saldo atualizado roda junto com as que a rota já fazia).
 - Seleção salva no localStorage `dashboard_saldos_accounts_v2` (o `_v2` reseta a
   seleção antiga quando a lista canônica muda); `REPORT_EXCLUDED_ACCOUNTS` vazio
   (o relatório MCP espelha a tela)
@@ -999,12 +1018,14 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   isso os dois batem dia a dia. Empresa parada na janela: vale a foto (o saldo não mudou).
   - Se a rota nova falhar, a aba cai na foto (`/api/sienge/bank-accounts?daily=true`), como era.
   - O último ponto do mês corrente só é igualado ao cartão Saldo Total quando a série é a foto;
-    com a série recalculada ele fica recalculado (`saldosRecalculados`). **O cartão Saldo Total
-    e a tabela de contas continuam na regra antiga** (ao vivo + foto para conta que a API não
-    devolve): de manhã, empresa sem movimento no dia aparece com o saldo da foto das 07:30 e o
-    cartão pode ficar atrás do Fechamento pelo que foi lançado depois (R$ 19,25 em 18/11).
-  - Memória do servidor por mês: com menos de 2 min volta direto; mais velho, volta na hora e
-    é refeito ao fundo; o mês corrente fica pronto ao subir e depois da rotina diária.
+    com a série recalculada ele fica recalculado (`saldosRecalculados`). O cartão Saldo Total e
+    a tabela de contas passaram a usar o mesmo dado no mesmo dia (item "Contas faltantes da
+    API", acima), então cartão, último ponto do gráfico e Fechamento dão o mesmo número.
+  - Memória do servidor por mês: com menos de 2 min volta direto. Mais velho: mês que já
+    fechou volta na hora e é refeito ao fundo; período que inclui hoje **espera a consulta
+    nova** (1 a 2 s; se o Sienge falhar, fica o guardado), porque dele saem o saldo de hoje do
+    cartão e o último ponto do gráfico. O mês corrente fica pronto ao subir e depois da
+    rotina diária.
   - A foto continua sendo gravada (rotina diária e modo `daily` da rota antiga): o MCP
     `saldos_bancarios` e o fechamento das 07:30 leem dela.
   - Local em 18/11 (Playwright), novembro nas 17 contas: gráfico = dia a dia do Fechamento em
@@ -1120,7 +1141,7 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   abaixo do que o Sienge mostra hoje; em 16/11, R$ 4.035,04). Só entra como reserva, com a linha
   marcada "estimado", para conta que o Sienge não devolver em data nenhuma. O gráfico "Evolução do
   Saldo" da aba Saldos também saiu das fotos no mesmo dia (ver "Saldos Bancários - Regras") e
-  bate com o Fechamento; o cartão Saldo Total da aba Saldos continua na regra antiga.
+  bate com o Fechamento, e o cartão Saldo Total passou a usar o saldo atualizado.
 
 ### Servidor, memória e HTML
 - `GET /api/fechamento-caixa?de=&ate=[&fresco=1]` (`src/app/api/fechamento-caixa/route.ts`,
