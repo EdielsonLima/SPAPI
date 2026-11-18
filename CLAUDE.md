@@ -1030,6 +1030,109 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   Entram (1) Banco do Brasil (924-5) SERENITY", foco em Cancelar, Cancelar fecha sem gravar
   (salvo continuou com 17). Produção tem 60 contas no seletor (local, 32).
 
+## Fechamento de Caixa — aba do Painel (Edielson, 18/11/2026)
+
+- Pedido: "depois da aba 'Saldos', criar uma outra aba chamada 'Fechamento de caixa', porque o
+  Carlos Humberto, todas as manhãs, chega e pede para a caixa: 'Quero o fechamento de caixa de
+  ontem.' [...] Ele não gosta muito de muitos detalhes, então tem que ser algo mais macro. Se
+  quiser, dá para abrir [...] por empresa, por bancos e também por períodos [...] sempre trazer
+  já o fechamento de caixa do dia anterior". A caixa montava à mão (Sienge, Excel, impressão).
+- Aba **Fechamento** (rótulo "Fechamento de Caixa" a partir de 1700 px de janela), logo depois
+  de Saldos; some no modo Holding. `src/components/fechamento-caixa-tab.tsx`. **Não usa as bases
+  nem os filtros do Painel**: nela a barra de filtros global e o "Atualizado em… / Atualizar" do
+  topo ficam escondidos; a aba tem o período, os filtros Empresas e Bancos, a hora da posição e
+  o botão de buscar de novo dela.
+- **Na tela:** cinco cartões que são a conta do fechamento (Saldo anterior + Entradas − Saídas ±
+  Transferências = Saldo final, com a variação no selo) e uma tabela com quatro visões: **Por
+  empresa** (padrão) · **Por banco** · **Dia a dia** (só com mais de um dia; clicar no dia abre o
+  fechamento dele) · **Lançamentos** (busca e tipo). Abrir a empresa ou o banco mostra as contas;
+  abrir a conta mostra os lançamentos, cada valor embaixo da coluna dele. A escolha Por empresa /
+  Por banco fica em `localStorage.dashboard_fechamento_agrupar`. Valores completos, com "R$".
+- **Período:** abre no fechamento do **dia anterior** = do último dia útil antes de hoje até
+  ontem (dia comum: só ontem; segunda: sexta a domingo; depois de feriado: inclui o feriado), a
+  mesma janela do fechamento das 07:30. As setas andam de fechamento em fechamento; atalhos Dia
+  anterior · Hoje (parcial) · Semana passada · Este mês · Mês passado; o botão com a data abre
+  "um dia" e "período" (até 400 dias, nunca depois de hoje). Calendário em `src/lib/dias-uteis.ts`
+  (trava `dias-uteis.test.ts`), cópia da regra do `feriados.py` da rotina (feriados bancários
+  nacionais, Carnaval segunda e terça, Sexta-feira Santa, Corpus Christi). Feriado local não entra.
+
+### NAO ALTERAR sem pedido explicito do usuario:
+- Regras em `src/lib/fechamento-caixa.ts` (trava `fechamento-caixa.test.ts`, com o caso real de
+  17/11/2026), nas **17 contas da relação** (`dimBanco.ts`); a Holding fica fora:
+  - **Entradas** = movimento de origem CR (entrada − "Desconto concedido") + entrada avulsa que
+    não é transferência.
+  - **Saídas** = movimento de origem CP (saída − "Retenção impostos" − "Desconto obtido") +
+    tarifa bancária avulsa. Retenção e desconto são sempre do mesmo título, no mesmo dia: abatem,
+    não são entrada. É o que passou pelo banco, como no extrato.
+  - **Transferências** (líquido) = avulso (origem BC) com operação transferência, saque ou
+    depósito, ou documento "TRANSFERÊNCIA ENTRE CONTAS" (inclui resgate de aplicação). Entre as
+    17 contas elas se anulam no total; o que sobra foi para fora (holding, caixa em dinheiro,
+    mútuo). Título (CP/CR) nunca é transferência.
+  - **Saldo final = saldo anterior + entradas − saídas + transferências.** O saldo anterior vem
+    do Sienge; o final é calculado pelos movimentos.
+  - **Pago em dinheiro** (linha à parte, informativa) = pagamentos de título pela conta `CAIXA`
+    das empresas das 17 contas. Não passa pelos bancos, por isso não está nas Saídas.
+- **Como o Sienge se comporta** (medido em 18/11/2026; é o que sustenta as regras acima):
+  - Só o **movimento bancário** traz a conta (`accountNumber` + `companyId`), no mesmo formato do
+    `dimBanco.ts`. Pagamento e recebimento do título não trazem.
+  - `/accounts-balances?balanceDate=D` devolve o saldo já com o que foi lançado depois, mas **só
+    das empresas que tiveram movimento em D** (em qualquer conta delas); domingo e feriado voltam
+    vazios. Por isso o saldo anterior de cada conta é o da **última data com movimento da
+    empresa** antes do período (`datasDeSaldo`), mais os movimentos da conta de lá até a véspera.
+  - Com isso a conta fecha no centavo: conferido em outubro e novembro inteiros nas 17 contas.
+  - Lançamento feito há pouco aparece nos movimentos antes de aparecer no saldo (em 18/11, três
+    tarifas de 17/11, R$ 19,25, estavam nos movimentos e ainda não no saldo; minutos depois o
+    saldo já as trazia). Quando o saldo do Sienge para o fim
+    do período difere do calculado, a aba mostra a nota "Saldo no Sienge: … ainda não entraram
+    nele" e um selo na conta, em vez de esconder.
+  - O campo "conciliado" do movimento vem sempre "N" na Silva Packer: não serve de indicador.
+- **O saldo diário gravado (`cached_daily_balances`) NÃO é usado**: é a foto tirada na manhã
+  seguinte e não enxerga lançamento feito depois (em 01 e 02/11/2026 ficou R$ 1.502.754,14
+  abaixo do que o Sienge mostra hoje; em 16/11, R$ 4.035,04). Só entra como reserva, com a linha
+  marcada "estimado", para conta que o Sienge não devolver em data nenhuma. O gráfico "Evolução do
+  Saldo" da aba Saldos continua nessas fotos e pode diferir do Fechamento em dia com lançamento
+  atrasado.
+
+### Servidor, memória e HTML
+- `GET /api/fechamento-caixa?de=&ate=[&fresco=1]` (`src/app/api/fechamento-caixa/route.ts`,
+  busca em `src/lib/fechamento-caixa-servidor.ts`), **ao vivo no Sienge**: movimentos bancários
+  (bulk, todos, de 15 dias antes do período até o fim dele; 75 dias se alguma empresa estiver
+  parada) e os saldos das datas escolhidas. Por que ao vivo: o fechamento de ontem só fica certo
+  depois que a caixa lança, de manhã, o que falta de ontem; o cache do Painel é o das 07:30.
+  `siengeGet` ganhou `{ semCache: true }` (sem ele, igual a antes) para saldo e movimentos serem
+  do mesmo instante.
+- **Nunca esperar:** o servidor guarda o último resultado de cada período (`globalThis`, até 40)
+  e deixa o do dia anterior pronto ao subir (`instrumentation.ts`, 25 s depois) e depois da
+  rotina diária (`prepararPainelDepoisDaRotina`). A aba mostra na hora o guardado e, se ele tem
+  mais de 1 minuto, busca de novo em segundo plano e troca ("buscando no Sienge…" → "posição das
+  HH:MM"). Se o Sienge falhar, fica o guardado e sai um aviso. Voltar à aba na mesma visita
+  mostra o período em que estava.
+- **Botão HTML** (`src/lib/fechamento-html.ts`, trava `fechamento-html.test.ts`): baixa
+  `Fechamento-de-Caixa-Silva-Packer-AAAA-MM-DD.html` com o que está na tela (filtros incluídos):
+  cartões, por empresa com as contas, por banco, dia a dia (se período) e até 300 lançamentos.
+  Arquivo único, sem script, logo embutido, no padrão do fechamento das 07:30 e do Resumo. Os
+  números são os da tela; nenhuma regra lá. Para ver:
+  `FECHAMENTO_HTML_SAIDA=arquivo.html npx tsx src/__tests__/fechamento-html.test.ts`.
+- **Tela:** sem rolagem de página e com as 10 empresas inteiras na tabela de 1280×720 a
+  1920×1080 (linhas do 1º nível mais baixas em tela baixa: `py-2` acima de 820 px de altura,
+  `py-1` de 741 a 820 e `py-0.5` até 740; faixas que não se sobrepõem, para a ordem das regras
+  no CSS não decidir nada). No celular a tabela rola para o lado dentro do cartão.
+  Contraste ≥ 4,5:1 nos dois temas (o traço "-" usa o cinza dos rótulos, não um mais claro).
+- Conferido local com o Sienge ao vivo em 18/11/2026 (Playwright): 17/11 = saldo anterior
+  R$ 18.355.139,04 · entradas R$ 723.033,95 (= Total Recebido do fechamento das 07:30) · saídas
+  R$ 539,25 · transferências −R$ 4.500,00 · saldo final R$ 19.073.133,74 · pago em dinheiro
+  R$ 15.170,00 (6 pagamentos). A conta fecha em 16/11, 10/11, 03/11, na semana de 09 a 15/11 e
+  em hoje; por banco = 4 bancos com o mesmo total; o HTML baixado bate com a tela.
+- **No ar em 18/11/2026 às 12:28 (Brasília), commit `9f7df7f`** (`commit.sha` do `inspectService`,
+  deployment `done`); conferido em produção pelo Chrome: abre em 0,9 s no dia anterior, com os
+  mesmos cartões e as 10 empresas do local, sem rolagem. **Botão HTML no ar às 12:37, commit
+  `7304c08`**; em produção o arquivo foi capturado dentro da página (sem baixar): 74 kB, sem
+  script, logo embutido, cartões iguais aos da tela, 10 empresas e as 17 contas nas duas tabelas.
+- **Não faz:** não mostra o saldo do caixa em dinheiro (só quanto foi pago por ele); "Saídas" é o
+  que saiu dos bancos (R$ 539,25 em 17/11), não o "Total Pago" do fechamento das 07:30
+  (R$ 15.690,00, que inclui dinheiro) — a linha "Pago em dinheiro" liga os dois; o fechamento
+  das 07:30 (rotina `rotinas-silvapacker`, WhatsApp) continua como está; contas da Holding fora.
+
 ## Resumo Financeiro - Regras (Criado em 2026-04-05)
 
 - Total Pago usa filtro de Tipo Operação do próprio Resumo (não per-company)
