@@ -38,6 +38,7 @@ import {
   LayoutGrid,
   Landmark,
   Info,
+  Wallet,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -67,6 +68,7 @@ import { IndicadoresTab } from "@/components/indicadores/indicadores-tab";
 import { CalendarioPagamentoTab } from "@/components/calendario-pagamento-tab";
 import { CalendarioRecebimentoTab } from "@/components/calendario-recebimento-tab";
 import { ComparativoTab } from "@/components/comparativo-tab";
+import { FechamentoCaixaTab } from "@/components/fechamento-caixa-tab";
 import { DetalhamentoTable } from "@/components/detalhamento-table";
 import { useCompanyMode } from "@/lib/company-context";
 import { MultiSelectFilter, CustomTooltip } from "@/components/multi-select-filter";
@@ -81,7 +83,7 @@ import { agruparPorBanco } from "@/lib/saldos-por-banco";
 import { resetContasSaldos } from "@/lib/saldos-padrao";
 
 type Section = "cp" | "cr";
-type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "dre" | "dre-api" | "saldos" | "resumo" | "indicadores" | "comparativo";
+type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "dre" | "dre-api" | "saldos" | "fechamento" | "resumo" | "indicadores" | "comparativo";
 
 // Each tab group has its own saved company filter
 function getTabGroup(tab: MainTab): string {
@@ -851,8 +853,9 @@ export function ExecutiveDashboard() {
       perTabCompanies.current = {};
       perTabFilters.current = {};
       setSelectedCompanies(new Set());
-      // Holding não tem Orçamento (o Comercial virou módulo próprio, fora do Painel) — redireciona pra Geral
-      const destino: MainTab = isHolding && activeTab === "orcamento" ? "visao-geral" : activeTab;
+      // Holding não tem Orçamento (o Comercial virou módulo próprio, fora do Painel) nem
+      // Fechamento de Caixa (as contas da relação são das outras empresas) — redireciona pra Geral
+      const destino: MainTab = isHolding && (activeTab === "orcamento" || activeTab === "fechamento") ? "visao-geral" : activeTab;
       padraoPendente.current = getTabGroup(destino);
       if (destino !== activeTab) setActiveTab(destino);
     }
@@ -2637,6 +2640,7 @@ export function ExecutiveDashboard() {
     "calendario-pagamento": [],
     "calendario-recebimento": [],
     saldos: [],
+    fechamento: [],
     "visao-geral": [],
     resumo: [],
     indicadores: [],
@@ -2899,7 +2903,7 @@ export function ExecutiveDashboard() {
                 switchTab("a-pagar");
               }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                section === "cp" && !["orcamento", "dre", "saldos", "visao-geral"].includes(activeTab)
+                section === "cp" && !["orcamento", "dre", "saldos", "fechamento", "visao-geral"].includes(activeTab)
                   ? "bg-white dark:bg-slate-700 text-red-600 dark:text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
               }`}
@@ -2969,6 +2973,25 @@ export function ExecutiveDashboard() {
               <Landmark className="h-3.5 w-3.5" />
               Saldos
             </button>
+            {/* Fechamento de Caixa (18/11/2026): as contas são as da relação bancária, que não
+                inclui a Holding. Abaixo de 1700 px o rótulo encurta para a linha de abas caber. */}
+            {!isHolding && (
+              <button
+                onClick={() => {
+                  setSection("cp");
+                  switchTab("fechamento");
+                }}
+                title="Fechamento de Caixa"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  activeTab === "fechamento"
+                    ? "bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                }`}
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                <span>Fechamento<span className="hidden min-[1700px]:inline"> de Caixa</span></span>
+              </button>
+            )}
             <button
               onClick={() => {
                 setSection("cp");
@@ -3015,7 +3038,9 @@ export function ExecutiveDashboard() {
             </button>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        {/* No Fechamento de Caixa vale a hora e o botão da própria aba (ela busca no Sienge
+            por conta dela); este "Atualizar" recarrega as bases do Painel, que ela não usa. */}
+        <div className={activeTab === "fechamento" ? "hidden" : "flex items-center gap-3"}>
           {(() => {
             const ts = section === "cp" ? lastUpdatedCp : lastUpdatedCr;
             if (!ts) return null;
@@ -3040,7 +3065,7 @@ export function ExecutiveDashboard() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
 
         {/* Sub-tabs CP/CR - separate line */}
-        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (
+        {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "fechamento" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (
           <Tabs value={activeTab} onValueChange={v => {
             const tab = v as MainTab;
             switchTab(tab);
@@ -3186,7 +3211,7 @@ export function ExecutiveDashboard() {
             onSelectValues={(vals) => setSelectedMonths(new Set(vals))}
           />
         </div>}
-        {activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "indicadores" && <div className="flex items-center gap-2 flex-wrap">
+        {activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "indicadores" && activeTab !== "fechamento" && <div className="flex items-center gap-2 flex-wrap">
           <MultiSelectFilter
             label="Empresas"
             icon={<Building2 className="h-4 w-4" />}
@@ -3503,7 +3528,7 @@ export function ExecutiveDashboard() {
           ícone colorido, ponto de estado antes do rótulo. O valor usa fonte
           fluida (clamp) e nunca é cortado com reticências — a 100% de zoom, com
           a barra lateral aberta, os seis cards cabem numa linha (Edielson, 06/11/2026). */}
-      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (() => {
+      {activeTab !== "visao-geral" && activeTab !== "orcamento" && activeTab !== "dre" && activeTab !== "dre-api" && activeTab !== "saldos" && activeTab !== "fechamento" && activeTab !== "resumo" && activeTab !== "indicadores" && activeTab !== "comparativo" && activeTab !== "calendario-pagamento" && activeTab !== "calendario-recebimento" && (() => {
         const colsXl: Record<number, string> = { 3: "2xl:grid-cols-3", 4: "2xl:grid-cols-4", 5: "2xl:grid-cols-5", 6: "2xl:grid-cols-6", 7: "xl:grid-cols-4 2xl:grid-cols-7" };
         const dotClass = (gradient: string) => (gradient.split(" ")[0] || "from-slate-500").replace("from-", "bg-");
         // Com 7 cards (A Pagar + "Geral a Pagar"), ou 6 com valor de centenas
@@ -5792,6 +5817,11 @@ export function ExecutiveDashboard() {
           </div>
         );
       })()}
+
+      {/* ══════ FECHAMENTO DE CAIXA TAB ══════ */}
+      {/* Aba própria (src/components/fechamento-caixa-tab.tsx): tem os filtros dela e busca
+          no Sienge por /api/fechamento-caixa; não usa as bases nem os filtros do Painel. */}
+      {activeTab === "fechamento" && !isHolding && <FechamentoCaixaTab />}
 
       {/* ══════ INDICADORES DE MERCADO TAB ══════ */}
       {activeTab === "indicadores" && (

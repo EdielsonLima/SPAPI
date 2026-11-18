@@ -11,5 +11,11 @@ export async function register() {
       prepararCachePainel("servidor iniciou").catch(() => {});
     }, 15_000);
     t.unref?.();
+    // Fechamento de Caixa do dia anterior já calculado, para a aba abrir na hora (18/11/2026).
+    const { aquecerFechamento } = await import("@/lib/fechamento-caixa-servidor");
+    const t2 = setTimeout(() => {
+      aquecerFechamento("servidor iniciou").catch(() => {});
+    }, 25_000);
+    t2.unref?.();
   }
 }

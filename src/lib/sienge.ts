@@ -36,7 +36,10 @@ function releaseSlot() {
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function siengeGet<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
+// `semCache`: não lê a resposta guardada (15 min) e busca de novo no Sienge; a resposta
+// nova fica guardada para os demais. Usado pelo Fechamento de Caixa, onde saldo e
+// movimentos têm de ser do mesmo instante.
+export async function siengeGet<T>(endpoint: string, params?: Record<string, string>, opcoes?: { semCache?: boolean }): Promise<T> {
   const apiUrl = process.env.SIENGE_API_URL!;
   const username = process.env.SIENGE_USERNAME!;
   const password = process.env.SIENGE_PASSWORD!;
@@ -48,7 +51,7 @@ export async function siengeGet<T>(endpoint: string, params?: Record<string, str
   }
 
   const cacheKey = url.toString();
-  const cached = cache.get(cacheKey);
+  const cached = opcoes?.semCache ? undefined : cache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data as T;
   }

@@ -26,6 +26,7 @@ import { siengeBulkGet, siengeGet } from "@/lib/sienge";
 import { expectedDimBancoKeys } from "@/lib/dimBanco";
 import { periodosDoPainel } from "@/lib/painel-periodos";
 import { prepararCachePainel } from "@/lib/cache-sienge-resposta";
+import { aquecerFechamento } from "@/lib/fechamento-caixa-servidor";
 
 export const REFRESH_START = "2016-01-01";
 export const REFRESH_END = "2031-12-31";
@@ -284,6 +285,8 @@ export function prepararPainelDepoisDaRotina(motivo: string): Promise<void> {
       console.error("[rotina] movimentos bancários (todos) falhou:", e instanceof Error ? e.message : e);
     }
     await prepararCachePainel(motivo);
+    // Fechamento de Caixa do dia anterior pronto para a aba abrir na hora (18/11/2026).
+    await aquecerFechamento(motivo);
   })().finally(() => {
     depoisDaRotina = null;
   });
