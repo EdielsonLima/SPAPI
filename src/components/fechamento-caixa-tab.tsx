@@ -5,7 +5,8 @@
 // (cinco cartões e uma tabela), e deixa abrir a empresa, a conta e o lançamento.
 // Regras em src/lib/fechamento-caixa.ts; a rota /api/fechamento-caixa busca no Sienge na hora.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Building2, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Landmark, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { Building2, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, FileDown, Landmark, Loader2, RefreshCw, Search, X } from "lucide-react";
+import { montarFechamentoHtml, nomeArquivoFechamento } from "@/lib/fechamento-html";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -251,6 +252,56 @@ export function FechamentoCaixaTab() {
     setPeriodoAberto(false);
   };
 
+  // Baixa o fechamento que está na tela (com os filtros) num arquivo HTML para guardar,
+  // mandar ou imprimir. Os números são os da tela: aqui só se monta o arquivo.
+  const baixarHtml = async () => {
+    if (!dados) return;
+    const dataHora = (d: Date, sep: string) =>
+      d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }) + sep + d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" });
+    // Logo embutido, para o arquivo abrir igual em qualquer aparelho, mesmo sem internet.
+    let logo: string | undefined;
+    try {
+      const resposta = await fetch("/logo-full.jpg");
+      if (resposta.ok) {
+        const imagem = await resposta.blob();
+        logo = await new Promise<string>((ok, falha) => {
+          const leitor = new FileReader();
+          leitor.onload = () => ok(String(leitor.result));
+          leitor.onerror = () => falha(leitor.error);
+          leitor.readAsDataURL(imagem);
+        });
+      }
+    } catch {
+      // Sem o logo o cabeçalho sai só com o texto.
+    }
+    const nomes = (s: Set<string>, um: string, varios: string) => (s.size === 0 ? "" : s.size <= 2 ? Array.from(s).join(" e ") : `${s.size} ${s.size === 1 ? um : varios}`);
+    const filtro = [nomes(empresas, "empresa", "empresas"), nomes(bancos, "banco", "bancos")].filter(Boolean).join(" · ");
+    const marca = "Silva Packer";
+    const posicao = new Date(dados.geradoEm);
+    const html = montarFechamentoHtml({
+      de: dados.de,
+      ate: dados.ate,
+      linhas,
+      lancamentos,
+      pagoEmDinheiro: dados.pagoEmDinheiro,
+      avisos: dados.avisos,
+      marca,
+      geradoEm: dataHora(new Date(), " "),
+      posicao: Number.isNaN(posicao.getTime()) ? undefined : dataHora(posicao, " às "),
+      filtro: filtro ? `só ${filtro}` : undefined,
+      logo,
+    });
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = nomeArquivoFechamento(marca, dados.de, dados.ate);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+    toast.success("Fechamento em HTML baixado.");
+  };
+
   const vespera = somarDias(janela.de, -1);
   const variacao = total.saldoFinal - total.saldoAnterior;
   const temDiferenca = Math.abs(total.diferenca) > 0.005;
@@ -483,6 +534,17 @@ export function FechamentoCaixaTab() {
             }}
           >
             {carregando || atualizando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-slate-700 dark:text-slate-200"
+            disabled={!dados}
+            title="Baixar este fechamento em HTML, para guardar, mandar ou imprimir"
+            onClick={baixarHtml}
+          >
+            <FileDown className="h-3.5 w-3.5" />
+            HTML
           </Button>
         </div>
       </div>
