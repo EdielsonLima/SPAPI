@@ -13,8 +13,12 @@ export async function register() {
     t.unref?.();
     // Fechamento de Caixa do dia anterior já calculado, para a aba abrir na hora (18/11/2026).
     const { aquecerFechamento } = await import("@/lib/fechamento-caixa-servidor");
+    // Em seguida, o saldo diário recalculado do mês (gráfico Evolução do Saldo da aba Saldos).
+    const { aquecerSaldosDiarios } = await import("@/lib/saldos-diarios-servidor");
     const t2 = setTimeout(() => {
-      aquecerFechamento("servidor iniciou").catch(() => {});
+      aquecerFechamento("servidor iniciou")
+        .then(() => aquecerSaldosDiarios("servidor iniciou"))
+        .catch(() => {});
     }, 25_000);
     t2.unref?.();
   }

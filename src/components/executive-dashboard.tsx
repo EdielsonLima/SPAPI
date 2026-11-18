@@ -85,6 +85,26 @@ import { resetContasSaldos } from "@/lib/saldos-padrao";
 type Section = "cp" | "cr";
 type MainTab = "visao-geral" | "a-pagar" | "pagas" | "atrasadas" | "calendario-pagamento" | "a-receber" | "recebidas" | "inadimplencia" | "calendario-recebimento" | "orcamento" | "dre" | "dre-api" | "saldos" | "fechamento" | "resumo" | "indicadores" | "comparativo";
 
+// Saldo de cada conta em cada dia do mês, para o gráfico Evolução do Saldo (aba Saldos).
+// Desde 18/11/2026 vem recalculado (/api/saldos-diarios: saldo que o Sienge devolve hoje
+// para a data, mais os movimentos), igual ao Fechamento de Caixa. A foto gravada na manhã
+// seguinte (/api/sienge/bank-accounts?daily=true) não enxerga lançamento feito depois e só
+// fica de reserva, para o gráfico não sumir se o Sienge não responder.
+type SaldosDoDia = Record<string, { accountId: string; amount: number }[]>;
+async function buscarSaldosDiarios(mes: string): Promise<{ dias: SaldosDoDia; recalculado: boolean } | null> {
+  try {
+    const resposta = await fetch(`/api/saldos-diarios?month=${mes}`, { cache: "no-store" });
+    if (resposta.ok) {
+      const corpo = await resposta.json();
+      if (corpo?.dailyBalances) return { dias: corpo.dailyBalances as SaldosDoDia, recalculado: true };
+    }
+  } catch {
+    // cai na foto gravada
+  }
+  const reserva = await fetch(`/api/sienge/bank-accounts?daily=true&month=${mes}`).then(r => r.json());
+  return reserva?.dailyBalances ? { dias: reserva.dailyBalances as SaldosDoDia, recalculado: false } : null;
+}
+
 // Each tab group has its own saved company filter
 function getTabGroup(tab: MainTab): string {
   switch (tab) {
@@ -443,6 +463,8 @@ export function ExecutiveDashboard() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [bankAccountsInitialized, setBankAccountsInitialized] = useState(false);
   const [dailyBalances, setDailyBalances] = useState<Record<string, { accountId: string; amount: number }[]> | null>(null);
+  // true = série recalculada (/api/saldos-diarios); false = foto gravada, a reserva.
+  const [saldosRecalculados, setSaldosRecalculados] = useState(false);
   const [loadingDaily, setLoadingDaily] = useState(false);
   const [saldosMonth, setSaldosMonth] = useState(() => {
     const now = new Date();
@@ -747,15 +769,14 @@ export function ExecutiveDashboard() {
   // Fetch daily balances for chart (re-fetches when month changes)
   useEffect(() => {
     if (activeTab !== "saldos") return;
+    let vivo = true;
     setLoadingDaily(true);
     setDailyBalances(null);
-    fetch(`/api/sienge/bank-accounts?daily=true&month=${saldosMonth === "last7" ? "last7" : saldosMonth}`)
-      .then(res => res.json())
-      .then(json => {
-        if (json.dailyBalances) setDailyBalances(json.dailyBalances);
-      })
+    buscarSaldosDiarios(saldosMonth)
+      .then(r => { if (vivo && r) { setDailyBalances(r.dias); setSaldosRecalculados(r.recalculado); } })
       .catch(() => {})
-      .finally(() => setLoadingDaily(false));
+      .finally(() => { if (vivo) setLoadingDaily(false); });
+    return () => { vivo = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, saldosMonth]);
 
@@ -765,12 +786,13 @@ export function ExecutiveDashboard() {
       setCompareBalances(null);
       return;
     }
+    let vivo = true;
     setLoadingCompare(true);
-    fetch(`/api/sienge/bank-accounts?daily=true&month=${saldosCompareMonth}`)
-      .then(res => res.json())
-      .then(json => { if (json.dailyBalances) setCompareBalances(json.dailyBalances); })
+    buscarSaldosDiarios(saldosCompareMonth)
+      .then(r => { if (vivo && r) setCompareBalances(r.dias); })
       .catch(() => {})
-      .finally(() => setLoadingCompare(false));
+      .finally(() => { if (vivo) setLoadingCompare(false); });
+    return () => { vivo = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [saldosCompareMonth, activeTab]);
 
@@ -5080,9 +5102,12 @@ export function ExecutiveDashboard() {
                       return { date: dayNum, fullDate: date, total, compare: compareByDay[dayNum] ?? null };
                     }).filter(d => d.total !== 0);
 
-                    // Ensure last point matches the card total (grandTotal) for current month
+                    // Com a foto gravada (reserva), o último ponto do mês corrente é igualado ao cartão
+                    // Saldo Total. Com a série recalculada ele fica como veio: é o saldo de hoje pelos
+                    // movimentos, o mesmo do Fechamento de Caixa (o cartão ainda usa a foto para
+                    // empresa sem movimento hoje e pode estar atrás).
                     const nowMonth = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`;
-                    if (lineData.length > 0 && (saldosMonth === nowMonth || saldosMonth === "last7") && grandTotal > 0) {
+                    if (!saldosRecalculados && lineData.length > 0 && (saldosMonth === nowMonth || saldosMonth === "last7") && grandTotal > 0) {
                       lineData[lineData.length - 1].total = grandTotal;
                     }
                   }

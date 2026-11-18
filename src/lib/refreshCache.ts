@@ -27,6 +27,7 @@ import { expectedDimBancoKeys } from "@/lib/dimBanco";
 import { periodosDoPainel } from "@/lib/painel-periodos";
 import { prepararCachePainel } from "@/lib/cache-sienge-resposta";
 import { aquecerFechamento } from "@/lib/fechamento-caixa-servidor";
+import { aquecerSaldosDiarios } from "@/lib/saldos-diarios-servidor";
 
 export const REFRESH_START = "2016-01-01";
 export const REFRESH_END = "2031-12-31";
@@ -287,6 +288,8 @@ export function prepararPainelDepoisDaRotina(motivo: string): Promise<void> {
     await prepararCachePainel(motivo);
     // Fechamento de Caixa do dia anterior pronto para a aba abrir na hora (18/11/2026).
     await aquecerFechamento(motivo);
+    // E o saldo diário recalculado do mês, para o gráfico Evolução do Saldo.
+    await aquecerSaldosDiarios(motivo);
   })().finally(() => {
     depoisDaRotina = null;
   });

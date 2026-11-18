@@ -40,7 +40,7 @@ function autenticacao(): string {
 const texto = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
 
 /** Movimentos bancários (todos, não só os avulsos) com a data entre `de` e `ate`, só com os campos usados. */
-async function buscarMovimentos(de: string, ate: string): Promise<MovimentoCaixa[]> {
+export async function buscarMovimentos(de: string, ate: string): Promise<MovimentoCaixa[]> {
   const url = new URL(`${process.env.SIENGE_BULK_API_URL!}/bank-movement`);
   url.searchParams.set("startDate", de);
   url.searchParams.set("endDate", ate);
@@ -69,7 +69,7 @@ async function buscarMovimentos(de: string, ate: string): Promise<MovimentoCaixa
 }
 
 /** Saldos que o Sienge devolve para a data: só das empresas que tiveram movimento nela. */
-async function buscarSaldos(data: string): Promise<Record<string, number>> {
+export async function buscarSaldos(data: string): Promise<Record<string, number>> {
   const contas: R[] = [];
   const pagina = async (offset: number) =>
     siengeGet<{ results?: R[]; resultSetMetadata?: { count?: number } }>(
@@ -102,7 +102,7 @@ async function contasDaRelacao(movimentos: MovimentoCaixa[]): Promise<ContaFecha
 }
 
 /** Foto gravada mais recente até `vespera` que tenha alguma das contas pedidas. */
-async function fotoGravada(vespera: string, contaIds: string[]): Promise<SaldosPorData> {
+export async function fotoGravada(vespera: string, contaIds: string[]): Promise<SaldosPorData> {
   for (let k = 0; k < DIAS_DA_FOTO; k++) {
     const data = somarDias(vespera, -k);
     try {
