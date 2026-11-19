@@ -1213,6 +1213,13 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   mesmos cartões e as 10 empresas do local, sem rolagem. **Botão HTML no ar às 12:37, commit
   `7304c08`**; em produção o arquivo foi capturado dentro da página (sem baixar): 74 kB, sem
   script, logo embutido, cartões iguais aos da tela, 10 empresas e as 17 contas nas duas tabelas.
+- **Entradas e Saídas pelos títulos no ar em 19/11/2026 às 09:07 (Brasília), commit `0e943dc`**
+  (`commit.sha` do `inspectService`, deployment `done`); conferido em produção pelo Chrome, por
+  medida dentro da página (a captura de tela do Chrome falha): a aba abre em quarta, 18/11/2026
+  com Saldo anterior R$ 19.073.133,74 · Entradas R$ 105.516,19 (4 recebimentos) · Saídas
+  R$ 87.256,80 (1 pagamento) · Outros −R$ 7.500,00 · Saldo final R$ 19.083.893,13, a nota do
+  caixa interno (recebido e pago R$ 87.256,80) e sem rolagem a 1616×893; a API de 17/11 dá
+  Saídas R$ 15.690,00 e Outros +R$ 10.650,75 com o mesmo saldo final.
 - **Não faz:** não mostra o saldo do caixa em dinheiro (a linha do caixa interno é sem saldo);
   o fechamento das 07:30 (rotina `rotinas-silvapacker`, WhatsApp) continua como está e não
   conta tarifa bancária (no painel ela fica em Outros); contas da Holding fora.
