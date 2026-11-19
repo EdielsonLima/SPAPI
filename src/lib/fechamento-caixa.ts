@@ -9,17 +9,36 @@
 //  2. Origem CR: entrada = recebimento; saída = só "Desconto concedido", que abate a entrada.
 //     Origem CP: saída = pagamento; entrada = só "Retenção impostos" e "Desconto obtido",
 //     sempre do mesmo título e no mesmo dia, que abatem a saída. Assim Entradas e Saídas
-//     são o que passou de fato pelo banco (o líquido), como no extrato.
-//  3. Avulso (origem BC): transferência entre empresas ou contas, saque, depósito e resgate
-//     de aplicação vão para Transferências (entre as contas da lista elas se anulam; o que
-//     sobra foi para fora: holding, caixa em dinheiro, mútuo). Tarifa bancária é saída.
-//  4. O `/accounts-balances` do Sienge só devolve as contas das empresas que tiveram
+//     são o líquido de cada título, como no extrato.
+//  3. O `/accounts-balances` do Sienge só devolve as contas das empresas que tiveram
 //     movimento na data pedida (domingo e feriado voltam vazios). Por isso o saldo de uma
 //     conta numa data é o saldo devolvido na última data com movimento da empresa, mais os
 //     movimentos da conta de lá até a data.
-//  5. Lançamento feito há pouco aparece nos movimentos antes de aparecer no saldo do
+//  4. Lançamento feito há pouco aparece nos movimentos antes de aparecer no saldo do
 //     Sienge. O saldo final é o saldo anterior + os movimentos; o saldo que o Sienge devolve
 //     para o fim do período vem ao lado, e a diferença (quando há) é mostrada, não escondida.
+//  5. O valor do movimento vale com o sinal que o Sienge manda: estorno de baixa vem
+//     negativo (conferido pelo saldo da conta 9937-6 em 08/09 e 07/10/2026).
+//
+// Entradas e Saídas = títulos recebidos e pagos, iguais ao fechamento das 07:30 (Edielson,
+// 19/11/2026: "o link do fechamento de caixa de ontem não bate com essa nova aba"). Em
+// 18/11 a aba mostrava Entradas R$ 18.259,39 e Saídas R$ 0,00 e o relatório, Recebido
+// R$ 105.516,19 e Pago R$ 87.256,80: dois recebimentos e um pagamento passaram pelo caixa
+// interno (conta CAIXA, dinheiro) da Construtora, fora dos bancos. Agora:
+//  6. Recebimento ou pagamento de título de empresa que não é a Holding entra em Entradas
+//     ou Saídas onde quer que o dinheiro tenha passado: nas 17 contas, no caixa interno
+//     (CAIXA) ou numa conta da Holding (ela paga contas do Galpão Canelinha). A empresa do
+//     título é a do lado do mútuo (`MUTUO*`) que tem a direção do pagamento; sem mútuo, a
+//     do próprio movimento.
+//  7. Fora das 17 contas o movimento vira uma linha "fora dos bancos" sem saldo (o saldo
+//     da conta CAIXA no Sienge é acumulado contábil, R$ 2,2 mi na Construtora em 18/11, não
+//     é dinheiro em caixa). Nela, a coluna Outros devolve o mesmo valor com o sinal
+//     contrário: o dinheiro não passou pelos bancos e o saldo deles não muda.
+//  8. Outros = o resto do que mexe nos bancos sem ser título das empresas: transferências
+//     (entre as 17 contas se anulam; o que sobra foi para fora: Holding, mútuo), tarifas
+//     bancárias (o fechamento das 07:30 não conta movimento sem título) e título da Holding
+//     pago ou recebido por uma das 17 contas (o fechamento das 07:30 não conta a Holding).
+//  Conferido com o fechamento das 07:30 em 12 dias úteis de novembro: igual no centavo.
 //
 // Tudo aqui é função pura: a rota busca no Sienge e a tela filtra e soma.
 import { detalheDaConta, instituicaoDaConta } from "./saldos-por-banco";
@@ -42,6 +61,7 @@ export interface MovimentoCaixa {
   companyId: number;
   companyName?: string;
   billId?: number | null;
+  installmentId?: number | null;
   creditorName?: string | null;
   clientName?: string | null;
 }
@@ -58,9 +78,14 @@ export interface ContaFechamento {
   instituicao: string;
   /** O que separa a conta das outras do mesmo banco: "Aplicação", "CH", "JP". */
   detalhe: string | null;
+  /** Caixa interno (dinheiro) ou conta da Holding: título pago ou recebido fora dos 17 bancos, sem saldo. */
+  foraDosBancos?: boolean;
 }
 
-export type TipoLancamento = "entrada" | "saida" | "transferencia";
+/** Entrada = título recebido; saída = título pago; outro = o resto (transferência, tarifa…). */
+export type TipoLancamento = "entrada" | "saida" | "outro";
+/** O que é o lançamento da coluna Outros. */
+export type CategoriaOutro = "transferencia" | "tarifa" | "holding" | "avulso";
 
 export interface Lancamento {
   id: number;
@@ -75,14 +100,20 @@ export interface Lancamento {
   documento: string;
   historico: string;
   titulo: number | null;
+  /** Só no tipo "outro". */
+  categoria?: CategoriaOutro;
+  /** Passou pelo caixa interno ou por conta da Holding: está em Entradas/Saídas e não mexe no saldo dos bancos. */
+  foraDosBancos?: boolean;
+  /** Empresa do título, quando não é a dona da conta (recebimento da Domus no caixa da Construtora). */
+  empresaTitulo?: string;
 }
 
 export interface LinhaConta extends ContaFechamento {
   saldoAnterior: number | null;
   entradas: number;
   saidas: number;
-  /** Líquido das transferências: positivo entrou, negativo saiu. */
-  transferencias: number;
+  /** Líquido do que não é título das empresas (transferências, tarifas…); na linha fora dos bancos, o contrário de entradas − saídas. */
+  outros: number;
   saldoFinal: number | null;
   /** Saldo que o Sienge devolve para o fim do período; null se a empresa não teve movimento nele. */
   saldoSienge: number | null;
@@ -92,6 +123,7 @@ export interface LinhaConta extends ContaFechamento {
   estimado: boolean;
   /** Lançamentos no período (sem contar retenção e desconto). */
   qtd: number;
+  foraDosBancos: boolean;
 }
 
 export interface PagoEmDinheiro {
@@ -121,23 +153,61 @@ const semAcento = (s: string | null | undefined) =>
 export const dataDoMovimento = (m: Pick<MovimentoCaixa, "bankMovementDate">) => String(m.bankMovementDate).slice(0, 10);
 export const contaDoMovimento = (m: Pick<MovimentoCaixa, "companyId" | "accountNumber">) => `${m.companyId}:${m.accountNumber}`;
 
+/** Efeito do movimento no saldo da conta, com o sinal do Sienge (estorno de baixa vem negativo). */
+export const efeitoDoMovimento = (m: Pick<MovimentoCaixa, "bankMovementOperationType" | "bankMovementAmount">) =>
+  (semAcento(m.bankMovementOperationType) === "E" ? 1 : -1) * (Number(m.bankMovementAmount) || 0);
+
+const ehTitulo = (m: Pick<MovimentoCaixa, "bankMovementOriginId">) => {
+  const origem = semAcento(m.bankMovementOriginId);
+  return origem === "CP" || origem === "CR";
+};
+export const ehMutuo = (conta: string) => /^MUTUO/.test(semAcento(conta));
+
 /** Dinheiro que só trocou de conta: transferência, saque, depósito, resgate/aplicação. Nunca título. */
 export function ehTransferencia(m: Pick<MovimentoCaixa, "bankMovementOriginId" | "bankMovementOperationName" | "documentIdentificationName">): boolean {
-  const origem = semAcento(m.bankMovementOriginId);
-  if (origem === "CP" || origem === "CR") return false;
+  if (ehTitulo(m)) return false;
   if (semAcento(m.documentIdentificationName).includes("TRANSFER")) return true;
   return /TRANSFER|SAQUE|DEPOSITO/.test(semAcento(m.bankMovementOperationName));
 }
 
-/** Em que coluna o movimento entra e quanto ele mexe no saldo. */
-export function classificar(m: MovimentoCaixa): { tipo: TipoLancamento; efeito: number; abate: boolean } {
+/**
+ * Em que coluna o movimento entra e quanto ele mexe no saldo. `tituloDaHolding`: título da
+ * Holding pago ou recebido por esta conta, que o fechamento das 07:30 não conta: vai para Outros.
+ */
+export function classificar(
+  m: MovimentoCaixa,
+  tituloDaHolding = false,
+): { tipo: TipoLancamento; efeito: number; abate: boolean; categoria?: CategoriaOutro } {
   const entrada = semAcento(m.bankMovementOperationType) === "E";
-  const efeito = (entrada ? 1 : -1) * Math.abs(m.bankMovementAmount || 0);
+  const efeito = efeitoDoMovimento(m);
   const origem = semAcento(m.bankMovementOriginId);
+  if (ehTitulo(m) && tituloDaHolding) return { tipo: "outro", efeito, abate: false, categoria: "holding" };
   if (origem === "CR") return { tipo: "entrada", efeito, abate: !entrada };
   if (origem === "CP") return { tipo: "saida", efeito, abate: entrada };
-  if (ehTransferencia(m)) return { tipo: "transferencia", efeito, abate: false };
-  return { tipo: entrada ? "entrada" : "saida", efeito, abate: false };
+  if (ehTransferencia(m)) return { tipo: "outro", efeito, abate: false, categoria: "transferencia" };
+  const tarifa = /TARIFA/.test(semAcento(`${m.bankMovementHistoricName ?? ""} ${m.bankMovementOperationName ?? ""}`));
+  return { tipo: "outro", efeito, abate: false, categoria: tarifa ? "tarifa" : "avulso" };
+}
+
+/** O mesmo pagamento ou recebimento de título nas várias contas (a de verdade e os dois lados do mútuo). */
+const chaveDoTitulo = (m: MovimentoCaixa) =>
+  `${semAcento(m.bankMovementOriginId)}|${m.billId}|${m.installmentId ?? ""}|${dataDoMovimento(m)}`;
+
+/**
+ * Empresa dona do título de cada baixa. Quando uma empresa paga ou recebe pela conta de outra,
+ * o Sienge lança o mútuo dos dois lados: a dona do título tem o lado com a direção do
+ * pagamento (saída no CP, entrada no CR); a que emprestou a conta tem o lado contrário.
+ * Sem mútuo, a dona é a empresa do próprio movimento.
+ */
+export function empresasDosTitulos(movimentos: MovimentoCaixa[]): Map<string, number> {
+  const donos = new Map<string, number>();
+  for (const m of movimentos) {
+    if (!ehTitulo(m) || m.billId == null || !ehMutuo(m.accountNumber)) continue;
+    const direcao = semAcento(m.bankMovementOriginId) === "CP" ? "S" : "E";
+    if (semAcento(m.bankMovementOperationType) !== direcao) continue;
+    donos.set(chaveDoTitulo(m), m.companyId);
+  }
+  return donos;
 }
 
 /** A conta com o banco e a instituição do mapa das 17 contas. */
@@ -153,6 +223,23 @@ export function montarConta(conta: string, companyId: number, empresa: string, b
   };
 }
 
+/** Grupo das contas fora dos 17 bancos na visão "Por banco". */
+export const FORA_DOS_BANCOS = "Fora dos bancos";
+
+/** Caixa interno, cofre ou conta da Holding por onde passou título das empresas. */
+export function montarContaFora(conta: string, companyId: number, empresa: string, daHolding: boolean): ContaFechamento {
+  const nome = semAcento(conta);
+  const bancoNome =
+    nome === "CAIXA" || nome.endsWith("CAIXA")
+      ? "Caixa interno (dinheiro)"
+      : nome.startsWith("COFRE")
+        ? "Cofre (dinheiro)"
+        : daHolding
+          ? "Conta da Holding"
+          : "Conta fora da lista";
+  return { id: `${companyId}:${conta}`, conta, companyId, empresa, bancoNome, instituicao: FORA_DOS_BANCOS, detalhe: null, foraDosBancos: true };
+}
+
 /**
  * Saldo da conta no fim do dia `data`, a partir dos saldos conhecidos: usa o da última
  * data ≤ `data` e soma os movimentos de lá até `data`; se só houver saldo depois, volta
@@ -160,7 +247,9 @@ export function montarConta(conta: string, companyId: number, empresa: string, b
  * `liquido` = { dia: efeito no saldo } da conta, cobrindo o intervalo entre as datas.
  */
 export function saldoNaData(contaId: string, data: string, saldos: SaldosPorData, liquido: Record<string, number>): number | null {
-  const datas = Object.keys(saldos).filter((d) => saldos[d] && contaId in saldos[d]).sort();
+  const datas = Object.keys(saldos)
+    .filter((d) => saldos[d] && contaId in saldos[d])
+    .sort();
   if (datas.length === 0) return null;
   let antes: string | undefined;
   for (const d of datas) if (d <= data) antes = d;
@@ -199,11 +288,14 @@ export function datasDeSaldo(args: { movimentos: MovimentoCaixa[]; companyIds: n
       if ((ultimaDentro.get(m.companyId) ?? "") < d) ultimaDentro.set(m.companyId, d);
     }
   }
-  const unicas = (m: Map<number, string>) => Array.from(new Set(m.values())).sort();
+  const unicas = (mapa: Map<number, string>) => Array.from(new Set(mapa.values())).sort();
   return { antes: unicas(ultimaAntes), dentro: unicas(ultimaDentro), semAncora: companyIds.filter((c) => !ultimaAntes.has(c)) };
 }
 
-/** Pagamentos de título feitos pela conta CAIXA (dinheiro) das empresas: não passam pelos bancos. */
+/**
+ * Pagamentos de título feitos pela conta CAIXA (dinheiro) das empresas. Desde 19/11/2026
+ * eles estão nas Saídas; o campo continua na resposta para a aba aberta antes da mudança.
+ */
 export function pagoEmDinheiro(movimentos: MovimentoCaixa[], de: string, ate: string, companyIds: number[]): PagoEmDinheiro {
   const quer = new Set(companyIds);
   let total = 0;
@@ -220,9 +312,21 @@ export function pagoEmDinheiro(movimentos: MovimentoCaixa[], de: string, ate: st
   return { total: r2(total), qtd };
 }
 
-function quemDoMovimento(m: MovimentoCaixa, tipo: TipoLancamento): string {
-  if (tipo === "transferencia") return (m.bankMovementHistoricName || m.bankMovementOperationName || "Transferência").trim();
+function quemDoMovimento(m: MovimentoCaixa, categoria?: CategoriaOutro): string {
+  if (categoria === "transferencia") return (m.bankMovementHistoricName || m.bankMovementOperationName || "Transferência").trim();
   return (m.clientName || m.creditorName || m.bankMovementHistoricName || m.bankMovementOperationName || "").trim();
+}
+
+type Soma = { entradas: number; saidas: number; outros: number; qtd: number };
+const somaVazia = (): Soma => ({ entradas: 0, saidas: 0, outros: 0, qtd: 0 });
+
+/** Põe o lançamento na coluna dele; o de fora dos bancos devolve o valor em Outros, para não mexer no saldo. */
+function somar(s: Soma, l: Pick<Lancamento, "tipo" | "efeito" | "abate" | "foraDosBancos">): void {
+  if (l.tipo === "entrada") s.entradas += l.efeito;
+  else if (l.tipo === "saida") s.saidas -= l.efeito;
+  else s.outros += l.efeito;
+  if (l.foraDosBancos) s.outros -= l.efeito;
+  if (!l.abate) s.qtd++;
 }
 
 /**
@@ -238,49 +342,75 @@ export function fecharCaixa(args: {
   de: string;
   ate: string;
   geradoEm: string;
-  /** Empresas cujo pagamento em dinheiro (conta CAIXA) entra na linha informativa. */
+  /** Empresas cujo pagamento em dinheiro (conta CAIXA) entra no campo `pagoEmDinheiro`. */
   empresasDoCaixa?: number[];
+  /** Ids da Holding (também vale a empresa com "HOLDING" no nome). */
+  empresasHolding?: number[];
+  /** Nome das empresas que não estão nas 17 contas (Holding, Domus…). */
+  nomesEmpresas?: Record<number, string>;
 }): FechamentoCaixa {
   const { contas, movimentos, saldos, fotos, de, ate, geradoEm } = args;
   const vespera = somarDias(de, -1);
   const daLista = new Map(contas.map((c) => [c.id, c]));
 
+  const holding = new Set(args.empresasHolding ?? []);
+  const nomes = new Map<number, string>();
+  for (const [id, nome] of Object.entries(args.nomesEmpresas ?? {})) nomes.set(Number(id), nome);
+  for (const c of contas) if (!nomes.has(c.companyId)) nomes.set(c.companyId, c.empresa);
+  for (const m of movimentos) if (m.companyName && !nomes.has(m.companyId)) nomes.set(m.companyId, m.companyName);
+  for (const [id, nome] of Array.from(nomes.entries())) if (/HOLDING/.test(semAcento(nome))) holding.add(id);
+  const nomeDa = (id: number) => nomes.get(id) ?? `Empresa ${id}`;
+  const donos = empresasDosTitulos(movimentos);
+
   const liquido = new Map<string, Record<string, number>>();
   const lancamentos: Lancamento[] = [];
-  const soma = new Map<string, { entradas: number; saidas: number; transferencias: number; qtd: number }>();
+  const soma = new Map<string, Soma>();
+  const fora = new Map<string, ContaFechamento>();
   let sequencia = 0;
   for (const m of movimentos) {
     const contaId = contaDoMovimento(m);
-    if (!daLista.has(contaId)) continue;
+    const naLista = daLista.has(contaId);
+    const titulo = ehTitulo(m);
+    const dono = titulo ? (donos.get(chaveDoTitulo(m)) ?? m.companyId) : m.companyId;
+    const daHolding = titulo && holding.has(dono);
+    // Fora das 17 contas só interessa título das empresas (não da Holding) em conta de verdade.
+    const foraDosBancos = !naLista && titulo && !daHolding && !ehMutuo(m.accountNumber);
+    if (!naLista && !foraDosBancos) continue;
     const data = dataDoMovimento(m);
-    const { tipo, efeito, abate } = classificar(m);
+    const { tipo, efeito, abate, categoria } = classificar(m, daHolding);
     if (efeito === 0) continue;
-    const porDia = liquido.get(contaId) ?? {};
-    porDia[data] = (porDia[data] || 0) + efeito;
-    liquido.set(contaId, porDia);
+    if (naLista) {
+      const porDia = liquido.get(contaId) ?? {};
+      porDia[data] = (porDia[data] || 0) + efeito;
+      liquido.set(contaId, porDia);
+    }
     if (data < de || data > ate) continue;
-    const s = soma.get(contaId) ?? { entradas: 0, saidas: 0, transferencias: 0, qtd: 0 };
-    if (tipo === "entrada") s.entradas += efeito;
-    else if (tipo === "saida") s.saidas -= efeito;
-    else s.transferencias += efeito;
-    if (!abate) s.qtd++;
-    soma.set(contaId, s);
-    lancamentos.push({
+    if (foraDosBancos && !fora.has(contaId)) {
+      fora.set(contaId, montarContaFora(m.accountNumber, m.companyId, nomeDa(m.companyId), holding.has(m.companyId)));
+    }
+    const lancamento: Lancamento = {
       id: m.bankMovementId ?? -++sequencia,
       data,
       contaId,
       tipo,
       efeito: r2(efeito),
       abate,
-      quem: quemDoMovimento(m, tipo),
+      quem: quemDoMovimento(m, categoria),
       // Na transferência o número do documento é o trajeto ("SP BB/SB BRAD"); o nome só repete "transferência".
       documento:
-        tipo === "transferencia" && m.documentIdentificationNumber
+        categoria === "transferencia" && m.documentIdentificationNumber
           ? m.documentIdentificationNumber.trim()
           : [m.documentIdentificationName, m.documentIdentificationNumber].filter(Boolean).join(" ").trim(),
       historico: (m.bankMovementHistoricName || "").trim(),
       titulo: m.billId ?? null,
-    });
+      ...(categoria ? { categoria } : {}),
+      ...(foraDosBancos ? { foraDosBancos: true } : {}),
+      ...(titulo && dono !== m.companyId ? { empresaTitulo: nomeDa(dono) } : {}),
+    };
+    const s = soma.get(contaId) ?? somaVazia();
+    somar(s, lancamento);
+    soma.set(contaId, s);
+    lancamentos.push(lancamento);
   }
   lancamentos.sort((a, b) => (a.data < b.data ? -1 : a.data > b.data ? 1 : Math.abs(b.efeito) - Math.abs(a.efeito)));
 
@@ -294,7 +424,7 @@ export function fecharCaixa(args: {
   const avisos: string[] = [];
   const linhas: LinhaConta[] = contas.map((conta) => {
     const liq = liquido.get(conta.id) ?? {};
-    const s = soma.get(conta.id) ?? { entradas: 0, saidas: 0, transferencias: 0, qtd: 0 };
+    const s = soma.get(conta.id) ?? somaVazia();
     let estimado = false;
     let anterior = saldoNaData(conta.id, vespera, saldosAntes, liq);
     if (anterior === null) anterior = saldoNaData(conta.id, vespera, saldos, liq);
@@ -302,26 +432,50 @@ export function fecharCaixa(args: {
       anterior = saldoNaData(conta.id, vespera, fotos, liq);
       estimado = anterior !== null;
     }
-    const saldoFinal = anterior === null ? null : anterior + s.entradas - s.saidas + s.transferencias;
+    const saldoFinal = anterior === null ? null : anterior + s.entradas - s.saidas + s.outros;
     const sienge = saldoNaData(conta.id, ate, saldosDentro, liq);
     return {
       ...conta,
       saldoAnterior: anterior === null ? null : r2(anterior),
       entradas: r2(s.entradas),
       saidas: r2(s.saidas),
-      transferencias: r2(s.transferencias),
+      outros: r2(s.outros),
       saldoFinal: saldoFinal === null ? null : r2(saldoFinal),
       saldoSienge: sienge === null ? null : r2(sienge),
       diferenca: sienge === null || saldoFinal === null ? 0 : r2(sienge - saldoFinal),
       estimado,
       qtd: s.qtd,
+      foraDosBancos: false,
     };
   });
 
   const semSaldo = linhas.filter((l) => l.saldoAnterior === null);
-  if (semSaldo.length > 0) avisos.push(`Sem saldo do Sienge para ${semSaldo.length === 1 ? "a conta" : "as contas"} ${semSaldo.map((l) => l.conta).join(", ")}.`);
+  if (semSaldo.length > 0) {
+    avisos.push(`Sem saldo do Sienge para ${semSaldo.length === 1 ? "a conta" : "as contas"} ${semSaldo.map((l) => l.conta).join(", ")}.`);
+  }
   const estimadas = linhas.filter((l) => l.estimado);
-  if (estimadas.length > 0) avisos.push(`Saldo estimado pela última posição gravada em ${estimadas.length === 1 ? "1 conta" : `${estimadas.length} contas`}: ${estimadas.map((l) => l.conta).join(", ")}.`);
+  if (estimadas.length > 0) {
+    avisos.push(
+      `Saldo estimado pela última posição gravada em ${estimadas.length === 1 ? "1 conta" : `${estimadas.length} contas`}: ${estimadas.map((l) => l.conta).join(", ")}.`,
+    );
+  }
+
+  for (const conta of Array.from(fora.values())) {
+    const s = soma.get(conta.id) ?? somaVazia();
+    linhas.push({
+      ...conta,
+      saldoAnterior: null,
+      entradas: r2(s.entradas),
+      saidas: r2(s.saidas),
+      outros: r2(s.outros),
+      saldoFinal: null,
+      saldoSienge: null,
+      diferenca: 0,
+      estimado: false,
+      qtd: s.qtd,
+      foraDosBancos: true,
+    });
+  }
 
   return {
     de,
@@ -338,25 +492,25 @@ export interface Totais {
   saldoAnterior: number;
   entradas: number;
   saidas: number;
-  transferencias: number;
+  outros: number;
   saldoFinal: number;
   /** Saldo no Sienge no fim do período, quando ele difere do calculado; senão igual ao saldoFinal. */
   saldoSienge: number;
   diferenca: number;
   qtd: number;
-  /** Alguma conta ficou sem saldo: o total não inclui o saldo dela. */
+  /** Alguma conta bancária ficou sem saldo: o total não inclui o saldo dela. */
   incompleto: boolean;
 }
 
 export function totalizar(linhas: LinhaConta[]): Totais {
-  const t = { saldoAnterior: 0, entradas: 0, saidas: 0, transferencias: 0, saldoFinal: 0, diferenca: 0, qtd: 0 };
+  const t = { saldoAnterior: 0, entradas: 0, saidas: 0, outros: 0, saldoFinal: 0, diferenca: 0, qtd: 0 };
   let incompleto = false;
   for (const l of linhas) {
-    if (l.saldoAnterior === null || l.saldoFinal === null) incompleto = true;
+    if (!l.foraDosBancos && (l.saldoAnterior === null || l.saldoFinal === null)) incompleto = true;
     t.saldoAnterior += l.saldoAnterior ?? 0;
     t.entradas += l.entradas;
     t.saidas += l.saidas;
-    t.transferencias += l.transferencias;
+    t.outros += l.outros;
     t.saldoFinal += l.saldoFinal ?? 0;
     t.diferenca += l.diferenca;
     t.qtd += l.qtd;
@@ -365,7 +519,7 @@ export function totalizar(linhas: LinhaConta[]): Totais {
     saldoAnterior: r2(t.saldoAnterior),
     entradas: r2(t.entradas),
     saidas: r2(t.saidas),
-    transferencias: r2(t.transferencias),
+    outros: r2(t.outros),
     saldoFinal: r2(t.saldoFinal),
     saldoSienge: r2(t.saldoFinal + t.diferenca),
     diferenca: r2(t.diferenca),
@@ -378,9 +532,11 @@ export interface GrupoFechamento {
   nome: string;
   linhas: LinhaConta[];
   total: Totais;
+  /** Só linhas fora dos bancos: o grupo não tem saldo. */
+  semSaldo: boolean;
 }
 
-/** Linhas agrupadas por empresa ou por instituição, do maior saldo final para o menor. */
+/** Linhas agrupadas por empresa ou por instituição, do maior saldo final para o menor; fora dos bancos por último. */
 export function agruparLinhas(linhas: LinhaConta[], por: "empresa" | "banco"): GrupoFechamento[] {
   const grupos = new Map<string, LinhaConta[]>();
   for (const l of linhas) {
@@ -392,17 +548,18 @@ export function agruparLinhas(linhas: LinhaConta[], por: "empresa" | "banco"): G
   return Array.from(grupos.entries())
     .map(([nome, lista]) => ({
       nome,
-      linhas: [...lista].sort((a, b) => (b.saldoFinal ?? 0) - (a.saldoFinal ?? 0)),
+      linhas: [...lista].sort((a, b) => Number(a.foraDosBancos) - Number(b.foraDosBancos) || (b.saldoFinal ?? 0) - (a.saldoFinal ?? 0)),
       total: totalizar(lista),
+      semSaldo: lista.every((l) => l.foraDosBancos),
     }))
-    .sort((a, b) => b.total.saldoFinal - a.total.saldoFinal);
+    .sort((a, b) => Number(a.semSaldo) - Number(b.semSaldo) || b.total.saldoFinal - a.total.saldoFinal);
 }
 
 export interface DiaDoFechamento {
   data: string;
   entradas: number;
   saidas: number;
-  transferencias: number;
+  outros: number;
   /** Saldo das contas no fim do dia. */
   saldoFinal: number;
   qtd: number;
@@ -411,22 +568,19 @@ export interface DiaDoFechamento {
 /** O período dia a dia (todos os dias, com ou sem movimento), só das contas em `linhas`. */
 export function diaADia(linhas: LinhaConta[], lancamentos: Lancamento[], de: string, ate: string): DiaDoFechamento[] {
   const ids = new Set(linhas.map((l) => l.id));
-  const porDia = new Map<string, { entradas: number; saidas: number; transferencias: number; qtd: number }>();
+  const porDia = new Map<string, Soma>();
   for (const l of lancamentos) {
     if (!ids.has(l.contaId)) continue;
-    const d = porDia.get(l.data) ?? { entradas: 0, saidas: 0, transferencias: 0, qtd: 0 };
-    if (l.tipo === "entrada") d.entradas += l.efeito;
-    else if (l.tipo === "saida") d.saidas -= l.efeito;
-    else d.transferencias += l.efeito;
-    if (!l.abate) d.qtd++;
+    const d = porDia.get(l.data) ?? somaVazia();
+    somar(d, l);
     porDia.set(l.data, d);
   }
   let saldo = linhas.reduce((s, l) => s + (l.saldoAnterior ?? 0), 0);
   const dias: DiaDoFechamento[] = [];
   for (let data = de; data <= ate; data = somarDias(data, 1)) {
-    const d = porDia.get(data) ?? { entradas: 0, saidas: 0, transferencias: 0, qtd: 0 };
-    saldo += d.entradas - d.saidas + d.transferencias;
-    dias.push({ data, entradas: r2(d.entradas), saidas: r2(d.saidas), transferencias: r2(d.transferencias), saldoFinal: r2(saldo), qtd: d.qtd });
+    const d = porDia.get(data) ?? somaVazia();
+    saldo += d.entradas - d.saidas + d.outros;
+    dias.push({ data, entradas: r2(d.entradas), saidas: r2(d.saidas), outros: r2(d.outros), saldoFinal: r2(saldo), qtd: d.qtd });
   }
   return dias;
 }
@@ -437,3 +591,57 @@ export function contarLancamentos(lancamentos: Lancamento[], tipo: TipoLancament
   for (const l of lancamentos) if (l.tipo === tipo && !l.abate && (!contaIds || contaIds.has(l.contaId))) n++;
   return n;
 }
+
+export interface ComposicaoOutros {
+  transferencias: number;
+  tarifas: number;
+  /** Título da Holding pago ou recebido por uma das 17 contas. */
+  holding: number;
+  avulsos: number;
+  /** O contrário do que passou fora dos bancos (pago em dinheiro = positivo). */
+  foraDosBancos: number;
+}
+
+/** De que é feita a coluna Outros, para a tela explicar o número. */
+export function composicaoOutros(lancamentos: Lancamento[], contaIds?: Set<string>): ComposicaoOutros {
+  const c = { transferencias: 0, tarifas: 0, holding: 0, avulsos: 0, foraDosBancos: 0 };
+  for (const l of lancamentos) {
+    if (contaIds && !contaIds.has(l.contaId)) continue;
+    if (l.foraDosBancos) c.foraDosBancos -= l.efeito;
+    if (l.tipo !== "outro") continue;
+    if (l.categoria === "transferencia") c.transferencias += l.efeito;
+    else if (l.categoria === "tarifa") c.tarifas += l.efeito;
+    else if (l.categoria === "holding") c.holding += l.efeito;
+    else c.avulsos += l.efeito;
+  }
+  return {
+    transferencias: r2(c.transferencias),
+    tarifas: r2(c.tarifas),
+    holding: r2(c.holding),
+    avulsos: r2(c.avulsos),
+    foraDosBancos: r2(c.foraDosBancos),
+  };
+}
+
+export interface ResumoForaDosBancos {
+  /** "Caixa interno (dinheiro)", "Conta da Holding"… */
+  rotulo: string;
+  recebido: number;
+  pago: number;
+  qtd: number;
+}
+
+/** O que foi recebido e pago fora dos 17 bancos, por tipo de conta (as linhas já filtradas). */
+export function resumoForaDosBancos(linhas: LinhaConta[]): ResumoForaDosBancos[] {
+  const porRotulo = new Map<string, ResumoForaDosBancos>();
+  for (const l of linhas) {
+    if (!l.foraDosBancos) continue;
+    const r = porRotulo.get(l.bancoNome) ?? { rotulo: l.bancoNome, recebido: 0, pago: 0, qtd: 0 };
+    r.recebido = r2(r.recebido + l.entradas);
+    r.pago = r2(r.pago + l.saidas);
+    r.qtd += l.qtd;
+    porRotulo.set(l.bancoNome, r);
+  }
+  return Array.from(porRotulo.values()).sort((a, b) => b.recebido + b.pago - (a.recebido + a.pago));
+}
+

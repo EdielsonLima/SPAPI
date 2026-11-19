@@ -74,4 +74,11 @@ const dias = saldosDiarios({ movimentos, saldos, fotos, de: "2026-11-12", ate: "
   assert.equal(grafico["2026-11-17"], 1087476.78 + 4433492.58 + 1150145.95 + 83781.76);
 }
 
+// ── 4. Estorno de baixa vem com valor negativo: vale o sinal (19/11/2026) ────────────────
+{
+  const comEstorno = [mov("275226-3", 1, "2026-11-17", "S", 580, "CP"), mov("275226-3", 1, "2026-11-17", "S", -580, "CP")];
+  const d = saldosDiarios({ movimentos: comEstorno, saldos: { "2026-11-16": { "1:275226-3": 1000 } }, de: "2026-11-16", ate: "2026-11-17" });
+  assert.equal(d["2026-11-17"][0].amount, 1000, "pagamento e estorno se anulam (antes caía R$ 1.160,00)");
+}
+
 console.log("saldos-diarios: ok");

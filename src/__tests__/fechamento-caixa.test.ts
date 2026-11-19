@@ -1,11 +1,13 @@
 // npx tsx src/__tests__/fechamento-caixa.test.ts
-// Trava das regras do Fechamento de Caixa (src/lib/fechamento-caixa.ts). O caso grande é o
-// de 17/11/2026, com os saldos e os movimentos que o Sienge devolveu em 18/11/2026.
+// Trava das regras do Fechamento de Caixa (src/lib/fechamento-caixa.ts). Os casos grandes são
+// o de 17/11/2026, com os saldos e os movimentos que o Sienge devolveu em 18/11/2026, e o de
+// 18/11/2026 com os 17 movimentos reais do dia (Entradas e Saídas iguais ao fechamento das 07:30).
 import assert from "node:assert/strict";
 import { BANK_NAMES, DIMBAN_ACCOUNT_COMPANY } from "../lib/dimBanco";
 import {
   agruparLinhas,
   classificar,
+  composicaoOutros,
   contarLancamentos,
   datasDeSaldo,
   diaADia,
@@ -13,6 +15,7 @@ import {
   fecharCaixa,
   montarConta,
   pagoEmDinheiro,
+  resumoForaDosBancos,
   saldoNaData,
   totalizar,
   type MovimentoCaixa,
@@ -57,14 +60,23 @@ const PAGTO = { bankMovementOperationName: "Pagamento", documentIdentificationNa
   // Título a pagar: saída; "Retenção impostos" e "Desconto obtido" (entrada de origem CP) abatem.
   assert.deepEqual(classificar(mov("275226-3", 1, "2026-11-17", "S", 1000, "CP", PAGTO)), { tipo: "saida", efeito: -1000, abate: false });
   assert.deepEqual(classificar(mov("275226-3", 1, "2026-11-17", "E", 110, "CP", { bankMovementHistoricName: "Retenção impostos" })), { tipo: "saida", efeito: 110, abate: true });
-  // Avulso: transferência, saque, depósito e resgate são transferência; tarifa é saída.
-  assert.equal(classificar(mov("275226-3", 1, "2026-11-17", "S", 266000, "BC", TRANSF)).tipo, "transferencia");
-  assert.equal(classificar(mov("275226-3", 1, "2026-11-17", "S", 50000, "BC", { bankMovementOperationName: "Saque", documentIdentificationName: "TRANSFERÊNCIA ENTRE CONTAS", bankMovementHistoricName: "Saque Bancário" })).tipo, "transferencia");
-  assert.equal(classificar(mov("275226-3", 1, "2026-11-17", "E", 38000, "BC", { bankMovementOperationName: "Depósito", documentIdentificationName: "TRANSFERÊNCIA ENTRE CONTAS" })).tipo, "transferencia");
-  assert.equal(classificar(mov("A5026-3", 3, "2026-11-17", "S", 9000, "BC", { bankMovementOperationName: "Transferência", documentIdentificationName: "TRANSFERÊNCIA ENTRE CONTAS", bankMovementHistoricName: "Resgate de Aplicação" })).tipo, "transferencia");
+  // Avulso (sem título) vai para Outros: transferência, saque, depósito e resgate; tarifa; o resto.
+  const categoria = (m: MovimentoCaixa) => {
+    const c = classificar(m);
+    return `${c.tipo}/${c.categoria}`;
+  };
+  assert.equal(categoria(mov("275226-3", 1, "2026-11-17", "S", 266000, "BC", TRANSF)), "outro/transferencia");
+  assert.equal(categoria(mov("275226-3", 1, "2026-11-17", "S", 50000, "BC", { bankMovementOperationName: "Saque", documentIdentificationName: "TRANSFERÊNCIA ENTRE CONTAS", bankMovementHistoricName: "Saque Bancário" })), "outro/transferencia");
+  assert.equal(categoria(mov("275226-3", 1, "2026-11-17", "E", 38000, "BC", { bankMovementOperationName: "Depósito", documentIdentificationName: "TRANSFERÊNCIA ENTRE CONTAS" })), "outro/transferencia");
+  assert.equal(categoria(mov("A5026-3", 3, "2026-11-17", "S", 9000, "BC", { bankMovementOperationName: "Transferência", documentIdentificationName: "TRANSFERÊNCIA ENTRE CONTAS", bankMovementHistoricName: "Resgate de Aplicação" })), "outro/transferencia");
   // "Transferência entre empresas" lançada com documento AVISO DE LANÇAMENTO também é transferência.
-  assert.equal(classificar(mov("275226-3", 1, "2026-11-17", "S", 5000, "BC", { bankMovementOperationName: "Transferência entre empresas", documentIdentificationName: "AVISO DE LANÇAMENTO" })).tipo, "transferencia");
-  assert.deepEqual(classificar(mov("275226-3", 1, "2026-11-17", "S", 15.14, "BC", TARIFA)), { tipo: "saida", efeito: -15.14, abate: false });
+  assert.equal(categoria(mov("275226-3", 1, "2026-11-17", "S", 5000, "BC", { bankMovementOperationName: "Transferência entre empresas", documentIdentificationName: "AVISO DE LANÇAMENTO" })), "outro/transferencia");
+  assert.deepEqual(classificar(mov("275226-3", 1, "2026-11-17", "S", 15.14, "BC", TARIFA)), { tipo: "outro", efeito: -15.14, abate: false, categoria: "tarifa" });
+  assert.equal(categoria(mov("275226-3", 1, "2026-11-17", "E", 3.5, "BC", { bankMovementOperationName: "Aviso de Lançamento", documentIdentificationName: "AVISO DE LANÇAMENTO", bankMovementHistoricName: "Crédito" })), "outro/avulso");
+  // Título da Holding (pago por conta de outra empresa) também vai para Outros.
+  assert.deepEqual(classificar(mov("275226-3", 1, "2026-11-17", "S", 1000, "CP", PAGTO), true), { tipo: "outro", efeito: -1000, abate: false, categoria: "holding" });
+  // Estorno de baixa vem com valor negativo: vale o sinal (diminui a saída, não soma).
+  assert.deepEqual(classificar(mov("9937-6", 2, "2026-09-08", "S", -580, "CP", PAGTO)), { tipo: "saida", efeito: 580, abate: false });
   // Título nunca é transferência, mesmo com a palavra no documento.
   assert.equal(ehTransferencia({ bankMovementOriginId: "CP", bankMovementOperationName: "Pagamento", documentIdentificationName: "TRANSFERÊNCIA ENTRE CONTAS" }), false);
 }
@@ -132,15 +144,17 @@ const saldos17 = {
     "4:490-1": 1147990.17, "5:274-7": 44436.77, "6:479-0": 2930707.93, "10:924-5": 77267.24,
   },
 };
-const f17 = fecharCaixa({ contas, movimentos: movimentos17, saldos: saldos17, de: "2026-11-17", ate: "2026-11-17", geradoEm: "2026-11-18T14:00:00.000Z" });
+const f17 = fecharCaixa({ contas, movimentos: movimentos17, saldos: saldos17, de: "2026-11-17", ate: "2026-11-17", geradoEm: "2026-11-18T14:00:00.000Z", empresasHolding: [2] });
 {
   const t = totalizar(f17.linhas);
   assert.equal(t.saldoAnterior, 18355139.04, "saldo anterior = saldo de 16/11 no Sienge");
   assert.equal(t.entradas, 723033.95, "entradas = Total Recebido do fechamento das 07:30");
-  assert.equal(t.saidas, 539.25, "saídas = pagamento de R$ 520,00 + 3 tarifas");
-  assert.equal(t.transferencias, -4500, "transferências internas se anulam; sobra o que foi para a holding");
-  assert.equal(t.saldoFinal, 19073133.74);
-  assert.equal(Math.round((t.saldoAnterior + t.entradas - t.saidas + t.transferencias) * 100), Math.round(t.saldoFinal * 100), "a conta fecha");
+  assert.equal(t.saidas, 15690, "saídas = Total Pago do fechamento das 07:30: R$ 520,00 no banco + R$ 15.170,00 em dinheiro");
+  // Outros: transferência para a holding (−4.500), 3 tarifas (−19,25) e a volta do que foi pago em dinheiro (+15.170).
+  assert.equal(t.outros, 10650.75);
+  assert.deepEqual(composicaoOutros(f17.lancamentos), { transferencias: -4500, tarifas: -19.25, holding: 0, avulsos: 0, foraDosBancos: 15170 });
+  assert.equal(t.saldoFinal, 19073133.74, "o saldo dos bancos não muda com a regra nova");
+  assert.equal(Math.round((t.saldoAnterior + t.entradas - t.saidas + t.outros) * 100), Math.round(t.saldoFinal * 100), "a conta fecha");
   // O saldo do Sienge para 17/11 ainda não tinha as três tarifas: aparece a diferença.
   assert.equal(t.diferenca, 19.25);
   assert.equal(t.saldoSienge, 19073152.99);
@@ -149,8 +163,8 @@ const f17 = fecharCaixa({ contas, movimentos: movimentos17, saldos: saldos17, de
 
   const bb = f17.linhas.find((l) => l.id === "1:275226-3")!;
   assert.deepEqual(
-    [bb.saldoAnterior, bb.entradas, bb.saidas, bb.transferencias, bb.saldoFinal, bb.saldoSienge, bb.diferenca, bb.qtd],
-    [1067511.92, 25000, 535.14, -4500, 1087476.78, 1087491.92, 15.14, 6]
+    [bb.saldoAnterior, bb.entradas, bb.saidas, bb.outros, bb.saldoFinal, bb.saldoSienge, bb.diferenca, bb.qtd],
+    [1067511.92, 25000, 520, -4515.14, 1087476.78, 1087491.92, 15.14, 6]
   );
   // Empresa sem movimento no período: fecha com o saldo anterior e não há saldo do Sienge para conferir.
   const rozza = f17.linhas.find((l) => l.id === "11:1241-6")!;
@@ -159,14 +173,24 @@ const f17 = fecharCaixa({ contas, movimentos: movimentos17, saldos: saldos17, de
   const btg = f17.linhas.find((l) => l.id === "1:00483730-8")!;
   assert.deepEqual([btg.saldoFinal, btg.saldoSienge, btg.diferenca], [4433492.58, 4433492.58, 0]);
 
-  // Lançamentos: só os das 17 contas no período.
-  assert.equal(f17.lancamentos.length, 17);
+  // O caixa interno da Construtora vira uma linha fora dos bancos, sem saldo; o da holding, o mútuo e a conta da holding ficam fora.
+  assert.equal(f17.linhas.length, 18);
+  const caixa = f17.linhas.find((l) => l.id === "1:CAIXA")!;
+  assert.deepEqual(
+    [caixa.foraDosBancos, caixa.bancoNome, caixa.instituicao, caixa.entradas, caixa.saidas, caixa.outros, caixa.saldoAnterior, caixa.saldoFinal, caixa.qtd],
+    [true, "Caixa interno (dinheiro)", "Fora dos bancos", 0, 15170, 15170, null, null, 2]
+  );
+  assert.deepEqual(resumoForaDosBancos(f17.linhas), [{ rotulo: "Caixa interno (dinheiro)", recebido: 0, pago: 15170, qtd: 2 }]);
+
+  // Lançamentos: os das 17 contas e os 2 do caixa interno, no período.
+  assert.equal(f17.lancamentos.length, 19);
   assert.equal(contarLancamentos(f17.lancamentos, "entrada"), 8);
-  assert.equal(contarLancamentos(f17.lancamentos, "saida"), 4);
-  assert.equal(contarLancamentos(f17.lancamentos, "transferencia"), 5);
+  assert.equal(contarLancamentos(f17.lancamentos, "saida"), 3);
+  assert.equal(contarLancamentos(f17.lancamentos, "outro"), 8);
+  assert.equal(f17.lancamentos.filter((l) => l.foraDosBancos).length, 2);
   assert.equal(f17.lancamentos[0].efeito, 565000, "do maior para o menor dentro do dia");
   assert.equal(f17.lancamentos[0].quem, "CLIENTE B");
-  assert.equal(f17.lancamentos.find((l) => l.tipo === "transferencia")!.quem, "Transferência");
+  assert.equal(f17.lancamentos.find((l) => l.categoria === "transferencia")!.quem, "Transferência");
 
   // Pago em dinheiro: conta CAIXA das empresas das 17 contas; a da holding (2) fica fora.
   assert.deepEqual(f17.pagoEmDinheiro, { total: 15170, qtd: 2 });
@@ -179,24 +203,26 @@ const f17 = fecharCaixa({ contas, movimentos: movimentos17, saldos: saldos17, de
   assert.equal(porEmpresa.length, 10);
   assert.equal(porEmpresa[0].nome, EMPRESAS[1]);
   assert.deepEqual(
-    [porEmpresa[0].total.saldoAnterior, porEmpresa[0].total.entradas, porEmpresa[0].total.saidas, porEmpresa[0].total.transferencias, porEmpresa[0].total.saldoFinal],
-    [9897105.04, 25000, 535.14, -4500, 9917069.9]
+    [porEmpresa[0].total.saldoAnterior, porEmpresa[0].total.entradas, porEmpresa[0].total.saidas, porEmpresa[0].total.outros, porEmpresa[0].total.saldoFinal],
+    [9897105.04, 25000, 15690, 10654.86, 9917069.9]
   );
   const sul = porEmpresa.find((g) => g.nome === EMPRESAS[3])!;
-  assert.deepEqual([sul.total.saldoAnterior, sul.total.transferencias, sul.total.saldoFinal], [3924397.91, 266000, 4190397.91]);
+  assert.deepEqual([sul.total.saldoAnterior, sul.total.outros, sul.total.saldoFinal], [3924397.91, 266000, 4190397.91]);
   const jardins = porEmpresa.find((g) => g.nome === EMPRESAS[4])!;
-  assert.deepEqual([jardins.total.saldoAnterior, jardins.total.entradas, jardins.total.transferencias, jardins.total.saldoFinal], [818990.17, 595000, -266000, 1147990.17]);
+  assert.deepEqual([jardins.total.saldoAnterior, jardins.total.entradas, jardins.total.outros, jardins.total.saldoFinal], [818990.17, 595000, -266000, 1147990.17]);
 
   const porBanco = agruparLinhas(f17.linhas, "banco");
-  assert.deepEqual(porBanco.map((g) => g.nome).sort(), ["BTG Pactual", "Banco do Brasil", "Bradesco", "Caixa Econômica"]);
+  assert.deepEqual(porBanco.map((g) => g.nome).sort(), ["BTG Pactual", "Banco do Brasil", "Bradesco", "Caixa Econômica", "Fora dos bancos"]);
+  const ultimo = porBanco[porBanco.length - 1];
+  assert.deepEqual([ultimo.nome, ultimo.semSaldo, ultimo.total.saidas], ["Fora dos bancos", true, 15170], "fora dos bancos vem por último, sem saldo");
   assert.equal(porBanco.find((g) => g.nome === "Banco do Brasil")!.linhas.length, 10);
   const somaBancos = porBanco.reduce((s, g) => s + g.total.saldoFinal, 0);
   assert.equal(Math.round(somaBancos * 100), 1907313374, "por banco soma o mesmo total");
   // A transferência entre empresas aparece nos bancos: saiu do BB (135 Jardins) e entrou no Bradesco (Sul Brasil).
-  assert.equal(porBanco.find((g) => g.nome === "Bradesco")!.total.transferencias, 266000);
+  assert.equal(porBanco.find((g) => g.nome === "Bradesco")!.total.outros, 266000);
 }
 
-// ── 5. Retenção e desconto abatem; conta fora da lista não entra ─────────────────────────
+// ── 5. Retenção e desconto abatem; título em conta fora da lista entra fora dos bancos ───
 {
   const movs = [
     mov("275226-3", 1, "2026-11-17", "S", 1000, "CP", PAGTO),
@@ -207,10 +233,14 @@ const f17 = fecharCaixa({ contas, movimentos: movimentos17, saldos: saldos17, de
   ];
   const f = fecharCaixa({ contas, movimentos: movs, saldos: { "2026-11-16": saldos17["2026-11-16"] }, de: "2026-11-17", ate: "2026-11-17", geradoEm: "x" });
   const bb = f.linhas.find((l) => l.id === "1:275226-3")!;
-  assert.deepEqual([bb.entradas, bb.saidas, bb.transferencias, bb.qtd], [480, 890, 0, 2]);
+  assert.deepEqual([bb.entradas, bb.saidas, bb.outros, bb.qtd], [480, 890, 0, 2]);
   assert.equal(bb.saldoFinal, 1067101.92);
-  assert.equal(f.lancamentos.length, 4);
+  assert.equal(f.lancamentos.length, 5);
   assert.equal(f.lancamentos.filter((l) => l.abate).length, 2);
+  const outra = f.linhas.find((l) => l.id === "1:99999-9")!;
+  assert.deepEqual([outra.foraDosBancos, outra.bancoNome, outra.entradas, outra.outros, outra.saldoFinal], [true, "Conta fora da lista", 777, -777, null]);
+  const t = totalizar(f.linhas);
+  assert.deepEqual([t.entradas, t.outros, t.incompleto], [1257, -777, false], "a linha fora dos bancos não deixa o total incompleto");
 }
 
 // ── 6. Período de vários dias, dia a dia ─────────────────────────────────────────────────
@@ -228,7 +258,7 @@ const f17 = fecharCaixa({ contas, movimentos: movimentos17, saldos: saldos17, de
   const f = fecharCaixa({ contas: duas, movimentos: movs, saldos, de: "2026-11-14", ate: "2026-11-17", geradoEm: "x" });
   const t = totalizar(f.linhas);
   // O movimento de 13/11 está antes do período: entra no saldo anterior, não nas entradas.
-  assert.deepEqual([t.saldoAnterior, t.entradas, t.saidas, t.transferencias, t.saldoFinal], [11500, 300, 150, 266000, 277650]);
+  assert.deepEqual([t.saldoAnterior, t.entradas, t.saidas, t.outros, t.saldoFinal], [11500, 300, 100, 265950, 277650]);
   const dias = diaADia(f.linhas, f.lancamentos, f.de, f.ate);
   assert.deepEqual(dias.map((d) => d.data), ["2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17"]);
   assert.deepEqual(dias.map((d) => d.saldoFinal), [11500, 11500, 11700, 277650]);
@@ -270,6 +300,119 @@ const f17 = fecharCaixa({ contas, movimentos: movimentos17, saldos: saldos17, de
   assert.deepEqual([siena.saldoAnterior, siena.estimado], [15838.35, false], "com saldo do Sienge a foto não é usada");
   assert.deepEqual([tesla.saldoAnterior, tesla.estimado], [40722.43, true]);
   assert.equal(comFoto.avisos.length, 1);
+}
+
+// ── 9. O fechamento de 18/11/2026: os 17 movimentos reais do dia ─────────────────────────
+// A aba mostrava Entradas R$ 18.259,39 e Saídas R$ 0,00; o fechamento das 07:30, Total
+// Recebido R$ 105.516,19 e Total Pago R$ 87.256,80. A diferença passou pelo caixa interno.
+{
+  const VIDROS = { ...PAGTO, documentIdentificationName: "CONTRATO", documentIdentificationNumber: "PER-TURQUESA", billId: 25947, installmentId: 19, creditorName: "FERREIRA E CAMARGO VIDROS" };
+  const ALEXANDRE = { ...RECEB, documentIdentificationNumber: "R-2450.1401+", billId: 611, installmentId: 31, clientName: "ALEXANDRE VITOR MACHADO" };
+  const LUCAS = { ...RECEB, documentIdentificationNumber: "PALAC.2801.2", billId: 681, installmentId: 27, clientName: "LUCAS MARTINS MEDEIROS" };
+  const SAH = { ...TRANSF, documentIdentificationNumber: "SB BB/SAH BB" };
+  const movimentos18: MovimentoCaixa[] = [
+    mov("9937-6", 2, "2026-11-18", "E", 7500, "BC", SAH),
+    mov("MUTUO-2", 2, "2026-11-18", "S", 7500, "BC", SAH),
+    mov("5370-8", 3, "2026-11-18", "S", 7500, "BC", SAH),
+    mov("MUTUO-3", 3, "2026-11-18", "E", 7500, "BC", SAH),
+    // A Construtora paga pelo caixa interno um título do 135 Jardins (o mútuo do 135 tem a saída).
+    mov("MUTUO-1", 1, "2026-11-18", "E", 87256.8, "CP", VIDROS),
+    mov("CAIXA", 1, "2026-11-18", "S", 87256.8, "CP", VIDROS),
+    mov("MUTUO-4", 4, "2026-11-18", "S", 87256.8, "CP", VIDROS),
+    // E recebe em dinheiro dois títulos de outras empresas (o mútuo delas tem a entrada).
+    mov("MUTUO-1", 1, "2026-11-18", "S", 51925, "CR", ALEXANDRE),
+    mov("CAIXA", 1, "2026-11-18", "E", 51925, "CR", ALEXANDRE),
+    mov("MUTUO-1", 1, "2026-11-18", "S", 35331.8, "CR", LUCAS),
+    mov("CAIXA", 1, "2026-11-18", "E", 35331.8, "CR", LUCAS),
+    mov("5370-8", 3, "2026-11-18", "E", 7500, "CR", { ...RECEB, documentIdentificationName: "CONTRATO DE LOCAÇÃO", billId: 1112, installmentId: 2, clientName: "JULIANA CHEN" }),
+    mov("MUTUO-6", 6, "2026-11-18", "E", 35330.8, "CR", LUCAS),
+    mov("MUTUO-6", 6, "2026-11-18", "E", 1, "CR", { ...LUCAS, bankMovementHistoricName: "Recebimento acréscimo" }),
+    mov("924-5", 10, "2026-11-18", "E", 10759.39, "CR", { ...RECEB, billId: 311, installmentId: 48, clientName: "CARLOS EDUARDO FERREIRA HALUCH" }),
+    mov("MUTUO-13", 13, "2026-11-18", "E", 51924.9, "CR", ALEXANDRE),
+    mov("MUTUO-13", 13, "2026-11-18", "E", 0.1, "CR", { ...ALEXANDRE, bankMovementHistoricName: "Recebimento acréscimo" }),
+  ];
+  // Saldo de 17/11 já com as três tarifas (como o Sienge devolveu em 18/11 mais tarde).
+  const fim17 = { ...saldos17["2026-11-17"], "1:275226-3": 1087476.78, "5:274-7": 44434.73, "10:924-5": 77265.17 };
+  const f = fecharCaixa({
+    contas,
+    movimentos: movimentos18,
+    saldos: { "2026-11-16": saldos17["2026-11-16"], "2026-11-17": fim17 },
+    de: "2026-11-18",
+    ate: "2026-11-18",
+    geradoEm: "x",
+    empresasHolding: [2],
+    nomesEmpresas: { 2: "SILVA ADMINISTRADORA HOLDING LTDA", 13: "RESIDENCIAL RUA 2450" },
+  });
+  const t = totalizar(f.linhas);
+  assert.equal(t.saldoAnterior, 19073133.74);
+  assert.equal(t.entradas, 105516.19, "= Total Recebido do fechamento das 07:30");
+  assert.equal(t.saidas, 87256.8, "= Total Pago do fechamento das 07:30");
+  assert.equal(t.outros, -7500, "a transferência da Sul Brasil para a holding; o caixa interno recebeu e pagou o mesmo valor");
+  assert.equal(t.saldoFinal, 19083893.13, "o mesmo saldo final de antes");
+  const caixa = f.linhas.find((l) => l.id === "1:CAIXA")!;
+  assert.deepEqual([caixa.entradas, caixa.saidas, caixa.outros, caixa.qtd], [87256.8, 87256.8, 0, 3]);
+  // Cada lançamento do caixa diz de que empresa é o título.
+  const doCaixa = f.lancamentos.filter((l) => l.contaId === "1:CAIXA");
+  assert.deepEqual(
+    doCaixa.map((l) => [l.quem, l.empresaTitulo]),
+    [
+      ["FERREIRA E CAMARGO VIDROS", EMPRESAS[4]],
+      ["ALEXANDRE VITOR MACHADO", "RESIDENCIAL RUA 2450"],
+      ["LUCAS MARTINS MEDEIROS", EMPRESAS[6]],
+    ]
+  );
+  // Título da própria dona da conta não leva a marca.
+  assert.equal(f.lancamentos.find((l) => l.titulo === 1112)!.empresaTitulo, undefined);
+  // A conta da holding que recebeu a transferência não entra (não é título das empresas).
+  assert.equal(f.linhas.some((l) => l.id === "2:9937-6"), false);
+}
+
+// ── 10. Holding: título do Galpão pago pela conta dela; título dela pago por conta da lista ──
+{
+  const GALPAO = { ...PAGTO, billId: 777, installmentId: 1, creditorName: "CELESC" };
+  const DA_HOLDING = { ...PAGTO, billId: 888, installmentId: 1, creditorName: "CONTADOR" };
+  const movs = [
+    mov("9937-6", 2, "2026-11-05", "S", 90.18, "CP", GALPAO),
+    mov("MUTUO-2", 2, "2026-11-05", "E", 90.18, "CP", GALPAO),
+    mov("MUTUO-15", 15, "2026-11-05", "S", 90.18, "CP", GALPAO),
+    mov("275226-3", 1, "2026-11-05", "S", 1000, "CP", DA_HOLDING),
+    mov("MUTUO-1", 1, "2026-11-05", "E", 1000, "CP", DA_HOLDING),
+    mov("MUTUO-2", 2, "2026-11-05", "S", 1000, "CP", DA_HOLDING),
+    // Título da própria holding pago pela conta dela: não entra em nada.
+    mov("9937-6", 2, "2026-11-05", "S", 300, "CP", { ...PAGTO, billId: 999, installmentId: 1 }),
+  ];
+  const bb = contas.filter((c) => c.id === "1:275226-3");
+  const f = fecharCaixa({
+    contas: bb,
+    movimentos: movs,
+    saldos: { "2026-11-04": { "1:275226-3": 5000 } },
+    de: "2026-11-05",
+    ate: "2026-11-05",
+    geradoEm: "x",
+    nomesEmpresas: { 2: "SILVA ADMINISTRADORA HOLDING LTDA", 15: "GALPÃO - RUA CANELINHA" },
+  });
+  const t = totalizar(f.linhas);
+  // A holding é achada pelo nome; o pagamento do Galpão entra nas Saídas, o da holding fica em Outros.
+  assert.deepEqual([t.entradas, t.saidas, t.outros, t.saldoFinal], [0, 90.18, -909.82, 4000]);
+  const daHolding = f.linhas.find((l) => l.id === "2:9937-6")!;
+  assert.deepEqual([daHolding.foraDosBancos, daHolding.bancoNome, daHolding.saidas, daHolding.outros], [true, "Conta da Holding", 90.18, 90.18]);
+  assert.equal(f.lancamentos.find((l) => l.titulo === 777)!.empresaTitulo, "GALPÃO - RUA CANELINHA");
+  const pagoPelaLista = f.lancamentos.find((l) => l.titulo === 888)!;
+  assert.deepEqual([pagoPelaLista.tipo, pagoPelaLista.categoria, pagoPelaLista.empresaTitulo], ["outro", "holding", "SILVA ADMINISTRADORA HOLDING LTDA"]);
+  assert.equal(f.lancamentos.some((l) => l.titulo === 999), false);
+  assert.deepEqual(composicaoOutros(f.lancamentos), { transferencias: 0, tarifas: 0, holding: -1000, avulsos: 0, foraDosBancos: 90.18 });
+}
+
+// ── 11. Estorno de baixa: valor negativo diminui a saída do dia ──────────────────────────
+{
+  const movs = [
+    mov("275226-3", 1, "2026-11-05", "S", 580, "CP", { ...PAGTO, billId: 50, installmentId: 1 }),
+    mov("275226-3", 1, "2026-11-05", "S", -580, "CP", { ...PAGTO, billId: 50, installmentId: 1, bankMovementHistoricName: "Estorno" }),
+  ];
+  const bb = contas.filter((c) => c.id === "1:275226-3");
+  const f = fecharCaixa({ contas: bb, movimentos: movs, saldos: { "2026-11-04": { "1:275226-3": 5000 } }, de: "2026-11-05", ate: "2026-11-05", geradoEm: "x" });
+  const t = totalizar(f.linhas);
+  assert.deepEqual([t.saidas, t.saldoFinal], [0, 5000], "pagamento e estorno se anulam (antes somava R$ 1.160,00)");
 }
 
 console.log("fechamento-caixa: ok");

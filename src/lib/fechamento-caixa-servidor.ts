@@ -63,6 +63,7 @@ export async function buscarMovimentos(de: string, ate: string): Promise<Movimen
     companyId: Number(m.companyId) || 0,
     companyName: texto(m.companyName),
     billId: m.billId == null ? null : Number(m.billId),
+    installmentId: m.installmentId == null ? null : Number(m.installmentId),
     creditorName: texto(m.creditorName) ?? null,
     clientName: texto(m.clientName) ?? null,
   }));
@@ -90,16 +91,27 @@ export async function buscarSaldos(data: string): Promise<Record<string, number>
   return mapa;
 }
 
-async function contasDaRelacao(movimentos: MovimentoCaixa[]): Promise<ContaFechamento[]> {
+/** Nome de cada empresa: o do cadastro do painel, senão o que vem no movimento. */
+async function nomesDasEmpresas(movimentos: MovimentoCaixa[]): Promise<Map<number, string>> {
   const nomes = new Map<number, string>();
   try {
     for (const e of await getCachedCompanies()) nomes.set(e.id, e.name);
   } catch { /* sem banco: vale o nome que vem no movimento */ }
   for (const m of movimentos) if (m.companyName && !nomes.has(m.companyId)) nomes.set(m.companyId, m.companyName);
+  return nomes;
+}
+
+function contasDaRelacao(nomes: Map<number, string>): ContaFechamento[] {
   return Object.entries(DIMBAN_ACCOUNT_COMPANY).map(([conta, empresa]) =>
     montarConta(conta, empresa, nomes.get(empresa) ?? `Empresa ${empresa}`, BANK_NAMES[conta] ?? "")
   );
 }
+
+/** Holding = empresa com "HOLDING" no nome (Silva Administradora Holding). */
+const empresasHolding = (nomes: Map<number, string>) =>
+  Array.from(nomes.entries())
+    .filter(([, nome]) => /HOLDING/i.test(nome))
+    .map(([id]) => id);
 
 /** Foto gravada mais recente até `vespera` que tenha alguma das contas pedidas. */
 export async function fotoGravada(vespera: string, contaIds: string[]): Promise<SaldosPorData> {
@@ -135,11 +147,23 @@ async function montar(de: string, ate: string): Promise<FechamentoCaixa> {
     })
   );
 
-  const contas = await contasDaRelacao(movimentos);
+  const nomes = await nomesDasEmpresas(movimentos);
+  const contas = contasDaRelacao(nomes);
   const semSaldo = contas.filter((c) => !Object.values(saldos).some((mapa) => c.id in mapa)).map((c) => c.id);
   const fotos = semSaldo.length > 0 ? await fotoGravada(somarDias(de, -1), semSaldo) : undefined;
 
-  const fechamento = fecharCaixa({ contas, movimentos, saldos, fotos, de, ate, geradoEm: new Date().toISOString(), empresasDoCaixa: companyIds });
+  const fechamento = fecharCaixa({
+    contas,
+    movimentos,
+    saldos,
+    fotos,
+    de,
+    ate,
+    geradoEm: new Date().toISOString(),
+    empresasDoCaixa: companyIds,
+    empresasHolding: empresasHolding(nomes),
+    nomesEmpresas: Object.fromEntries(nomes),
+  });
   console.log(
     `[fechamento-caixa] ${de}..${ate}: ${movimentos.length} movimentos, saldos de ${Object.keys(saldos).length} datas, ${((Date.now() - t0) / 1000).toFixed(1)} s`
   );

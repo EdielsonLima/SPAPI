@@ -4,6 +4,9 @@
 // O Carlos Humberto pede toda manhã o fechamento do dia anterior: a aba abre nele, macro
 // (cinco cartões e uma tabela), e deixa abrir a empresa, a conta e o lançamento.
 // Regras em src/lib/fechamento-caixa.ts; a rota /api/fechamento-caixa busca no Sienge na hora.
+// Desde 19/11/2026 Entradas e Saídas são os títulos recebidos e pagos, iguais ao fechamento
+// das 07:30, também os que passaram pelo caixa interno ou por conta da Holding; o resto
+// do que mexe nos bancos fica em "Outros".
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Building2, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, FileDown, Landmark, Loader2, RefreshCw, Search, X } from "lucide-react";
 import { montarFechamentoHtml, nomeArquivoFechamento } from "@/lib/fechamento-html";
@@ -18,9 +21,13 @@ import { MultiSelectFilter } from "@/components/multi-select-filter";
 import { formatCurrency } from "@/lib/dashboard-utils";
 import {
   agruparLinhas,
+  composicaoOutros,
   contarLancamentos,
   diaADia,
+  resumoForaDosBancos,
   totalizar,
+  type CategoriaOutro,
+  type ComposicaoOutros,
   type FechamentoCaixa,
   type Lancamento,
   type LinhaConta,
@@ -69,7 +76,30 @@ const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um :
 const VERDE = "text-emerald-700 dark:text-emerald-400";
 const VERMELHO = "text-[#c03f55] dark:text-rose-300";
 const APAGADO = "text-slate-500 dark:text-slate-400";
-const ROTULO_TIPO: Record<TipoLancamento, string> = { entrada: "Entrada", saida: "Saída", transferencia: "Transferência" };
+const ROTULO_TIPO: Record<TipoLancamento, string> = { entrada: "Entrada", saida: "Saída", outro: "Outro" };
+const ROTULO_CATEGORIA: Record<CategoriaOutro, string> = {
+  transferencia: "Transferência",
+  tarifa: "Tarifa bancária",
+  holding: "Título da Holding",
+  avulso: "Lançamento avulso",
+};
+const rotuloDoLancamento = (l: Lancamento) =>
+  l.abate ? l.historico || "Abate" : l.tipo === "outro" ? ROTULO_CATEGORIA[l.categoria ?? "avulso"] : ROTULO_TIPO[l.tipo];
+const DICA_OUTROS =
+  "O que mexe no saldo dos bancos sem ser título das empresas (transferências, tarifas, título da Holding) e, com o sinal contrário, o que foi pago ou recebido fora dos bancos (caixa interno, conta da Holding): isso está em Entradas e Saídas, mas não passou pelas contas.";
+
+/** De que é feita a coluna Outros, do maior para o menor. */
+function partesDosOutros(c: ComposicaoOutros): { rotulo: string; valor: number }[] {
+  return [
+    { rotulo: "transferências", valor: c.transferencias },
+    { rotulo: "tarifas", valor: c.tarifas },
+    { rotulo: "títulos da Holding", valor: c.holding },
+    { rotulo: "avulsos", valor: c.avulsos },
+    { rotulo: "fora dos bancos", valor: c.foraDosBancos },
+  ]
+    .filter((p) => Math.abs(p.valor) > 0.005)
+    .sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
+}
 
 function lerVisaoSalva(): "empresa" | "banco" {
   try {
@@ -212,7 +242,8 @@ export function FechamentoCaixaTab() {
   const dias = useMemo(() => (dados && !umDia ? diaADia(linhas, dados.lancamentos, dados.de, dados.ate) : []), [dados, linhas, umDia]);
   const nEntradas = useMemo(() => contarLancamentos(lancamentos, "entrada"), [lancamentos]);
   const nSaidas = useMemo(() => contarLancamentos(lancamentos, "saida"), [lancamentos]);
-  const nTransf = useMemo(() => contarLancamentos(lancamentos, "transferencia"), [lancamentos]);
+  const outros = useMemo(() => partesDosOutros(composicaoOutros(lancamentos)), [lancamentos]);
+  const fora = useMemo(() => resumoForaDosBancos(linhas), [linhas]);
 
   const listaFiltrada = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -221,7 +252,7 @@ export function FechamentoCaixaTab() {
       if (tipoLista !== "todos" && l.tipo !== tipoLista) return false;
       if (!q) return true;
       const c = contaPorId.get(l.contaId);
-      return [l.quem, l.documento, l.historico, c?.empresa, c?.bancoNome, c?.conta, l.titulo ? String(l.titulo) : ""].some((t) => (t || "").toLowerCase().includes(q));
+      return [l.quem, l.documento, l.historico, l.empresaTitulo, c?.empresa, c?.bancoNome, c?.conta, l.titulo ? String(l.titulo) : ""].some((t) => (t || "").toLowerCase().includes(q));
     });
   }, [lancamentos, busca, tipoLista, contaLista, contaPorId]);
 
@@ -283,7 +314,6 @@ export function FechamentoCaixaTab() {
       ate: dados.ate,
       linhas,
       lancamentos,
-      pagoEmDinheiro: dados.pagoEmDinheiro,
       avisos: dados.avisos,
       marca,
       geradoEm: dataHora(new Date(), " "),
@@ -307,22 +337,38 @@ export function FechamentoCaixaTab() {
   const temDiferenca = Math.abs(total.diferenca) > 0.005;
   const parcial = janela.ate === hoje;
 
-  const cartoes: { rotulo: string; valor: string; sub: string; ponto: string; cor?: string; operador?: string; selo?: string; corSelo?: string }[] = [
+  const cartoes: { rotulo: string; valor: string; sub: string; ponto: string; cor?: string; operador?: string; selo?: string; corSelo?: string; dica?: string }[] = [
     { rotulo: "Saldo anterior", valor: reais(total.saldoAnterior), sub: `fim de ${abrevDoDia(vespera)}, ${dataBr(vespera)}`, ponto: "bg-slate-400" },
-    { rotulo: "Entradas", valor: reais(total.entradas), sub: plural(nEntradas, "recebimento", "recebimentos"), ponto: "bg-emerald-500", cor: VERDE, operador: "+" },
-    { rotulo: "Saídas", valor: reais(total.saidas), sub: plural(nSaidas, "pagamento", "pagamentos"), ponto: "bg-rose-500", cor: VERMELHO, operador: "−" },
     {
-      rotulo: "Transferências",
-      valor: total.transferencias === 0 ? reais(0) : comSinal(total.transferencias),
-      sub: nTransf === 0
-        ? "nenhuma no período"
-        : filtrado
-          ? "líquido das contas filtradas"
-          : total.transferencias === 0
-            ? "entre as contas, se anulam"
-            : total.transferencias < 0
-              ? "saiu para contas fora da lista"
-              : "entrou de contas fora da lista",
+      rotulo: "Entradas",
+      valor: reais(total.entradas),
+      sub: plural(nEntradas, "recebimento", "recebimentos"),
+      ponto: "bg-emerald-500",
+      cor: VERDE,
+      operador: "+",
+      dica: "Títulos recebidos no período, nos bancos e no caixa interno (o mesmo Total Recebido do fechamento das 07:30).",
+    },
+    {
+      rotulo: "Saídas",
+      valor: reais(total.saidas),
+      sub: plural(nSaidas, "pagamento", "pagamentos"),
+      ponto: "bg-rose-500",
+      cor: VERMELHO,
+      operador: "−",
+      dica: "Títulos pagos no período, pelos bancos, pelo caixa interno ou por conta da Holding (o mesmo Total Pago do fechamento das 07:30).",
+    },
+    {
+      rotulo: "Outros movimentos",
+      valor: total.outros === 0 ? reais(0) : comSinal(total.outros),
+      sub:
+        outros.length === 0
+          ? "nenhum no período"
+          : Math.abs(total.outros) < 0.005
+            ? "se anulam no período"
+            : outros.length <= 2
+              ? outros.map((p) => p.rotulo).join(" e ")
+              : `${outros[0].rotulo}, ${outros[1].rotulo} e mais`,
+      dica: [DICA_OUTROS, ...outros.map((p) => `${p.rotulo}: ${comSinal(p.valor)}`)].join("\n"),
       ponto: "bg-violet-500",
       operador: "±",
     },
@@ -345,6 +391,8 @@ export function FechamentoCaixaTab() {
     v === 0 ? <span className={APAGADO}>-</span> : <span className={cor}>{sinal ? comSinal(v) : reais(v)}</span>;
   const celulaSaldo = (v: number | null) =>
     v === null ? <span className={APAGADO} title="O Sienge não devolveu o saldo desta conta">sem saldo</span> : <span className={v < 0 ? "text-red-600 dark:text-red-300/70" : ""}>{reais(v)}</span>;
+  const SEM_SALDO_FORA = <span className={APAGADO} title="Fora dos bancos: o fechamento não soma saldo desta conta">—</span>;
+  const CINZA = "text-slate-600 dark:text-slate-300";
 
   const NUM = "text-right tabular-nums whitespace-nowrap px-3";
   // Linhas do 1º nível (empresa ou banco) e do total: mais baixas em tela baixa, para as 10
@@ -359,15 +407,25 @@ export function FechamentoCaixaTab() {
     <TableRow key={`${l.contaId}-${l.id}`} className="bg-slate-50/40 dark:bg-slate-800/20 hover:bg-slate-50 dark:hover:bg-slate-800/40">
       <TableCell />
       <TableCell className="pl-12 py-1.5">
-        <span className="text-xs text-slate-700 dark:text-slate-300">{l.quem || ROTULO_TIPO[l.tipo]}</span>
+        <span className="text-xs text-slate-700 dark:text-slate-300">{l.quem || rotuloDoLancamento(l)}</span>
         {!umDia && <span className="ml-2 text-[11px] tabular-nums text-slate-500 dark:text-slate-400">{diaMes(l.data)}</span>}
         {l.documento && <span className="ml-2 text-[11px] text-slate-500 dark:text-slate-400">{l.documento}</span>}
         {l.abate && <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 font-medium">{l.historico || "abate"}</Badge>}
+        {l.categoria === "holding" && (
+          <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 font-medium" title="Título da Holding: o fechamento das 07:30 não conta, por isso fica em Outros">
+            título da Holding
+          </Badge>
+        )}
+        {l.empresaTitulo && l.categoria !== "holding" && (
+          <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 font-medium" title="Empresa dona do título, diferente da dona da conta">
+            título: {l.empresaTitulo}
+          </Badge>
+        )}
       </TableCell>
       <TableCell />
       <TableCell className={`${NUM} py-1.5 text-xs`}>{l.tipo === "entrada" ? <span className={VERDE}>{reais(l.efeito)}</span> : null}</TableCell>
       <TableCell className={`${NUM} py-1.5 text-xs`}>{l.tipo === "saida" ? <span className={VERMELHO}>{reais(-l.efeito)}</span> : null}</TableCell>
-      <TableCell className={`${NUM} py-1.5 text-xs`}>{l.tipo === "transferencia" ? <span className="text-slate-600 dark:text-slate-300">{comSinal(l.efeito)}</span> : null}</TableCell>
+      <TableCell className={`${NUM} py-1.5 text-xs`}>{l.tipo === "outro" ? <span className={CINZA}>{comSinal(l.efeito)}</span> : null}</TableCell>
       <TableCell />
     </TableRow>
   );
@@ -387,9 +445,14 @@ export function FechamentoCaixaTab() {
           <TableCell className="pl-7 py-2">
             <span className="inline-flex items-center gap-1.5 align-middle">
               {temLista ? (aberta ? <ChevronDown className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />) : <span className="inline-block w-3.5" />}
-              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{visaoAtiva === "banco" ? l.empresa : l.instituicao}</span>
+              <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">{visaoAtiva === "banco" ? l.empresa : l.foraDosBancos ? l.bancoNome : l.instituicao}</span>
             </span>
             <span className="ml-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">{l.conta}</span>
+            {l.foraDosBancos && (
+              <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 font-medium" title="O dinheiro não passou pelos 17 bancos: está em Entradas e Saídas e volta em Outros, sem mexer no saldo">
+                {visaoAtiva === "banco" ? l.bancoNome.toLowerCase() : "fora dos bancos"}
+              </Badge>
+            )}
             {l.detalhe && <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 font-medium">{l.detalhe}</Badge>}
             {l.estimado && <Badge variant="secondary" className="ml-2 text-[10px] px-1.5 font-medium" title="O Sienge não devolveu esta conta; saldo da última posição gravada pelo painel">estimado</Badge>}
             {Math.abs(l.diferenca) > 0.005 && (
@@ -398,13 +461,26 @@ export function FechamentoCaixaTab() {
               </Badge>
             )}
           </TableCell>
-          <TableCell className={`${NUM} py-2 text-xs text-slate-600 dark:text-slate-300`}>{celulaSaldo(l.saldoAnterior)}</TableCell>
+          <TableCell className={`${NUM} py-2 text-xs text-slate-600 dark:text-slate-300`}>{l.foraDosBancos ? SEM_SALDO_FORA : celulaSaldo(l.saldoAnterior)}</TableCell>
           <TableCell className={`${NUM} py-2 text-xs`}>{celulaValor(l.entradas, VERDE)}</TableCell>
           <TableCell className={`${NUM} py-2 text-xs`}>{celulaValor(l.saidas, VERMELHO)}</TableCell>
-          <TableCell className={`${NUM} py-2 text-xs`}>{celulaValor(l.transferencias, "text-slate-600 dark:text-slate-300", true)}</TableCell>
-          <TableCell className={`${NUM} py-2 text-xs font-semibold text-slate-700 dark:text-slate-200`}>{celulaSaldo(l.saldoFinal)}</TableCell>
+          <TableCell className={`${NUM} py-2 text-xs`}>{celulaValor(l.outros, CINZA, true)}</TableCell>
+          <TableCell className={`${NUM} py-2 text-xs font-semibold text-slate-700 dark:text-slate-200`}>{l.foraDosBancos ? SEM_SALDO_FORA : celulaSaldo(l.saldoFinal)}</TableCell>
         </TableRow>
         {aberta && lista.slice(0, LANCAMENTOS_POR_CONTA).map(linhaDoLancamento)}
+        {aberta && l.foraDosBancos && Math.abs(l.outros) > 0.005 && (
+          <TableRow className="bg-slate-50/40 dark:bg-slate-800/20">
+            <TableCell />
+            <TableCell className="pl-12 py-1.5 text-xs italic text-slate-600 dark:text-slate-400">Não passou pelos bancos: volta em Outros, sem mexer no saldo</TableCell>
+            <TableCell />
+            <TableCell />
+            <TableCell />
+            <TableCell className={`${NUM} py-1.5 text-xs`}>
+              <span className={CINZA}>{comSinal(l.outros)}</span>
+            </TableCell>
+            <TableCell />
+          </TableRow>
+        )}
         {aberta && lista.length > LANCAMENTOS_POR_CONTA && (
           <TableRow className="bg-slate-50/40 dark:bg-slate-800/20">
             <TableCell />
@@ -568,7 +644,7 @@ export function FechamentoCaixaTab() {
           {/* Cartões: a conta do fechamento, da esquerda para a direita */}
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 shrink-0">
             {cartoes.map((c) => (
-              <div key={c.rotulo} className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 min-w-0">
+              <div key={c.rotulo} title={c.dica} className="relative rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-4 py-3 min-w-0">
                 {c.operador && (
                   <span aria-hidden className="hidden xl:flex absolute -left-[17px] top-1/2 -translate-y-1/2 z-10 h-[22px] w-[22px] items-center justify-center rounded-full border border-slate-200 dark:border-slate-700 bg-background text-[13px] font-semibold leading-none text-slate-500 dark:text-slate-400">
                     {c.operador}
@@ -590,18 +666,33 @@ export function FechamentoCaixaTab() {
           </div>
 
           {/* Notas: o que não está nos cartões */}
-          {(dados.pagoEmDinheiro.total !== 0 || temDiferenca || total.incompleto || dados.avisos.length > 0 || parcial) && (
+          {(fora.length > 0 || temDiferenca || total.incompleto || dados.avisos.length > 0 || parcial) && (
             <div className="flex items-center gap-x-5 gap-y-1 flex-wrap shrink-0 px-1 text-[11px] text-slate-600 dark:text-slate-400">
               {parcial && (
                 <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-1.5 rounded-full bg-sky-500" />O dia de hoje ainda está aberto: os valores mudam conforme os lançamentos entram no Sienge.</span>
               )}
-              {dados.pagoEmDinheiro.total !== 0 && (
-                <span className="inline-flex items-center gap-1.5" title="Pagamentos de títulos feitos pela conta CAIXA (dinheiro) das empresas. Não passam pelos bancos, por isso não estão nas Saídas.">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-                  Pago em dinheiro pelo caixa interno: <strong className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{reais(dados.pagoEmDinheiro.total)}</strong>
-                  ({plural(dados.pagoEmDinheiro.qtd, "pagamento", "pagamentos")}), fora dos bancos
+              {fora.map((f) => (
+                <span
+                  key={f.rotulo}
+                  className="inline-flex items-center gap-1"
+                  title="Títulos pagos ou recebidos fora dos 17 bancos. Estão em Entradas e Saídas, como no fechamento das 07:30, e voltam em Outros: o saldo dos bancos não muda."
+                >
+                  <span className="mr-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" />
+                  {f.rotulo}:
+                  {f.recebido !== 0 && (
+                    <span>
+                      recebido <strong className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{reais(f.recebido)}</strong>
+                    </span>
+                  )}
+                  {f.recebido !== 0 && f.pago !== 0 && <span>·</span>}
+                  {f.pago !== 0 && (
+                    <span>
+                      pago <strong className="font-semibold text-slate-800 dark:text-slate-200 tabular-nums">{reais(f.pago)}</strong>
+                    </span>
+                  )}
+                  <span>(fora dos bancos)</span>
                 </span>
-              )}
+              ))}
               {temDiferenca && (
                 <span className="inline-flex items-center gap-1.5" title="O saldo do Sienge demora a refletir lançamento feito há pouco. O saldo final do painel soma os movimentos, que já aparecem.">
                   <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
@@ -626,7 +717,7 @@ export function FechamentoCaixaTab() {
                   {visaoAtiva === "empresa" && "Clique na empresa para ver as contas e na conta para ver os lançamentos"}
                   {visaoAtiva === "banco" && "Clique no banco para ver as contas e na conta para ver os lançamentos"}
                   {visaoAtiva === "dias" && "Clique num dia para abrir o fechamento dele"}
-                  {visaoAtiva === "lancamentos" && `${plural(listaFiltrada.length, "lançamento", "lançamentos")} nas contas bancárias`}
+                  {visaoAtiva === "lancamentos" && `${plural(listaFiltrada.length, "lançamento", "lançamentos")} no período`}
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
@@ -649,9 +740,9 @@ export function FechamentoCaixaTab() {
                       />
                     </div>
                     <div role="group" aria-label="Tipo de lançamento" className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
-                      {(["todos", "entrada", "saida", "transferencia"] as const).map((t) => (
+                      {(["todos", "entrada", "saida", "outro"] as const).map((t) => (
                         <button key={t} type="button" aria-pressed={tipoLista === t} onClick={() => setTipoLista(t)} className={pilula(tipoLista === t)}>
-                          {t === "todos" ? "Todos" : t === "entrada" ? "Entradas" : t === "saida" ? "Saídas" : "Transferências"}
+                          {t === "todos" ? "Todos" : t === "entrada" ? "Entradas" : t === "saida" ? "Saídas" : "Outros"}
                         </button>
                       ))}
                     </div>
@@ -679,7 +770,7 @@ export function FechamentoCaixaTab() {
                       <TableHead className={`${CAB} text-right px-3`}>Saldo anterior</TableHead>
                       <TableHead className={`${CAB} text-right px-3`}>Entradas</TableHead>
                       <TableHead className={`${CAB} text-right px-3`}>Saídas</TableHead>
-                      <TableHead className={`${CAB} text-right px-3`}>Transferências</TableHead>
+                      <TableHead className={`${CAB} text-right px-3`} title={DICA_OUTROS}>Outros</TableHead>
                       <TableHead className={`${CAB} text-right px-3`}>{parcial ? "Saldo até agora" : "Saldo final"}</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -698,11 +789,11 @@ export function FechamentoCaixaTab() {
                               {g.nome}
                               <Badge variant="secondary" className="ml-2 h-[18px] py-0 text-[10px] px-1" title={plural(g.linhas.length, "conta", "contas")}>{g.linhas.length}</Badge>
                             </TableCell>
-                            <TableCell className={`${NUM} text-slate-600 dark:text-slate-300`}>{reais(g.total.saldoAnterior)}</TableCell>
+                            <TableCell className={`${NUM} text-slate-600 dark:text-slate-300`}>{g.semSaldo ? SEM_SALDO_FORA : reais(g.total.saldoAnterior)}</TableCell>
                             <TableCell className={`${NUM} font-medium`}>{celulaValor(g.total.entradas, VERDE)}</TableCell>
                             <TableCell className={`${NUM} font-medium`}>{celulaValor(g.total.saidas, VERMELHO)}</TableCell>
-                            <TableCell className={`${NUM}`}>{celulaValor(g.total.transferencias, "text-slate-600 dark:text-slate-300", true)}</TableCell>
-                            <TableCell className={`${NUM} font-bold ${g.total.saldoFinal < 0 ? "text-red-600 dark:text-red-300/70" : "text-slate-900 dark:text-slate-50"}`}>{reais(g.total.saldoFinal)}</TableCell>
+                            <TableCell className={`${NUM}`}>{celulaValor(g.total.outros, CINZA, true)}</TableCell>
+                            <TableCell className={`${NUM} font-bold ${g.total.saldoFinal < 0 ? "text-red-600 dark:text-red-300/70" : "text-slate-900 dark:text-slate-50"}`}>{g.semSaldo ? SEM_SALDO_FORA : reais(g.total.saldoFinal)}</TableCell>
                           </TableRow>
                           {aberto && g.linhas.map((l) => linhaDaConta(l, chave))}
                         </React.Fragment>
@@ -719,7 +810,7 @@ export function FechamentoCaixaTab() {
                       <td className={`${NUM} font-bold text-slate-800 dark:text-slate-100`}>{reais(total.saldoAnterior)}</td>
                       <td className={`${NUM} font-bold`}>{celulaValor(total.entradas, VERDE)}</td>
                       <td className={`${NUM} font-bold`}>{celulaValor(total.saidas, VERMELHO)}</td>
-                      <td className={`${NUM} font-bold`}>{celulaValor(total.transferencias, "text-slate-700 dark:text-slate-200", true)}</td>
+                      <td className={`${NUM} font-bold`}>{celulaValor(total.outros, "text-slate-700 dark:text-slate-200", true)}</td>
                       <td className={`${NUM} font-bold text-slate-900 dark:text-slate-50`}>{reais(total.saldoFinal)}</td>
                     </tr>
                   </tfoot>
@@ -734,7 +825,7 @@ export function FechamentoCaixaTab() {
                       <TableHead className={`${CAB} text-right px-3`}>Lançamentos</TableHead>
                       <TableHead className={`${CAB} text-right px-3`}>Entradas</TableHead>
                       <TableHead className={`${CAB} text-right px-3`}>Saídas</TableHead>
-                      <TableHead className={`${CAB} text-right px-3`}>Transferências</TableHead>
+                      <TableHead className={`${CAB} text-right px-3`} title={DICA_OUTROS}>Outros</TableHead>
                       <TableHead className={`${CAB} text-right px-3`}>Saldo no fim do dia</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -751,7 +842,7 @@ export function FechamentoCaixaTab() {
                           <TableCell className={`${NUM} py-2 text-slate-600 dark:text-slate-300`}>{d.qtd === 0 ? <span className={APAGADO}>-</span> : d.qtd}</TableCell>
                           <TableCell className={`${NUM} py-2`}>{celulaValor(d.entradas, VERDE)}</TableCell>
                           <TableCell className={`${NUM} py-2`}>{celulaValor(d.saidas, VERMELHO)}</TableCell>
-                          <TableCell className={`${NUM} py-2`}>{celulaValor(d.transferencias, "text-slate-600 dark:text-slate-300", true)}</TableCell>
+                          <TableCell className={`${NUM} py-2`}>{celulaValor(d.outros, CINZA, true)}</TableCell>
                           <TableCell className={`${NUM} py-2 font-semibold text-slate-800 dark:text-slate-100`}>{reais(d.saldoFinal)}</TableCell>
                         </TableRow>
                       );
@@ -763,7 +854,7 @@ export function FechamentoCaixaTab() {
                       <td className={`${NUM} font-bold text-slate-800 dark:text-slate-100`}>{total.qtd}</td>
                       <td className={`${NUM} font-bold`}>{celulaValor(total.entradas, VERDE)}</td>
                       <td className={`${NUM} font-bold`}>{celulaValor(total.saidas, VERMELHO)}</td>
-                      <td className={`${NUM} font-bold`}>{celulaValor(total.transferencias, "text-slate-700 dark:text-slate-200", true)}</td>
+                      <td className={`${NUM} font-bold`}>{celulaValor(total.outros, "text-slate-700 dark:text-slate-200", true)}</td>
                       <td className={`${NUM} font-bold text-slate-900 dark:text-slate-50`}>{reais(total.saldoFinal)}</td>
                     </tr>
                   </tfoot>
@@ -788,10 +879,13 @@ export function FechamentoCaixaTab() {
                       return (
                         <TableRow key={`${l.contaId}-${l.id}`}>
                           <TableCell className="pl-4 py-1.5 tabular-nums whitespace-nowrap text-slate-600 dark:text-slate-300">{dataBr(l.data)}</TableCell>
-                          <TableCell className="py-1.5 text-slate-800 dark:text-slate-200">{l.quem || "-"}</TableCell>
+                          <TableCell className="py-1.5 text-slate-800 dark:text-slate-200">
+                            {l.quem || "-"}
+                            {l.empresaTitulo && l.categoria !== "holding" && <span className="ml-1.5 text-[11px] text-slate-500 dark:text-slate-400">· título: {l.empresaTitulo}</span>}
+                          </TableCell>
                           <TableCell className="py-1.5 text-slate-600 dark:text-slate-400">{l.documento || "-"}{l.titulo ? <span className="ml-1.5 text-[11px]">· título {l.titulo}</span> : null}</TableCell>
-                          <TableCell className="py-1.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{c ? `${c.empresa.split(" ").slice(0, 3).join(" ")} · ${c.instituicao} ${c.conta}` : l.contaId}</TableCell>
-                          <TableCell className="py-1.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{l.abate ? l.historico || "Abate" : ROTULO_TIPO[l.tipo]}</TableCell>
+                          <TableCell className="py-1.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{c ? `${c.empresa.split(" ").slice(0, 3).join(" ")} · ${c.foraDosBancos ? c.bancoNome : `${c.instituicao} ${c.conta}`}` : l.contaId}</TableCell>
+                          <TableCell className="py-1.5 text-slate-600 dark:text-slate-400 whitespace-nowrap">{rotuloDoLancamento(l)}</TableCell>
                           <TableCell className={`${NUM} py-1.5 font-medium ${l.efeito >= 0 ? VERDE : VERMELHO}`}>{comSinal(l.efeito)}</TableCell>
                         </TableRow>
                       );

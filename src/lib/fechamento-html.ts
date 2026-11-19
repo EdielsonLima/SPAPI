@@ -6,7 +6,17 @@
 // Os números são os da tela: a aba entrega as linhas e os lançamentos já filtrados e este
 // arquivo só monta. Nenhuma regra de cálculo aqui (elas ficam em fechamento-caixa.ts).
 import { formatCurrency } from "./dashboard-utils";
-import { agruparLinhas, contarLancamentos, diaADia, totalizar, type GrupoFechamento, type Lancamento, type LinhaConta, type PagoEmDinheiro } from "./fechamento-caixa";
+import {
+  agruparLinhas,
+  composicaoOutros,
+  contarLancamentos,
+  diaADia,
+  resumoForaDosBancos,
+  totalizar,
+  type GrupoFechamento,
+  type Lancamento,
+  type LinhaConta,
+} from "./fechamento-caixa";
 import { abrevDoDia, dataBr, feriado, rotuloDaJanela, somarDias } from "./dias-uteis";
 
 export interface DadosFechamentoHtml {
@@ -15,7 +25,6 @@ export interface DadosFechamentoHtml {
   /** Linhas e lançamentos como estão na tela (com os filtros de empresa e banco aplicados). */
   linhas: LinhaConta[];
   lancamentos: Lancamento[];
-  pagoEmDinheiro: PagoEmDinheiro;
   avisos?: string[];
   marca: string;
   /** "18/11/2026 12:19": quando o arquivo foi gerado. */
@@ -85,32 +94,34 @@ footer{color:var(--muted);font-size:11px;text-align:center;margin-top:26px;line-
 
 const valor = (v: number, classe: string, sinal = false) => (v === 0 ? '<span class="m">-</span>' : `<span class="${classe}">${sinal ? comSinal(v) : reais(v)}</span>`);
 const saldo = (v: number | null) => (v === null ? '<span class="m">sem saldo</span>' : `<span${v < 0 ? ' class="neg"' : ""}>${reais(v)}</span>`);
+const SEM_SALDO = '<span class="m">&mdash;</span>';
 
 function tabelaDeGrupos(grupos: GrupoFechamento[], por: "empresa" | "banco", total: ReturnType<typeof totalizar>): string {
   const p: string[] = [];
   p.push('<div class="tabela"><table class="tbl"><thead><tr>'
-    + `<th>${por === "empresa" ? "Empresa" : "Banco"}</th><th>Saldo anterior</th><th>Entradas</th><th>Sa&iacute;das</th><th>Transfer&ecirc;ncias</th><th>Saldo final</th>`
+    + `<th>${por === "empresa" ? "Empresa" : "Banco"}</th><th>Saldo anterior</th><th>Entradas</th><th>Sa&iacute;das</th><th>Outros</th><th>Saldo final</th>`
     + "</tr></thead><tbody>");
   for (const g of grupos) {
     p.push('<tr class="grp">'
       + `<td>${esc(g.nome)}</td>`
-      + `<td>${reais(g.total.saldoAnterior)}</td>`
+      + `<td>${g.semSaldo ? SEM_SALDO : reais(g.total.saldoAnterior)}</td>`
       + `<td>${valor(g.total.entradas, "pos")}</td>`
       + `<td>${valor(g.total.saidas, "neg")}</td>`
-      + `<td>${valor(g.total.transferencias, "", true)}</td>`
-      + `<td>${saldo(g.total.saldoFinal)}</td>`
+      + `<td>${valor(g.total.outros, "", true)}</td>`
+      + `<td>${g.semSaldo ? SEM_SALDO : saldo(g.total.saldoFinal)}</td>`
       + "</tr>");
     for (const l of g.linhas) {
       p.push('<tr class="cta">'
-        + `<td>${esc(por === "empresa" ? l.instituicao : l.empresa)} <span class="cta-num">${esc(l.conta)}</span>`
+        + `<td>${esc(por === "empresa" ? (l.foraDosBancos ? l.bancoNome : l.instituicao) : l.empresa)} <span class="cta-num">${esc(l.conta)}</span>`
         + (l.detalhe ? `<span class="selo">${esc(l.detalhe)}</span>` : "")
+        + (l.foraDosBancos ? `<span class="selo">${por === "empresa" ? "fora dos bancos" : esc(l.bancoNome.toLowerCase())}</span>` : "")
         + (l.estimado ? '<span class="selo">estimado</span>' : "")
         + "</td>"
-        + `<td>${saldo(l.saldoAnterior)}</td>`
+        + `<td>${l.foraDosBancos ? SEM_SALDO : saldo(l.saldoAnterior)}</td>`
         + `<td>${valor(l.entradas, "pos")}</td>`
         + `<td>${valor(l.saidas, "neg")}</td>`
-        + `<td>${valor(l.transferencias, "", true)}</td>`
-        + `<td class="fim">${saldo(l.saldoFinal)}</td>`
+        + `<td>${valor(l.outros, "", true)}</td>`
+        + `<td class="fim">${l.foraDosBancos ? SEM_SALDO : saldo(l.saldoFinal)}</td>`
         + "</tr>");
     }
   }
@@ -119,7 +130,7 @@ function tabelaDeGrupos(grupos: GrupoFechamento[], por: "empresa" | "banco", tot
     + `<td>${reais(total.saldoAnterior)}</td>`
     + `<td>${valor(total.entradas, "pos")}</td>`
     + `<td>${valor(total.saidas, "neg")}</td>`
-    + `<td>${valor(total.transferencias, "", true)}</td>`
+    + `<td>${valor(total.outros, "", true)}</td>`
     + `<td>${reais(total.saldoFinal)}</td>`
     + "</tr></tbody></table></div>");
   return p.join("");
@@ -135,7 +146,24 @@ export function montarFechamentoHtml(dados: DadosFechamentoHtml): string {
   const marca = esc(dados.marca);
   const nEntradas = contarLancamentos(lancamentos, "entrada");
   const nSaidas = contarLancamentos(lancamentos, "saida");
-  const nTransf = contarLancamentos(lancamentos, "transferencia");
+  const c = composicaoOutros(lancamentos);
+  const partesOutros = [
+    { rotulo: "transfer&ecirc;ncias", valor: c.transferencias },
+    { rotulo: "tarifas", valor: c.tarifas },
+    { rotulo: "t&iacute;tulos da Holding", valor: c.holding },
+    { rotulo: "avulsos", valor: c.avulsos },
+    { rotulo: "fora dos bancos", valor: c.foraDosBancos },
+  ]
+    .filter((x) => Math.abs(x.valor) > 0.005)
+    .sort((a, b) => Math.abs(b.valor) - Math.abs(a.valor));
+  const subOutros =
+    partesOutros.length === 0
+      ? "nenhum no per&iacute;odo"
+      : Math.abs(t.outros) < 0.005
+        ? "se anulam no per&iacute;odo"
+        : partesOutros.length <= 2
+          ? partesOutros.map((x) => x.rotulo).join(" e ")
+          : `${partesOutros[0].rotulo}, ${partesOutros[1].rotulo} e mais`;
   const contaPorId = new Map(linhas.map((l) => [l.id, l]));
 
   const titulo = `Fechamento de Caixa ${periodo} | ${dados.marca}`;
@@ -160,13 +188,17 @@ export function montarFechamentoHtml(dados: DadosFechamentoHtml): string {
     + `<div class="kpi"><div class="lbl">Saldo anterior</div><div class="val">${reais(t.saldoAnterior)}</div><div class="qt">fim de ${abrevDoDia(vespera)}, ${dataBr(vespera)}</div></div>`
     + `<div class="kpi"><div class="lbl">Entradas</div><div class="val g">${reais(t.entradas)}</div><div class="qt">${plural(nEntradas, "recebimento", "recebimentos")}</div></div>`
     + `<div class="kpi"><div class="lbl">Sa&iacute;das</div><div class="val r">${reais(t.saidas)}</div><div class="qt">${plural(nSaidas, "pagamento", "pagamentos")}</div></div>`
-    + `<div class="kpi"><div class="lbl">Transfer&ecirc;ncias</div><div class="val">${t.transferencias === 0 ? reais(0) : comSinal(t.transferencias)}</div><div class="qt">${nTransf === 0 ? "nenhuma no per&iacute;odo" : "l&iacute;quido entre contas"}</div></div>`
+    + `<div class="kpi"><div class="lbl">Outros movimentos</div><div class="val">${t.outros === 0 ? reais(0) : comSinal(t.outros)}</div><div class="qt">${subOutros}</div></div>`
     + `<div class="kpi fim"><div class="lbl">Saldo final</div><div class="val">${reais(t.saldoFinal)}</div><div class="qt">${variacao === 0 ? "sem varia&ccedil;&atilde;o" : `${comSinal(variacao)} ${umDia ? "no dia" : "no per&iacute;odo"}`}</div></div>`
     + "</div>");
 
   const notas: string[] = [];
-  if (dados.pagoEmDinheiro.total !== 0) {
-    notas.push(`Pago em dinheiro pelo caixa interno: <b>${reais(dados.pagoEmDinheiro.total)}</b> (${plural(dados.pagoEmDinheiro.qtd, "pagamento", "pagamentos")}). N&atilde;o passa pelos bancos, por isso n&atilde;o est&aacute; nas Sa&iacute;das.`);
+  for (const f of resumoForaDosBancos(linhas)) {
+    const partes = [f.recebido !== 0 ? `recebido <b>${reais(f.recebido)}</b>` : "", f.pago !== 0 ? `pago <b>${reais(f.pago)}</b>` : ""].filter(Boolean);
+    notas.push(`${esc(f.rotulo)}: ${partes.join(" &middot; ")}. Est&aacute; em Entradas e Sa&iacute;das, como no fechamento das 07:30, e volta em Outros: n&atilde;o passou pelos bancos.`);
+  }
+  if (partesOutros.length > 0) {
+    notas.push(`Outros movimentos: ${partesOutros.map((x) => `${x.rotulo} <b>${comSinal(x.valor)}</b>`).join(" &middot; ")}.`);
   }
   if (Math.abs(t.diferenca) > 0.005) {
     notas.push(`Saldo no Sienge: <b>${reais(t.saldoSienge)}</b>. ${reais(Math.abs(t.diferenca))} em lan&ccedil;amentos recentes ainda n&atilde;o entraram nele.`);
@@ -175,7 +207,7 @@ export function montarFechamentoHtml(dados: DadosFechamentoHtml): string {
   if (notas.length > 0) p.push(`<ul class="notas">${notas.map((n) => `<li>${n}</li>`).join("")}</ul>`);
 
   p.push(`<section><h2>Por empresa <span class="pill">${plural(linhas.length, "conta", "contas")}</span></h2>`
-    + '<p class="hint">Saldo anterior + entradas &minus; sa&iacute;das &plusmn; transfer&ecirc;ncias = saldo final, em cada linha.</p>'
+    + '<p class="hint">Saldo anterior + entradas &minus; sa&iacute;das &plusmn; outros = saldo final, em cada conta banc&aacute;ria.</p>'
     + tabelaDeGrupos(agruparLinhas(linhas, "empresa"), "empresa", t)
     + "</section>");
 
@@ -188,7 +220,7 @@ export function montarFechamentoHtml(dados: DadosFechamentoHtml): string {
     const dias = diaADia(linhas, lancamentos, de, ate);
     p.push("<section><h2>Dia a dia</h2>"
       + '<p class="hint">Movimento de cada dia e o saldo das contas no fim dele.</p>'
-      + '<div class="tabela"><table class="tbl"><thead><tr><th>Dia</th><th>Lan&ccedil;amentos</th><th>Entradas</th><th>Sa&iacute;das</th><th>Transfer&ecirc;ncias</th><th>Saldo no fim do dia</th></tr></thead><tbody>'
+      + '<div class="tabela"><table class="tbl"><thead><tr><th>Dia</th><th>Lan&ccedil;amentos</th><th>Entradas</th><th>Sa&iacute;das</th><th>Outros</th><th>Saldo no fim do dia</th></tr></thead><tbody>'
       + dias.map((d) => {
         const nome = feriado(d.data);
         return `<tr${d.qtd === 0 ? ' class="fds"' : ""}>`
@@ -196,12 +228,12 @@ export function montarFechamentoHtml(dados: DadosFechamentoHtml): string {
           + `<td>${d.qtd === 0 ? '<span class="m">-</span>' : d.qtd}</td>`
           + `<td>${valor(d.entradas, "pos")}</td>`
           + `<td>${valor(d.saidas, "neg")}</td>`
-          + `<td>${valor(d.transferencias, "", true)}</td>`
+          + `<td>${valor(d.outros, "", true)}</td>`
           + `<td>${reais(d.saldoFinal)}</td>`
           + "</tr>";
       }).join("")
       + '<tr class="tot-row">'
-      + `<td>Total do per&iacute;odo</td><td>${t.qtd}</td><td>${valor(t.entradas, "pos")}</td><td>${valor(t.saidas, "neg")}</td><td>${valor(t.transferencias, "", true)}</td><td>${reais(t.saldoFinal)}</td>`
+      + `<td>Total do per&iacute;odo</td><td>${t.qtd}</td><td>${valor(t.entradas, "pos")}</td><td>${valor(t.saidas, "neg")}</td><td>${valor(t.outros, "", true)}</td><td>${reais(t.saldoFinal)}</td>`
       + "</tr></tbody></table></div></section>");
   }
 
@@ -212,12 +244,14 @@ export function montarFechamentoHtml(dados: DadosFechamentoHtml): string {
       + `${umDia ? "" : '<th class="esq">Data</th>'}<th class="esq">Quem</th><th class="esq">Documento</th><th class="esq">Conta</th><th>Valor</th>`
       + "</tr></thead><tbody>"
       + mostrados.map((l) => {
-        const c = contaPorId.get(l.contaId);
+        const conta = contaPorId.get(l.contaId);
         return "<tr>"
           + (umDia ? "" : `<td>${dataBr(l.data)}</td>`)
-          + `<td class="esq">${esc(l.quem || "-")}${l.abate ? `<span class="selo">${esc(l.historico || "abate")}</span>` : ""}</td>`
+          + `<td class="esq">${esc(l.quem || "-")}${l.abate ? `<span class="selo">${esc(l.historico || "abate")}</span>` : ""}`
+          + (l.categoria === "holding" ? '<span class="selo">t&iacute;tulo da Holding</span>' : l.empresaTitulo ? `<span class="selo">t&iacute;tulo: ${esc(l.empresaTitulo)}</span>` : "")
+          + "</td>"
           + `<td class="esq m">${esc(l.documento || "-")}</td>`
-          + `<td class="esq m">${c ? `${esc(c.empresa)} &middot; ${esc(c.instituicao)} <span class="cta-num">${esc(c.conta)}</span>` : esc(l.contaId)}</td>`
+          + `<td class="esq m">${conta ? `${esc(conta.empresa)} &middot; ${conta.foraDosBancos ? esc(conta.bancoNome) : `${esc(conta.instituicao)} <span class="cta-num">${esc(conta.conta)}</span>`}` : esc(l.contaId)}</td>`
           + `<td class="${l.efeito >= 0 ? "pos" : "neg"}">${comSinal(l.efeito)}</td>`
           + "</tr>";
       }).join("")
@@ -228,7 +262,7 @@ export function montarFechamentoHtml(dados: DadosFechamentoHtml): string {
 
   p.push("<footer>"
     + `Relat&oacute;rio gerado em ${esc(dados.geradoEm)}${dados.posicao ? ` &middot; saldos e movimentos buscados no Sienge em ${esc(dados.posicao)}` : ""} &middot; Fonte: Sienge (via Painel Financeiro).<br>`
-    + "Contas da rela&ccedil;&atilde;o banc&aacute;ria (17). Entradas e sa&iacute;das s&atilde;o o que passou pelo banco, j&aacute; sem reten&ccedil;&atilde;o de imposto e desconto. Transfer&ecirc;ncias entre as contas se anulam no total."
+    + "Contas da rela&ccedil;&atilde;o banc&aacute;ria (17). Entradas e sa&iacute;das s&atilde;o os t&iacute;tulos recebidos e pagos, iguais ao fechamento das 07:30 (sem a Holding), j&aacute; sem reten&ccedil;&atilde;o de imposto e desconto, inclusive os que passaram pelo caixa interno ou por conta da Holding. Outros = transfer&ecirc;ncias (entre as contas se anulam), tarifas, t&iacute;tulos da Holding e a volta do que n&atilde;o passou pelos bancos."
     + "</footer></div></body></html>");
   return p.join("\n");
 }

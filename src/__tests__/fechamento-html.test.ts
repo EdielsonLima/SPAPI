@@ -37,7 +37,7 @@ const movimentos: MovimentoCaixa[] = [
 // ── 1. Um dia ────────────────────────────────────────────────────────────────────────────
 const f = fecharCaixa({ contas, movimentos, saldos: { "2026-11-16": saldos16 }, de: "2026-11-17", ate: "2026-11-17", geradoEm: "2026-11-18T15:14:00.000Z" });
 const html = montarFechamentoHtml({
-  de: f.de, ate: f.ate, linhas: f.linhas, lancamentos: f.lancamentos, pagoEmDinheiro: f.pagoEmDinheiro, avisos: f.avisos,
+  de: f.de, ate: f.ate, linhas: f.linhas, lancamentos: f.lancamentos, avisos: f.avisos,
   marca: "Silva Packer", geradoEm: "18/11/2026 12:19", posicao: "18/11/2026 às 12:14", logo: "data:image/jpeg;base64,AAAA",
 });
 {
@@ -46,14 +46,18 @@ const html = montarFechamentoHtml({
   assert.ok(!/undefined|NaN|\[object/.test(html), "nada quebrado no texto");
   assert.ok(html.includes("Fechamento de Caixa &mdash; 17/11/2026"));
   assert.ok(html.includes('src="data:image/jpeg;base64,AAAA"'), "logo embutido");
-  // Cartões: os números do fechamento (anterior 18.355.139,04; +620.000; -462,80; -4.500).
-  for (const texto of ["R$ 18.355.139,04", "R$ 620.000,00", "R$ 462,80", "-R$ 4.500,00", "R$ 18.970.176,24", "+R$ 615.037,20 no dia", "fim de seg, 16/11/2026", "2 recebimentos", "1 pagamento"]) {
+  // Cartões: os números do fechamento (anterior 18.355.139,04; +620.000; −15.632,80 = 462,80 no
+  // banco + 15.170,00 em dinheiro; outros +10.670 = −4.500 de transferência + a volta do dinheiro).
+  for (const texto of ["R$ 18.355.139,04", "R$ 620.000,00", "R$ 15.632,80", "+R$ 10.670,00", "R$ 18.970.176,24", "+R$ 615.037,20 no dia", "fim de seg, 16/11/2026", "2 recebimentos", "2 pagamentos", "Outros movimentos"]) {
     assert.ok(html.includes(texto), `falta "${texto}"`);
   }
-  assert.ok(html.includes("Pago em dinheiro pelo caixa interno: <b>R$ 15.170,00</b> (1 pagamento)"));
-  // Duas tabelas (empresa e banco) com as 17 contas cada e o mesmo total.
-  assert.equal((html.match(/<tr class="cta">/g) || []).length, 34);
-  assert.equal((html.match(/<tr class="grp">/g) || []).length, 10 + 4);
+  assert.ok(html.includes("Caixa interno (dinheiro): pago <b>R$ 15.170,00</b>."));
+  assert.ok(html.includes("Outros movimentos: fora dos bancos <b>+R$ 15.170,00</b> &middot; transfer&ecirc;ncias <b>-R$ 4.500,00</b>."));
+  assert.ok(!html.includes("Transfer&ecirc;ncias</th>"), "a coluna agora é Outros");
+  // Duas tabelas (empresa e banco) com as 17 contas e o caixa interno, e o mesmo total.
+  assert.equal((html.match(/<tr class="cta">/g) || []).length, 36);
+  assert.equal((html.match(/<tr class="grp">/g) || []).length, 10 + 5);
+  assert.ok(html.includes('<span class="selo">fora dos bancos</span>') && html.includes('<span class="selo">caixa interno (dinheiro)</span>'));
   assert.equal((html.match(/<tr class="tot-row">/g) || []).length, 2);
   assert.ok(html.includes("Por empresa") && html.includes("Por banco") && !html.includes("Dia a dia"));
   // Lançamentos: nome com caracteres de HTML sai escapado; retenção vem marcada.
@@ -70,7 +74,7 @@ const html = montarFechamentoHtml({
   const soBB = p.linhas.filter((l) => l.instituicao === "Banco do Brasil");
   const ids = new Set(soBB.map((l) => l.id));
   const h = montarFechamentoHtml({
-    de: p.de, ate: p.ate, linhas: soBB, lancamentos: p.lancamentos.filter((l) => ids.has(l.contaId)), pagoEmDinheiro: p.pagoEmDinheiro,
+    de: p.de, ate: p.ate, linhas: soBB, lancamentos: p.lancamentos.filter((l) => ids.has(l.contaId)),
     marca: "Silva Packer", geradoEm: "19/11/2026 08:00", filtro: "só Banco do Brasil",
   });
   assert.ok(h.includes("Fechamento de Caixa &mdash; ter 17/11 a qua 18/11/2026"));

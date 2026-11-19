@@ -7,7 +7,7 @@
 // as empresas que tiveram movimento nela) mais ou menos os movimentos bancários da conta
 // entre essa data e o dia pedido. É a mesma conta do Fechamento de Caixa
 // (`saldoNaData` em fechamento-caixa.ts), por isso o gráfico e o Fechamento batem.
-import { contaDoMovimento, dataDoMovimento, r2, saldoNaData, type MovimentoCaixa, type SaldosPorData } from "./fechamento-caixa";
+import { contaDoMovimento, dataDoMovimento, efeitoDoMovimento, r2, saldoNaData, type MovimentoCaixa, type SaldosPorData } from "./fechamento-caixa";
 import { somarDias } from "./dias-uteis";
 
 /** O mesmo formato que a aba Saldos já lia: { dia: [{ accountId: "empresa:conta", amount }] }. */
@@ -37,12 +37,13 @@ export function saldosDiarios(args: { movimentos: MovimentoCaixa[]; saldos: Sald
   const { movimentos, saldos, fotos, de, ate } = args;
   const liquido = new Map<string, Record<string, number>>();
   for (const m of movimentos) {
-    const valor = Math.abs(m.bankMovementAmount || 0);
-    if (valor === 0) continue;
+    // Com o sinal do Sienge: estorno de baixa vem negativo (19/11/2026, mesma regra do Fechamento).
+    const efeito = efeitoDoMovimento(m);
+    if (efeito === 0) continue;
     const conta = contaDoMovimento(m);
     const porDia = liquido.get(conta) ?? {};
     const dia = dataDoMovimento(m);
-    porDia[dia] = (porDia[dia] || 0) + (String(m.bankMovementOperationType).toUpperCase() === "E" ? valor : -valor);
+    porDia[dia] = (porDia[dia] || 0) + efeito;
     liquido.set(conta, porDia);
   }
 

@@ -1093,7 +1093,8 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   topo ficam escondidos; a aba tem o período, os filtros Empresas e Bancos, a hora da posição e
   o botão de buscar de novo dela.
 - **Na tela:** cinco cartões que são a conta do fechamento (Saldo anterior + Entradas − Saídas ±
-  Transferências = Saldo final, com a variação no selo) e uma tabela com quatro visões: **Por
+  Outros movimentos = Saldo final, com a variação no selo; até 19/11 o 4º era "Transferências")
+  e uma tabela com quatro visões: **Por
   empresa** (padrão) · **Por banco** · **Dia a dia** (só com mais de um dia; clicar no dia abre o
   fechamento dele) · **Lançamentos** (busca e tipo). Abrir a empresa ou o banco mostra as contas;
   abrir a conta mostra os lançamentos, cada valor embaixo da coluna dele. A escolha Por empresa /
@@ -1107,21 +1108,55 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   nacionais, Carnaval segunda e terça, Sexta-feira Santa, Corpus Christi). Feriado local não entra.
 
 ### NAO ALTERAR sem pedido explicito do usuario:
-- Regras em `src/lib/fechamento-caixa.ts` (trava `fechamento-caixa.test.ts`, com o caso real de
-  17/11/2026), nas **17 contas da relação** (`dimBanco.ts`); a Holding fica fora:
-  - **Entradas** = movimento de origem CR (entrada − "Desconto concedido") + entrada avulsa que
-    não é transferência.
-  - **Saídas** = movimento de origem CP (saída − "Retenção impostos" − "Desconto obtido") +
-    tarifa bancária avulsa. Retenção e desconto são sempre do mesmo título, no mesmo dia: abatem,
-    não são entrada. É o que passou pelo banco, como no extrato.
-  - **Transferências** (líquido) = avulso (origem BC) com operação transferência, saque ou
-    depósito, ou documento "TRANSFERÊNCIA ENTRE CONTAS" (inclui resgate de aplicação). Entre as
-    17 contas elas se anulam no total; o que sobra foi para fora (holding, caixa em dinheiro,
-    mútuo). Título (CP/CR) nunca é transferência.
-  - **Saldo final = saldo anterior + entradas − saídas + transferências.** O saldo anterior vem
-    do Sienge; o final é calculado pelos movimentos.
-  - **Pago em dinheiro** (linha à parte, informativa) = pagamentos de título pela conta `CAIXA`
-    das empresas das 17 contas. Não passa pelos bancos, por isso não está nas Saídas.
+- Regras em `src/lib/fechamento-caixa.ts` (trava `fechamento-caixa.test.ts`, com os casos reais
+  de 17 e 18/11/2026), sobre as **17 contas da relação** (`dimBanco.ts`); contas da Holding fora:
+  - **Entradas e Saídas = títulos recebidos e pagos, iguais ao fechamento das 07:30** (desde
+    19/11/2026, ver o item seguinte). Entrada = movimento de origem CR (recebimento −
+    "Desconto concedido"); Saída = origem CP (pagamento − "Retenção impostos" − "Desconto
+    obtido"). Retenção e desconto são sempre do mesmo título, no mesmo dia: abatem, não são
+    entrada. Vale onde quer que o dinheiro tenha passado: nas 17 contas, no **caixa interno**
+    (conta `CAIXA`, dinheiro) ou numa **conta da Holding** (ela paga contas do Galpão Canelinha).
+  - **Empresa do título** = a do lado do mútuo (`MUTUO*`) que tem a direção do pagamento (S no
+    CP, E no CR); sem mútuo, a do próprio movimento (`empresasDosTitulos`, chave origem +
+    título + parcela + data). Quando difere da dona da conta, o lançamento mostra "título:
+    <empresa>".
+  - **Holding** = empresa com "HOLDING" no nome (`empresasHolding` no servidor e o mesmo teste
+    em `fecharCaixa`). Título da Holding não entra em Entradas e Saídas (o fechamento das 07:30
+    não conta a Holding): recebido ou pago por uma das 17 contas vai para Outros; fora delas,
+    não aparece.
+  - **Fora dos bancos:** título pago ou recebido fora das 17 contas (e fora de conta MUTUO) vira
+    uma linha da empresa "Caixa interno (dinheiro)", "Cofre (dinheiro)", "Conta da Holding" ou
+    "Conta fora da lista" (`montarContaFora`), **sem saldo** (traço): o saldo da conta CAIXA no
+    Sienge é acumulado contábil (R$ 2,2 mi na Construtora em 18/11), não dinheiro em caixa. Na
+    linha, Outros devolve o mesmo valor com o sinal trocado: o saldo dos bancos não muda. No
+    Por banco essas linhas ficam no grupo "Fora dos bancos", por último. Saiu a nota "Pago em
+    dinheiro" (o valor agora está nas Saídas); fica uma nota por tipo de linha fora dos bancos.
+  - **Outros** (coluna e cartão "Outros movimentos"; até 19/11 eram "Transferências") = o que
+    mexe nos bancos sem ser título das empresas: transferências (avulso BC com operação
+    transferência, saque ou depósito, ou documento "TRANSFERÊNCIA ENTRE CONTAS", inclui resgate
+    de aplicação; entre as 17 contas se anulam), tarifas bancárias avulsas (o fechamento das
+    07:30 não conta movimento sem título), títulos da Holding pelas 17 contas, outros avulsos e
+    a volta do que não passou pelos bancos. O cartão diz a composição (`composicaoOutros`).
+    Título (CP/CR) de empresa que não é a Holding nunca é Outros.
+  - **Saldo final = saldo anterior + entradas − saídas + outros**, em cada conta bancária. O
+    saldo anterior vem do Sienge; o final é calculado pelos movimentos.
+  - **Valor com o sinal do Sienge** (`efeitoDoMovimento`): estorno de baixa vem negativo e
+    anula o pagamento. Até 19/11 o valor era tomado em módulo e o estorno somava como mais um
+    pagamento (conferido pelo saldo da conta 9937-6 em 08/09 e 07/10/2026). Corrigido também
+    em `saldos-diarios.ts` (gráfico Evolução do Saldo e saldo atualizado da aba Saldos).
+- **Por que Entradas e Saídas são os títulos (Edielson, 19/11/2026: "O link do fechamento de
+  caixa de ontem não bate com essa nova aba de fechamento de caixa aqui do painel").** Em
+  18/11 a aba mostrava Entradas R$ 18.259,39 e Saídas R$ 0,00; o fechamento das 07:30
+  (`relatorios/fechamento-caixa.html`), Recebido R$ 105.516,19 e Pago R$ 87.256,80. A
+  diferença passou pelo caixa interno da Construtora: pagou R$ 87.256,80 a FERREIRA E CAMARGO
+  VIDROS (título do 135 Jardins) e recebeu em dinheiro R$ 51.925,00 de ALEXANDRE VITOR MACHADO
+  (Residencial Rua 2450) e R$ 35.331,80 de LUCAS MARTINS MEDEIROS (Palácio Elizabeth). Depois:
+  18/11 = Entradas R$ 105.516,19 · Saídas R$ 87.256,80 · Outros −R$ 7.500,00 (transferência da
+  Sul Brasil para a Holding) · saldo final R$ 19.083.893,13 (o mesmo de antes); 17/11 = Saídas
+  R$ 15.690,00 (= Total Pago das 07:30; eram R$ 539,25) · Outros +R$ 10.650,75 · saldo final
+  R$ 19.073.133,74 (o mesmo). Entradas e Saídas conferidas no centavo com o MCP
+  `pagas_recebidas_dia` (a mesma fonte do fechamento das 07:30) nos 12 dias úteis de 03 a
+  18/11/2026. Os saldos não mudaram em dia nenhum.
 - **Como o Sienge se comporta** (medido em 18/11/2026; é o que sustenta as regras acima):
   - Só o **movimento bancário** traz a conta (`accountNumber` + `companyId`), no mesmo formato do
     `dimBanco.ts`. Pagamento e recebimento do título não trazem.
@@ -1178,10 +1213,11 @@ Os valores da DRE foram validados contra o Power BI e batem 100%.
   mesmos cartões e as 10 empresas do local, sem rolagem. **Botão HTML no ar às 12:37, commit
   `7304c08`**; em produção o arquivo foi capturado dentro da página (sem baixar): 74 kB, sem
   script, logo embutido, cartões iguais aos da tela, 10 empresas e as 17 contas nas duas tabelas.
-- **Não faz:** não mostra o saldo do caixa em dinheiro (só quanto foi pago por ele); "Saídas" é o
-  que saiu dos bancos (R$ 539,25 em 17/11), não o "Total Pago" do fechamento das 07:30
-  (R$ 15.690,00, que inclui dinheiro) — a linha "Pago em dinheiro" liga os dois; o fechamento
-  das 07:30 (rotina `rotinas-silvapacker`, WhatsApp) continua como está; contas da Holding fora.
+- **Não faz:** não mostra o saldo do caixa em dinheiro (a linha do caixa interno é sem saldo);
+  o fechamento das 07:30 (rotina `rotinas-silvapacker`, WhatsApp) continua como está e não
+  conta tarifa bancária (no painel ela fica em Outros); contas da Holding fora.
+  (Até 19/11 "Saídas" era só o que saiu dos bancos, R$ 539,25 em 17/11, e uma nota "Pago em
+  dinheiro" ligava ao Total Pago das 07:30.)
 
 ## Resumo Financeiro - Regras (Criado em 2026-04-05)
 
